@@ -3,7 +3,7 @@ package yunsuan.vector
 import chisel3._
 import chisel3.util._
 
-class VFuCtrl extends Bundle {
+class VFuInfo extends Bundle {
   val vm = Bool()
   val ma = Bool()
   val ta = Bool()

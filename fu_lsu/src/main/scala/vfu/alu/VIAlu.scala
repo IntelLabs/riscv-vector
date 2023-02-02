@@ -2,11 +2,13 @@ package yunsuan.vector.alu
 
 import chisel3._
 import chisel3.util._
+import yunsuan.vector._
 
 class VIAlu extends Module {
   val io = IO(new Bundle {
     val valid = Input(Bool())
     val opcode = Input(UInt(6.W))
+    val info = Input(new VFuInfo)
     val srcType = Input(Vec(2, UInt(4.W)))
     val vdType  = Input(UInt(4.W))
     val vs1 = Input(UInt(128.W))
