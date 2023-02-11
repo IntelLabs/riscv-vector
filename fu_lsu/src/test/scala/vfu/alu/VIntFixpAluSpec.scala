@@ -8,21 +8,22 @@ import yunsuan.vector.alu._
 import vfu._
 import chiseltest.WriteVcdAnnotation
 import vfu.dataType._
+import yunsuan.vector.alu.VAluOpcode._
 
 trait VAluBehavior {
   this: AnyFlatSpec with ChiselScalatestTester with BundleGenHelper =>
 
   val vadd = CtrlBundle(opcode = 0)
-  val vsub = CtrlBundle(opcode = 0, is_sub = true)
-  val vand = CtrlBundle(opcode = 6)
-  val vor = CtrlBundle(opcode = 10)
-  val vxor = CtrlBundle(opcode = 9)
-  val sll = CtrlBundle(opcode = 14)
-  val srl = CtrlBundle(opcode = 15)
-  val sra = CtrlBundle(opcode = 16)
+  val vsub = CtrlBundle(opcode = 1)
+  val vand = CtrlBundle(opcode = 7)
+  val vor = CtrlBundle(opcode = 11)
+  val vxor = CtrlBundle(opcode = 10)
+  val sll = CtrlBundle(opcode = 15)
+  val srl = CtrlBundle(opcode = 16)
+  val sra = CtrlBundle(opcode = 17)
 
   def vIntFixpTest(): Unit = {
-    it should "pass" in {
+    it should "pass the integer test" in {
       test(new VIAluWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
         TestHarnessAlu.test_init(dut)
 
@@ -84,9 +85,45 @@ trait VAluBehavior {
       }
     }
   } 
+
+  def vMaskTest(): Unit = {
+    it should "pass the mask test" in {
+      test(new VIAluWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+        TestHarnessAlu.test_init(dut)
+
+        //----- Input gen -----
+        val inputSeq = Seq(
+          // Fake !!
+          genVAluInput(SrcBundle("h0008000f0200ff0001070008000f0200", "h7ff8f8030100ffff7f7f7ff8f8030100"), vadd.copy(s8, s8, s8)),
+          // Fake !!
+          genVAluInput(SrcBundle(vs2 = "h0008000f0200ff0001070008000f0200", vs1 = "h7ff8f8030100ffff7f7f7ff8f8030100", old_vd = "h1", mask = "h2"), 
+                       CtrlBundle(4, 4, 4, 30))
+                       // vadd.copy(vdType = 4, s8, s8)),  val vadd = CtrlBundle(opcode = 0)
+
+        )
+
+        //----- Output expectation -----
+        val outputSeq = Seq(
+          // Fake !!
+          genVAluOutput("h7f00f8120300feff80867f00f8120300"),
+          genVAluOutput("h800087fe7fffff78fff8001200030000"),
+
+        )
+
+        fork {
+          dut.io.in.enqueueSeq(inputSeq)
+        }.fork {
+          dut.io.out.expectDequeueSeq(outputSeq)
+        }.join()
+        dut.clock.step(1)
+      }
+    }
+  } 
 }
 
 class VAluSpec extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VAluBehavior {
   behavior of "Int fixP test"
   it should behave like vIntFixpTest()
+  // behavior of "Mask/reduction/permutation test"
+  // it should behave like vMaskTest()
 }

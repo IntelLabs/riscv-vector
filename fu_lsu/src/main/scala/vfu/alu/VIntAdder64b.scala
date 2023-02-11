@@ -12,12 +12,13 @@ package yunsuan.vector.alu
 
 import chisel3._
 import chisel3.util._
-import yunsuan.vector.{VFuInfo, SewOH}
+import yunsuan.vector.{VIFuInfo, SewOH}
+import yunsuan.vector.alu.VAluOpcode._
 
 class VIntAdder64b extends Module {
   val io = IO(new Bundle {
     val opcode = Input(UInt(6.W))
-    val info = Input(new VFuInfo)
+    val info = Input(new VIFuInfo)
     val srcType = Input(Vec(2, UInt(4.W)))
     val vdType  = Input(UInt(4.W))
     val vs1 = Input(UInt(64.W))
@@ -40,9 +41,8 @@ class VIntAdder64b extends Module {
   val vmask = io.vmask
   val vm = io.info.vm
   val sub = io.is_sub
-  // val widen = opcode === 0.U && srcTypeVs1(1, 0) =/= io.vdType(1, 0)
   val signed = srcTypeVs2(3, 2) === 1.U
-  val addWithCarry = opcode(5, 3) === "b000".U && opcode(2) =/= opcode(1)
+  val addWithCarry = opcode(5, 3) === "b000".U && (opcode(2, 0) === 3.U || opcode(2, 0) === 4.U || opcode(2, 0) === 5.U || opcode(2, 0) === 6.U)
 
   // /**
   //   * Input adjust: widen & subtract
@@ -94,7 +94,7 @@ class VIntAdder64b extends Module {
     // Generate carry-in from sub and vmask(11.4 Add-with-Carry/Sub-with_Borrow)
     carryIn(i) := Mux(addWithCarry, Mux(vm, sub, vmask_adjust(i) ^ sub), sub)
     // Generate final carry-in: cin
-    cin(i) := Mux1H(Mux(opcode === 0.U, eewVd.oneHot, eewVs1.oneHot), Seq(1, 2, 4, 8).map(n => 
+    cin(i) := Mux1H(Mux(opcode(5,1) === 0.U, eewVd.oneHot, eewVs1.oneHot), Seq(1, 2, 4, 8).map(n => 
       if ((i % n) == 0) carryIn(i) else cout(i-1))
     )
     cout(i) := adder_8b.cout
@@ -120,16 +120,16 @@ class VIntAdder64b extends Module {
   val cmpNe = ~cmpEq
   val lessThan = Cat(lessThan_vec.reverse)
   val cmpResult = Mux1H(Seq(
-    (opcode === 17.U) -> cmpEq,
-    (opcode === 18.U) -> cmpNe,
-    (opcode === 19.U) -> lessThan,
-    (opcode === 20.U) -> (lessThan | cmpEq),
-    (opcode === 21.U) -> ~(lessThan | cmpEq)
+    (opcode === vmseq) -> cmpEq,
+    (opcode === vmsne) -> cmpNe,
+    (opcode === vmslt) -> lessThan,
+    (opcode === vmsle) -> (lessThan | cmpEq),
+    (opcode === vmsgt) -> ~(lessThan | cmpEq)
   ))
 
   //-------- Min/Max --------
   val minMaxResult = Wire(Vec(8, UInt(8.W)))
-  val selectVs1 = lessThan_vec.map(_ === opcode(0))
+  val selectVs1 = lessThan_vec.map(_ === !opcode(0))
   for (i <- 0 until 8) {
     val sel = Mux1H(Seq(
       eewVs1.is8  -> selectVs1(i),
@@ -140,7 +140,7 @@ class VIntAdder64b extends Module {
     minMaxResult(i) := Mux(sel, vs1(8*i+7, 8*i), vs2(8*i+7, 8*i))
   }
 
-  io.vd := Mux(opcode(5, 1) === 11.U, Cat(minMaxResult.reverse), Cat(vd.reverse))
+  io.vd := Mux(opcode === vmin || opcode === vmax, Cat(minMaxResult.reverse), Cat(vd.reverse))
 
   io.cmpOut := Mux(addWithCarry, Cat(cout.reverse), cmpResult)
   // io.out.cmp := Mux1H(Seq(

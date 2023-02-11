@@ -3,13 +3,30 @@ package yunsuan.vector
 import chisel3._
 import chisel3.util._
 
-class VFuInfo extends Bundle {
+class VIFuInfo extends Bundle {
   val vm = Bool()
   val ma = Bool()
   val ta = Bool()
   val vlmul = UInt(3.W)
   val vl = UInt(8.W)
   val uopIdx = UInt(6.W)
+  val vxrm = UInt(2.W)
+}
+
+class VIFuInput extends Bundle {
+  val opcode = UInt(6.W)
+  val info = new VIFuInfo
+  val srcType = Vec(2, UInt(4.W))
+  val vdType  = UInt(4.W)
+  val vs1 = UInt(128.W)
+  val vs2 = UInt(128.W)
+  val old_vd = UInt(128.W)
+  val mask = UInt(128.W)
+}
+
+class VIFuOutput extends Bundle {
+  val vd = UInt(128.W)
+  val vxsat = Bool()
 }
 
 class SewOH extends Bundle {  // 0   1   2   3

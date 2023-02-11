@@ -24,16 +24,17 @@ package yunsuan.vector.alu
 import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.decode._
-import yunsuan.vector.{VFuInfo, SewOH, UIntSplit}
+import yunsuan.vector.{VIFuInfo, VIFuInput, VIFuOutput, SewOH, UIntSplit}
 
 class VIntFixpDecode extends Bundle {
+  val sub = Bool()
   val misc = Bool()
 }
 
 class VIntFixpAlu64b extends Module {
   val io = IO(new Bundle {
     val opcode = Input(UInt(6.W))
-    val info = Input(new VFuInfo)
+    val info = Input(new VIFuInfo)
     val srcType = Input(Vec(2, UInt(4.W)))
     val vdType  = Input(UInt(4.W))
     val vs1 = Input(UInt(64.W))
@@ -74,21 +75,13 @@ class VIntFixpAlu64b extends Module {
 
 class VIntFixpAlu extends Module {
   val io = IO(new Bundle {
-    val opcode = Input(UInt(6.W))
-    val info = Input(new VFuInfo)
-    val srcType = Input(Vec(2, UInt(4.W)))
-    val vdType  = Input(UInt(4.W))
-    val vs1 = Input(UInt(128.W))
-    val vs2 = Input(UInt(128.W))
-    val vmask = Input(UInt(128.W))
-    val is_sub = Input(Bool())  // subtract
-
-    val vd = Output(UInt(128.W))
+    val in = Input(new VIFuInput)
+    val out = Output(new VIFuOutput)
   })
 
-  val opcode = io.opcode
+  val opcode = io.in.opcode
 
-  val truthTable = TruthTable(VAluMISC.table, VAluMISC.default)
+  val truthTable = TruthTable(VIntFixpMISC.table, VIntFixpMISC.default)
   val decoderOut = decoder(QMCMinimizer, Cat(opcode), truthTable)
   val vIntFixpDecode = decoderOut.asTypeOf(new VIntFixpDecode)
 
@@ -96,18 +89,19 @@ class VIntFixpAlu extends Module {
   val vIntFixpAlu64bs = Seq.fill(2)(Module(new VIntFixpAlu64b))
   for (i <- 0 until 2) {
     vIntFixpAlu64bs(i).io.opcode := opcode
-    vIntFixpAlu64bs(i).io.info := io.info
-    vIntFixpAlu64bs(i).io.srcType := io.srcType
-    vIntFixpAlu64bs(i).io.vdType := io.vdType
-    vIntFixpAlu64bs(i).io.is_sub := io.is_sub
+    vIntFixpAlu64bs(i).io.info := io.in.info
+    vIntFixpAlu64bs(i).io.srcType := io.in.srcType
+    vIntFixpAlu64bs(i).io.vdType := io.in.vdType
+    vIntFixpAlu64bs(i).io.is_sub := vIntFixpDecode.sub
     vIntFixpAlu64bs(i).io.isMisc := vIntFixpDecode.misc
     // !!!! TODO: support widen !!!!
-    vIntFixpAlu64bs(i).io.vs1 := UIntSplit(io.vs1, 64)(i)
-    vIntFixpAlu64bs(i).io.vs2 := UIntSplit(io.vs2, 64)(i)
+    vIntFixpAlu64bs(i).io.vs1 := UIntSplit(io.in.vs1, 64)(i)
+    vIntFixpAlu64bs(i).io.vs2 := UIntSplit(io.in.vs2, 64)(i)
   }
   for (i <- 0 until 2) {
-    vIntFixpAlu64bs(i).io.vmask := io.vmask(7, 0) //!!!! Todo: Incorrect!!!!
+    vIntFixpAlu64bs(i).io.vmask := io.in.mask(7, 0) //!!!! Todo: Incorrect!!!!
   }
 
-  io.vd := Cat(vIntFixpAlu64bs.map(_.io.vd).reverse) //!!!! Todo: Incorrect!!
+  io.out.vd := Cat(vIntFixpAlu64bs.map(_.io.vd).reverse) //!!!! Todo: Incorrect!!
+  io.out.vxsat := false.B //!!!! Todo: Incorrect!!
 }

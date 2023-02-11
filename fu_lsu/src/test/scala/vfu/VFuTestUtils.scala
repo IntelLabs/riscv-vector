@@ -5,7 +5,7 @@ import chiseltest._
 import chisel3.experimental.BundleLiterals._
 import chisel3.experimental.VecLiterals._
 import yunsuan.vector._
-import vfu.alu.{VIAluInput, VIAluOutput, VIAluWrapper}
+import vfu.alu.{VIAluWrapper}
 
 case class SrcBundle(vs2: String = "h0",
                      vs1: String = "h0",
@@ -24,39 +24,37 @@ case class CtrlBundle(vdType: Int = 0,
                       vl: Int = 0,
                       uopIdx: Int = 0,
                       vxrm : Int = 0,
-                      is_sub: Boolean = false
 )
 
 trait BundleGenHelper {
 
-  def genVFuInfo(c: CtrlBundle) = {
-    (new VFuInfo).Lit(
+  def genVIFuInfo(c: CtrlBundle) = {
+    (new VIFuInfo).Lit(
       _.vm -> c.vm.B,
       _.ma -> c.ma.B,
       _.ta -> c.ta.B,
       _.vlmul -> c.vlmul.U,
       _.vl -> c.vl.U,
       _.uopIdx -> c.uopIdx.U,
+      _.vxrm -> c.vxrm.U,
     )
   }
 
   def genVAluInput(s: SrcBundle, c: CtrlBundle) = {
-    (new VIAluInput).Lit(
+    (new VIFuInput).Lit(
       _.opcode -> c.opcode.U,
-      _.info -> genVFuInfo(c),
+      _.info -> genVIFuInfo(c),
       _.srcType -> Vec.Lit(c.srcTypeVs2.U(4.W), c.srcTypeVs1.U(4.W)),
       _.vdType -> c.vdType.U,
       _.vs1 -> s.vs1.U(128.W),
       _.vs2 -> s.vs2.U(128.W),
       _.old_vd -> s.old_vd.U(128.W),
       _.mask -> s.mask.U(128.W),
-      _.vxrm -> c.vxrm.U,
-      _.is_sub -> c.is_sub.B
     )
   }
 
   def genVAluOutput(vd: String, vxsat: Boolean = false) = {
-    (new VIAluOutput).Lit(
+    (new VIFuOutput).Lit(
       _.vd -> vd.U(128.W),
       _.vxsat -> vxsat.B
     )

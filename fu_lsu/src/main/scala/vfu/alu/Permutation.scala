@@ -20,7 +20,7 @@ class Permutation extends Module {
     val srcType       = Input (Vec(2, VectorElementFormat()))  
     val vdType        = Input (VectorElementFormat())  
     val op_code       = Input (OpType())        
-    val info          = Input(new VFuInfo)
+    val info          = Input(new VIFuInfo)
     val valid         = Input(Bool())
     val vd            = Output(UInt(VLEN.W))
   })

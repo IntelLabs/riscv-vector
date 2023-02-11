@@ -14,12 +14,13 @@ package yunsuan.vector.alu
 
 import chisel3._
 import chisel3.util._
-import yunsuan.vector.{VFuInfo, SewOH, UIntSplit, BitsExtend}
+import yunsuan.vector.{VIFuInfo, SewOH, UIntSplit, BitsExtend}
+import yunsuan.vector.alu.VAluOpcode._
 
 class VIntMisc64b extends Module {
   val io = IO(new Bundle {
     val opcode = Input(UInt(6.W))
-    val info = Input(new VFuInfo)
+    val info = Input(new VIFuInfo)
     val srcType = Input(Vec(2, UInt(4.W)))
     val vdType  = Input(UInt(4.W))
     val vs1 = Input(UInt(64.W))
@@ -68,7 +69,7 @@ class VIntMisc64b extends Module {
   }
 
   //---- Bitwise Logical instructions ----
-  val bitLogicalType = Seq.tabulate(8)(i => opcode === (i + 6).U)
+  val bitLogicalType = Seq.tabulate(8)(i => opcode === (i + 7).U)
   val bitLogical = Mux1H(Seq(
     bitLogicalType(0) -> (vs2 & vs1),
     bitLogicalType(1) -> ~(vs2 & vs1),
@@ -84,7 +85,7 @@ class VIntMisc64b extends Module {
   /**
     * Shift: vsll, vsrl, vsra, vnsrl, vnsra (vssrl, vssra and vnclipu/vnclip)
     */
-  val signed_shift = opcode === 16.U || opcode === 27.U
+  val signed_shift = opcode === vsra || opcode === vssra
   def shiftOnce(n: Int, data: UInt): (UInt, Bool, Bool) = { // n: number of shift bits
     val len = data.getWidth
     require(len > n)
@@ -123,10 +124,10 @@ class VIntMisc64b extends Module {
       }
     }
   }
-  val is_shift = opcode(5, 1) === "b00111".U || opcode === 16.U || opcode(5, 1) === "b01101".U
+  val is_shift = opcode === vsll || opcode === vsrl || opcode === vssrl || signed_shift
 
   // Handle shift left
-  val leftShift = opcode(2, 0) === "b110".U
+  val leftShift = opcode === vsll
   val vs2_reverse = Cat(vs2.asBools) // bit reverse
   val vs2_adjust = Mux(leftShift, vs2_reverse, vs2)
   val vs1_revsByElem = MuxCase(vs1, Seq(  // reverse vs1 by element when left-shift
@@ -199,6 +200,6 @@ class VIntMisc64b extends Module {
 
   // Output arbiter
   io.vd := Mux(is_shift, shiftResult,
-               Mux(opcode === 1.U, extResult,
+               Mux(opcode === vext, extResult,
                Mux(is_bitLogical, bitLogical, mergeMove)))
 }
