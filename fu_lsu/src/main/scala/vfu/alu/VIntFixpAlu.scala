@@ -52,7 +52,7 @@ class VIntFixpAlu64b extends Module {
     val vs1 = Input(UInt(64.W))
     val vs2 = Input(UInt(64.W))
     val vmask = Input(UInt(8.W))
-    val is_sub = Input(Bool())  // subtract
+    val isSub = Input(Bool())  // subtract
     val isMisc = Input(Bool())
 
     val vd = Output(UInt(64.W))
@@ -66,7 +66,7 @@ class VIntFixpAlu64b extends Module {
   vIntAdder64b.io.vs1 := io.vs1
   vIntAdder64b.io.vs2 := io.vs2
   vIntAdder64b.io.vmask := io.vmask
-  vIntAdder64b.io.is_sub := io.is_sub
+  vIntAdder64b.io.isSub := io.isSub
 
   val vIntMisc64b = Module(new VIntMisc64b)
   vIntMisc64b.io.opcode := io.opcode 
@@ -92,6 +92,13 @@ class VIntFixpAlu extends Module {
   })
 
   val opcode = io.in.opcode
+  val srcTypeVs2 = io.in.srcType(0)
+  val srcTypeVs1 = io.in.srcType(1)
+  val vdType = io.in.vdType
+  val eewVs1 = SewOH(srcTypeVs1(1, 0))
+  val uopIdx = io.in.info.uopIdx
+  val signed = srcTypeVs2(3, 2) === 1.U
+  val widen = opcode(5, 1) === 0.U && srcTypeVs1(1, 0) =/= srcTypeVs2(1, 0)
 
   val truthTable = TruthTable(VIntFixpMISC.table, VIntFixpMISC.default)
   val decoderOut = decoder(QMCMinimizer, Cat(opcode), truthTable)
@@ -104,11 +111,29 @@ class VIntFixpAlu extends Module {
     vIntFixpAlu64bs(i).io.info := io.in.info
     vIntFixpAlu64bs(i).io.srcType := io.in.srcType
     vIntFixpAlu64bs(i).io.vdType := io.in.vdType
-    vIntFixpAlu64bs(i).io.is_sub := vIntFixpDecode.sub
+    vIntFixpAlu64bs(i).io.isSub := vIntFixpDecode.sub
     vIntFixpAlu64bs(i).io.isMisc := vIntFixpDecode.misc
-    // !!!! TODO: support widen !!!!
-    vIntFixpAlu64bs(i).io.vs1 := UIntSplit(io.in.vs1, 64)(i)
-    vIntFixpAlu64bs(i).io.vs2 := UIntSplit(io.in.vs2, 64)(i)
+  }
+  //---- Widen vs1 & vs2 ----
+  def widenPad(x: UInt) = {
+    val len = x.getWidth
+    Cat(Fill(len, x(len-1) && signed), x)
+  }
+  val vs = Seq(io.in.vs1, io.in.vs2)
+  val vs_widen = Wire(Vec(2, UInt(128.W)))
+  val widenCase = Seq(widen, {widen && srcTypeVs2(1, 0) =/= vdType(1, 0)})
+  for (i <- 0 until 2) { // 0: vs1,  1: vs2
+    val vs_64b = Mux(uopIdx(0), vs(i)(127, 64), vs(i)(63, 0))
+    when (widenCase(i)) {
+      vs_widen(i) := Mux1H(eewVs1.oneHot.take(3), Seq(8, 16, 32).map(sew => 
+                           Cat(UIntSplit(vs_64b, sew).map(widenPad(_)).reverse)))
+    }.otherwise {
+      vs_widen(i) := vs(i)
+    }
+  }
+  for (i <- 0 until 2) { // 0: high 64b   1: low 64b
+    vIntFixpAlu64bs(i).io.vs1 := UIntSplit(vs_widen(0), 64)(i)
+    vIntFixpAlu64bs(i).io.vs2 := UIntSplit(vs_widen(1), 64)(i)    
   }
   for (i <- 0 until 2) {
     vIntFixpAlu64bs(i).io.vmask := io.in.mask(7, 0) //!!!! Todo: Incorrect!!!!

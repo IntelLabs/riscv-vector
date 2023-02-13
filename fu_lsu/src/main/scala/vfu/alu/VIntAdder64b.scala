@@ -36,7 +36,7 @@ class VIntAdder64b extends Module {
     val vs1 = Input(UInt(64.W))
     val vs2 = Input(UInt(64.W))
     val vmask = Input(UInt(8.W))
-    val is_sub = Input(Bool())  // subtract
+    val isSub = Input(Bool())  // subtract
 
     val vd = Output(UInt(64.W))
     val cmpOut = Output(UInt(8.W)) // compare or add-with-carry carry output
@@ -52,33 +52,9 @@ class VIntAdder64b extends Module {
   val vs2 = io.vs2
   val vmask = io.vmask
   val vm = io.info.vm
-  val sub = io.is_sub
+  val sub = io.isSub
   val signed = srcTypeVs2(3, 2) === 1.U
   val addWithCarry = opcode(5, 3) === "b000".U && (opcode(2, 0) === 3.U || opcode(2, 0) === 4.U || opcode(2, 0) === 5.U || opcode(2, 0) === 6.U)
-
-  // /**
-  //   * Input adjust: widen & subtract
-  //   */
-  // // Widen vs1 & vs2
-  // def widenPad(x: UInt) = {
-  //   val len = x.getWidth
-  //   Cat(Fill(len, x(len-1) && signed), x)
-  // }
-  // val vs = Seq(vs1, vs2)
-  // val vs_widen = Wire(Vec(2, UInt(64.W)))
-  // val widenCase = Seq(widen, {widen && eewVs2 =/= eewVd})
-  // for (i <- 0 until 2) {
-  //   val vs_32b = Mux(uop.expdIdx(0), vs(i)(63, 32), vs(i)(31, 0))
-  //   when (widenCase(i)) {
-  //     vs_widen(i) := Mux1H(Seq(
-  //       sew.is8  -> Cat(widenPad(vs_32b(31, 24)), widenPad(vs_32b(23, 16)), widenPad(vs_32b(15, 8)), widenPad(vs_32b(7, 0))),
-  //       sew.is16 -> Cat(widenPad(vs_32b(31, 16)), widenPad(vs_32b(15, 0))),
-  //       sew.is32 -> widenPad(vs_32b(31, 0))
-  //     ))
-  //   }.otherwise {
-  //     vs_widen(i) := vs(i)
-  //   }
-  // }
 
   // Subtract: bit negate
   val vs1_adjust = vs1 ^ Fill(64, sub)
