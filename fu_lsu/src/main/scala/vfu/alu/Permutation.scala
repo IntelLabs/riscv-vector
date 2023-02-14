@@ -1,10 +1,22 @@
+/***************************************************************************************
+*Copyright (c) 2023-2024 Intel Corporation
+*Vector Acceleration IP core for RISC-V* is licensed under Mulan PSL v2.
+*You can use this software according to the terms and conditions of the Mulan PSL v2.
+*You may obtain a copy of Mulan PSL v2 at:
+*        http://license.coscl.org.cn/MulanPSL2
+*THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+*EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+*MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+*See the Mulan PSL v2 for more details.
+***************************************************************************************/
+
 package vfu.alu
 
 import chisel3._
 import chisel3.util._
 import scala.language.postfixOps
-import yunsuan._
 import vfu._
+import vfu.alu.VAluOpcode._
 
 class Permutation extends Module {
   val VLEN = 128
@@ -17,14 +29,16 @@ class Permutation extends Module {
     val vs2           = Input (UInt(VLEN.W))
     val vmask         = Input (UInt(VLEN.W))
     val old_vd        = Input (UInt(VLEN.W))
-    val srcType       = Input (Vec(2, VectorElementFormat()))  
-    val vdType        = Input (VectorElementFormat())  
-    val op_code       = Input (OpType())        
+    val srcType       = Input (Vec(2, UInt(4.W)))  
+    val vdType        = Input (UInt(4.W))  
+    val op_code       = Input (UInt(6.W))       
     val info          = Input(new VIFuInfo)
     val valid         = Input(Bool())
     val vd            = Output(UInt(VLEN.W))
   })
 
+
+val vcompress = io.op_code === VAluOpcode.vcompress
 
 val (vs1, vs2, vmask, old_vd) = (io.vs1, io.vs2, io.vmask, io.old_vd)
 
@@ -46,11 +60,10 @@ val vlRemainBytes = vlRemain << vsew
 val current_res_boundary = Mux((vlRemainBytes > vlenb.U), vlenb.U, vlRemainBytes)
 
 val previous_ones_sum = Wire(UInt(7.W))
-val res_idx = Wire(UInt(7.W))
-val res_valid = Wire(Bool())
+val res_idx = Wire(Vec(vlenb, UInt(7.W)))
+val res_valid = Wire(Vec(vlenb, Bool()))
 val current_ones_sum = Wire(Vec(vlenb+1, UInt(7.W)))
 val base = Cat(uopIdx, 0.U(4.W))
-val is_cmprs = io.op_code === VipuType.vcompress
 
 val vs1_bits = vs1 >> (ele_cnt * uopIdx)
 val vs1_byte_strb = Wire(Vec(vlenb, UInt(1.W))) 
@@ -80,18 +93,18 @@ for (i <-0 until (vlenb+1)) {
 
 for (i <-0 until vlenb) {
   cmprs_vd(i) := 0.U
+  res_idx(i) := 0.U
+  res_valid(i) := false.B
 }
 
-res_idx := 0.U
-res_valid := false.B
 current_ones_sum(0) := previous_ones_sum
 for (i <-0 until vlenb) {
-  cmprs_vd(i) := old_vd(i*8+7, i*8)
+  cmprs_vd(i) := Mux(ta, "hff".U, old_vd(i*8+7, i*8))
   current_ones_sum(i+1) := current_ones_sum(i) + vs1_byte_strb(i)
-  res_idx := current_ones_sum(i+1) -base - 1.U
-  res_valid := current_ones_sum(i+1) >= base + 1.U
-  when (vs1_byte_strb(i).asBool && res_valid && (res_idx < current_res_boundary)) {
-    cmprs_vd(res_idx) := vs2(i*8+7, i*8)
+  res_idx(i) := current_ones_sum(i+1) -base - 1.U
+  res_valid(i) := current_ones_sum(i+1) >= base + 1.U
+  when (vs1_byte_strb(i).asBool && res_valid(i) && (res_idx(i) < current_res_boundary)) {
+    cmprs_vd(res_idx(i)) := vs2(i*8+7, i*8)
   } 
 }
 

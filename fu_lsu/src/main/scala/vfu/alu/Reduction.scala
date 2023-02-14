@@ -1,18 +1,22 @@
+/***************************************************************************************
+*Copyright (c) 2023-2024 Intel Corporation
+*Vector Acceleration IP core for RISC-V* is licensed under Mulan PSL v2.
+*You can use this software according to the terms and conditions of the Mulan PSL v2.
+*You may obtain a copy of Mulan PSL v2 at:
+*        http://license.coscl.org.cn/MulanPSL2
+*THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+*EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+*MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+*See the Mulan PSL v2 for more details.
+***************************************************************************************/
+
 package vfu.alu
 
 import chisel3._
 import chisel3.util._
 import scala.language.postfixOps
-import yunsuan._
 import vfu._
-
-class SewOH extends Bundle {  // 0   1   2   3
-  val oneHot = Vec(4, Bool()) // 8, 16, 32, 64
-  def is8 = oneHot(0)
-  def is16 = oneHot(1)
-  def is32 = oneHot(2)
-  def is64 = oneHot(3)
-}
+import vfu.alu.VAluOpcode._
 
 class Reduction extends Module {
   val VLEN = 128
@@ -25,9 +29,9 @@ class Reduction extends Module {
     val vs2           = Input (UInt(VLEN.W))
     val vmask         = Input (UInt(VLEN.W))
     val old_vd        = Input (UInt(VLEN.W))
-    val srcType       = Input (Vec(2, VectorElementFormat()))  
-    val vdType        = Input (VectorElementFormat())  
-    val op_code       = Input (OpType())        
+    val srcType       = Input (Vec(2, UInt(4.W)))  
+    val vdType        = Input (UInt(4.W))  
+    val op_code       = Input (UInt(6.W))       
     val info          = Input(new VIFuInfo)
     val valid         = Input(Bool())
     val vd            = Output(UInt(VLEN.W))
@@ -49,16 +53,16 @@ val widen  = io.vdType(1,0) === (io.srcType(1)(1,0) + 1.U)
 val vsew_bytes = 1.U << vsew;
 val vsew_bits = 8.U << vsew;
 
-val vredsum_vs     = io.op_code === VipuType.vredsum
-val vredmax_vs     = (io.op_code === VipuType.vredmax) && io.srcType(1)(2).asBool
-val vredmaxu_vs    = (io.op_code === VipuType.vredmax) && !io.srcType(1)(2).asBool
-val vredmin_vs     = (io.op_code === VipuType.vredmin) && io.srcType(1)(2).asBool  
-val vredminu_vs    = (io.op_code === VipuType.vredmin) && !io.srcType(1)(2).asBool 
-val vredand_vs     = io.op_code === VipuType.vredand
-val vredor_vs      = io.op_code === VipuType.vredor
-val vredxor_vs     = io.op_code === VipuType.vredxor
-val vwredsum_vs    = (io.op_code === VipuType.vredsum) && io.srcType(1)(2).asBool && (io.vdType(1,0) === (io.srcType(1)(1,0) + 1.U)) 
-val vwredsumu_vs   = (io.op_code === VipuType.vredsum) && !io.srcType(1)(2).asBool && (io.vdType(1,0) === (io.srcType(1)(1,0) + 1.U)) 
+val vredsum_vs     = io.op_code === VAluOpcode.vredsum
+val vredmax_vs     = (io.op_code === VAluOpcode.vredmax) && io.srcType(1)(2).asBool
+val vredmaxu_vs    = (io.op_code === VAluOpcode.vredmax) && !io.srcType(1)(2).asBool
+val vredmin_vs     = (io.op_code === VAluOpcode.vredmin) && io.srcType(1)(2).asBool  
+val vredminu_vs    = (io.op_code === VAluOpcode.vredmin) && !io.srcType(1)(2).asBool 
+val vredand_vs     = io.op_code === VAluOpcode.vredand
+val vredor_vs      = io.op_code === VAluOpcode.vredor
+val vredxor_vs     = io.op_code === VAluOpcode.vredxor
+val vwredsum_vs    = (io.op_code === VAluOpcode.vredsum) && io.srcType(1)(2).asBool && (io.vdType(1,0) === (io.srcType(1)(1,0) + 1.U)) 
+val vwredsumu_vs   = (io.op_code === VAluOpcode.vredsum) && !io.srcType(1)(2).asBool && (io.vdType(1,0) === (io.srcType(1)(1,0) + 1.U)) 
 
 def zero(w: Int) = 0.U(w.W)
 def umax(w: Int) = ~(0.U(w.W))
@@ -220,7 +224,7 @@ val red_vd_tail_vd = (old_vd & (vd_mask << vsew_bits)) | (sum_vd & (vd_mask >> (
 val red_vd = Mux(ta, red_vd_tail_one, red_vd_tail_vd)
 val vd_reg = RegInit(0.U(VLEN.W))
 
-when ((io.op_code === VipuType.vredsum) && fire) {
+when ((io.op_code === VAluOpcode.vredsum) && fire) {
   vd_reg := red_vd
 }
 

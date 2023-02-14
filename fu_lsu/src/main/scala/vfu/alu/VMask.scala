@@ -1,10 +1,22 @@
+/***************************************************************************************
+*Copyright (c) 2023-2024 Intel Corporation
+*Vector Acceleration IP core for RISC-V* is licensed under Mulan PSL v2.
+*You can use this software according to the terms and conditions of the Mulan PSL v2.
+*You may obtain a copy of Mulan PSL v2 at:
+*        http://license.coscl.org.cn/MulanPSL2
+*THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+*EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+*MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+*See the Mulan PSL v2 for more details.
+***************************************************************************************/
+
 package vfu.alu
 
 import chisel3._
 import chisel3.util._
 import scala.language.postfixOps
-import yunsuan._
 import vfu._
+import vfu.alu.VAluOpcode._
 
 class VMask extends Module {
   val VLEN = 128
@@ -17,9 +29,9 @@ class VMask extends Module {
     val vs2           = Input (UInt(VLEN.W))
     val vmask         = Input (UInt(VLEN.W))
     val old_vd        = Input (UInt(VLEN.W))
-    val srcType       = Input (Vec(2, VectorElementFormat()))  
-    val vdType        = Input (VectorElementFormat())  
-    val op_code       = Input (OpType())        
+    val srcType       = Input (Vec(2, UInt(4.W)))  
+    val vdType        = Input (UInt(4.W))  
+    val op_code       = Input (UInt(6.W))       
     val info          = Input(new VIFuInfo)
     val valid         = Input(Bool())
     val vd            = Output(UInt(VLEN.W))
@@ -37,13 +49,13 @@ val vl     = io.info.vl
 val uopIdx = io.info.uopIdx 
 val fire   = io.valid
 
-val vpopc_m  = io.op_code === VipuType.vpopc 
-val vfirst_m = io.op_code === VipuType.vfirst
-val vmsbf_m  = io.op_code === VipuType.vmsbf 
-val vmsif_m  = io.op_code === VipuType.vmsif 
-val vmsof_m  = io.op_code === VipuType.vmsof 
-val viota_m  = io.op_code === VipuType.viota 
-val vid_v    = io.op_code === VipuType.vid   
+val vcpop_m  = io.op_code === VAluOpcode.vcpop 
+val vfirst_m = io.op_code === VAluOpcode.vfirst
+val vmsbf_m  = io.op_code === VAluOpcode.vmsbf 
+val vmsif_m  = io.op_code === VAluOpcode.vmsif 
+val vmsof_m  = io.op_code === VAluOpcode.vmsof 
+val viota_m  = io.op_code === VAluOpcode.viota 
+val vid_v    = io.op_code === VAluOpcode.vid   
 
 val first = Wire(Vec(NLanes, SInt(xLen.W)))
 val vmfirst = Wire(SInt(xLen.W))
@@ -190,14 +202,14 @@ tail_vd := old_vd_vl_mask | (vd & vd_vl_mask)
 
 when ((vmsbf_m || vmsif_m || vmsof_m) && fire) {
   vd_reg := tail_vd
-} .elsewhen((vpopc_m || vfirst_m) && fire) {
+} .elsewhen((vcpop_m || vfirst_m) && fire) {
   vd_reg := Cat(0.U((VLEN-xLen).W), rd)
 } .elsewhen (vid_v && fire) {
   vd_reg := vid_tail_mask_vd 
 }
 
 rd := 0.U
-when (vpopc_m && fire) {
+when (vcpop_m && fire) {
   rd := PopCount(Cat(vs2m.reverse)) 
 } .elsewhen (vfirst_m && fire) {
   rd := vmfirst.asUInt 
