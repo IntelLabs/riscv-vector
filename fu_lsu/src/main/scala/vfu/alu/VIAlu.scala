@@ -10,11 +10,11 @@
 *See the Mulan PSL v2 for more details.
 ***************************************************************************************/
 
-package yunsuan.vector.alu
+package vfu.alu
 
 import chisel3._
 import chisel3.util._
-import yunsuan.vector._
+import vfu._
 
 class VIAlu extends Module {
   val io = IO(new Bundle {

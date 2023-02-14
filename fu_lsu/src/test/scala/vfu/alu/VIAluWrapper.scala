@@ -10,12 +10,12 @@
 *See the Mulan PSL v2 for more details.
 ***************************************************************************************/
 
-package vfu.alu
+package vfutest.alu
 
 import chisel3._
 import chisel3.util._
-import yunsuan.vector.{VIFuInfo, VIFuInput, VIFuOutput}
-import yunsuan.vector.alu.{VIAlu}
+import vfu.{VIFuInfo, VIFuInput, VIFuOutput}
+import vfu.alu.{VIAlu}
 
 class VIAluWrapper extends Module {
   val io = IO(new Bundle {

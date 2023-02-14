@@ -1,4 +1,4 @@
-package yunsuan.vector
+package vfu
 
 import chisel3._
 import chisel3.util._

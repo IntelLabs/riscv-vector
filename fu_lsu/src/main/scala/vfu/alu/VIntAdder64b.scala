@@ -20,12 +20,12 @@
   *     Part of 12.1
   *     Part of 12.2
   */
-package yunsuan.vector.alu
+package vfu.alu
 
 import chisel3._
 import chisel3.util._
-import yunsuan.vector.{VIFuInfo, SewOH}
-import yunsuan.vector.alu.VAluOpcode._
+import vfu.{VIFuInfo, SewOH}
+import vfu.alu.VAluOpcode._
 
 class VIntAdder64b extends Module {
   val io = IO(new Bundle {
@@ -40,7 +40,7 @@ class VIntAdder64b extends Module {
 
     val vd = Output(UInt(64.W))
     val cmpOut = Output(UInt(8.W)) // compare or add-with-carry carry output
-    // val toFixP = Output(new AdderToFixP)
+    val toFixP = Output(new AdderToFixP)
   })
 
   val opcode = io.opcode
@@ -139,10 +139,10 @@ class VIntAdder64b extends Module {
   // ))
 
   //---- To Fixed-Point unit ----
-  // for (i <- 0 until 8) {
-  //   io.toFixP.vs2H(i) := vs2(8*i+7)
-  //   io.toFixP.vs1H(i) := vs1(8*i+7)
-  //   io.toFixP.vd(i) := vd(i)
-  //   io.toFixP.cout(i) := cout(i)
-  // }
+  for (i <- 0 until 8) {
+    io.toFixP.vs2H(i) := vs2(8*i+7)
+    io.toFixP.vs1H(i) := vs1(8*i+7)
+    io.toFixP.vd(i) := vd(i)
+    io.toFixP.cout(i) := cout(i)
+  }
 }

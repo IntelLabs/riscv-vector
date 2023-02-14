@@ -22,12 +22,12 @@
   *     Part of 12.5
   *     15.1  vmand.mm, ...
   */
-package yunsuan.vector.alu
+package vfu.alu
 
 import chisel3._
 import chisel3.util._
-import yunsuan.vector.{VIFuInfo, SewOH, UIntSplit, BitsExtend}
-import yunsuan.vector.alu.VAluOpcode._
+import vfu.{VIFuInfo, SewOH, UIntSplit, BitsExtend}
+import vfu.alu.VAluOpcode._
 
 class VIntMisc64b extends Module {
   val io = IO(new Bundle {
@@ -41,14 +41,8 @@ class VIntMisc64b extends Module {
 
     val vd = Output(UInt(64.W))
     val narrowVd = Output(UInt(32.W))
-    // val toFixP = Output(new MiscToFixP)
+    val toFixP = Output(new MiscToFixP)
   })
-
-  // val uop = io.in.uop
-  // val ctrl = io.in.ctrl
-  // val funct6 = uop.ctrl.funct6
-  // val sew = io.in.sew
-  // val (vs1, vs2, vmask) = (io.in.vs1_rs1_imm, io.in.vs2, io.in.vmask)
 
   val opcode = io.opcode
   val srcTypeVs2 = io.srcType(0)
@@ -173,22 +167,22 @@ class VIntMisc64b extends Module {
   // Different SEW cases
   when (Mux(narrow, eewVd.is16, eewVd.is32)) {
     shiftOut := Cat(shift32.map(_._1).reverse)
-    // io.toFixP.rnd_high := Cat(Fill(4, shift32(1)._2), Fill(4, shift32(0)._2))
-    // io.toFixP.rnd_tail := Cat(Fill(4, shift32(1)._3), Fill(4, shift32(0)._3))
+    io.toFixP.rnd_high := Cat(Fill(4, shift32(1)._2), Fill(4, shift32(0)._2))
+    io.toFixP.rnd_tail := Cat(Fill(4, shift32(1)._3), Fill(4, shift32(0)._3))
   }.elsewhen (Mux(narrow, eewVd.is8,  eewVd.is16)) {
     shiftOut := Cat(shift16.map(_._1).reverse)
-    // io.toFixP.rnd_high := Cat(Fill(2, shift16(3)._2), Fill(2, shift16(2)._2), Fill(2, shift16(1)._2), Fill(2, shift16(0)._2))
-    // io.toFixP.rnd_tail := Cat(Fill(2, shift16(3)._3), Fill(2, shift16(2)._3), Fill(2, shift16(1)._3), Fill(2, shift16(0)._3))
+    io.toFixP.rnd_high := Cat(Fill(2, shift16(3)._2), Fill(2, shift16(2)._2), Fill(2, shift16(1)._2), Fill(2, shift16(0)._2))
+    io.toFixP.rnd_tail := Cat(Fill(2, shift16(3)._3), Fill(2, shift16(2)._3), Fill(2, shift16(1)._3), Fill(2, shift16(0)._3))
   }.elsewhen (Mux(narrow, false.B,  eewVd.is8)) {
     shiftOut := Cat(shift8.map(_._1).reverse)
-    // io.toFixP.rnd_high := Cat(shift8.map(_._2).reverse)
-    // io.toFixP.rnd_tail := Cat(shift8.map(_._3).reverse)
+    io.toFixP.rnd_high := Cat(shift8.map(_._2).reverse)
+    io.toFixP.rnd_tail := Cat(shift8.map(_._3).reverse)
   }.otherwise {
     shiftOut := shift64(0)._1
-    // io.toFixP.rnd_high := Fill(8, shift64(0)._2)
-    // io.toFixP.rnd_tail := Fill(8, shift64(0)._3)
+    io.toFixP.rnd_high := Fill(8, shift64(0)._2)
+    io.toFixP.rnd_tail := Fill(8, shift64(0)._3)
   }
-  // io.toFixP.shiftOut := shiftOut
+  io.toFixP.shiftOut := shiftOut
   
   val shiftResult = Mux(leftShift, Cat(shiftOut.asBools), shiftOut)
   io.narrowVd := Mux1H(Seq(

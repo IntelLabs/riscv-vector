@@ -10,14 +10,14 @@
 *See the Mulan PSL v2 for more details.
 ***************************************************************************************/
 
-package vfu
+package vfutest
 
 import chisel3._
 import chiseltest._
 import chisel3.experimental.BundleLiterals._
 import chisel3.experimental.VecLiterals._
-import yunsuan.vector._
-import vfu.alu.{VIAluWrapper}
+import vfu._
+import vfutest.alu.{VIAluWrapper}
 
 case class SrcBundle(vs2: String = "h0",
                      vs1: String = "h0",

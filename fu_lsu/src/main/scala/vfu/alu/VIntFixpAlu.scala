@@ -31,12 +31,13 @@
   *     12.5  vnclip, ...
   */
 
-package yunsuan.vector.alu
+package vfu.alu
 
 import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.decode._
-import yunsuan.vector.{VIFuInfo, VIFuInput, VIFuOutput, SewOH, UIntSplit}
+import vfu.{VIFuInfo, VIFuInput, VIFuOutput, SewOH, UIntSplit}
+import vfu.alu.VAluOpcode._
 
 class VIntFixpDecode extends Bundle {
   val sub = Bool()
@@ -54,9 +55,13 @@ class VIntFixpAlu64b extends Module {
     val vmask = Input(UInt(8.W))
     val isSub = Input(Bool())  // subtract
     val isMisc = Input(Bool())
+    val isFixp = Input(Bool())
 
     val vd = Output(UInt(64.W))
+    val vxsat = Output(Bool())
   })
+
+  val srcTypeVs2 = io.srcType(0)
 
   val vIntAdder64b = Module(new VIntAdder64b)
   vIntAdder64b.io.opcode := io.opcode 
@@ -81,7 +86,19 @@ class VIntFixpAlu64b extends Module {
   val vdMiscS1 = RegNext(vIntMisc64b.io.vd)
   val isMiscS1 = RegNext(io.isMisc)
 
-  io.vd := Mux(isMiscS1, vdMiscS1, vdAdderS1)
+  val vFixPoint64b = Module(new VFixPoint64b)
+  vFixPoint64b.io.opcode := RegNext(io.opcode)
+  vFixPoint64b.io.info := RegNext(io.info)
+  vFixPoint64b.io.sew := RegNext(SewOH(io.vdType(1, 0)))
+  vFixPoint64b.io.isSub := RegNext(io.isSub)
+  vFixPoint64b.io.isSigned := RegNext(srcTypeVs2(3, 2) === 1.U)
+  vFixPoint64b.io.isNClip := RegNext((io.opcode === vssrl || io.opcode === vssra) &&
+                             io.vdType(1,0) =/= srcTypeVs2(1,0))
+  vFixPoint64b.io.fromAdder := RegNext(vIntAdder64b.io.toFixP)
+  vFixPoint64b.io.fromMisc := RegNext(vIntMisc64b.io.toFixP)
+
+  io.vd := Mux(io.isFixp, vFixPoint64b.io.out.vd, Mux(isMiscS1, vdMiscS1, vdAdderS1)) //todo: add narrow
+  io.vxsat := vFixPoint64b.io.out.vxsat
 }
 
 
@@ -104,6 +121,9 @@ class VIntFixpAlu extends Module {
   val decoderOut = decoder(QMCMinimizer, Cat(opcode), truthTable)
   val vIntFixpDecode = decoderOut.asTypeOf(new VIntFixpDecode)
 
+  val isFixp = Mux(vIntFixpDecode.misc, opcode === vssrl || opcode === vssra,
+                   opcode === vsadd || opcode === vssub || opcode === vaadd || opcode === vasub)
+
   //------- Two 64b modules form one 128b unit ------
   val vIntFixpAlu64bs = Seq.fill(2)(Module(new VIntFixpAlu64b))
   for (i <- 0 until 2) {
@@ -113,6 +133,7 @@ class VIntFixpAlu extends Module {
     vIntFixpAlu64bs(i).io.vdType := io.in.vdType
     vIntFixpAlu64bs(i).io.isSub := vIntFixpDecode.sub
     vIntFixpAlu64bs(i).io.isMisc := vIntFixpDecode.misc
+    vIntFixpAlu64bs(i).io.isFixp := isFixp
   }
   //---- Widen vs1 & vs2 ----
   def widenPad(x: UInt) = {
@@ -140,5 +161,5 @@ class VIntFixpAlu extends Module {
   }
 
   io.out.vd := Cat(vIntFixpAlu64bs.map(_.io.vd).reverse) //!!!! Todo: Incorrect!!
-  io.out.vxsat := false.B //!!!! Todo: Incorrect!!
+  io.out.vxsat := vIntFixpAlu64bs.map(_.io.vxsat).reduce(_ || _)
 }

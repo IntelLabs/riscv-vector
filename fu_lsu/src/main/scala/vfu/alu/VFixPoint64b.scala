@@ -5,13 +5,12 @@
   *     12.4  vssrl, ...
   *     12.5  vnclip, ...
   */
-package darecreek.exu.fu.alu
+package vfu.alu
 
 import chisel3._
 import chisel3.util._
-import darecreek.DarecreekParam._
-import darecreek.{VExpdUOp, SewOH}
-import darecreek.UIntSplit
+import vfu.{VIFuInfo, SewOH, UIntSplit}
+import vfu.alu.VAluOpcode._
 
 class AdderToFixP extends Bundle {
   val cout = Vec(8, Bool())
@@ -20,33 +19,38 @@ class AdderToFixP extends Bundle {
   val vs1H = Vec(8, Bool()) // Highest bit of one 8-bit element of vs1_adjust
 }
 class MiscToFixP extends Bundle {
-  val shiftOut = UInt(LaneWidth.W)
+  val shiftOut = UInt(64.W)
   val rnd_high = UInt(8.W) // 8 * (v[d-1])
   val rnd_tail = UInt(8.W) // 8 * (v[d-2:0] == 0)
 }
 
-class VAluFixP extends Module {
+class VFixPoint64b extends Module {
   val io = IO(new Bundle {
-    val uop = Input(new VExpdUOp)
-    val ctrl = Input(new Bundle {
-      val sew = new SewOH
-      val sub = Bool()
-    })
+    // val uop = Input(new VExpdUOp)
+    // val ctrl = Input(new Bundle {
+    //   val sew = new SewOH
+    //   val sub = Bool()
+    // })
+    val opcode = Input(UInt(6.W))
+    val info = Input(new VIFuInfo)
+    val sew = Input(new SewOH)
+    val isSub = Input(Bool())
+    val isSigned = Input(Bool())
+    val isNClip = Input(Bool())
     val fromAdder = Input(new AdderToFixP)
     val fromMisc = Input(new MiscToFixP)
     val out = Output(new Bundle {
-      val vd = UInt(LaneWidth.W)
-      val narrow = UInt((LaneWidth/2).W)
+      val vd = UInt(64.W)
+      val narrow = UInt(32.W)
       val vxsat = Bool()
     })
   })
 
-  val uop = io.uop
-  val funct6 = uop.ctrl.funct6
-  val vxrm = uop.info.vxrm
-  val sew = io.ctrl.sew
-  val sub = io.ctrl.sub
-  val signed = funct6(0)
+  val opcode = io.opcode
+  val vxrm = io.info.vxrm
+  val sew = io.sew
+  val sub = io.isSub
+  val signed = io.isSigned
   val rnd_high = io.fromMisc.rnd_high
   val rnd_tail = io.fromMisc.rnd_tail
 
@@ -101,7 +105,7 @@ class VAluFixP extends Module {
       when (signed) {
         vdSat(i) := Mux(downOverflowS, Cat(highestBits, 0.U(7.W)), Cat(!highestBits, "h7F".U(7.W)))
       }.otherwise {
-        vdSat(i) := Mux(upOverflowU, "hFF".U, "h00".U),
+        vdSat(i) := Mux(upOverflowU, "hFF".U, "h00".U)
       }
     }.otherwise {
       vdSat(i) := adderOut(i)
@@ -178,8 +182,9 @@ class VAluFixP extends Module {
     ))
   }
 
-  val beforeRnd = dataFromMisc zip avgBeforeRnd map {case (d, a) => Mux(funct6(5), d, a)}
-  val rndInc = shiftRndInc zip avgRndInc map {case (s, a) => Mux(funct6(5), s, a)}
+  val isScalingShift = opcode === vssrl || opcode === vssra
+  val beforeRnd = dataFromMisc zip avgBeforeRnd map {case (d, a) => Mux(isScalingShift, d, a)}
+  val rndInc = shiftRndInc zip avgRndInc map {case (s, a) => Mux(isScalingShift, s, a)}
   val afterRnd = Adder_chain_rnd(beforeRnd, rndInc)
 
   /**
@@ -226,8 +231,9 @@ class VAluFixP extends Module {
     sew.is8  -> nclipResult8.map(_._2).reduce(_ || _)
   ))
   
-
-  io.out.vxsat := Mux(uop.ctrl.fixP && funct6(3) === funct6(2), 
-                      Mux(funct6(3), nclipSat, sat.reduce(_ || _)), false.B)
-  io.out.vd := Mux(funct6(3), afterRndUInt, Cat(vdSat.reverse))
+  // io.out.vxsat := Mux(uop.ctrl.fixP && funct6(3) === funct6(2), 
+                      // Mux(funct6(3), nclipSat, sat.reduce(_ || _)), false.B)
+  io.out.vxsat := Mux(io.isNClip, nclipSat, 
+                      Mux(opcode === vsadd || opcode === vssub, sat.reduce(_ || _), false.B))
+  io.out.vd := Mux(opcode === vsadd || opcode === vssub, Cat(vdSat.reverse), afterRndUInt)
 }

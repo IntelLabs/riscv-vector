@@ -10,17 +10,17 @@
 *See the Mulan PSL v2 for more details.
 ***************************************************************************************/
 
-package vfu.alu
+package vfutest.alu
 
 import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
 import chisel3._
-import yunsuan.vector._
-import yunsuan.vector.alu._
 import vfu._
+import vfu.alu._
+import vfutest._
 import chiseltest.WriteVcdAnnotation
-import vfu.dataType._
-import yunsuan.vector.alu.VAluOpcode._
+import vfutest.dataType._
+import vfu.alu.VAluOpcode._
 
 trait VAluBehavior {
   this: AnyFlatSpec with ChiselScalatestTester with BundleGenHelper =>
@@ -97,45 +97,9 @@ trait VAluBehavior {
       }
     }
   } 
-
-  def vMaskTest(): Unit = {
-    it should "pass the mask test" in {
-      test(new VIAluWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-        TestHarnessAlu.test_init(dut)
-
-        //----- Input gen -----
-        val inputSeq = Seq(
-          // Fake !!
-          genVAluInput(SrcBundle("h0008000f0200ff0001070008000f0200", "h7ff8f8030100ffff7f7f7ff8f8030100"), vadd.copy(s8, s8, s8)),
-          // Fake !!
-          genVAluInput(SrcBundle(vs2 = "h0008000f0200ff0001070008000f0200", vs1 = "h7ff8f8030100ffff7f7f7ff8f8030100", old_vd = "h1", mask = "h2"), 
-                       CtrlBundle(4, 4, 4, 30))
-                       // vadd.copy(vdType = 4, s8, s8)),  val vadd = CtrlBundle(opcode = 0)
-
-        )
-
-        //----- Output expectation -----
-        val outputSeq = Seq(
-          // Fake !!
-          genVAluOutput("h7f00f8120300feff80867f00f8120300"),
-          genVAluOutput("h800087fe7fffff78fff8001200030000"),
-
-        )
-
-        fork {
-          dut.io.in.enqueueSeq(inputSeq)
-        }.fork {
-          dut.io.out.expectDequeueSeq(outputSeq)
-        }.join()
-        dut.clock.step(1)
-      }
-    }
-  } 
 }
 
 class VAluSpec extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VAluBehavior {
   behavior of "Int fixP test"
   it should behave like vIntFixpTest()
-  // behavior of "Mask/reduction/permutation test"
-  // it should behave like vMaskTest()
 }
