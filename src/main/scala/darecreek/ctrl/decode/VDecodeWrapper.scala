@@ -38,4 +38,5 @@ class VDecodeUnit extends Module {
   io.out.vInfo.ma := RegNext(io.in.v_csr(41))
   io.out.vInfo.ta := RegNext(io.in.v_csr(42))
   io.out.vInfo.destEew := 0.U  // don't care
+  io.out.vInfo.emulVd := 0.U  // don't care
 }

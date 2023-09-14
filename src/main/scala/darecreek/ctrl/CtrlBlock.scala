@@ -104,6 +104,7 @@ class VCtrlBlock extends Module {
   vIllegalInstrn.io.info := decoder.io.out.vInfo
   vIllegalInstrn.io.robPtrIn := vq.io.enqPtrOut
   vq.io.illegal := vIllegalInstrn.io.ill
+  vq.io.partialVInfo := vIllegalInstrn.io.partialVInfo
 
   // ROB
   rob.io.in.valid := io.ovi_issue.valid
@@ -115,6 +116,7 @@ class VCtrlBlock extends Module {
   // rob.io.illegal.bits.info := decoder.io.out.vInfo
   // rob.io.illegalPtr := vq.io.illegalPtr
   rob.io.illegal := vIllegalInstrn.io.ill
+  rob.io.partialVInfo := vIllegalInstrn.io.partialVInfo
   rob.io.fromRename zip rename.io.out map { case (rob, rename) =>
     rob.valid := rename.fire
     rob.bits := rename.bits

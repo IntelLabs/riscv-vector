@@ -32,8 +32,10 @@ class VRob extends Module with HasCircularQueuePtrHelper {
     }
     // OVI dispatch
     val ovi_dispatch = new OVIdispatch
-    // illegal indicator
+    // from VIllegalInstrn.io.ill
     val illegal = Flipped(ValidIO(new VRobPtr))
+    // from VIllegalInstrn.io.partialVInfo
+    val partialVInfo = Flipped(ValidIO(new PartialVInfo))
     // from Rename block
     val fromRename = Vec(VRenameWidth, Input(ValidIO(new VExpdUOp)))
     // writeback from EXU and LSU
@@ -60,8 +62,7 @@ class VRob extends Module with HasCircularQueuePtrHelper {
   val KILL = 2.U(2.W)
   val senior_or_kill = RegInit(VecInit(Seq.fill(VQSize)(0.U(2.W))))
   val oviCompltSigs = Reg(Vec(VQSize, new OviCompltSigs))
-  // logic and physical registers
-  val expdLen = RegInit(VecInit(Seq.fill(VQSize)(0.U(4.W))))
+  val emulVd = RegInit(VecInit(Seq.fill(VQSize)(0.U(4.W))))
   val oneCycleCommit = RegInit(VecInit(Seq.fill(VQSize)(false.B)))  //Commit using only one cycle
 
   val enqPtr = RegInit(0.U.asTypeOf(new VRobPtr))
@@ -92,6 +93,10 @@ class VRob extends Module with HasCircularQueuePtrHelper {
   when (io.illegal.valid) {
     illegal(io.illegal.bits.value) := true.B
     busy(io.illegal.bits.value) := false.B
+  }
+  // Partial VInfo
+  when (io.partialVInfo.valid) {
+    emulVd(io.partialVInfo.bits.vRobPtr.value) := io.partialVInfo.bits.emulVd
   }
 
   /**
@@ -130,8 +135,7 @@ class VRob extends Module with HasCircularQueuePtrHelper {
   val wbA = io.wbArith.bits.uop
   when (io.wbArith.valid) {
     busy(wbA.vRobIdx.value) := !wbA.expdEnd  // Only support in-order write-backs under the same instruction
-    expdLen(wbA.vRobIdx.value) := wbA.expdLen
-    oneCycleCommit(wbA.vRobIdx.value) := wbA.ctrl.narrow_to_1 || wbA.ctrl.redu || wbA.expdLen === 1.U
+    oneCycleCommit(wbA.vRobIdx.value) := wbA.ctrl.narrow_to_1 || wbA.ctrl.redu || wbA.info.emulVd === 1.U
     oviCompltSigs(wbA.vRobIdx.value) := Cat(io.wbArith.bits.fflags, io.wbArith.bits.vxsat,
                                             io.wbArith.bits.rd).asTypeOf(new OviCompltSigs)
   }
@@ -139,14 +143,12 @@ class VRob extends Module with HasCircularQueuePtrHelper {
   val wbL = io.wbLSU(0).bits
   when (io.wbLSU(0).valid) {
     busy(wbL.vRobIdx.value) := !wbL.expdEnd
-    expdLen(wbL.vRobIdx.value) := wbL.expdLen
-    oneCycleCommit(wbL.vRobIdx.value) := wbL.expdLen === 1.U
+    oneCycleCommit(wbL.vRobIdx.value) := wbL.info.emulVd === 1.U
   }
   // Write back of st
   val wbS = io.wbLSU(1).bits
   when (io.wbLSU(1).valid) {
     busy(wbS.vRobIdx.value) := !wbS.expdEnd
-    expdLen(wbS.vRobIdx.value) := wbS.expdLen
     oneCycleCommit(wbS.vRobIdx.value) := true.B
   }
 
@@ -183,7 +185,7 @@ class VRob extends Module with HasCircularQueuePtrHelper {
                   // || illegal(deqPtr.value)) //??
   // Commit finish, deq pointer can + 1
   // Todo: this expression doesn't work out for VCommitWidth > 2
-  val commitEnd = canCommit && (expdCnt === expdLen(deqPtr.value) - 1.U || expdCnt === expdLen(deqPtr.value) - 2.U 
+  val commitEnd = canCommit && (expdCnt === emulVd(deqPtr.value) - 1.U || expdCnt === emulVd(deqPtr.value) - 2.U 
                                 || oneCycleCommit(deqPtr.value) 
                                 || senior_or_kill(deqPtr.value) === KILL
                                 || illegal(deqPtr.value))

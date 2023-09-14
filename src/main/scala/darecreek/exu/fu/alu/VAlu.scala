@@ -278,24 +278,11 @@ class VAlu extends Module {
   readyS2FixP := arb.io.in(0).ready
   readyS1Int := arb.io.in(1).ready
 
-  val uopS1_adjust = Wire(new VExpdUOp) // Adjust expdIdx & expdLen when narrow (to reduce ROB complexity)
-  uopS1_adjust := uopS1
-  when (uopS1.ctrl.narrow) {
-    uopS1_adjust.expdLen := Mux(uopS1.expdLen === 1.U, 1.U, uopS1.expdLen >> 1)
-    uopS1_adjust.expdIdx := uopS1.expdIdx >> 1
-  }
-  val uopS2_adjust = Wire(new VExpdUOp) // Adjust expdIdx & expdLen when narrow
-  uopS2_adjust := uopS2
-  when (uopS2.ctrl.narrow) {
-    uopS2_adjust.expdLen := Mux(uopS2.expdLen === 1.U, 1.U, uopS2.expdLen >> 1)
-    uopS2_adjust.expdIdx := uopS2.expdIdx >> 1
-  }
-
-  arb.io.in(0).bits.uop := uopS2_adjust
+  arb.io.in(0).bits.uop := uopS2
   arb.io.in(0).bits.vd := vdS2FixPFinal
   arb.io.in(0).bits.fflags := 0.U
   arb.io.in(0).bits.vxsat := vxsatS2
-  arb.io.in(1).bits.uop := uopS1_adjust
+  arb.io.in(1).bits.uop := uopS1
   arb.io.in(1).bits.vd := vdS1IntFinal
   arb.io.in(1).bits.fflags := 0.U
   arb.io.in(1).bits.vxsat := false.B
