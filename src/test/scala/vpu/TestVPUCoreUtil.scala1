@@ -1,0 +1,90 @@
+package vpu
+
+import chisel3._
+import chisel3.util._
+import chisel3.experimental.BundleLiterals._
+import chisel3.experimental.VecLiterals._
+import chiseltest._
+import org.scalatest.flatspec.AnyFlatSpec
+import scala.util._
+import utils._
+import darecreek._
+
+class V_csr_bundle extends Bundle {
+  val vill = Bool()
+  val vsew = UInt(3.W)
+  val vlmul = UInt(2.W) // ??
+  val frm = UInt(3.W)
+  val vxrm = UInt(2.W)
+  val vl = UInt(15.W)
+  val vstart = UInt(14.W)
+}
+
+class OviIssueDispth extends Bundle {
+  // OVI issue
+  val inst = UInt(32.W)
+  val scalar_opnd = UInt(64.W)
+  val sb_id = UInt(5.W)
+  val v_csr_bundle = new V_csr_bundle
+  // OVI dispatch (assume they arrive at the same cycle of OVI issue)
+  val next_senior = Bool()
+  val kill = Bool()
+}
+
+class VPUCoreTestWrapper extends Module {
+  val io = IO(new Bundle {
+    val in = Flipped(Decoupled(new OviIssueDispth))
+      // Temp mem io of vpu core
+    val mem_store = Decoupled(Vec(NLanes, UInt(64.W)))
+    // Pre load of temp mem
+    val preLoadMem = Flipped(ValidIO(UInt(2.W))) // vsew    0: 8,  1: 16,  2: 32,  3: 64
+  })
+
+  val vpu = Module(new VPUCore)
+  val dummyMem = Module(new DummyMem)
+  
+  // connect input with vpu input
+  io.in.ready := true.B
+  vpu.io.ovi_issue.valid := io.in.valid
+  vpu.io.ovi_issue.inst := io.in.bits.inst
+  vpu.io.ovi_issue.scalar_opnd := io.in.bits.scalar_opnd
+  vpu.io.ovi_issue.sb_id := io.in.bits.sb_id
+  vpu.io.ovi_issue.v_csr := io.in.bits.v_csr_bundle.asUInt
+  vpu.io.ovi_dispatch.sb_id := io.in.bits.sb_id
+  vpu.io.ovi_dispatch.next_senior := io.in.bits.next_senior
+  vpu.io.ovi_dispatch.kill := io.in.bits.kill
+
+  // connect vpu with mem
+  (dummyMem.io.mem zip vpu.io.mem) map {case (x, y) => x <> y}
+  // mem preload (when sew change)
+  dummyMem.io.preLoadMem := io.preLoadMem
+
+  // probe the mem store data
+  io.mem_store.bits := VecInit(vpu.io.mem.map(x => x.wdata))
+  io.mem_store.valid := vpu.io.mem(0).wen
+}
+
+object LitGen {
+  def oviIssueDispth(sb_id: Int, inst: String, sop: Int = 0, 
+                     vstart: Int = 0, vl: Int, vxrm: Int = 0, frm: Int = 0, 
+                     vlmul: Int, vsew: Int, vill: Boolean = false,
+                     next_senior: Boolean = true, kill: Boolean = false): OviIssueDispth = {
+    (new OviIssueDispth).Lit(
+      _.sb_id -> sb_id.U, _.inst -> inst.U, _.scalar_opnd -> sop.U,
+      _.v_csr_bundle -> (new V_csr_bundle).Lit(_.vstart -> vstart.U, _.vl -> vl.U, _.vxrm -> vxrm.U,
+                         _.frm  -> frm.U, _.vlmul -> vlmul.U, _.vsew -> vsew.U, _.vill -> vill.B),
+      _.next_senior -> next_senior.B, _.kill -> kill.B
+    )
+  }
+
+  def memStore(stData: Seq[Int]): Vec[UInt] = {
+    Vec(4, UInt(64.W)).Lit(0 -> stData(0).U, 1 -> stData(1).U, 2 -> stData(2).U, 3 -> stData(3).U)
+  }
+}
+
+object VSEW {
+  val SEW_IS_8 = 0.U
+  val SEW_IS_16 = 1.U
+  val SEW_IS_32 = 2.U
+  val SEW_IS_64 = 3.U
+}

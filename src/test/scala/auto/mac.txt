@@ -1,0 +1,15 @@
+vmul_vv
+vmulh_vv
+vmulhu_vv
+vmulhsu_vv
+vmacc_vv
+vnmsac_vv
+vmadd_vv
+vnmsub_vv
+vsmul_vv
+vwmul_vv
+vwmulu_vv
+vwmulsu_vv
+vwmacc_vv
+vwmaccu_vv
+vwmaccsu_vv

@@ -1,0 +1,67 @@
+package vpu
+
+import chisel3._
+import chisel3.util._
+import chisel3.experimental.BundleLiterals._
+import chisel3.experimental.VecLiterals._
+import chiseltest._
+import org.scalatest.flatspec.AnyFlatSpec
+import scala.util._
+import darecreek._
+import VSEW._
+
+class TestVPUCore extends AnyFlatSpec with ChiselScalatestTester {
+
+  "Simple test of VPU Core (temp LSU and Mem)" should "pass" in {
+    test(new VPUCoreTestWrapper) { dut => 
+      dut.io.in.valid.poke(false.B)
+      dut.io.preLoadMem.valid.poke(true.B)
+      dut.io.preLoadMem.bits.poke(SEW_IS_64)
+      dut.clock.step(1)
+      dut.io.preLoadMem.valid.poke(false.B)
+      dut.clock.step(1)
+
+      // Source init
+      dut.io.in.initSource()
+      dut.io.in.setSourceClock(dut.clock)
+      // Sink init
+      dut.io.mem_store.initSink()
+      dut.io.mem_store.setSinkClock(dut.clock)
+
+      //-----------------------------
+      // vle64.v   v0, (a1)   lmul=4
+      // vle64.v   v4, (a2)   lmul=4
+      // vadd.vv   v8, v4, v0   lmul=4
+      // vse64.v   v8, (a1)   lmul=4
+      //-----------------------------
+
+      // ---- vsew    0: 8,  1: 16,  2: 32,  3: 64
+      // ---- vlmul   0: 1,  1: 2,   2: 4,   3: 8
+      var inputSeq = Seq(
+        // load, lmul = 4
+        LitGen.oviIssueDispth(sb_id=0, inst="b000000_1_00000_00001_111_00000_0000111", sop=0, vl=4, vlmul=2, vsew=3),
+        LitGen.oviIssueDispth(sb_id=1, inst="b000000_1_00000_00001_111_00100_0000111", sop=16, vl=4, vlmul=2, vsew=3),
+        // // add, lmul = 4
+        LitGen.oviIssueDispth(sb_id=2, inst="b000000_1_00100_00000_000_01000_1010111", sop=0, vl=4, vlmul=2, vsew=3),
+        // store, lmul = 4
+        LitGen.oviIssueDispth(sb_id=3, inst="b000000_1_00000_00001_111_01000_0100111", sop=0, vl=4, vlmul=2, vsew=3),
+      )
+
+      val memStore = Seq(0+16, 1+17, 2+18, 3+19)
+      var resultSeq = Seq(
+        LitGen.memStore(memStore),
+        LitGen.memStore(memStore.map(_ + 8)),
+        LitGen.memStore(memStore.map(_ + 16)),
+        LitGen.memStore(memStore.map(_ + 24)),
+      )
+      
+      fork {
+        dut.io.in.enqueueSeq(inputSeq)
+      }.fork{
+        dut.io.mem_store.expectDequeueSeq(resultSeq)
+      }.join()
+      dut.clock.step(4)
+    }
+  }
+
+}
