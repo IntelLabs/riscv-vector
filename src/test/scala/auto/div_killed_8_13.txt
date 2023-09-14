@@ -1,0 +1,6 @@
+vrem_vv
+vremu_vv
+vrem_vx
+vremu_vx
+vfdiv_vv
+vfsqrt_v
