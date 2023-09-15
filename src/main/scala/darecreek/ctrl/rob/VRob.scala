@@ -1,9 +1,10 @@
 /** OVI (Open Vector Interface) adoption
-  * Note: following signal does not support VCommitWidth > 2
-  *       1) deqPtrRhb
-  *       2) io.commits.valid
-  */
-
+ *    Every instrucion in VRob will finally be commited OR flushed
+ * 
+ *  Note: following signal does not support VCommitWidth > 2
+ *        1) deqPtrRhb
+ *        2) io.commits.valid
+ */
 package darecreek
 
 import chisel3._
@@ -12,8 +13,8 @@ import utils._
 import darecreek.util._
 
 class OviCompltSigs extends Bundle {
-  val fflags = UInt(5.W) // Floating-point accrued exception flag
-  val vxsat = Bool() // Fixed-point accrued saturation flag
+  val fflags = UInt(5.W)
+  val vxsat = Bool()
   val rd = UInt(xLen.W)
 }
 
@@ -41,7 +42,7 @@ class VRob extends Module with HasCircularQueuePtrHelper {
     val partialVInfo = Flipped(ValidIO(new PartialVInfo))
     // from Rename block
     val fromRename = Vec(VRenameWidth, Input(ValidIO(new VExpdUOp)))
-    // writeback from EXU and LSU
+    // writebacks from EXU and LSU
     val wbArith = Flipped(ValidIO(new WbArith))
     val wbLSU = Vec(2, Flipped(ValidIO(new VExpdUOp)))
     // OVI completed
@@ -160,36 +161,34 @@ class VRob extends Module with HasCircularQueuePtrHelper {
   //   will not be set for any instruction that receives a dispatch.kill.
   val compltPtr = RegInit(0.U.asTypeOf(new VRobPtr))
   val canComplete = senior_or_kill(compltPtr.value) === NEXT_SENIOR && !busy(compltPtr.value) && valid(compltPtr.value)
-  io.ovi_completed.valid := canComplete
-  io.ovi_completed.sb_id := sb_id(compltPtr.value)
-  io.ovi_completed.illegal := illegal(compltPtr.value)
+  val ovi_completed = Wire(new OVIcompleted)
+  ovi_completed.valid := canComplete
+  ovi_completed.sb_id := sb_id(compltPtr.value)
+  ovi_completed.illegal := illegal(compltPtr.value)
   // !! Fake !!
-  io.ovi_completed.vstart := 0.U  // !! Fake
-  io.ovi_completed.fflags := oviCompltSigs(compltPtr.value).fflags
-  io.ovi_completed.vxsat := oviCompltSigs(compltPtr.value).vxsat
-  io.ovi_completed.dest_reg := oviCompltSigs(compltPtr.value).rd
+  ovi_completed.vstart := 0.U  // !! Fake
+  ovi_completed.fflags := oviCompltSigs(compltPtr.value).fflags
+  ovi_completed.vxsat := oviCompltSigs(compltPtr.value).vxsat
+  ovi_completed.dest_reg := oviCompltSigs(compltPtr.value).rd
   when (canComplete || valid(compltPtr.value) && senior_or_kill(compltPtr.value) === KILL) {
     compltPtr := compltPtr + 1.U
   }
+  io.ovi_completed := RegEnable(ovi_completed, ovi_completed.valid)
+  io.ovi_completed.valid := RegNext(ovi_completed.valid)
 
   /**
     * Commit
     */
-  // Commit pointer
+  // Deq pointer (commit or flush)
   val deqPtr = RegInit(0.U.asTypeOf(new VRobPtr))
   val expdCnt = RegInit(0.U(3.W))
   // Can commit for expanded instructions (may need multiple cycles)
   val canCommit = valid(deqPtr.value) && (
-                     senior_or_kill(deqPtr.value) === NEXT_SENIOR && !busy(deqPtr.value)
-                  || senior_or_kill(deqPtr.value) === KILL //??
-                  || illegal(deqPtr.value)) //??
-  // Commit finish, deq pointer can + 1
+                     senior_or_kill(deqPtr.value) === NEXT_SENIOR && !busy(deqPtr.value))
   val vdRemain = emulVd(deqPtr.value) - expdCnt
+  // Commit finish, deq pointer can + 1
   val commitEnd = canCommit && (vdRemain <= VCommitWidth.U 
-                                || !ldestVal(deqPtr.value)
-                                || senior_or_kill(deqPtr.value) === KILL
-                                || illegal(deqPtr.value))
-  when (commitEnd) { deqPtr := deqPtr + 1.U }
+                                || !ldestVal(deqPtr.value))
   when (commitEnd) {
     expdCnt := 0.U
   }.elsewhen(canCommit) {
@@ -199,46 +198,49 @@ class VRob extends Module with HasCircularQueuePtrHelper {
     valid(deqPtr.value) := false.B
     senior_or_kill(deqPtr.value) := 0.U
   }
+  val commitInfo = Wire(new VRobCommitIO)
 
   // !! Only works for VCommitWidth = 2
   when (canCommit && ldestVal(deqPtr.value)) { 
       deqPtrRhb := deqPtrRhb + Mux(vdRemain === 1.U, 1.U, VCommitWidth.U)
   }
   when (canCommit) { 
-    io.commits.valid(0) := true.B
-    io.commits.valid(VCommitWidth - 1) := Mux(vdRemain === 1.U, false.B, true.B)
+    commitInfo.valid(0) := true.B
+    commitInfo.valid(VCommitWidth - 1) := Mux(vdRemain === 1.U, false.B, true.B)
   }.otherwise {
-    io.commits.valid.foreach(_ := false.B)
+    commitInfo.valid.foreach(_ := false.B)
   }
 
   for (i <- 0 until VCommitWidth) {
-    io.commits.info(i).pdestVal := rhb((deqPtrRhb + i.U).value).pdestVal
-    io.commits.info(i).ldest := rhb((deqPtrRhb + i.U).value).ldest
-    io.commits.info(i).pdest := rhb((deqPtrRhb + i.U).value).pdest
-    io.commits.info(i).old_pdest := rhb((deqPtrRhb + i.U).value).old_pdest
+    commitInfo.info(i).pdestVal := rhb((deqPtrRhb + i.U).value).pdestVal
+    commitInfo.info(i).ldest := rhb((deqPtrRhb + i.U).value).ldest
+    commitInfo.info(i).pdest := rhb((deqPtrRhb + i.U).value).pdest
+    commitInfo.info(i).old_pdest := rhb((deqPtrRhb + i.U).value).old_pdest
   }
+  io.commits.valid := RegNext(commitInfo.valid)
+  io.commits.info := RegEnable(commitInfo.info, commitInfo.valid(0))
 
-  // Flush
-  val flush = RegInit(false.B)
-  val flushPtr = Reg(new VRobPtr)
-  when (commitEnd) {
-    flush := (senior_or_kill(deqPtr.value) === KILL)
-    flushPtr := deqPtr
-  }.otherwise {
-    flush := false.B
-    flushPtr := flushPtr
+  /** Flush */
+  val canFlush = valid(deqPtr.value) && senior_or_kill(deqPtr.value) === KILL
+  val flush = canFlush
+  io.flush.valid := RegNext(canFlush)
+  io.flush.bits := RegEnable(deqPtr, flush)
+
+  // Update deq status
+  when (commitEnd || flush) { 
+    deqPtr := deqPtr + 1.U
+    valid(deqPtr.value) := false.B
+    senior_or_kill(deqPtr.value) := 0.U
   }
-  io.flush.valid := flush
-  io.flush.bits := flushPtr
 
   // Credit
   val credit = RegInit(false.B)
-  credit := commitEnd
+  credit := commitEnd || flush
   io.ovi_issueCredit := credit
 
   /**
     *  Debug
     */
-  io.rvfi_sb_id := sb_id(deqPtr.value)
-  io.commitEnd := commitEnd
+  io.rvfi_sb_id := RegNext(sb_id(deqPtr.value))
+  io.commitEnd := RegNext(commitEnd)
 }
