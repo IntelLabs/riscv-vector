@@ -489,11 +489,13 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   cmp_tail_vd := old_vd_vl_mask | (cmpOutResult & vd_vl_mask)
 
   val narrow_vd = Wire(UInt(VLEN.W))
-  narrow_vd := Mux(io.out.bits.uop.ctrl.narrow, Cat(vd(1)(63, 32), vd(0)(63, 32), vd(1)(31, 0), vd(0)(31, 0)), Cat(vd.reverse))
-
-  val vstart_gte_vl = io.out.bits.uop.info.vstart >= io.out.bits.uop.info.vl
+  val normal_tail_vd = Wire(UInt(VLEN.W))
+  narrow_vd := Cat(vd(1)(63, 32), vd(0)(63, 32), vd(1)(31, 0), vd(0)(31, 0))
   val narrow_tail_vd = narrow_vd & Cat(maskKeep(1)(63, 32), maskKeep(0)(63, 32), maskKeep(1)(31, 0), maskKeep(0)(31, 0)) |
     Cat(maskOff(1)(63, 32), maskOff(0)(63, 32), maskOff(1)(31, 0), maskOff(0)(31, 0))
+  normal_tail_vd := Cat(vd.reverse) & Cat(maskKeep.reverse) | Cat(maskOff.reverse)
+
+  val vstart_gte_vl = io.out.bits.uop.info.vstart >= io.out.bits.uop.info.vl
 
   val red_fflag = RegInit(0.U(5.W))
 
@@ -503,7 +505,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
     red_fflag := red_fflag | fpu(0).io.out.bits.fflags
   }
 
-  io.out.bits.vd := Mux(output_en, output_data, Mux(io.out.bits.uop.ctrl.narrow_to_1, cmp_tail_vd, narrow_tail_vd))
+  io.out.bits.vd := Mux(output_en, output_data, Mux(io.out.bits.uop.ctrl.narrow_to_1, cmp_tail_vd, Mux(io.out.bits.uop.ctrl.narrow, narrow_tail_vd, normal_tail_vd)))
   io.in.ready := fpu(0).io.in.ready & fpu(1).io.in.ready & io.out.ready & !red_busy
   io.out.bits.fflags := Mux(vstart_gte_vl, 0.U, Mux(output_en, red_fflag, fpu(0).io.out.bits.fflags | fpu(1).io.out.bits.fflags))
   io.out.valid := Mux(output_en, output_valid, Mux(io.out.bits.uop.ctrl.narrow_to_1, io.out.bits.uop.uopEnd & fpu(0).io.out.valid & !red_busy, fpu(0).io.out.valid & !red_busy))
