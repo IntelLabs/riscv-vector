@@ -1,5 +1,6 @@
-/**
-  * OVI (Open Vector Interface) adoption
+/** OVI (Open Vector Interface) adoption
+  * Note: following code does not support VCommitWidth > 2
+  *       1) deqPtrRhb update
   */
 
 package darecreek
@@ -25,10 +26,11 @@ class RenameHistoryBufferEntry extends Bundle {
 
 class VRob extends Module with HasCircularQueuePtrHelper {
   val io = IO(new Bundle {
-    // OVI issue
+    // from decoder
     val in = new Bundle {
-      val sb_id = Input(UInt(5.W))
       val valid = Input(Bool())
+      val sb_id = Input(UInt(5.W))
+      val ldestVal = Input(Bool())
     }
     // OVI dispatch
     val ovi_dispatch = new OVIdispatch
@@ -62,20 +64,21 @@ class VRob extends Module with HasCircularQueuePtrHelper {
   val KILL = 2.U(2.W)
   val senior_or_kill = RegInit(VecInit(Seq.fill(VQSize)(0.U(2.W))))
   val oviCompltSigs = Reg(Vec(VQSize, new OviCompltSigs))
+  val ldestVal = Reg(Vec(VQSize, Bool()))
   val emulVd = RegInit(VecInit(Seq.fill(VQSize)(0.U(4.W))))
   val oneCycleCommit = RegInit(VecInit(Seq.fill(VQSize)(false.B)))  //Commit using only one cycle
-
-  val enqPtr = RegInit(0.U.asTypeOf(new VRobPtr))
 
   /**
     * Enq
     */
+  val enqPtr = RegInit(0.U.asTypeOf(new VRobPtr))
   when (io.in.valid) {
     sb_id(enqPtr.value) := io.in.sb_id
     valid(enqPtr.value) := true.B
     busy(enqPtr.value) := true.B
     illegal(enqPtr.value) := false.B
     oviCompltSigs(enqPtr.value) := 0.U.asTypeOf(new OviCompltSigs)
+    ldestVal(enqPtr.value) := io.in.ldestVal
   }
   when (io.in.valid) { enqPtr := enqPtr + 1.U }
 
@@ -184,8 +187,8 @@ class VRob extends Module with HasCircularQueuePtrHelper {
                   // || senior_or_kill(deqPtr.value) === KILL //??
                   // || illegal(deqPtr.value)) //??
   // Commit finish, deq pointer can + 1
-  // Todo: this expression doesn't work out for VCommitWidth > 2
-  val commitEnd = canCommit && (expdCnt === emulVd(deqPtr.value) - 1.U || expdCnt === emulVd(deqPtr.value) - 2.U 
+  val vdRemain = emulVd(deqPtr.value) - expdCnt
+  val commitEnd = canCommit && (vdRemain <= VCommitWidth.U 
                                 || oneCycleCommit(deqPtr.value) 
                                 || senior_or_kill(deqPtr.value) === KILL
                                 || illegal(deqPtr.value))
@@ -200,48 +203,60 @@ class VRob extends Module with HasCircularQueuePtrHelper {
     senior_or_kill(deqPtr.value) := 0.U
   }
 
+  // !! Only works for VCommitWidth = 2
+  when (canCommit && ldestVal(deqPtr.value)) { 
+      deqPtrRhb := deqPtrRhb + Mux(vdRemain === 1.U, 1.U, VCommitWidth.U)
+  }
+  // when (senior_or_kill(deqPtr.value) === KILL || illegal(deqPtr.value)) {
+  //   deqPtrRhb := deqPtrRhb
+  // }.elsewhen (oneCycleCommit(deqPtr.value)) {
+  //   deqPtrRhb := Mux(canCommit, deqPtrRhb + 1.U, deqPtrRhb)
+  // }.otherwise {
+  //   deqPtrRhb := Mux(canCommit, deqPtrRhb + VCommitWidth.U, deqPtrRhb)
+  // }
+
   // Payload of the Commit
   for (i <- 0 until VCommitWidth) {
     // valid            // Todo: ld/st segment needs modification
     when (senior_or_kill(deqPtr.value) === KILL || illegal(deqPtr.value)) {
       io.commits.valid(i) := false.B
-
-      deqPtrRhb := deqPtrRhb
     }.elsewhen (oneCycleCommit(deqPtr.value)) {
       if (i == 0) {io.commits.valid(i) := canCommit}
       else {io.commits.valid(i) := false.B}
-
-      deqPtrRhb := Mux(canCommit, deqPtrRhb + 1.U, deqPtrRhb)
     }.otherwise {
       io.commits.valid(i) := canCommit
-
-      deqPtrRhb := Mux(canCommit, deqPtrRhb + VCommitWidth.U, deqPtrRhb)
     }
 
     // pdest valid
-    when (oneCycleCommit(deqPtr.value)) {
-      if (i == 0) { io.commits.info(i).pdestVal := rhb(deqPtrRhb.value).pdestVal }
-      else { io.commits.info(i).pdestVal := false.B }
-    }.otherwise {
-      io.commits.info(i).pdestVal := rhb((deqPtrRhb + i.U).value).pdestVal
-    }
+    io.commits.info(i).pdestVal := rhb((deqPtrRhb + i.U).value).pdestVal
+
+    // when (oneCycleCommit(deqPtr.value)) {
+    //   if (i == 0) { io.commits.info(i).pdestVal := rhb(deqPtrRhb.value).pdestVal }
+    //   else { io.commits.info(i).pdestVal := false.B }
+    // }.otherwise {
+    //   io.commits.info(i).pdestVal := rhb((deqPtrRhb + i.U).value).pdestVal
+    // }
 
     // others
-    when (oneCycleCommit(deqPtr.value)) {
-      if (i == 0) {
-        io.commits.info(i).ldest := rhb(deqPtrRhb.value).ldest
-        io.commits.info(i).pdest := rhb(deqPtrRhb.value).pdest
-        io.commits.info(i).old_pdest := rhb(deqPtrRhb.value).old_pdest
-      } else {
-        io.commits.info(i).ldest := 0.U
-        io.commits.info(i).pdest := 0.U
-        io.commits.info(i).old_pdest := 0.U
-      }
-    }.otherwise {
-      io.commits.info(i).ldest := rhb((deqPtrRhb + i.U).value).ldest
-      io.commits.info(i).pdest := rhb((deqPtrRhb + i.U).value).pdest
-      io.commits.info(i).old_pdest := rhb((deqPtrRhb + i.U).value).old_pdest
-    }
+    io.commits.info(i).ldest := rhb((deqPtrRhb + i.U).value).ldest
+    io.commits.info(i).pdest := rhb((deqPtrRhb + i.U).value).pdest
+    io.commits.info(i).old_pdest := rhb((deqPtrRhb + i.U).value).old_pdest
+
+    // when (oneCycleCommit(deqPtr.value)) {
+    //   if (i == 0) {
+    //     io.commits.info(i).ldest := rhb(deqPtrRhb.value).ldest
+    //     io.commits.info(i).pdest := rhb(deqPtrRhb.value).pdest
+    //     io.commits.info(i).old_pdest := rhb(deqPtrRhb.value).old_pdest
+    //   } else {
+    //     io.commits.info(i).ldest := 0.U
+    //     io.commits.info(i).pdest := 0.U
+    //     io.commits.info(i).old_pdest := 0.U
+    //   }
+    // }.otherwise {
+    //   io.commits.info(i).ldest := rhb((deqPtrRhb + i.U).value).ldest
+    //   io.commits.info(i).pdest := rhb((deqPtrRhb + i.U).value).pdest
+    //   io.commits.info(i).old_pdest := rhb((deqPtrRhb + i.U).value).old_pdest
+    // }
   }
 
   // Flush
