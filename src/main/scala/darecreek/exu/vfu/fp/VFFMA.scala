@@ -179,6 +179,9 @@ class MulToAddIOVec(val ftypes: Seq[VFPU.FType])(implicit val p: Parameters) ext
   val mulOutElmt0Vec = MixedVec(ftypes.map(t => new FMULToFADD(t.expWidth, t.precision))) // 32 bit + 64 bit
   val mulOutElmt1 = new FMULToFADD(VFPU.f32.expWidth, VFPU.f32.precision) // 32 bit
   val addend = UInt(ftypes.map(_.len).max.W)
+  val prestart = UInt(8.W)
+  val mask = UInt(8.W)
+  val tail = UInt(8.W)
   val uop = new VFPUOp
 
 //  def getFloat0 = mul_out_0.head
@@ -264,6 +267,9 @@ class VFMUL_pipe(val mulLat: Int = 2)(implicit val p: Parameters)
   // output logic
   // to adder
   toAdd.addend := S2Reg(S1Reg(io.in.bits.old_vd))
+  toAdd.prestart  := S2Reg(S1Reg(io.in.bits.prestart))
+  toAdd.mask := S2Reg(S1Reg(io.in.bits.mask))
+  toAdd.tail := S2Reg(S1Reg(io.in.bits.tail))
   toAdd.mulOutElmt0Vec.zip(stage3Elmt0.map(_.io.to_fadd)).foreach(x => x._1 := x._2)
   toAdd.mulOutElmt1 := stage3Elmt1.io.to_fadd
   toAdd.uop := uopVec.last
@@ -393,6 +399,10 @@ class VFFMA(implicit val p: Parameters) extends VFPUSubModule {
   // Since FADD gets FMUL data from add_pipe.mulToAdd, only uop needs Mux.
   add_pipe.io.in.valid := sourcePrepare.io.out.valid && isAddSub || mulOutIsFMAReg // isAddSub or FMAfromMulPipe
   add_pipe.io.in.bits := sourcePrepare.io.out.bits
+  add_pipe.io.in.bits.prestart := Mux(mulOutIsFMAReg, add_pipe.mulToAddVec.prestart, sourcePrepare.io.out.bits.prestart)
+  add_pipe.io.in.bits.mask := Mux(mulOutIsFMAReg, add_pipe.mulToAddVec.mask, sourcePrepare.io.out.bits.mask)
+  add_pipe.io.in.bits.tail := Mux(mulOutIsFMAReg, add_pipe.mulToAddVec.tail, sourcePrepare.io.out.bits.tail)
+
   add_pipe.io.redirect := sourcePrepare.io.redirectOut
   add_pipe.io.in.bits.uop := Mux(mulOutIsFMAReg, add_pipe.mulToAddVec.uop, sourcePrepare.io.out.bits.uop)
   add_pipe.isFMA := mulOutIsFMAReg
