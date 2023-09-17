@@ -162,7 +162,7 @@ class VFMiscDataModule(implicit val p: Parameters) extends VFPUPipelineModule {
   val mergeResult = Seq.fill(2)(Wire(UInt(32.W)))  // default vfmv.v.f
   mergeResult(1) := Mux(!uop.ctrl.vm && !mask(0), vs2.tail(32), vs1.tail(32))  // tail32b
   mergeResult(0) := Mux(
-    !uop.ctrl.vm && ((typeTagIn === VFPU.D && !mask(0)) || (typeTagIn === VFPU.S && !mask(1))),
+    !uop.ctrl.vm && ((typeTagIn === VFPU.D && !mask(0)) || (typeTagIn === VFPU.S && !mask(4))),
     vs2.head(32),
     vs1.head(32)
   )
