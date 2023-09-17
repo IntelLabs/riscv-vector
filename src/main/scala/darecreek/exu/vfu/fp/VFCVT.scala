@@ -156,8 +156,8 @@ class VFCVTDataModule(implicit val p: Parameters) extends VFPUPipelineModule {
   i2d.io.int := Mux(
     uop.ctrl.widen && state === State.sWiden, // widening cycle1 included
     zeroExt(src.head(32), 64),
-    Mux(uop.ctrl.widen && state === State.sEmpty,  zeroExt(src.tail(32), 64),
-    src)
+    Mux(uop.ctrl.widen && state === State.sEmpty, zeroExt(src.tail(32), 64),
+      src)
   )
   i2d.io.sign := ctrl.cvtSigned
   i2d.io.rm := rm1
@@ -167,7 +167,7 @@ class VFCVTDataModule(implicit val p: Parameters) extends VFPUPipelineModule {
   val i2fOut = Mux(isTypeSingle && !uop.ctrl.widen, i2sResult, i2d.io.result)
   val i2sfflags = Seq(i2sX1, i2sX2).zipWithIndex.map(x => x._1.io.fflags & Fill(5, eleActives(x._2))) // X1tail, X2head
   val i2dfflags = i2d.io.fflags & Mux(state === State.sWiden, Fill(5, eleActives(1)), Fill(5, eleActives(0)))
-  val i2sNarrowFlag = i2sfflags(0)
+  val i2sNarrowFlag = i2sX1.io.fflags & Mux(state === State.sNarrow, Fill(5, eleActives(1)), Fill(5, eleActives(0)))
   val i2fFlagOut = Mux(isTypeSingle && !uop.ctrl.widen, i2sfflags.reduce(_ | _), i2dfflags)
 
   // narrowing output handling
