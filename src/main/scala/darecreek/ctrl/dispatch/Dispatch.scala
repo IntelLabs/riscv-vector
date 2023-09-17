@@ -20,15 +20,14 @@ class VDispatch extends Module {
       val toStaIQ = Vec(VRenameWidth, Decoupled(new VExpdUOp))
       // val toStdIQ = Vec(VRenameWidth, Decoupled(new VExpdUOp))
     }
-    // val toRob = Vec(VRenameWidth, Decoupled(new VExpdUOp))
-    // // Allocated PRegs from Rename (to update the busy table)
-    // val allocPregs = Vec(VRenameWidth, ValidIO(UInt(VPRegIdxWidth.W)))
+    val toRob = Vec(VRenameWidth, Decoupled(new VExpdUOp))
     // To read the busy table
     val readBusyTable = Vec(VRenameWidth, Vec(4, Output(UInt(VPRegIdxWidth.W))))
     val flush = Input(Bool())
   })
 
   val inputHasValid = Cat(io.in.map(_.valid)).orR
+  val rdyRob = io.toRob(0).ready
   for (i <- 0 until VRenameWidth) {
     val canOut = io.out.toArithIQ(0).ready && io.out.toLdIQ(0).ready &&
                  io.out.toStaIQ(0).ready // && io.out.toStdIQ(0).ready && io.toRob(0).ready
@@ -37,19 +36,21 @@ class VDispatch extends Module {
     val isArith = io.in(i).bits.ctrl.arith
     val isLd = io.in(i).bits.ctrl.load
     val isSt = io.in(i).bits.ctrl.store
+    val rdyArith = io.out.toArithIQ(0).ready
+    val rdyLd = io.out.toLdIQ(0).ready
+    val rdySta = io.out.toStaIQ(0).ready
     
     // -- NOTE: so far there is only one arithmetic issue queue (NArithIQs = 1)
-    io.out.toArithIQ(i).valid := io.in(i).valid && isArith
-    io.out.toLdIQ(i).valid := io.in(i).valid && isLd
-    io.out.toStaIQ(i).valid := io.in(i).valid && isSt
+    io.out.toArithIQ(i).valid := io.in(i).valid && isArith && rdyLd && rdySta && rdyRob
+    io.out.toLdIQ(i).valid := io.in(i).valid && isLd && rdyArith && rdySta && rdyRob
+    io.out.toStaIQ(i).valid := io.in(i).valid && isSt && rdyArith && rdyLd && rdyRob
     // io.out.toStdIQ(i).valid := io.in(i).valid && isSt
+    io.toRob(i).valid := io.in(i).valid && rdyArith && rdyLd && rdySta
     io.out.toArithIQ(i).bits := io.in(i).bits
     io.out.toLdIQ(i).bits := io.in(i).bits
     io.out.toStaIQ(i).bits := io.in(i).bits
     // io.out.toStdIQ(i).bits := io.in(i).bits
-
-    // io.toRob(i).bits := io.in(i).bits
-    // io.toRob(i).valid := io.in(i).valid
+    io.toRob(i).bits := io.in(i).bits
 
     // // To write busy table 
     // io.allocPregs(i).valid := io.in(i).valid && io.in(i).bits.pdestVal && !io.flush
