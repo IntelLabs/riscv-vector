@@ -110,6 +110,7 @@ class VInfo extends Bundle {
   val ta = Bool() // tail agnostic
   // val lmul = UInt(4.W) // 1, 2, 4, 8
   val destEew = UInt(3.W) // Destination EEW
+  val emulVd = UInt(4.W)
   // val wenRF = Bool() // RF wen. E.g., vstart >= vl or vl=0 
 }
 

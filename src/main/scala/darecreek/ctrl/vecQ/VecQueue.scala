@@ -13,15 +13,11 @@ class VRobPtr extends CircularQueuePtr[VRobPtr](VQSize)
 
 class VecQueue extends Module with HasCircularQueuePtrHelper {
   val io = IO(new Bundle {
-    val in = new Bundle {
-      val vCtrl = Input(new VCtrl)
-      val scalar_opnd = Input(UInt(64.W))
-      val sb_id = Input(UInt(5.W))
-      val vInfo = Input(new VInfo)
-      val valid = Input(Bool())
-    }
-    // illegal indicator
+    val in = Flipped(ValidIO(new VDecodeOut))
+    // from VIllegalInstrn.io.ill
     val illegal = Flipped(ValidIO(new VRobPtr))
+    // from VIllegalInstrn.io.partialVInfo
+    val partialVInfo = Flipped(ValidIO(new PartialVInfo))
     // flush from ROB
     val flush = Flipped(ValidIO(new VRobPtr))
     // to illegal instrn module
@@ -47,10 +43,10 @@ class VecQueue extends Module with HasCircularQueuePtrHelper {
     * Enq
     */
   when (io.in.valid) {
-    vq(enqPtr.value).ctrl := io.in.vCtrl
-    vq(enqPtr.value).info := io.in.vInfo
-    sop(enqPtr.value) := io.in.scalar_opnd
-    sb_id(enqPtr.value) := io.in.sb_id
+    vq(enqPtr.value).ctrl := io.in.bits.vCtrl
+    vq(enqPtr.value).info := io.in.bits.vInfo
+    sop(enqPtr.value) := io.in.bits.scalar_opnd
+    sb_id(enqPtr.value) := io.in.bits.sb_id
     valid(enqPtr.value) := true.B
     ill(enqPtr.value) := false.B
   }
@@ -60,6 +56,11 @@ class VecQueue extends Module with HasCircularQueuePtrHelper {
   /** Illegal instrn */
   when (io.illegal.valid) {
     ill(io.illegal.bits.value) := true.B
+  }
+
+  // Partial VInfo
+  when (io.partialVInfo.valid) {
+    vq(io.partialVInfo.bits.vRobPtr.value).info.emulVd := io.partialVInfo.bits.emulVd
   }
 
   /**
@@ -74,6 +75,12 @@ class VecQueue extends Module with HasCircularQueuePtrHelper {
   io.out.bits.info := vq(deqPtr.value).info
   io.out.bits.sb_id := sb_id(deqPtr.value)
   io.out.bits.vRobIdx := deqPtr
+
+  when (io.out.fire) {
+    when (io.partialVInfo.valid && io.partialVInfo.bits.vRobPtr === deqPtr) {
+      io.out.bits.info.emulVd := io.partialVInfo.bits.emulVd
+    }
+  }
 
   // deqPtr := Mux(io.flush.valid, 0.U, deqPtr + Mux(io.out.fire, 1.U, 0.U))
   deqPtr := Mux(io.flush.valid, io.flush.bits + 1.U, 
