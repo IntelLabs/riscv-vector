@@ -1,11 +1,13 @@
 /** OVI (Open Vector Interface) adoption
  *    Every instrucion in VRob will finally be commited OR flushed
- * 
- *  Notes: following signal does not support VCommitWidth > 2
- *         1) deqPtrRhb
- *         2) io.commits.valid
- *  Features: 1) Decoupled rename history buffer
- *            2) Small rd (scalar dest) buffer, source of io.fromDispatch.ready
+ *  Notes:
+ *    1) following signal does not support VCommitWidth > 2
+ *      a) deqPtrRhb
+ *      b) io.commits.valid
+ *    2) Currently the ovi_completed is ordered 
+ *  Features: 
+ *    1) Decoupled rename history buffer
+ *    2) Small rd (scalar dest) buffer, source of io.fromDispatch.ready
  */
 package darecreek
 

@@ -217,9 +217,9 @@ class VAlu(implicit p: Parameters) extends VFuModule {
   val mask16b = MaskExtract(io.in.bits.mask, maskIdx, eewVm)
   for (i <- 0 until 2) {
     vIntFixpAlu64bs(i).io.vmask := 
-      mask16_to_2x8(mask16b, eewVm)(i)
+      MaskExtract.mask16_to_2x8(mask16b, eewVm)(i)
     vIntFixpAlu64bs(i).io.oldVd := // only for compare instrution
-      mask16_to_2x8(MaskExtract(oldVd, uopIdx, sew), sew)(i)
+      MaskExtract.mask16_to_2x8(MaskExtract(oldVd, uopIdx, sew), sew)(i)
   }
 
   /**
@@ -346,19 +346,6 @@ class VAlu(implicit p: Parameters) extends VFuModule {
                      Mux(uopIdxS1(0), Cat(updateType.drop(VLENB/2).map(_(1) === false.B).reverse),
                                       Cat(updateType.take(VLENB/2).map(_(1) === false.B).reverse))
                      ).orR
-  }
-
-
-  //---- Some methods ----
-  def mask16_to_2x8(maskIn: UInt, sew: SewOH): Seq[UInt] = {
-    require(maskIn.getWidth == 16)
-    val result16 = Mux1H(Seq(
-      sew.is8  -> maskIn,
-      sew.is16 -> Cat(0.U(4.W), maskIn(7, 4), 0.U(4.W), maskIn(3, 0)),
-      sew.is32 -> Cat(0.U(6.W), maskIn(3, 2), 0.U(6.W), maskIn(1, 0)),
-      sew.is64 -> Cat(0.U(7.W), maskIn(1), 0.U(7.W), maskIn(0)),
-    ))
-    Seq(result16(7, 0), result16(15, 8))
   }
 }
 
