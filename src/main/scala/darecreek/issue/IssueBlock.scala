@@ -1,8 +1,6 @@
 /**
   * IssueBlock: issue queues + physical register file
-  *   Constrain: So far only one arith IQ is supported
-  * 
-  * TODO: flush handling
+  *   So far only one arith IQ is supported
   */
 
 package darecreek
@@ -77,8 +75,7 @@ class VIssueBlock extends Module {
   wbRFAddrs(1).valid := io.fromLSU.ld.valid && io.fromLSU.ld.bits.uop.pdestVal
   wbRFAddrs(1).bits := io.fromLSU.ld.bits.uop.pdest
 
-  /**
-    * ---- Arithmetic ----
+  /** ---- Arithmetic ----
     *  IQ --> Read RF --> EXU
     */
   val validPipe_arith = RegInit(false.B)
@@ -104,7 +101,9 @@ class VIssueBlock extends Module {
   io.get_rs1.exu.addr := arithIQ.io.out.bits.vRobIdx
   io.toExu.bits.rs1 := RegEnable(io.get_rs1.exu.data, fireArithIQout)
   // Pipeline of valid
-  when (fireArithIQout) {
+  when (io.flush) {
+    validPipe_arith := false.B
+  }.elsewhen (fireArithIQout) {
     validPipe_arith := true.B
   }.elsewhen (toExuReady) {
     validPipe_arith := false.B
@@ -161,11 +160,12 @@ class VIssueBlock extends Module {
   io.toLSU.ld.bits.rs2 := RegEnable(io.get_rs1.ld.data, fireLdIQout)
   // Pipeline of valid
   val validPipe_ld = RegInit(false.B)
-  when (io.toLSU.ld.ready) {
+  when (io.flush) {
     validPipe_ld := false.B
-  }
-  when (fireLdIQout) {
+  }.elsewhen (fireLdIQout) {
     validPipe_ld := true.B
+  }.elsewhen (io.toLSU.ld.ready) {
+    validPipe_ld := false.B
   }
   io.toLSU.ld.valid := validPipe_ld
   // Ready
@@ -200,11 +200,12 @@ class VIssueBlock extends Module {
   io.toLSU.st.bits.rs2 := RegEnable(io.get_rs1.st.data, fireStIQout)
   // Pipeline of valid
   val validPipe_st = RegInit(false.B)
-  when (io.toLSU.st.ready) {
+  when (io.flush) {
     validPipe_st := false.B
-  }
-  when (fireStIQout) {
+  }.elsewhen (fireStIQout) {
     validPipe_st := true.B
+  }.elsewhen (io.toLSU.st.ready) {
+    validPipe_st := false.B
   }
   io.toLSU.st.valid := validPipe_st
   // Ready

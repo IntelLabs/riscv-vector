@@ -1,4 +1,4 @@
-/**
+/** Ordered issue queue 
   * Constraint: so far all inputs of io.in share one 'ready'.
   *             Only support 1 output
   */
@@ -12,7 +12,6 @@ import utils._
 class VLdstIssueQ(size: Int, nEnq: Int) extends Module with HasCircularQueuePtrHelper {
   val io = IO(new Bundle {
     val in = Vec(nEnq, Flipped(Decoupled(new VExpdUOp)))
-    // from busy table
     val fromBusyTable = Vec(nEnq, Vec(4, Input(Bool()))) // true: busy
     // wakeups from RF write ports
     val vRFWriteback = Vec(nVRFWritePorts, Flipped(ValidIO(UInt(VPRegIdxWidth.W))))

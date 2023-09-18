@@ -43,11 +43,11 @@ class VLane extends Module{
   val vmac = Module(new VIMac)
   // val vmac = Module(new DummyLaneFU)
   // FP
-  val vfp = Module(new VFPUTop)
-  // val vfp = Module(new DummyLaneFU)
+  // val vfp = Module(new VFPUTop)
+  val vfp = Module(new DummyLaneFU)
   // fake div
-  val vdiv = Module(new DivTop)
-  // val vdiv = Module(new DummyLaneFU)
+  // val vdiv = Module(new DivTop)
+  val vdiv = Module(new DummyLaneFU)
 
   // Input of ALU
   valu.io.in.bits := io.in.data
