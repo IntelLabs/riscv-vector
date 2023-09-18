@@ -1,9 +1,11 @@
 /** OVI (Open Vector Interface) adoption
  *    Every instrucion in VRob will finally be commited OR flushed
  * 
- *  Note: following signal does not support VCommitWidth > 2
- *        1) deqPtrRhb
- *        2) io.commits.valid
+ *  Notes: following signal does not support VCommitWidth > 2
+ *         1) deqPtrRhb
+ *         2) io.commits.valid
+ *  Features: 1) Decoupled rename history buffer
+ *            2) Small rd (scalar dest) buffer, source of io.fromDispatch.ready
  */
 package darecreek
 
@@ -15,15 +17,17 @@ import darecreek.util._
 class OviCompltSigs extends Bundle {
   val fflags = UInt(5.W)
   val vxsat = Bool()
-  val rd = UInt(xLen.W)
 }
-
 class RenameHistoryBufferEntry extends Bundle {
-  val sb_id = UInt(5.W)
+  val sb_id = UInt(5.W)  // only need by assertion
   val pdestVal = Bool()
   val ldest = UInt(5.W)
   val pdest = UInt(VPRegIdxWidth.W)
   val old_pdest = UInt(VPRegIdxWidth.W)
+}
+class RdBufferEntry extends Bundle {
+  val rd = UInt(xLen.W)
+  val robPtr = new VRobPtr 
 }
 
 class VRob extends Module with HasCircularQueuePtrHelper {
@@ -33,6 +37,7 @@ class VRob extends Module with HasCircularQueuePtrHelper {
       val valid = Input(Bool())
       val sb_id = Input(UInt(5.W))
       val ldestVal = Input(Bool())
+      val rdVal = Input(Bool())
     }
     // OVI dispatch
     val ovi_dispatch = new OVIdispatch
@@ -41,7 +46,7 @@ class VRob extends Module with HasCircularQueuePtrHelper {
     // from VIllegalInstrn.io.partialVInfo
     val partialVInfo = Flipped(ValidIO(new PartialVInfo))
     // from Rename block
-    val fromRename = Vec(VRenameWidth, Input(ValidIO(new VExpdUOp)))
+    val fromDispatch = Vec(VRenameWidth, Flipped(Decoupled(new VExpdUOp)))
     // writebacks from EXU and LSU
     val wbArith = Flipped(ValidIO(new WbArith))
     val wbLSU = Vec(2, Flipped(ValidIO(new VExpdUOp)))
@@ -111,7 +116,7 @@ class VRob extends Module with HasCircularQueuePtrHelper {
   val enqPtrRhb = RegInit(0.U.asTypeOf(new VRhbPtr))
   val deqPtrRhb = RegInit(0.U.asTypeOf(new VRhbPtr))
   val uopExtractRhb = Wire(Vec(VRenameWidth, new RenameHistoryBufferEntry))
-  uopExtractRhb zip io.fromRename.map(_.bits) map { case (y, x) =>
+  uopExtractRhb zip io.fromDispatch.map(_.bits) map { case (y, x) =>
     y.sb_id := x.sb_id
     y.pdestVal := x.pdestVal
     y.ldest := x.ldestExpd
@@ -122,7 +127,7 @@ class VRob extends Module with HasCircularQueuePtrHelper {
   // Enq of RHB
   val enqPtrRhbOHs = Wire(Vec(VRenameWidth, UInt(NVPhyRegs.W)))
   enqPtrRhbOHs(0) := enqPtrRhb.toOH
-  val enqRhbFire = io.fromRename.map(x => x.valid && x.bits.pdestVal)
+  val enqRhbFire = io.fromDispatch.map(x => x.fire && x.bits.pdestVal)
   val enqRhbPopCnt = PopCount(enqRhbFire)
   for (i <- 1 until VRenameWidth) {
     enqPtrRhbOHs(i) := Mux(enqRhbFire(i-1), CircularShift.left(enqPtrRhbOHs(i-1), 1), enqPtrRhbOHs(i-1))
@@ -132,6 +137,26 @@ class VRob extends Module with HasCircularQueuePtrHelper {
   }
   enqPtrRhb := enqPtrRhb + enqRhbPopCnt
 
+  /** rd buffer */
+  val RdBufSize = 4
+  val rdBuf = Reg(Vec(RdBufSize, new RdBufferEntry))
+  class RdBufPtr extends CircularQueuePtr[RdBufPtr](RdBufSize)
+  val enqPtrRdBuf = RegInit(0.U.asTypeOf(new RdBufPtr))
+  val deqPtrRdBuf = RegInit(0.U.asTypeOf(new RdBufPtr))
+  when(io.in.valid && io.in.rdVal) {
+    rdBuf(enqPtrRdBuf.value).robPtr := enqPtr
+    enqPtrRdBuf := enqPtrRdBuf + 1.U
+  }
+  val wb_rdBuf_oneHot = rdBuf.map(_.robPtr === io.wbArith.bits.uop.vRobIdx)
+  rdBuf zip wb_rdBuf_oneHot map { case (entry, hit) => 
+    when (hit && io.wbArith.valid && io.wbArith.bits.uop.ctrl.rdVal) {
+      entry.rd := io.wbArith.bits.rd
+    }
+  }
+  val emptyRdBuf = isEmpty(enqPtrRdBuf, deqPtrRdBuf)
+  val fullRdBuf = isFull(enqPtrRdBuf, deqPtrRdBuf)
+  io.fromDispatch.foreach(_.ready := !fullRdBuf)
+
   /**
     * Write back
     */
@@ -139,8 +164,7 @@ class VRob extends Module with HasCircularQueuePtrHelper {
   val wbA = io.wbArith.bits.uop
   when (io.wbArith.valid) {
     busy(wbA.vRobIdx.value) := !wbA.expdEnd  // Only support in-order write-backs under the same instruction
-    oviCompltSigs(wbA.vRobIdx.value) := Cat(io.wbArith.bits.fflags, io.wbArith.bits.vxsat,
-                                            io.wbArith.bits.rd).asTypeOf(new OviCompltSigs)
+    oviCompltSigs(wbA.vRobIdx.value) := Cat(io.wbArith.bits.fflags, io.wbArith.bits.vxsat).asTypeOf(new OviCompltSigs)
   }
   // Write back of ld
   val wbL = io.wbLSU(0).bits
@@ -169,9 +193,12 @@ class VRob extends Module with HasCircularQueuePtrHelper {
   ovi_completed.vstart := 0.U  // !! Fake
   ovi_completed.fflags := oviCompltSigs(compltPtr.value).fflags
   ovi_completed.vxsat := oviCompltSigs(compltPtr.value).vxsat
-  ovi_completed.dest_reg := oviCompltSigs(compltPtr.value).rd
+  ovi_completed.dest_reg := rdBuf(deqPtrRdBuf.value).rd
   when (canComplete || valid(compltPtr.value) && senior_or_kill(compltPtr.value) === KILL) {
     compltPtr := compltPtr + 1.U
+  }
+  when (ovi_completed.valid && !emptyRdBuf && compltPtr === rdBuf(deqPtrRdBuf.value).robPtr) {
+    deqPtrRdBuf := deqPtrRdBuf + 1.U
   }
   io.ovi_completed := RegEnable(ovi_completed, ovi_completed.valid)
   io.ovi_completed.valid := RegNext(ovi_completed.valid)
@@ -183,12 +210,10 @@ class VRob extends Module with HasCircularQueuePtrHelper {
   val deqPtr = RegInit(0.U.asTypeOf(new VRobPtr))
   val expdCnt = RegInit(0.U(3.W))
   // Can commit for expanded instructions (may need multiple cycles)
-  val canCommit = valid(deqPtr.value) && (
-                     senior_or_kill(deqPtr.value) === NEXT_SENIOR && !busy(deqPtr.value))
+  val canCommit = valid(deqPtr.value) && (senior_or_kill(deqPtr.value) === NEXT_SENIOR && !busy(deqPtr.value))
   val vdRemain = emulVd(deqPtr.value) - expdCnt
   // Commit finish, deq pointer can + 1
-  val commitEnd = canCommit && (vdRemain <= VCommitWidth.U 
-                                || !ldestVal(deqPtr.value))
+  val commitEnd = canCommit && (vdRemain <= VCommitWidth.U || !ldestVal(deqPtr.value))
   when (commitEnd) {
     expdCnt := 0.U
   }.elsewhen(canCommit) {
@@ -233,10 +258,22 @@ class VRob extends Module with HasCircularQueuePtrHelper {
     senior_or_kill(deqPtr.value) := 0.U
   }
 
+  // Clear rhb/rdBuf when flush
+  when (flush) {
+    enqPtrRhb := 0.U.asTypeOf(new VRhbPtr)
+    deqPtrRhb := 0.U.asTypeOf(new VRhbPtr)
+    enqPtrRdBuf := 0.U.asTypeOf(new RdBufPtr)
+    deqPtrRdBuf := 0.U.asTypeOf(new RdBufPtr)
+  }
+
   // Credit
   val credit = RegInit(false.B)
   credit := commitEnd || flush
   io.ovi_issueCredit := credit
+
+  // Assertions
+  assertWhen(commitInfo.valid(0) && commitInfo.info(0).pdestVal,
+             rhb(deqPtrRhb.value).sb_id === sb_id(deqPtr.value), "Error: VRob sb_id not matched!")
 
   /**
     *  Debug

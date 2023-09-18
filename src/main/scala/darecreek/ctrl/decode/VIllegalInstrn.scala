@@ -1,3 +1,4 @@
+//Todo: extract vec-info generation from ill detection
 package darecreek
 
 import chisel3._

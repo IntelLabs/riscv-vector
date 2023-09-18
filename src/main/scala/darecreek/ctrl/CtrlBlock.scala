@@ -110,13 +110,11 @@ class VCtrlBlock extends Module {
   rob.io.in.valid := decoder.io.out.valid
   rob.io.in.sb_id := decoder.io.out.bits.sb_id
   rob.io.in.ldestVal := decoder.io.out.bits.vCtrl.ldestVal
+  rob.io.in.rdVal := decoder.io.out.bits.vCtrl.rdVal
   rob.io.ovi_dispatch := io.ovi_dispatch
   rob.io.illegal := vIllegalInstrn.io.ill
   rob.io.partialVInfo := vIllegalInstrn.io.partialVInfo
-  rob.io.fromRename zip rename.io.out map { case (rob, rename) =>
-    rob.valid := rename.fire
-    rob.bits := rename.bits
-  }
+  rob.io.fromDispatch <> dispatch.io.toRob
   rob.io.wbArith := io.wbArith
   rob.io.wbLSU := io.wbLSU
   io.ovi_completed := rob.io.ovi_completed
