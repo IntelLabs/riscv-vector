@@ -90,7 +90,7 @@ class VFMiscDataModule(implicit val p: Parameters) extends VFPUPipelineModule {
   val uop = uopVec(1)
   val fpCtrl = uop.vfpCtrl
   val typeTagIn = uop.typeTag
-  val eleActives = S1Reg(VecInit(Seq(0,4).map(isActive)))
+  val eleActives = S1Reg(VecInit(Seq(0,1).map(isActive)))
 
   // sign injection & min/max (f2f)
   val signs = Seq(63,31).map( i => Mux(fpCtrl.miscSubCmd(1), vs1(i) ^ vs2(i), Mux(fpCtrl.miscSubCmd(0), ~vs1(i), vs1(i))))
