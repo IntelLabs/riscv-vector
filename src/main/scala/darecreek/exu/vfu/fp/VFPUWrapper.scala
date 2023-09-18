@@ -354,10 +354,21 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   //---- Mask gen ----
   val maskIdx = Mux(narrow, uopIdx >> 1, uopIdx)
   val mask16b = MaskExtract(io.in.bits.mask, maskIdx, eewVd)
+  val old_vd_16b = MaskExtract(io.in.bits.oldVd, maskIdx, eewVd)
 
   val tailReorg = MaskReorg.splash(tail, eewVd)
-  val prestartReorg = Mux(narrow_to_1, prestart, MaskReorg.splash(prestart, eewVd))
+  val prestartReorg = MaskReorg.splash(prestart, eewVd)
   val mask16bReorg = MaskReorg.splash(mask16b, eewVd)
+
+  val cmp_prestart = Wire(Vec(2, UInt(8.W)))
+  val cmp_mask = Wire(Vec(2, UInt(8.W)))
+  val cmp_old_vd = Wire(Vec(2, UInt(64.W)))
+
+  for (i <- 0 until 2) {
+    cmp_prestart(i) := MaskExtract.mask16_to_2x8(prestart, eewVd)(i)
+    cmp_mask(i) := MaskExtract.mask16_to_2x8(mask16b, eewVd)(i)
+    cmp_old_vd(i) := Cat(0.U(56.W), MaskExtract.mask16_to_2x8(old_vd_16b, eewVd)(i))
+  }
 
   val widen_vs1 = Wire(UInt(VLEN.W))
   val widen_vs2 = Wire(UInt(VLEN.W))
@@ -396,11 +407,11 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
     fpu(i).io.in.bits.uop.sysUop := sysUop
     fpu(i).io.in.bits.vs1 := Mux(red_in_valid, red_in(i).vs1, widen_vs1(VLEN / 2, 0))
     fpu(i).io.in.bits.vs2 := Mux(red_in_valid, red_in(i).vs2, widen_vs2(VLEN / 2, 0))
-    fpu(i).io.in.bits.old_vd := Mux(red_in_valid, red_in(i).old_vd, narrow_old_vd(VLEN / 2, 0))
+    fpu(i).io.in.bits.old_vd := Mux(red_in_valid, red_in(i).old_vd, Mux(narrow_to_1, cmp_old_vd(i), narrow_old_vd(VLEN / 2, 0)))
     fpu(i).io.in.bits.rs1 := rs1
-    fpu(i).io.in.bits.prestart := Mux(red_in_valid, red_in(i).prestart, Mux(narrow, Cat(prestartReorg(11, 8), prestartReorg(3, 0)), UIntSplit(prestartReorg, 8)(i)))
-    fpu(i).io.in.bits.mask := Mux(red_in_valid, red_in(i).mask, Mux(narrow, Cat(mask16bReorg(11, 8), mask16bReorg(3, 0)), UIntSplit(mask16bReorg, 8)(i)))
-    fpu(i).io.in.bits.tail := Mux(red_in_valid, red_in(i).tail, Mux(narrow, Cat(tailReorg(11, 8), tailReorg(3, 0)), UIntSplit(tailReorg, 8)(i)))
+    fpu(i).io.in.bits.prestart := Mux(red_in_valid, red_in(i).prestart, Mux(narrow, Cat(prestartReorg(11, 8), prestartReorg(3, 0)), Mux(narrow_to_1, cmp_prestart(i), UIntSplit(prestartReorg, 8)(i))))
+    fpu(i).io.in.bits.mask := Mux(red_in_valid, red_in(i).mask, Mux(narrow, Cat(mask16bReorg(11, 8), mask16bReorg(3, 0)), Mux(narrow_to_1, cmp_mask(i), UIntSplit(mask16bReorg, 8)(i))))
+    fpu(i).io.in.bits.tail := Mux(red_in_valid, red_in(i).tail, Mux(narrow, Cat(tailReorg(11, 8), tailReorg(3, 0)), Mux(narrow_to_1, 0.U, UIntSplit(tailReorg, 8)(i))))
     fpu(i).io.out.ready := io.out.ready
     fpu(i).io.redirect := io.redirect
     vd(i) := fpu(i).io.out.bits.vd
@@ -438,11 +449,11 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
     fpu(i).io.in.bits.uop.sysUop := sysUop
     fpu(i).io.in.bits.vs1 := widen_vs1(VLEN - 1, VLEN / 2)
     fpu(i).io.in.bits.vs2 := widen_vs2(VLEN - 1, VLEN / 2)
-    fpu(i).io.in.bits.old_vd := narrow_old_vd(VLEN - 1, VLEN / 2)
+    fpu(i).io.in.bits.old_vd := Mux(narrow_to_1, cmp_old_vd(i), narrow_old_vd(VLEN - 1, VLEN / 2))
     fpu(i).io.in.bits.rs1 := rs1
-    fpu(i).io.in.bits.prestart := Mux(narrow, Cat(prestartReorg(15, 12), prestartReorg(7, 4)), UIntSplit(prestartReorg, 8)(i))
-    fpu(i).io.in.bits.mask := Mux(narrow, Cat(mask16bReorg(15, 12), mask16bReorg(7, 4)), UIntSplit(mask16bReorg, 8)(i))
-    fpu(i).io.in.bits.tail := Mux(narrow, Cat(tailReorg(15, 12), tailReorg(7, 4)), UIntSplit(tailReorg, 8)(i))
+    fpu(i).io.in.bits.prestart := Mux(narrow, Cat(prestartReorg(15, 12), prestartReorg(7, 4)), Mux(narrow_to_1, cmp_prestart(i), UIntSplit(prestartReorg, 8)(i)))
+    fpu(i).io.in.bits.mask := Mux(narrow, Cat(mask16bReorg(15, 12), mask16bReorg(7, 4)), Mux(narrow_to_1, cmp_mask(i), UIntSplit(mask16bReorg, 8)(i)))
+    fpu(i).io.in.bits.tail := Mux(narrow, Cat(tailReorg(15, 12), tailReorg(7, 4)), Mux(narrow_to_1, 0.U, UIntSplit(tailReorg, 8)(i)))
     fpu(i).io.redirect := io.redirect
     fpu(i).io.out.ready := io.out.ready
     vd(i) := fpu(i).io.out.bits.vd
