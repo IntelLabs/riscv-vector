@@ -349,8 +349,8 @@ val vrgather_byte_sel = Mux(vrgather_vv, vrgathervv_byte_sel, vrgather16_byte_se
 val vrgather_vd = Wire(Vec(vlenb, UInt(8.W)))
 val vrgather_vd_reg = RegNext(Cat(vrgather_vd.reverse), 0.U(VLEN.W))
 
-val sew = Wire(new SewOH)  // 0:8, 1:16, 2:32, 3:64
-sew.oneHot := VecInit(Seq.tabulate(4)(i => vsew === i.U)) 
+val sew = SewOH(vsew)  // 0:8, 1:16, 2:32, 3:64
+// sew.oneHot := VecInit(Seq.tabulate(4)(i => vsew === i.U)) 
 val rs1_imm = Mux(uop.ctrl.vi, Cat(Fill(59, 0.U(1.W)), imme), rs1)
 val rs1_imm_bytes = rs1_imm << vsew
 val vrgather_rs1_imm = RegInit(0.U(LaneWidth.W))
@@ -558,9 +558,10 @@ when ((vmv_x_s || vfmv_f_s) && fire) {
 io.in.ready := (!io.in.valid || io.out.ready) && !compress_busy && !vslidedn_flush && !vslidedn_busy && !vrgather_xi_busy && !vrgather_vxi_valid && !vrgather_vv_busy
 io.out.valid := cross_lane_valid_reg
 io.out.bits.vd := cross_lane_vd_reg
+when (io.out.bits.uop.ctrl.rdVal) { io.out.bits.vd(0) := rd }
 
 io.out.bits.uop := uop_lmul(output_data_cnt_r)
-io.out.bits.rd := rd
+// io.out.bits.rd := rd
 
 // temp!!
 io.out.bits.fflags := 0.U

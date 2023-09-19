@@ -127,7 +127,7 @@ class VIssueBlock extends Module {
   io.wbArith.bits.uop := io.fromExu.bits.uop
   io.wbArith.bits.fflags := io.fromExu.bits.fflags
   io.wbArith.bits.vxsat := io.fromExu.bits.vxsat
-  io.wbArith.bits.rd := io.fromExu.bits.rd
+  io.wbArith.bits.rd := io.fromExu.bits.vd(0)(xLen-1, 0)
 
   /**
     * ---- Load/Store ----

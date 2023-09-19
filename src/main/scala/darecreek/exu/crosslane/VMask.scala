@@ -355,11 +355,12 @@ when (vpopc_m && fire) {
 
 //--------- Ready & valid ---------
 io.in.ready := (!io.in.valid || io.out.ready) 
-io.out.valid := cross_lane_valid 
-io.out.bits.vd := cross_lane_vd_reg 
+io.out.valid := cross_lane_valid
+io.out.bits.vd := cross_lane_vd_reg
+when (io.out.bits.uop.ctrl.rdVal) { io.out.bits.vd(0) := rd }
 
 io.out.bits.uop := RegEnable(uop, fire)
-io.out.bits.rd := rd
+// io.out.bits.rd := rd
 
 // temp!!
 io.out.bits.fflags := 0.U

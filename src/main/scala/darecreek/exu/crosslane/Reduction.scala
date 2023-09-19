@@ -269,8 +269,8 @@ def fmin(w: Int) = {
 }
 
 val ele64 = Wire(UInt(64.W))
-val sew = Wire(new SewOH)  // 0:8, 1:16, 2:32, 3:64
-sew.oneHot := VecInit(Seq.tabulate(4)(i => vsew === i.U)) 
+val sew = SewOH(vsew)  // 0:8, 1:16, 2:32, 3:64
+// sew.oneHot := VecInit(Seq.tabulate(4)(i => vsew === i.U)) 
 
 ele64 := 0.U
 when (fire) {
@@ -521,7 +521,7 @@ when (output_en && (red_state === calc_vs1) && red_out_valid && red_out_ready) {
 io.in.ready := (!io.in.valid || io.out.ready) && !red_busy 
 io.out.valid := output_valid 
 io.out.bits.vd := VecInit(Seq.tabulate(NLanes)(i => output_data((i+1)*LaneWidth-1, i*LaneWidth)))
-io.out.bits.rd := 0.U 
+// io.out.bits.rd := 0.U 
 
 io.out.bits.uop := RegEnable(uop, fire) 
 // temp!!

@@ -1,7 +1,10 @@
-/**
-  * Lane EXU: contains multiple lanes
-  *     Todo: add assertion to check if all lanes are sync.
-  */
+/** Lane EXU: contains multiple lanes
+ *  
+ *  Mask/tail/prestart distribution to each lane
+ *  Input vs1/vs2/oldVd rearrange for widen or narrow
+ *  Output vd rearrange for narrow
+ *  Output mask rearrange for compare/add-with-carry
+ */
 
 package darecreek
 
@@ -20,48 +23,65 @@ class VLaneExu extends Module {
 
   require(NLanes > 1, s"Number of lanes: $NLanes must > 1 (XLEN >= 128)")
   val uop = io.in.bits.uop
+  val narrow = uop.ctrl.narrow
   val destEew = SewOH(uop.info.destEew)
+  val expdIdx = uop.expdIdx
 
   val lanes = Seq.fill(NLanes)(Module(new VLane))
   for (i <- 0 until NLanes) {
     lanes(i).io.idx := i.U
+    lanes(i).io.in.valids(0) := io.in.valid && uop.ctrl.alu
     lanes(i).io.in.valids(1) := io.in.valid && uop.ctrl.mul
     lanes(i).io.in.valids(2) := io.in.valid && uop.ctrl.fp
     lanes(i).io.in.valids(3) := io.in.valid && uop.ctrl.div
     lanes(i).io.in.data.uop := uop
-    lanes(i).io.in.valids(0) := io.in.valid && uop.ctrl.alu
     lanes(i).io.in.data.rs1 := io.in.bits.rs1
-    // prestart and tail
-    // lanes(i).io.in.data.tail := tailGen(destEew.oneHot, i, io.in.bits.vlRemain)
-    // lanes(i).io.in.data.prestart := prestartGen(destEewOH, i, io.in.bits.vstartRemain)
-    lanes(i).io.in.data.prestart := 0.U  // Set vstart = 0 for all arithmetic instructions
-    // ready
+    lanes(i).io.in.data.prestart := 0.U  // So far, set vstart = 0 for all arithmetic instructions
     lanes(i).io.out.ready := io.out.ready
   }
   io.in.readys := lanes(0).io.in.readys
 
-  //---- Input tail generation ----
+  /** Input tail distribution
+   */
+  val tail = TailGen(uop.info.vl, expdIdx, destEew, narrow)
+  // Tail of each lane. It occupies the lowest bits of lane mask_input.
   val laneTail = Wire(Vec(NLanes, UInt(NByteLane.W)))
+  // Lane index:        3       2       1       0
+  // sew=32 laneTail:  76      54      32      10
   for (i <- 0 until NLanes) {
-    laneTail(i) := tailGen(destEew.oneHot, i, io.in.bits.vlRemain)
+    laneTail(i) :=  Mux1H(destEew.oneHot, Seq(1,2,4,8).map(bytes => UIntSplit(tail, NByteLane/bytes)(i)))
   }
   //---- Tail rearrange for narrow instruction ----
-  // Lane index:     0       1       2       3
+  // Lane index:      3       2       1       0
   // sew=32 input:   76      54      32      10 (input is laneTail)
   //       output:   73      62      51      40 (output is laneTailNarrow)
   // sew=16 input:                 7654    3210
-  //       output:               111032    9810
+  //       output:                 BA32    9810
   val laneTailNarrow = Wire(Vec(NLanes, UInt(NByteLane.W)))
-  val allTailsSew32 = VecInit(laneTail.map(_(1, 0))).asUInt
-  val allTailsSew16 = VecInit(laneTail.map(_(3, 0))).asUInt
-  val allTailsSew8 = VecInit(laneTail.map(_(7, 0))).asUInt
   for (i <- 0 until NLanes) {
-    laneTailNarrow(i) := Mux1H(Seq(
-      destEew.is32 -> Cat(allTailsSew32(NLanes+i), allTailsSew32(i)),
-      destEew.is16 -> Cat(allTailsSew16(2*NLanes+2*i+1, 2*NLanes+2*i), allTailsSew16(2*i+1, 2*i)),
-      destEew.is8  -> Cat(allTailsSew8(4*NLanes+4*i+3, 4*NLanes+4*i), allTailsSew8(4*i+3, 4*i))
-    ))
+    laneTailNarrow(i) := Mux1H(destEew.oneHot(2, 0), Seq(2,4,8).map(bytes => 
+            Cat(UIntSplit(tail, NByteLane/bytes)(i+NLanes), UIntSplit(tail, NByteLane/bytes)(i))))
     lanes(i).io.in.data.tail := Mux(uop.ctrl.narrow, laneTailNarrow(i), laneTail(i))
+  }
+
+  /** Input mask distribution (same as Tail)
+   */
+  val v0 = Cat(io.in.bits.vSrc(3).reverse) // vector mask reg is v0
+  val expdIdxOH = Seq.tabulate(8)(i => Mux(uop.ctrl.narrow, Cat(false.B, uop.expdIdx >> 1) === i.U, 
+                                                            uop.expdIdx === i.U))
+  val mask = Wire(UInt(vlenb.W))
+  // Effective bits: sew = 8: vlenb,  16: vlenb/2,  32: vlenb/4,  64: vlenb/8
+  mask := Mux1H(expdIdxOH, Seq.tabulate(8)(i => 
+                        Mux1H(destEew.oneHot, Seq(1,2,4,8).map(k => UIntSplit(v0, vlenb/k)(i)))))
+  // Mask for each lane. It occupies the lowest bits of lane mask_input.
+  val maskLane = Wire(Vec(NLanes, UInt(NByteLane.W)))
+  // Mask rearrange for narrow instruction (same as tail)
+  val maskLaneNarrow = Wire(Vec(NLanes, UInt(NByteLane.W)))
+  for (i <- 0 until NLanes) {
+    maskLane(i) := Mux1H(destEew.oneHot, Seq(1,2,4,8).map(k => UIntSplit(mask, NByteLane/k)(i)))
+    maskLaneNarrow(i) := Mux1H(destEew.oneHot(2, 0), Seq(2,4,8).map(k => 
+            Cat(UIntSplit(mask, NByteLane/k)(i+NLanes), UIntSplit(mask, NByteLane/k)(i))))
+    lanes(i).io.in.data.mask := Mux(uop.ctrl.narrow, maskLaneNarrow(i), maskLane(i))
   }
 
   /**
@@ -111,39 +131,20 @@ class VLaneExu extends Module {
     lanes(i).io.in.data.vs1 := Cat(laneVs1H, laneVs1L)
   }
 
-  /**
-    *  Input mask/old_vd rearrangement
-    */
-  val maskReg = Cat(io.in.bits.vSrc(3).reverse)
-  val oldVdReg = Cat(io.in.bits.vSrc(2).reverse)
-  val expdIdxOH = Seq.tabulate(8)(i => Mux(uop.ctrl.narrow, Cat(false.B, uop.expdIdx >> 1) === i.U, 
-                                                            uop.expdIdx === i.U))
-  //---- Extract mask for all lanes from v0 (width: vlenb)
-  val maskAllLanes = Wire(UInt(vlenb.W))
-  // Effective bits: sew = 8: vlenb,  16: vlenb/2,  32: vlenb/4,  64: vlenb/8
-  maskAllLanes := Mux1H(expdIdxOH, Seq.tabulate(8)(i => 
-                        Mux1H(destEew.oneHot, Seq(1,2,4,8).map(k => UIntSplit(maskReg, vlenb/k)(i)))))
-  // Mask for each lane (normal). It occupies the lowest bits of lane mask_input.
-  val maskOneLane = Wire(Vec(NLanes, UInt(NByteLane.W)))
-  // Mask for each lane (narrow)
-  val maskOneLaneNarrow = Wire(Vec(NLanes, UInt(NByteLane.W)))
+  /** Input old_vd rearrangement
+   */
+  // -------- For narrow instrution ------ 
+  // Lane index:           3       2       1       0 (sew = destEew = 16)
+  // original old_vd:   FEDC     BA98   7654    3210
+  // rearranged old_vd: FE76     DC54   BA32    9810
+  //
   for (i <- 0 until NLanes) {
-    maskOneLane(i) := Mux1H(destEew.oneHot, Seq(1,2,4,8).map(k => UIntSplit(maskAllLanes, NByteLane/k)(i)))
-    //Narrow: sew=32: 76543210 -> 72 62 51 40    sew=16: fedcba9876543210 -> fe76 dc54 ba32 9810
-    //                      lane:  3  2  1  0                           lane:  3    2    1    0
-    maskOneLaneNarrow(i) := Mux1H(destEew.oneHot.take(3), Seq(2,4,8).map(k => 
-            Cat(UIntSplit(maskAllLanes, NByteLane/k)(i+NLanes), UIntSplit(maskAllLanes, NByteLane/k)(i))))
-  }
-  for (i <- 0 until NLanes) {
-    // mask rearrangement
-    lanes(i).io.in.data.mask := Mux(uop.ctrl.narrow, maskOneLaneNarrow(i), maskOneLane(i))
-    // old_vd rearrangement
-    val laneOldVdf2 = Wire(Vec(2, UInt(32.W)))  // narrow: 76 54 32 10 --> 73 62 51 40
+    val laneOldVdNarrow = Wire(Vec(2, UInt(32.W)))  // narrow: 76 54 32 10 --> 73 62 51 40
     for (k <- 0 until 2) {
-      laneOldVdf2(k) := io.in.bits.vSrc(2)(i/2 + k*NLanes/2)(32*(i%2)+31, 32*(i%2))
+      laneOldVdNarrow(k) := io.in.bits.vSrc(2)(i/2 + k*NLanes/2)(32*(i%2)+31, 32*(i%2))
     }
-    lanes(i).io.in.data.old_vd := Mux(uop.ctrl.narrow_to_1, maskOneLane(i), 
-             Mux(uop.ctrl.narrow, laneOldVdf2.asUInt, io.in.bits.vSrc(2)(i)))
+    lanes(i).io.in.data.old_vd := Mux(uop.ctrl.narrow_to_1, maskLane(i), 
+             Mux(uop.ctrl.narrow, laneOldVdNarrow.asUInt, io.in.bits.vSrc(2)(i)))
   }
   
   //---------- Output --------------
@@ -151,7 +152,6 @@ class VLaneExu extends Module {
   io.out.bits.uop := lanes(0).io.out.bits.uop
   io.out.bits.fflags := lanes(0).io.out.bits.fflags
   io.out.bits.vxsat := lanes(0).io.out.bits.vxsat
-  io.out.bits.rd := 0.U  // temp !!!!!!!!!!!!!!!!!!
 
   /**
     *  Output vd rearrangement
@@ -193,43 +193,4 @@ class VLaneExu extends Module {
   for (i <- 0 until NLanes) {
     io.out.bits.vd(i) := Mux(io.out.bits.uop.ctrl.narrow_to_1, (UIntSplit(vdCmp))(i), vd(i))
   }
-
-
-  
-  def tailGen(destEew: Seq[Bool], laneIdx: Int, vlRemain: UInt) = {
-    val endLaneIdx = Wire(UInt(LaneIdxWidth.W))
-    val remainder = Wire(UInt(3.W))
-    val tail = Wire(UInt(NByteLane.W))
-    val noTail_thisExpdUop = vlRemain >= ((vlenb.U(bVL.W)) >> uop.info.destEew(1, 0))
-    endLaneIdx := Mux1H(destEew, Seq(3, 2, 1, 0).map(k => vlRemain(LaneIdxWidth + k-1, k)))
-    remainder := Mux1H(destEew, Seq(2, 1, 0).map(k => vlRemain(k, 0)) :+ 0.U)
-    when (noTail_thisExpdUop) {
-      tail := 0.U
-    }.elsewhen ((laneIdx.U(LaneIdxWidth.W)) > endLaneIdx) {
-      tail := "b11111111".U
-    }.elsewhen ((laneIdx.U(LaneIdxWidth.W)) === endLaneIdx) {
-      // tail := Mux1H(Seq.tabulate(8)(i => (remainder === i.U) -> ("b" + "1"*(8-i) + "0"*i).U))
-      tail := UIntToCont0s(remainder, 3)
-    }.otherwise {
-      tail := 0.U
-    }
-    tail
-  }
-
-  // def prestartGen(destEew: Seq[Bool], laneIdx: Int, vstartRemain: UInt) = {
-  //   val endLaneIdx = Wire(UInt(LaneIdxWidth.W))
-  //   val remainder = Wire(UInt(3.W))
-  //   val prestart = Wire(UInt(NByteLane.W))
-  //   endLaneIdx := Mux1H(destEew, Seq(3, 2, 1, 0).map(k => vstartRemain(LaneIdxWidth + k-1, k)))
-  //   remainder := Mux1H(destEew, Seq(2, 1, 0).map(k => vstartRemain(k, 0)) :+ 0.U)
-  //   when ((laneIdx.U(LaneIdxWidth.W)) > endLaneIdx) {
-  //     prestart := "b00000000".U
-  //   }.elsewhen ((laneIdx.U(LaneIdxWidth.W)) === endLaneIdx) {
-  //     prestart := Mux1H(Seq.tabulate(8)(i => (remainder === i.U) -> ("b" + "0"*(8-i) + "1"*i).U))
-  //   }.otherwise {
-  //     prestart := "b11111111".U
-  //   }
-  //   prestart
-  // }
-
 }
