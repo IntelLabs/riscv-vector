@@ -110,3 +110,11 @@ object TailGen {
     tail
   }
 }
+
+// Rearrange mask, tail, or vstart bits  (width: NByteLane bits)
+object MaskReorg {
+  // sew = 8: unchanged, sew = 16: 0000abcd -> aabbccdd, ...
+  def splash(bits: UInt, sew: SewOH): UInt = {
+    Mux1H(sew.oneHot, Seq(1,2,4,8).map(k => Cat(bits(NByteLane/k -1, 0).asBools.map(Fill(k, _)).reverse)))
+  }
+}

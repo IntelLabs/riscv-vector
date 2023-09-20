@@ -30,22 +30,9 @@ class MaskTailDataVIMac extends Module {
   }
   val destEew = SewOH(uop.info.destEew)
 
-  io.maskKeep := Mux1H(Seq(
-    destEew.is8  -> Cat(maskTail.map(x => Mux(x(1), 0.U(8.W), ~(0.U(8.W)))).reverse),
-    destEew.is16 -> Cat(maskTail.take(4).map(x => Mux(x(1), 0.U(16.W), ~(0.U(16.W)))).reverse),
-    destEew.is32 -> Cat(maskTail.take(2).map(x => Mux(x(1), 0.U(32.W), ~(0.U(32.W)))).reverse),
-    destEew.is64 -> Cat(maskTail.take(1).map(x => Mux(x(1), 0.U(64.W), ~(0.U(64.W))))),
-  ))
-  io.maskOff := Mux1H(Seq(
-    destEew.is8  -> Cat(maskTail.zipWithIndex.map({case (x, i) => 
-                        Mux(!x(1), 0.U(8.W), Mux(x(0), ~0.U(8.W), UIntSplit(oldVd, 8)(i)))}).reverse),
-    destEew.is16 -> Cat(maskTail.take(4).zipWithIndex.map({case (x, i) => 
-                        Mux(!x(1), 0.U(16.W), Mux(x(0), ~0.U(16.W), UIntSplit(oldVd, 16)(i)))}).reverse),
-    destEew.is32 -> Cat(maskTail.take(2).zipWithIndex.map({case (x, i) => 
-                        Mux(!x(1), 0.U(32.W), Mux(x(0), ~0.U(32.W), UIntSplit(oldVd, 32)(i)))}).reverse),
-    destEew.is64 -> Cat(maskTail.take(1).zipWithIndex.map({case (x, i) => 
-                        Mux(!x(1), 0.U(64.W), Mux(x(0), ~0.U(64.W), UIntSplit(oldVd, 64)(i)))}).reverse),
-  ))
+  io.maskKeep := Cat(maskTail.map(x => Mux(x(1), 0.U(8.W), ~(0.U(8.W)))).reverse)
+  io.maskOff := Cat(maskTail.zipWithIndex.map({case (x, i) => 
+                        Mux(!x(1), 0.U(8.W), Mux(x(0), ~0.U(8.W), UIntSplit(oldVd, 8)(i)))}).reverse)
 }
 
 class VIMac extends Module {

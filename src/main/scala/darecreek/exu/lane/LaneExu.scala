@@ -61,7 +61,8 @@ class VLaneExu extends Module {
   for (i <- 0 until NLanes) {
     laneTailNarrow(i) := Mux1H(destEew.oneHot(2, 0), Seq(2,4,8).map(bytes => 
             Cat(UIntSplit(tail, NByteLane/bytes)(i+NLanes), UIntSplit(tail, NByteLane/bytes)(i))))
-    lanes(i).io.in.data.tail := Mux(uop.ctrl.narrow, laneTailNarrow(i), laneTail(i))
+    // Splash. sew = 8: unchanged, sew = 16: 0000abcd -> aabbccdd, ...
+    lanes(i).io.in.data.tail := MaskReorg.splash(Mux(uop.ctrl.narrow, laneTailNarrow(i), laneTail(i)), destEew)
   }
 
   /** Input mask distribution (same as Tail)
@@ -74,14 +75,15 @@ class VLaneExu extends Module {
   mask := Mux1H(expdIdxOH, Seq.tabulate(8)(i => 
                         Mux1H(destEew.oneHot, Seq(1,2,4,8).map(k => UIntSplit(v0, vlenb/k)(i)))))
   // Mask for each lane. It occupies the lowest bits of lane mask_input.
-  val maskLane = Wire(Vec(NLanes, UInt(NByteLane.W)))
+  val laneMask = Wire(Vec(NLanes, UInt(NByteLane.W)))
   // Mask rearrange for narrow instruction (same as tail)
-  val maskLaneNarrow = Wire(Vec(NLanes, UInt(NByteLane.W)))
+  val laneMaskNarrow = Wire(Vec(NLanes, UInt(NByteLane.W)))
   for (i <- 0 until NLanes) {
-    maskLane(i) := Mux1H(destEew.oneHot, Seq(1,2,4,8).map(k => UIntSplit(mask, NByteLane/k)(i)))
-    maskLaneNarrow(i) := Mux1H(destEew.oneHot(2, 0), Seq(2,4,8).map(k => 
+    laneMask(i) := Mux1H(destEew.oneHot, Seq(1,2,4,8).map(k => UIntSplit(mask, NByteLane/k)(i)))
+    laneMaskNarrow(i) := Mux1H(destEew.oneHot(2, 0), Seq(2,4,8).map(k => 
             Cat(UIntSplit(mask, NByteLane/k)(i+NLanes), UIntSplit(mask, NByteLane/k)(i))))
-    lanes(i).io.in.data.mask := Mux(uop.ctrl.narrow, maskLaneNarrow(i), maskLane(i))
+    // Splash. sew = 8: unchanged, sew = 16: 0000abcd -> aabbccdd, ...
+    lanes(i).io.in.data.mask := MaskReorg.splash(Mux(uop.ctrl.narrow, laneMaskNarrow(i), laneMask(i)), destEew)
   }
 
   /**
@@ -143,7 +145,7 @@ class VLaneExu extends Module {
     for (k <- 0 until 2) {
       laneOldVdNarrow(k) := io.in.bits.vSrc(2)(i/2 + k*NLanes/2)(32*(i%2)+31, 32*(i%2))
     }
-    lanes(i).io.in.data.old_vd := Mux(uop.ctrl.narrow_to_1, maskLane(i), 
+    lanes(i).io.in.data.old_vd := Mux(uop.ctrl.narrow_to_1, laneMask(i), 
              Mux(uop.ctrl.narrow, laneOldVdNarrow.asUInt, io.in.bits.vSrc(2)(i)))
   }
   
@@ -156,7 +158,10 @@ class VLaneExu extends Module {
   /**
     *  Output vd rearrangement
     */
-  // common ouptut
+  // -------- For narrow instrution ------ 
+  // Lane index:           3       2       1       0 (sew = destEew = 16)
+  // Output of lanes:   FE76     DC54   BA32    9810
+  // Rearranged vd:     FEDC     BA98   7654    3210
   val vd = Wire(Vec(NLanes, UInt(64.W)))
   for (i <- 0 until NLanes) {
     when (io.out.bits.uop.ctrl.narrow) {
@@ -175,20 +180,16 @@ class VLaneExu extends Module {
     for (i <- 0 until VLEN) {
       if (i >= VLEN/(sew/8)) {result(i) := true.B}
       else {
-        val laneIdx = (i % (256/sew)) / (64/sew)
-        val lmulIdx = i / (256/sew)
-        val offset = (i % (256/sew)) - laneIdx * (64/sew)
+        val laneIdx = (i % (VLEN/sew)) / (64/sew)
+        val lmulIdx = i / (VLEN/sew)
+        val offset = (i % (VLEN/sew)) - laneIdx * (64/sew)
         result(i) := lanes(laneIdx).io.out.bits.vd(lmulIdx*8 + offset)
       }
     }
     Cat(result.reverse)
   }
-  val vdCmp = Mux1H(Seq(
-    (io.out.bits.uop.info.vsew === 0.U) -> cmpOutRearrange(8), 
-    (io.out.bits.uop.info.vsew === 1.U) -> cmpOutRearrange(16), 
-    (io.out.bits.uop.info.vsew === 2.U) -> cmpOutRearrange(32), 
-    (io.out.bits.uop.info.vsew === 3.U) -> cmpOutRearrange(64), 
-  ))
+  val vdCmp = Mux1H(SewOH(io.out.bits.uop.info.vsew).oneHot, Seq(8,16,32,64).map(sew => cmpOutRearrange(sew)))
+
   // Final output vd
   for (i <- 0 until NLanes) {
     io.out.bits.vd(i) := Mux(io.out.bits.uop.ctrl.narrow_to_1, (UIntSplit(vdCmp))(i), vd(i))
