@@ -84,6 +84,7 @@ class VLaneExu extends Module {
             Cat(UIntSplit(mask, NByteLane/k)(i+NLanes), UIntSplit(mask, NByteLane/k)(i))))
     // Splash. sew = 8: unchanged, sew = 16: 0000abcd -> aabbccdd, ...
     lanes(i).io.in.data.mask := MaskReorg.splash(Mux(uop.ctrl.narrow, laneMaskNarrow(i), laneMask(i)), destEew)
+    lanes(i).io.in.mask_ori := Mux(uop.ctrl.narrow, laneMaskNarrow(i), laneMask(i))
   }
 
   /**

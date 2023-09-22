@@ -7,9 +7,11 @@ package darecreek
 import chisel3._
 import chisel3.util._
 import darecreek.exu.fp._
-import darecreek.exu.fu.alu._
+import darecreek.exu.lanevfu.alu._
 import darecreek.exu.fu.mac._
 import darecreek.exu.fu.div._
+import chipsalliance.rocketchip.config._
+import darecreek.exu.vfu._
 
 class DummyLaneFU extends Module {
   val io = IO(new Bundle {
@@ -30,6 +32,7 @@ class VLane extends Module{
     val idx = Input(UInt(LaneIdxWidth.W))
     val in = new Bundle {
       val data = Input(new LaneFUInput)
+      val mask_ori = Input(UInt(8.W))
       val valids = Input(Vec(NLaneExuFUs, Bool()))
       val readys = Output(Vec(NLaneExuFUs, Bool()))
     }
@@ -37,7 +40,8 @@ class VLane extends Module{
   })
 
   // ALU
-  val valu = Module(new VAlu)
+  val valu = Module(new LaneVAlu()(Parameters.empty.alterPartial({
+                    case VFuParamsKey => VFuParameters(VLEN = 256)})))
   // val valu = Module(new DummyLaneFU)
   // MUL
   val vmac = Module(new VIMac)
@@ -52,6 +56,7 @@ class VLane extends Module{
   // Input of ALU
   valu.io.in.bits := io.in.data
   valu.io.in.valid := io.in.valids(0)
+  valu.io.mask_ori := io.in.mask_ori
   io.in.readys(0) := valu.io.in.ready
   // Input of MUL
   vmac.io.in.bits := io.in.data
