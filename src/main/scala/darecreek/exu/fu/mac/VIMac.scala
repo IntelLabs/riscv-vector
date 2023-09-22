@@ -96,12 +96,14 @@ class VIMac extends Module {
   val maskS1 = RegEnable(io.in.bits.mask, io.in.fire)
   val tailS1 = RegEnable(io.in.bits.tail, io.in.fire)
   val oldVdS1 = RegEnable(io.in.bits.old_vd, io.in.fire)
+  val eewVdS1 = RegEnable(eewVd, io.in.fire)
   val maskS2 = RegEnable(maskS1, fireS1)
   val tailS2 = RegEnable(tailS1, fireS1)
   val oldVdS2 = RegEnable(oldVdS1, fireS1)
+  val eewVdS2 = RegEnable(eewVdS1, fireS1)
 
-  val maskSplash = MaskReorg.splash(maskS2, eewVd)
-  val tailSplash = MaskReorg.splash(tailS2, eewVd)
+  val maskSplash = MaskReorg.splash(maskS2, eewVdS2)
+  val tailSplash = MaskReorg.splash(tailS2, eewVdS2)
   val maskTailData = Module(new MaskTailDataVIMac)
   maskTailData.io.mask := maskSplash
   maskTailData.io.tail := tailSplash
