@@ -25,7 +25,7 @@ package darecreek.exu.lanevfu.alu
 import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.decode._
-import darecreek.{LaneFUInput, LaneFUOutput, SewOH, VExpdUOp, UIntSplit}
+import darecreek.{LaneFUInput, LaneFUOutput, SewOH, VExpdUOp, UIntSplit, MaskReorg}
 import chipsalliance.rocketchip.config._
 import darecreek.exu.vfu.alu._
 import darecreek.exu.vfu.{VFuModule, VFuParamsKey, VFuParameters}
@@ -83,14 +83,13 @@ class MaskTailDataVAlu extends Module {
 class LaneVAlu(implicit p: Parameters) extends VFuModule {
   val io = IO(new Bundle {
     val in = Flipped(Decoupled(new LaneFUInput))
-    val mask_ori = Input(UInt(8.W))
     val out = Decoupled(new LaneFUOutput)
   })
   
   val uop = io.in.bits.uop
   val sew = SewOH(uop.info.vsew)  // 0:8, 1:16, 2:32, 3:64
+  val eewVd = SewOH(uop.info.destEew)
   val fire = io.in.fire
-
   // broadcast rs1 or imm to all elements, assume xLen = 64
   val imm = uop.ctrl.lsrc(0)
   //                            |sign-extend imm to 64 bits|
@@ -116,12 +115,12 @@ class LaneVAlu(implicit p: Parameters) extends VFuModule {
   vIntAdder.io.vm := uop.ctrl.vm
   vIntAdder.io.ma := uop.info.ma
   vIntAdder.io.sew := sew
-  vIntAdder.io.eewVd := SewOH(uop.info.destEew)
+  vIntAdder.io.eewVd := eewVd
   vIntAdder.io.uopIdx := uop.expdIdx
   vIntAdder.io.vs1 := vs1_rs1_imm
   vIntAdder.io.vs2 := io.in.bits.vs2
   vIntAdder.io.oldVd := io.in.bits.old_vd
-  vIntAdder.io.vmask := io.mask_ori
+  vIntAdder.io.vmask := io.in.bits.mask
   vIntAdder.io.isSub := vAluDecode.sub
   vIntAdder.io.widen := uop.ctrl.widen
   vIntAdder.io.widen2 := uop.ctrl.widen2
@@ -134,19 +133,22 @@ class LaneVAlu(implicit p: Parameters) extends VFuModule {
   vIntMisc.io.vm := uop.ctrl.vm
   vIntMisc.io.vs1_imm := uop.ctrl.lsrc(0)
   vIntMisc.io.narrow := uop.ctrl.narrow
-  vIntMisc.io.sew := SewOH(uop.info.vsew)
+  vIntMisc.io.sew := sew
   vIntMisc.io.uopIdx := uop.expdIdx
   vIntMisc.io.vs1 := vs1_rs1_imm
   vIntMisc.io.vs2 := io.in.bits.vs2
-  vIntMisc.io.vmask := io.mask_ori
+  vIntMisc.io.vmask := io.in.bits.mask
 
 
   //------------------------------------
   //-------- Mask/Tail data gen --------
   //------------------------------------
+  // Splash. sew = 8: unchanged, sew = 16: 0000abcd -> aabbccdd, ...
+  val maskSplash = MaskReorg.splash(io.in.bits.mask, eewVd)
+  val tailSplash = MaskReorg.splash(io.in.bits.tail, eewVd)
   val maskTailData = Module(new MaskTailDataVAlu)
-  maskTailData.io.mask := io.in.bits.mask
-  maskTailData.io.tail := io.in.bits.tail
+  maskTailData.io.mask := maskSplash
+  maskTailData.io.tail := tailSplash
   maskTailData.io.oldVd := io.in.bits.old_vd
   maskTailData.io.uop := io.in.bits.uop
   maskTailData.io.opi := opi

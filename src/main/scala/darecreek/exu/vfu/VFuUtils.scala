@@ -172,8 +172,6 @@ class MaskTailData(implicit p: Parameters) extends Module {
       maskTail(i) := 0.U
     }
   }
-  val destEew = SewOH(uop.info.destEew)
-
   //--------------------------------------------------------
   //-------- Mask/Tail for non-compare instructions --------
   //--------------------------------------------------------

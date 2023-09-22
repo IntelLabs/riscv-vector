@@ -2,7 +2,7 @@ package darecreek.exu.fu.mac
 
 import chisel3._
 import chisel3.util._
-import darecreek.{LaneFUInput, LaneFUOutput, SewOH, VExpdUOp, UIntSplit}
+import darecreek.{LaneFUInput, LaneFUOutput, SewOH, VExpdUOp, UIntSplit, MaskReorg}
 import darecreek.DarecreekParam._
 
 // finalResult = result & maskKeep | maskOff
@@ -28,8 +28,6 @@ class MaskTailDataVIMac extends Module {
       maskTail(i) := 0.U
     }
   }
-  val destEew = SewOH(uop.info.destEew)
-
   io.maskKeep := Cat(maskTail.map(x => Mux(x(1), 0.U(8.W), ~(0.U(8.W)))).reverse)
   io.maskOff := Cat(maskTail.zipWithIndex.map({case (x, i) => 
                         Mux(!x(1), 0.U(8.W), Mux(x(0), ~0.U(8.W), UIntSplit(oldVd, 8)(i)))}).reverse)
@@ -43,6 +41,7 @@ class VIMac extends Module {
 
   val uop = io.in.bits.uop
   val sew = SewOH(uop.info.vsew)  // 0:8, 1:16, 2:32, 3:64
+  val eewVd = SewOH(uop.info.destEew)
   val funct6 = uop.ctrl.funct6
 
   // broadcast rs1 to all elements, assume xLen = 64
@@ -101,9 +100,11 @@ class VIMac extends Module {
   val tailS2 = RegEnable(tailS1, fireS1)
   val oldVdS2 = RegEnable(oldVdS1, fireS1)
 
+  val maskSplash = MaskReorg.splash(maskS2, eewVd)
+  val tailSplash = MaskReorg.splash(tailS2, eewVd)
   val maskTailData = Module(new MaskTailDataVIMac)
-  maskTailData.io.mask := maskS2
-  maskTailData.io.tail := tailS2
+  maskTailData.io.mask := maskSplash
+  maskTailData.io.tail := tailSplash
   maskTailData.io.oldVd := oldVdS2
   maskTailData.io.uop := uopS2
 
