@@ -27,8 +27,8 @@ import chisel3.util._
 import chisel3.util.experimental.decode._
 import darecreek.{LaneFUInput, LaneFUOutput, SewOH, VExpdUOp, UIntSplit}
 import chipsalliance.rocketchip.config._
-import darecreek.exu.vfu._
 import darecreek.exu.vfu.alu._
+import darecreek.exu.vfu.{VFuModule, VFuParamsKey, VFuParameters}
 
 class VIntFixpDecode extends Bundle {
   val sub = Bool()
@@ -118,7 +118,7 @@ class LaneVAlu(implicit p: Parameters) extends VFuModule {
   vIntAdder.io.sew := sew
   vIntAdder.io.eewVd := SewOH(uop.info.destEew)
   vIntAdder.io.uopIdx := uop.expdIdx
-  vIntAdder.io.vs1 := io.in.bits.vs1
+  vIntAdder.io.vs1 := vs1_rs1_imm
   vIntAdder.io.vs2 := io.in.bits.vs2
   vIntAdder.io.oldVd := io.in.bits.old_vd
   vIntAdder.io.vmask := io.mask_ori
@@ -136,7 +136,7 @@ class LaneVAlu(implicit p: Parameters) extends VFuModule {
   vIntMisc.io.narrow := uop.ctrl.narrow
   vIntMisc.io.sew := SewOH(uop.info.vsew)
   vIntMisc.io.uopIdx := uop.expdIdx
-  vIntMisc.io.vs1 := io.in.bits.vs1
+  vIntMisc.io.vs1 := vs1_rs1_imm
   vIntMisc.io.vs2 := io.in.bits.vs2
   vIntMisc.io.vmask := io.mask_ori
 
