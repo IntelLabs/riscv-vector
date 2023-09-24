@@ -62,7 +62,8 @@ class VLaneExu extends Module {
     laneTailNarrow(i) := Mux1H(destEew.oneHot(2, 0), Seq(2,4,8).map(bytes => 
             Cat(UIntSplit(tail, NByteLane/bytes)(i+NLanes), UIntSplit(tail, NByteLane/bytes)(i))))
     // Splash. sew = 8: unchanged, sew = 16: 0000abcd -> aabbccdd, ...
-    lanes(i).io.in.data.tail := MaskReorg.splash(Mux(uop.ctrl.narrow, laneTailNarrow(i), laneTail(i)), destEew)
+    // lanes(i).io.in.data.tail := MaskReorg.splash(Mux(uop.ctrl.narrow, laneTailNarrow(i), laneTail(i)), destEew)
+    lanes(i).io.in.data.tail := Mux(uop.ctrl.narrow, laneTailNarrow(i), laneTail(i))
   }
 
   /** Input mask distribution (same as Tail)
@@ -83,7 +84,8 @@ class VLaneExu extends Module {
     laneMaskNarrow(i) := Mux1H(destEew.oneHot(2, 0), Seq(2,4,8).map(k => 
             Cat(UIntSplit(mask, NByteLane/k)(i+NLanes), UIntSplit(mask, NByteLane/k)(i))))
     // Splash. sew = 8: unchanged, sew = 16: 0000abcd -> aabbccdd, ...
-    lanes(i).io.in.data.mask := MaskReorg.splash(Mux(uop.ctrl.narrow, laneMaskNarrow(i), laneMask(i)), destEew)
+    // lanes(i).io.in.data.mask := MaskReorg.splash(Mux(uop.ctrl.narrow, laneMaskNarrow(i), laneMask(i)), destEew)
+    lanes(i).io.in.data.mask := Mux(uop.ctrl.narrow, laneMaskNarrow(i), laneMask(i))
   }
 
   /**
