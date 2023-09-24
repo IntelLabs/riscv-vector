@@ -178,7 +178,6 @@ class MaskTailData(implicit p: Parameters) extends Module {
   io.maskKeep := Cat(maskTail.map(x => Mux(x(1), 0.U(8.W), ~(0.U(8.W)))).reverse)
   io.maskOff := Cat(maskTail.zipWithIndex.map({case (x, i) => 
                         Mux(!x(1), 0.U(8.W), Mux(x(0), ~0.U(8.W), UIntSplit(oldVd, 8)(i)))}).reverse)
-
   //----------------------------------------------------
   //---- Mask/Tail for compare instruction -------------
   //----------------------------------------------------

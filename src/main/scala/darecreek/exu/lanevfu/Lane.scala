@@ -6,7 +6,7 @@ import chisel3._
 import chisel3.util._
 import darecreek.exu.fp._
 import darecreek.exu.lanevfu.alu._
-import darecreek.exu.fu.mac._
+import darecreek.exu.lanevfu.mac._
 import darecreek.exu.fu.div._
 import chipsalliance.rocketchip.config._
 import darecreek.exu.vfu.{VFuParamsKey, VFuParameters}
@@ -42,7 +42,7 @@ class VLane extends Module{
   val valu = Module(new LaneVAlu()(p))
   // val valu = Module(new DummyLaneFU)
   // MUL
-  val vmac = Module(new VIMac)
+  val vmac = Module(new LaneVMac)
   // val vmac = Module(new DummyLaneFU)
   // FP
   // val vfp = Module(new VFPUTop)

@@ -30,12 +30,6 @@ import chipsalliance.rocketchip.config._
 import darecreek.exu.vfu.alu._
 import darecreek.exu.vfu.{VFuModule, VFuParamsKey, VFuParameters}
 
-class VIntFixpDecode extends Bundle {
-  val sub = Bool()
-  val misc = Bool()
-  val fixp = Bool()
-}
-
 // finalResult = result & maskKeep | maskOff
 class MaskTailDataVAlu extends Module {
   val io = IO(new Bundle {
