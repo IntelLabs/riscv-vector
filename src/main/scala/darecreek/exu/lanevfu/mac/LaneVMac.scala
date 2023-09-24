@@ -1,12 +1,13 @@
-package darecreek.exu.fu.mac
+package darecreek.exu.lanevfu.mac
 
 import chisel3._
 import chisel3.util._
 import darecreek.{LaneFUInput, LaneFUOutput, SewOH, VExpdUOp, UIntSplit, MaskReorg}
 import darecreek.DarecreekParam._
+import darecreek.exu.vfu.mac.VMac64b
 
 // finalResult = result & maskKeep | maskOff
-class MaskTailDataVIMac extends Module {
+class MaskTailDataVMac extends Module {
   val io = IO(new Bundle {
     val mask = Input(UInt(8.W))
     val tail = Input(UInt(8.W))
@@ -20,7 +21,6 @@ class MaskTailDataVIMac extends Module {
   val (mask, tail, oldVd, uop) = (io.mask, io.tail, io.oldVd, io.uop)
   for (i <- 0 until 8) {
     when (tail(i)) {
-    // !! Temp, debug, since Spike does not support ta to write all 1's"
       maskTail(i) := Mux(uop.info.ta, 3.U, 2.U)
     }.elsewhen (!mask(i) && !uop.ctrl.vm) {
       maskTail(i) := Mux(uop.info.ma, 3.U, 2.U)
@@ -33,7 +33,7 @@ class MaskTailDataVIMac extends Module {
                         Mux(!x(1), 0.U(8.W), Mux(x(0), ~0.U(8.W), UIntSplit(oldVd, 8)(i)))}).reverse)
 }
 
-class VIMac extends Module {
+class LaneVMac extends Module {
   val io = IO(new Bundle {
     val in = Flipped(Decoupled(new LaneFUInput))
     val out = Decoupled(new LaneFUOutput)
@@ -48,23 +48,23 @@ class VIMac extends Module {
   val rs1_repeat = Mux1H(sew.oneHot, Seq(8, 16, 32, 64).map(n => Fill(64/n, io.in.bits.rs1(n-1, 0))))
   val vs1_rs1 = Mux(uop.ctrl.vv, io.in.bits.vs1, rs1_repeat)
 
-  val vIMac64b = Module(new VIMac64b)
-  vIMac64b.io.info.uopIdx := uop.expdIdx
-  vIMac64b.io.info.vxrm := uop.info.vxrm
+  val vMac64b = Module(new VMac64b)
+  vMac64b.io.sew := sew
+  vMac64b.io.uopIdx := uop.expdIdx
+  vMac64b.io.vxrm := uop.info.vxrm
 
-  vIMac64b.io.vs1 := vs1_rs1
-  vIMac64b.io.vs2 := Mux(funct6(4,2) === "b010".U, io.in.bits.old_vd, io.in.bits.vs2)
-  vIMac64b.io.oldVd := Mux(funct6(4,2) === "b010".U, io.in.bits.vs2, io.in.bits.old_vd)
+  vMac64b.io.vs1 := vs1_rs1
+  vMac64b.io.vs2 := Mux(funct6(4,2) === "b010".U, io.in.bits.old_vd, io.in.bits.vs2)
+  vMac64b.io.oldVd := Mux(funct6(4,2) === "b010".U, io.in.bits.vs2, io.in.bits.old_vd)
 
-  vIMac64b.io.eewVs2 := SewOH(uop.info.vsew)
-  vIMac64b.io.vs2_is_signed := !(funct6(4,0) === "b11111".U || funct6(1,0) === 0.U)
-  vIMac64b.io.vs1_is_signed := funct6(4,2) === "b001".U && funct6(0) || funct6(4,3) === "b01".U ||
+  vMac64b.io.vs2_is_signed := !(funct6(4,0) === "b11111".U || funct6(1,0) === 0.U)
+  vMac64b.io.vs1_is_signed := funct6(4,2) === "b001".U && funct6(0) || funct6(4,3) === "b01".U ||
                                funct6(4,3) === "b11".U && funct6(0)
-  vIMac64b.io.ctrl.highHalf := funct6(4,2) === "b001".U && funct6(1,0) =/= 1.U
-  vIMac64b.io.ctrl.isMacc := funct6(4,3) === "b01".U || funct6(4,2) === "b111".U
-  vIMac64b.io.ctrl.isSub := funct6(4,3) === "b01".U && funct6(1,0) === "b11".U
-  vIMac64b.io.ctrl.widen := funct6(4,3) === "b11".U
-  vIMac64b.io.ctrl.isFixP := uop.ctrl.fixP
+  vMac64b.io.highHalf := funct6(4,2) === "b001".U && funct6(1,0) =/= 1.U
+  vMac64b.io.isMacc := funct6(4,3) === "b01".U || funct6(4,2) === "b111".U
+  vMac64b.io.isSub := funct6(4,3) === "b01".U && funct6(1,0) === "b11".U
+  vMac64b.io.widen := funct6(4,3) === "b11".U
+  vMac64b.io.isFixP := uop.ctrl.fixP
   
   //---- ready-valid S1
   val validS1 = RegInit(false.B)
@@ -104,16 +104,16 @@ class VIMac extends Module {
 
   val maskSplash = MaskReorg.splash(maskS2, eewVdS2)
   val tailSplash = MaskReorg.splash(tailS2, eewVdS2)
-  val maskTailData = Module(new MaskTailDataVIMac)
+  val maskTailData = Module(new MaskTailDataVMac)
   maskTailData.io.mask := maskSplash
   maskTailData.io.tail := tailSplash
   maskTailData.io.oldVd := oldVdS2
   maskTailData.io.uop := uopS2
 
-  io.out.bits.vd := RegEnable(vIMac64b.io.vd & maskTailData.io.maskKeep | maskTailData.io.maskOff, fireS2)
-  io.out.bits.vxsat := RegEnable(vIMac64b.io.vxsat, fireS2)
+  io.out.bits.vd := RegEnable(vMac64b.io.vd & maskTailData.io.maskKeep | maskTailData.io.maskOff, fireS2)
+  io.out.bits.vxsat := RegEnable(vMac64b.io.vxsat, fireS2)
   io.out.bits.fflags := 0.U
 
-  vIMac64b.io.fireIn := io.in.fire
-  vIMac64b.io.fireS1 := fireS1
+  vMac64b.io.fireIn := io.in.fire
+  vMac64b.io.fireS1 := fireS1
 }

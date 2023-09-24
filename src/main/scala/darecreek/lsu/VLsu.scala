@@ -252,7 +252,7 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   // el_count mask
   val el_count_bytes = Wire(UInt(7.W))
   el_count_bytes := Mux1H(destEewOH_ld.oneHot, Seq(0, 1, 2, 3).map(elCountSquash << _))
-  val elCount_to_1s = Mux(el_count_bytes === 0.U, 0.U, UIntToCont1s((el_count_bytes - 1.U)(5, 0), 6))
+  val elCount_to_1s = Mux(el_count_bytes === 0.U, 0.U, UIntToCont1s.applySLL((el_count_bytes - 1.U)(5, 0), 6))
   require(elCount_to_1s.getWidth == 64, "elCount_to_1s of VLSU is supposed to be 64-wide")
   val elCountMask = Wire(UInt(96.W)) // 3 * vlenb = 96
   val el_id_low_bytes = Wire(UInt(vlenbWidth.W))

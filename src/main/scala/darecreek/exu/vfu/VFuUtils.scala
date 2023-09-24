@@ -36,6 +36,16 @@ object MaskExtract {
                                               vmask128b((idx+1)*stride-1, idx*stride)))))
     extracted
   }
+  def mask16_to_2x8(maskIn: UInt, sew: SewOH): Seq[UInt] = {
+    require(maskIn.getWidth == 16)
+    val result16 = Mux1H(Seq(
+      sew.is8  -> maskIn,
+      sew.is16 -> Cat(0.U(4.W), maskIn(7, 4), 0.U(4.W), maskIn(3, 0)),
+      sew.is32 -> Cat(0.U(6.W), maskIn(3, 2), 0.U(6.W), maskIn(1, 0)),
+      sew.is64 -> Cat(0.U(7.W), maskIn(1), 0.U(7.W), maskIn(0)),
+    ))
+    Seq(result16(7, 0), result16(15, 8))
+  }
 }
 
 // E.g., 0.U(3.W) => b"1111_11111"  1.U(3.W) => b"1111_1110"  7.U(3.W) => b"1000_0000"
@@ -162,15 +172,12 @@ class MaskTailData(implicit p: Parameters) extends Module {
       maskTail(i) := 0.U
     }
   }
-  val destEew = SewOH(uop.info.destEew)
-
   //--------------------------------------------------------
   //-------- Mask/Tail for non-compare instructions --------
   //--------------------------------------------------------
   io.maskKeep := Cat(maskTail.map(x => Mux(x(1), 0.U(8.W), ~(0.U(8.W)))).reverse)
   io.maskOff := Cat(maskTail.zipWithIndex.map({case (x, i) => 
                         Mux(!x(1), 0.U(8.W), Mux(x(0), ~0.U(8.W), UIntSplit(oldVd, 8)(i)))}).reverse)
-
   //----------------------------------------------------
   //---- Mask/Tail for compare instruction -------------
   //----------------------------------------------------

@@ -7,6 +7,7 @@ import chisel3.util._
 trait DarecreekParameters {
   //---- Come from scalar parameters ----
   val xLen = 64
+  val XLEN = xLen
   val NPhyRegs: Int = 192 // Scalar PRF
   val RobSize = 192
   val CommitWidth = 6
@@ -38,7 +39,7 @@ trait DarecreekParameters {
   val NLaneExuFUs = 4
   val NArithFUs = NLaneExuFUs + 3 // Number of FUs in EXU
 
-  val NVPhyRegs: Int = 96  // Vector PRF
+  val NVPhyRegs: Int = 80  // Vector PRF
   val SPRegIdxWidth = log2Up(NPhyRegs) // Scalar
   val VPRegIdxWidth = log2Up(NVPhyRegs) // Vector
 

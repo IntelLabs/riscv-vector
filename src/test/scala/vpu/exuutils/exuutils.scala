@@ -349,14 +349,14 @@ trait BundleGenHelper {
     )
   }
 
-  def genVExuOutput(rd: String,vd: String, s: SrcBundle, c: VCtrlBundle): VExuOutput = {
+  def genVExuOutput(vd: String, s: SrcBundle, c: VCtrlBundle): VExuOutput = {
     (new VExuOutput).Lit(
       _.uop -> genVExpdUOp(c),
       //_.vd = Vec.Lit(),
       _.vd -> gencrosslanevdgroup(vd).vd,//Vec.Lit(0.U(LaneWidth.W),0.U(LaneWidth.W),0.U(LaneWidth.W),0.U(LaneWidth.W)),
       _.fflags -> 0.U,
-      _.vxsat -> 0.U,
-      _.rd ->  rd.U(xLen.W)
+      _.vxsat -> 0.U
+      // _.rd ->  rd.U(xLen.W)
     )
   }
 

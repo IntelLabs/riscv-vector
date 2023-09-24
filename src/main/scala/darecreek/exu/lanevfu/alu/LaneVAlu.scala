@@ -1,11 +1,9 @@
-/**
-  * Top of vector ALU.
-  *   Assumption: xLen = 64
-  * 
+/** Integer and fixed-point (except mult and div)
+  *   
   * Perform below instructions:
   *     11.1  vadd, ...
   *     11.2  vwadd, ...
-  *     11.3  vzext, ...
+  *     11.3  vzext, ... //Todo: move to crosslane block
   *     11.4  vadc, vmadc, ...
   *     11.5  vand, ...
   *     11.6  vsll, ...
@@ -18,18 +16,22 @@
   *     12.2  vaadd, ...
   *     12.4  vssrl, ...
   *     12.5  vnclip, ...
+  *     16.1
+  *     16.2
+  *     16.6
   */
-
-package darecreek.exu.fu.alu
+package darecreek.exu.lanevfu.alu
 
 import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.decode._
-import darecreek.{LaneFUInput, LaneFUOutput, SewOH, VExpdUOp}
-import darecreek.UIntSplit
+import darecreek.{LaneFUInput, LaneFUOutput, SewOH, VExpdUOp, UIntSplit, MaskReorg}
+import chipsalliance.rocketchip.config._
+import darecreek.exu.vfu.alu._
+import darecreek.exu.vfu.{VFuModule, VFuParamsKey, VFuParameters}
 
 // finalResult = result & maskKeep | maskOff
-class MaskTailData extends Module {
+class MaskTailDataVAlu extends Module {
   val io = IO(new Bundle {
     val mask = Input(UInt(8.W))
     val tail = Input(UInt(8.W))
@@ -57,8 +59,6 @@ class MaskTailData extends Module {
       maskTail(i) := 0.U
     }
   }
-  val destEew = SewOH(uop.info.destEew)
-
   //--------------------------------------------------------
   //-------- Mask/Tail for non-compare instructions --------
   //--------------------------------------------------------
@@ -74,7 +74,7 @@ class MaskTailData extends Module {
 }
 
 
-class VAlu extends Module {
+class LaneVAlu(implicit p: Parameters) extends VFuModule {
   val io = IO(new Bundle {
     val in = Flipped(Decoupled(new LaneFUInput))
     val out = Decoupled(new LaneFUOutput)
@@ -82,8 +82,8 @@ class VAlu extends Module {
   
   val uop = io.in.bits.uop
   val sew = SewOH(uop.info.vsew)  // 0:8, 1:16, 2:32, 3:64
+  val eewVd = SewOH(uop.info.destEew)
   val fire = io.in.fire
-
   // broadcast rs1 or imm to all elements, assume xLen = 64
   val imm = uop.ctrl.lsrc(0)
   //                            |sign-extend imm to 64 bits|
@@ -94,39 +94,55 @@ class VAlu extends Module {
   
   // Ctrl signals from alu (funct6) decoder
   val opi = uop.ctrl.funct3(0) === uop.ctrl.funct3(1)
-  val vAluDecode = Wire(new VAluDecode)
-  val truthTable = TruthTable(VAluADD.table, VAluADD.default)
+  val vAluDecode = Wire(new VIntFixpDecode)
+  val truthTable = TruthTable(VAluTable.table, VAluTable.default)
   val decoderOut = decoder(QMCMinimizer, Cat(uop.ctrl.funct6, opi), truthTable)
-  vAluDecode := decoderOut.asTypeOf(new VAluDecode)
+  vAluDecode := decoderOut.asTypeOf(new VIntFixpDecode)
   
 
   /**
     *  ---- Pipeline-stage 1 (int instructions) ----
     */
   // Instantiate sub-modules
-  val vAluAdder = Module(new VAluAdder)
-  vAluAdder.io.in.uop := uop
-  vAluAdder.io.in.ctrl := vAluDecode
-  vAluAdder.io.in.sew := sew
-  vAluAdder.io.in.vs1_rs1_imm := vs1_rs1_imm
-  vAluAdder.io.in.vs2 := io.in.bits.vs2
-  vAluAdder.io.in.vmask := io.in.bits.mask
+  val vIntAdder = Module(new VIntAdder64b)
+  vIntAdder.io.funct6 := uop.ctrl.funct6
+  vIntAdder.io.vm := uop.ctrl.vm
+  vIntAdder.io.ma := uop.info.ma
+  vIntAdder.io.sew := sew
+  vIntAdder.io.eewVd := eewVd
+  vIntAdder.io.uopIdx := uop.expdIdx
+  vIntAdder.io.vs1 := vs1_rs1_imm
+  vIntAdder.io.vs2 := io.in.bits.vs2
+  vIntAdder.io.oldVd := io.in.bits.old_vd
+  vIntAdder.io.vmask := io.in.bits.mask
+  vIntAdder.io.isSub := vAluDecode.sub
+  vIntAdder.io.widen := uop.ctrl.widen
+  vIntAdder.io.widen2 := uop.ctrl.widen2
+  vIntAdder.io.narrow_to_1 := uop.ctrl.narrow_to_1
 
-  val vAluMisc = Module(new VAluMisc)
-  vAluMisc.io.in.uop := uop
-  vAluMisc.io.in.ctrl := vAluDecode
-  vAluMisc.io.in.sew := sew
-  vAluMisc.io.in.vs1_rs1_imm := vs1_rs1_imm
-  vAluMisc.io.in.vs2 := io.in.bits.vs2
-  vAluMisc.io.in.vmask := io.in.bits.mask
+  val vIntMisc = Module(new VIntMisc64b)
+  vIntMisc.io.funct6 := uop.ctrl.funct6
+  vIntMisc.io.funct3 := uop.ctrl.funct3
+  vIntMisc.io.vi := uop.ctrl.vi
+  vIntMisc.io.vm := uop.ctrl.vm
+  vIntMisc.io.vs1_imm := uop.ctrl.lsrc(0)
+  vIntMisc.io.narrow := uop.ctrl.narrow
+  vIntMisc.io.sew := sew
+  vIntMisc.io.uopIdx := uop.expdIdx
+  vIntMisc.io.vs1 := vs1_rs1_imm
+  vIntMisc.io.vs2 := io.in.bits.vs2
+  vIntMisc.io.vmask := io.in.bits.mask
 
 
   //------------------------------------
   //-------- Mask/Tail data gen --------
   //------------------------------------
-  val maskTailData = Module(new MaskTailData)
-  maskTailData.io.mask := io.in.bits.mask
-  maskTailData.io.tail := io.in.bits.tail
+  // Splash. sew = 8: unchanged, sew = 16: 0000abcd -> aabbccdd, ...
+  val maskSplash = MaskReorg.splash(io.in.bits.mask, eewVd)
+  val tailSplash = MaskReorg.splash(io.in.bits.tail, eewVd)
+  val maskTailData = Module(new MaskTailDataVAlu)
+  maskTailData.io.mask := maskSplash
+  maskTailData.io.tail := tailSplash
   maskTailData.io.oldVd := io.in.bits.old_vd
   maskTailData.io.uop := io.in.bits.uop
   maskTailData.io.opi := opi
@@ -142,13 +158,13 @@ class VAlu extends Module {
   val aluAdderOut = Reg(UInt(64.W))
   val aluAdderValid = RegInit(false.B)
   when (fire) {
-    aluAdderOut := vAluAdder.io.out.vd
+    aluAdderOut := vIntAdder.io.vd
     aluAdderValid := !vAluDecode.misc && !uop.ctrl.narrow_to_1
   }
   // Output of narrow-to-1
   val aluCmpOut = Reg(Vec(8, UInt(8.W)))
   val aluCmpValid = RegInit(false.B)
-  val cmpMasked = vAluAdder.io.out.cmp & maskKeep_cmp | maskOff_cmp
+  val cmpMasked = vIntAdder.io.cmpOut & maskKeep_cmp | maskOff_cmp
   when (fire) {
     aluCmpOut(0) := Mux(uop.expdIdx === 0.U, cmpMasked, aluCmpOut(0))
     for (i <- 1 until 8) {
@@ -164,10 +180,10 @@ class VAlu extends Module {
   val aluNarrowOut = Reg(UInt(64.W))
   val aluNarrowValid = RegInit(false.B)
   when (fire) {
-    aluMiscOut := vAluMisc.io.out.vd
+    aluMiscOut := vIntMisc.io.vd
     aluMiscValid := vAluDecode.misc && !uop.ctrl.narrow
-    aluNarrowOut := Mux(uop.expdIdx(0), Cat(vAluMisc.io.out.narrow, aluNarrowOut(31, 0)),
-                        Cat(0.U(32.W), vAluMisc.io.out.narrow))
+    aluNarrowOut := Mux(uop.expdIdx(0), Cat(vIntMisc.io.narrowVd, aluNarrowOut(31, 0)),
+                        Cat(0.U(32.W), vIntMisc.io.narrowVd))
     aluNarrowValid := (uop.expdIdx(0) || uop.expdEnd) && uop.ctrl.narrow
   }
   assert(PopCount(Cat(aluAdderValid, aluCmpValid, aluMiscValid, aluNarrowValid)) <= 1.U, "Error VPU: ALU_int out has more than 1 valids")
@@ -194,12 +210,14 @@ class VAlu extends Module {
                         Mux(uopS1.ctrl.narrow, aluNarrowValid && validS1Int, validS1Int))
 
   //-------------- S1FixP ------------------
-  val vAluFixP = Module(new VAluFixP)
-  vAluFixP.io.uop := uopS1
-  vAluFixP.io.ctrl.sew := RegEnable(sew, fire)
-  vAluFixP.io.ctrl.sub := RegEnable(vAluDecode.sub, fire)
-  vAluFixP.io.fromAdder := RegEnable(vAluAdder.io.toFixP, fire)
-  vAluFixP.io.fromMisc := RegEnable(vAluMisc.io.toFixP, fire)
+  val vAluFixP = Module(new VFixPoint64b)
+  vAluFixP.io.funct6 := uopS1.ctrl.funct6
+  vAluFixP.io.sew := RegEnable(sew, fire)
+  vAluFixP.io.vxrm := uopS1.info.vxrm
+  vAluFixP.io.isFixp := RegEnable(vAluDecode.fixp, fire)
+  vAluFixP.io.isSub := RegEnable(vAluDecode.sub, fire)
+  vAluFixP.io.fromAdder := RegEnable(vIntAdder.io.toFixP, fire)
+  vAluFixP.io.fromMisc := RegEnable(vIntMisc.io.toFixP, fire)
   
   //--------- Ready/valid of S1FixP (S1: pipeline stage 1) ---------
   val validS1FixP = RegInit(false.B)
@@ -218,10 +236,10 @@ class VAlu extends Module {
   val aluFixPNarrowOut = Reg(UInt(64.W))
   val aluFixPNarrowValid = RegInit(false.B)
   when (fireS1FixP) {
-    aluFixPOut := vAluFixP.io.out.vd
+    aluFixPOut := vAluFixP.io.vd
     aluFixPValid := uopS1.ctrl.fixP && !uopS1.ctrl.narrow
-    aluFixPNarrowOut := Mux(uopS1.expdIdx(0), Cat(vAluFixP.io.out.narrow, aluFixPNarrowOut(31, 0)),
-                        Cat(0.U(32.W), vAluFixP.io.out.narrow))
+    aluFixPNarrowOut := Mux(uopS1.expdIdx(0), Cat(vAluFixP.io.narrowVd, aluFixPNarrowOut(31, 0)),
+                        Cat(0.U(32.W), vAluFixP.io.narrowVd))
     aluFixPNarrowValid := (uopS1.expdIdx(0) || uopS1.expdEnd) && uopS1.ctrl.narrow
   }
 
@@ -235,7 +253,7 @@ class VAlu extends Module {
   val vdS2FixPFinal = vdS2FixP & maskKeepS2 | maskOffS2
 
   val uopS2 = RegEnable(uopS1, fireS1FixP) 
-  val vxsatS2 = RegEnable(vAluFixP.io.out.vxsat, fireS1FixP)
+  val vxsatS2 = RegEnable(vAluFixP.io.vxsat, fireS1FixP)
 
   val validS2FixP = RegInit(false.B)
   validS2FixP := Mux(fireS1FixP, true.B, Mux(readyS2FixP, false.B, validS2FixP))
@@ -263,7 +281,11 @@ class VAlu extends Module {
   io.out <> arb.io.out
 }
 
-object VerilogAlu extends App {
-  println("Generating the VPU ALU hardware")
-  emitVerilog(new VAlu(), Array("--target-dir", "generated"))
+import xiangshan._
+object Main extends App {
+  println("Generating hardware")
+  val p = Parameters.empty
+  emitVerilog(new LaneVAlu()(p.alterPartial({case VFuParamsKey => 
+              VFuParameters(VLEN = 256)})), Array("--target-dir", "generated",
+              "--emission-options=disableMemRandomization,disableRegisterRandomization"))
 }

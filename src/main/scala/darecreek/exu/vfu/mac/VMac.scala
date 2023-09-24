@@ -43,7 +43,8 @@ class VMac(implicit p: Parameters) extends VFuModule {
 
   val vIMac64bs = Seq.fill(2)(Module(new VMac64b))
   for (i <- 0 until 2) {
-    vIMac64bs(i).io.valid := valid
+    vIMac64bs(i).io.fireIn := valid
+    vIMac64bs(i).io.fireS1 := validS1
     vIMac64bs(i).io.sew := sew
     vIMac64bs(i).io.uopIdx := uopIdx
     vIMac64bs(i).io.vxrm := io.in.bits.uop.info.vxrm
