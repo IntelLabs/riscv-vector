@@ -1,4 +1,4 @@
-package darecreek.vfutest.alu
+package darecreek.vfutest.mac
 
 import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
@@ -9,6 +9,7 @@ import darecreek.exu.vfu._
 import darecreek.exu.vfu.mac._
 import darecreek.exu.vfu.VInstructions._
 import chipsalliance.rocketchip.config.Parameters
+import darecreek.vfutest._
 import xiangshan._
 
 /** @note VMac has the same IO ports as VAlu */
@@ -28,6 +29,17 @@ class VMacWrapper extends Module {
   vMac.io.in.valid := io.in.valid
   io.out.valid := vMac.io.out.valid
   io.in.ready := io.out.ready
+}
+
+object TestHarnessMac {
+  def test_init(dut: VMacWrapper): Unit = {
+    dut.clock.setTimeout(2000)
+    dut.io.in.initSource()
+    dut.io.in.setSourceClock(dut.clock)
+    dut.io.out.initSink()
+    dut.io.out.setSinkClock(dut.clock)
+    dut.io.out.ready.poke(true.B)
+  }
 }
 
 trait VMacBehavior {

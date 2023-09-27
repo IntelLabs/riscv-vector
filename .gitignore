@@ -5,3 +5,5 @@ test_run_dir/
 generated/
 build/
 *~
+.coursier
+out/

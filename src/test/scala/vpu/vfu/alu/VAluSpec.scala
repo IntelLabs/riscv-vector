@@ -9,6 +9,7 @@ import darecreek.exu.vfu._
 import darecreek.exu.vfu.alu._
 import darecreek.exu.vfu.VInstructions._
 import chipsalliance.rocketchip.config.Parameters
+import darecreek.vfutest._
 import xiangshan._
 
 class VAluWrapper extends Module {
@@ -26,6 +27,17 @@ class VAluWrapper extends Module {
   vAlu.io.in.valid := io.in.valid
   io.out.valid := vAlu.io.out.valid
   io.in.ready := io.out.ready
+}
+
+object TestHarnessAlu {
+  def test_init(dut: VAluWrapper): Unit = {
+    dut.clock.setTimeout(2000)
+    dut.io.in.initSource()
+    dut.io.in.setSourceClock(dut.clock)
+    dut.io.out.initSink()
+    dut.io.out.setSinkClock(dut.clock)
+    dut.io.out.ready.poke(true.B)
+  }
 }
 
 trait VAluBehavior {

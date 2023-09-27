@@ -1,4 +1,4 @@
-package darecreek.vfutest.alu
+package darecreek.vfutest.div
 
 import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
@@ -9,6 +9,7 @@ import darecreek.exu.vfu._
 import darecreek.exu.vfu.div._
 import darecreek.exu.vfu.VInstructions._
 import chipsalliance.rocketchip.config._
+import darecreek.vfutest._
 import xiangshan._
 
 class VFpuInput(implicit p: Parameters) extends Bundle {
@@ -32,6 +33,17 @@ class VDivWrapper extends Module {
   vdiv.io.redirect := io.in.bits.redirect
 
   vdiv.io.out <> io.out
+}
+
+object TestHarnessDiv {
+  def test_init(dut: VDivWrapper): Unit = {
+    dut.clock.setTimeout(1000)
+    dut.io.in.initSource()
+    dut.io.in.setSourceClock(dut.clock)
+    dut.io.out.initSink()
+    dut.io.out.setSinkClock(dut.clock)
+    dut.io.out.ready.poke(true.B)
+  }
 }
 
 trait VDivBehavior {

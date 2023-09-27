@@ -1,4 +1,4 @@
-package darecreek.vfutest.alu
+package darecreek.vfutest
 
 import chisel3._
 import chisel3.util._
@@ -10,6 +10,9 @@ import darecreek.exu.vfu.div._
 import chipsalliance.rocketchip.config.Parameters
 import xiangshan._
 import xiangshan.backend.rob.RobPtr
+import darecreek.vfutest.alu._
+import darecreek.vfutest.mac._
+import darecreek.vfutest.div._
 
 case class SrcBundle(vs2: String = "h0",
                      vs1: String = "h0",
@@ -116,35 +119,35 @@ trait BundleGenHelper {
 }
 
 
-object TestHarnessAlu {
-  def test_init(dut: VAluWrapper): Unit = {
-    dut.clock.setTimeout(2000)
-    dut.io.in.initSource()
-    dut.io.in.setSourceClock(dut.clock)
-    dut.io.out.initSink()
-    dut.io.out.setSinkClock(dut.clock)
-    dut.io.out.ready.poke(true.B)
-  }
-}
+// object TestHarnessAlu {
+//   def test_init(dut: VAluWrapper): Unit = {
+//     dut.clock.setTimeout(2000)
+//     dut.io.in.initSource()
+//     dut.io.in.setSourceClock(dut.clock)
+//     dut.io.out.initSink()
+//     dut.io.out.setSinkClock(dut.clock)
+//     dut.io.out.ready.poke(true.B)
+//   }
+// }
 
-object TestHarnessMac {
-  def test_init(dut: VMacWrapper): Unit = {
-    dut.clock.setTimeout(2000)
-    dut.io.in.initSource()
-    dut.io.in.setSourceClock(dut.clock)
-    dut.io.out.initSink()
-    dut.io.out.setSinkClock(dut.clock)
-    dut.io.out.ready.poke(true.B)
-  }
-}
+// object TestHarnessMac {
+//   def test_init(dut: VMacWrapper): Unit = {
+//     dut.clock.setTimeout(2000)
+//     dut.io.in.initSource()
+//     dut.io.in.setSourceClock(dut.clock)
+//     dut.io.out.initSink()
+//     dut.io.out.setSinkClock(dut.clock)
+//     dut.io.out.ready.poke(true.B)
+//   }
+// }
 
-object TestHarnessDiv {
-  def test_init(dut: VDivWrapper): Unit = {
-    dut.clock.setTimeout(1000)
-    dut.io.in.initSource()
-    dut.io.in.setSourceClock(dut.clock)
-    dut.io.out.initSink()
-    dut.io.out.setSinkClock(dut.clock)
-    dut.io.out.ready.poke(true.B)
-  }
-}
+// object TestHarnessDiv {
+//   def test_init(dut: VDivWrapper): Unit = {
+//     dut.clock.setTimeout(1000)
+//     dut.io.in.initSource()
+//     dut.io.in.setSourceClock(dut.clock)
+//     dut.io.out.initSink()
+//     dut.io.out.setSinkClock(dut.clock)
+//     dut.io.out.ready.poke(true.B)
+//   }
+// }

@@ -2,10 +2,10 @@ test_alu:
 	sbt "testOnly darecreek.vfutest.alu.VAluSpec"
 
 test_mac:
-	sbt "testOnly darecreek.vfutest.alu.VMacSpec"
+	sbt "testOnly darecreek.vfutest.mac.VMacSpec"
 
 test_div:
-	sbt "testOnly darecreek.vfutest.alu.VDivSpec"
+	sbt "testOnly darecreek.vfutest.div.VDivSpec"
 
 # test_amd: test_alu, test_mac, test_div
 test_amd: test_alu test_mac test_div
