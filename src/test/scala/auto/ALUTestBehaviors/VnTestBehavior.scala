@@ -10,7 +10,7 @@ import scala.reflect.runtime.universe._
 import darecreek.exu.vfu._
 import darecreek.exu.vfu.alu._
 import darecreek.exu.vfu.VInstructions._
-import chipsalliance.rocketchip.config.Parameters
+import org.chipsalliance.cde.config.Parameters
 
 class VnclipwvTestBehavior extends VnTestBehavior("vnclip.wv.data", ctrlBundles.vnclip_wv, "s", "vnclip_wv", true) {}
 class VnclipuwvTestBehavior extends VnTestBehavior("vnclipu.wv.data", ctrlBundles.vnclipu_wv, "u", "vnclipu_wv", true) {}

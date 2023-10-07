@@ -77,7 +77,7 @@ class FMUL_s1(val expWidth: Int, val precision: Int) extends Module {
   val prod_exp = exp_sum - (biasInt - (paddingBits + 1)).U
 
   val shift_lim_sub = Cat(0.U(1.W), exp_sum) - (biasInt - paddingBits).U
-  val prod_exp_uf = shift_lim_sub.head(1).asBool()
+  val prod_exp_uf = shift_lim_sub.head(1).asBool
   val shift_lim = shift_lim_sub.tail(1)
   // ov <=> exp_a + exp_b - bias > max_exp
   val prod_exp_ov = exp_sum >
@@ -248,7 +248,7 @@ class FMUL_s3(val expWidth: Int, val precision: Int) extends Module {
   io.to_fadd.fp_prod.exp := Mux(special_case.bits.hasZero, 0.U, exp_pre_round)
   io.to_fadd.fp_prod.sig := Mux(special_case.bits.hasZero,
     0.U,
-    sig_shifted.tail(1).head(2 * precision - 1) | sig_shifted.tail(2 * precision).orR()
+    sig_shifted.tail(1).head(2 * precision - 1) | sig_shifted.tail(2 * precision).orR
   )
   io.to_fadd.inter_flags.isInv := special_case.bits.inv
   io.to_fadd.inter_flags.isInf := special_case.bits.inf && !special_case.bits.nan

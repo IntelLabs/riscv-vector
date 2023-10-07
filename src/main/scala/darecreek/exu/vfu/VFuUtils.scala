@@ -2,7 +2,7 @@ package darecreek.exu.vfu
 
 import chisel3._
 import chisel3.util._
-import chipsalliance.rocketchip.config.Parameters
+import org.chipsalliance.cde.config.Parameters
 
 object UIntSplit {
   //Split into elements, e.g., if sew=8, UInt(64.W) => Seq(UInt(8.W) * 8)

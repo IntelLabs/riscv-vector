@@ -2,7 +2,7 @@ package darecreek.vfuAutotest.alu
 import darecreek.exu.vfu._
 import darecreek.exu.vfu.alu._
 import darecreek.exu.vfu.VInstructions._
-import chipsalliance.rocketchip.config.Parameters
+import org.chipsalliance.cde.config.Parameters
 
 import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec

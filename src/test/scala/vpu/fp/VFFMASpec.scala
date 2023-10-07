@@ -3,7 +3,7 @@ package vpu.fp
 import chisel3.stage.ChiselStage
 import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
-import chipsalliance.rocketchip.config.Parameters
+import org.chipsalliance.cde.config.Parameters
 import chisel3._
 import darecreek.exu.fp._
 import darecreek._ //to do change later

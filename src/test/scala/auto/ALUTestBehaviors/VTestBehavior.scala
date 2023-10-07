@@ -10,7 +10,7 @@ import scala.reflect.runtime.universe._
 import darecreek.exu.vfu._
 import darecreek.exu.vfu.alu._
 import darecreek.exu.vfu.VInstructions._
-import chipsalliance.rocketchip.config.Parameters
+import org.chipsalliance.cde.config.Parameters
 
 class VaddvvTestBehavior extends VTestBehavior("vadd.vv.data", ctrlBundles.vadd_vv, "u", "vadd_vv") {}
 class VsubvvTestBehavior extends VTestBehavior("vsub.vv.data", ctrlBundles.vsub_vv, "u", "vsub_vv") {}

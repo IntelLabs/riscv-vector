@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import darecreek.exu.vfu._
 // import darecreek.exu.vfu.VFUParam._
-import chipsalliance.rocketchip.config._
+import org.chipsalliance.cde.config._
 
 class VMac(implicit p: Parameters) extends VFuModule {
   val io = IO(new Bundle {

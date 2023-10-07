@@ -3,7 +3,7 @@ package darecreek.exu.fp
 import chisel3._
 import chisel3.util.DecoupledIO
 import darecreek.{BundleHelper, LaneFUInput, LaneFUOutput, VExpdUOp}
-import freechips.rocketchip.config.Parameters
+import org.chipsalliance.cde.config.Parameters
 
 class VFPUCtrlSigs extends Bundle {
 

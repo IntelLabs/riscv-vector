@@ -33,14 +33,14 @@ class FarPath(val expWidth: Int, val precision: Int, val outPc: Int)
 
 
   val adder_in_sig_b_raw = Cat(0.U(1.W), sig_b_main, sig_b_sticky)
-  val adder_in_sig_b = Mux(effSub, (~adder_in_sig_b_raw).asUInt(), adder_in_sig_b_raw) + effSub
+  val adder_in_sig_b = Mux(effSub, (~adder_in_sig_b_raw).asUInt, adder_in_sig_b_raw) + effSub
 
   /*
   val adder_in_sig_b = Cat(0.U(1.W), sig_b_main, sig_b_sticky)
   val adder_in_sig_a = Cat(0.U(1.W), a.sig, 0.U(3.W))
   val adder_result =
     adder_in_sig_a +
-      Mux(effSub, ~adder_in_sig_b, adder_in_sig_b).asUInt() + effSub
+      Mux(effSub, ~adder_in_sig_b, adder_in_sig_b).asUInt + effSub
    */
 
   val exp_a_plus_1 = a.exp + 1.U
@@ -101,46 +101,46 @@ class NearPath(val expWidth: Int, val precision: Int, val outPc: Int)
   val (a, b) = (io.in.a, io.in.b)
   val need_shift = io.in.need_shift_b
   val a_sig = Cat(a.sig, 0.U(1.W))
-  val b_sig = (Cat(b.sig, 0.U(1.W)) >> need_shift).asUInt()
-  val b_neg = (~b_sig).asUInt()
+  val b_sig = (Cat(b.sig, 0.U(1.W)) >> need_shift).asUInt
+  val b_neg = (~b_sig).asUInt
   // extend 1 bit to get 'a_lt_b'
   val a_minus_b = Cat(0.U(1.W), a_sig) + Cat(1.U(1.W), b_neg) + 1.U
-  val a_lt_b = a_minus_b.head(1).asBool()
+  val a_lt_b = a_minus_b.head(1).asBool
   val sig_raw = a_minus_b.tail(1)
   val lza_ab = Module(new LZA(precision + 1))
   lza_ab.io.a := a_sig
   lza_ab.io.b := b_neg
   val lza_str = lza_ab.io.f
-  val lza_str_zero = !Cat(lza_str).orR()
+  val lza_str_zero = !Cat(lza_str).orR
 
   // need to limit the shamt? (if a.exp is not large enough, a.exp-lzc may < 1)
   val need_shift_lim = a.exp < (precision + 1).U
   val mask_table_k_width = log2Up(precision + 1)
   val shift_lim_mask_raw = ((
     Cat(true.B, 0.U((precision + 1).W)) >> a.exp(mask_table_k_width - 1, 0)
-    ).asUInt())(precision , 0)
+    ).asUInt)(precision , 0)
   val shift_lim_mask = Mux(need_shift_lim, shift_lim_mask_raw, 0.U)
-  val shift_lim_bit = (shift_lim_mask_raw & sig_raw).orR()
+  val shift_lim_bit = (shift_lim_mask_raw & sig_raw).orR
 
   val lzc_str = shift_lim_mask | lza_str
   val lzc = CLZ(lzc_str)
 
   val int_bit_mask = Cat((0 until precision + 1).reverseMap {
     case i @ `precision` => lzc_str(i)
-    case i               => lzc_str(i) & !lzc_str.head(precision + 1 - i - 1).orR()
+    case i               => lzc_str(i) & !lzc_str.head(precision + 1 - i - 1).orR
   })
 
   val int_bit_predicted =
-    ((int_bit_mask | lza_str_zero) & sig_raw).orR()
+    ((int_bit_mask | lza_str_zero) & sig_raw).orR
   val int_bit_rshift_1 =
-    ((int_bit_mask >> 1.U).asUInt() & sig_raw).orR()
+    ((int_bit_mask >> 1.U).asUInt & sig_raw).orR
 
   val exceed_lim_mask = Cat((0 until precision + 1).reverseMap {
     case `precision` => false.B
-    case i           => lza_str.head(precision + 1 - i - 1).orR()
+    case i           => lza_str.head(precision + 1 - i - 1).orR
   })
   val exceed_lim =
-    need_shift_lim && !(exceed_lim_mask & shift_lim_mask_raw).orR()
+    need_shift_lim && !(exceed_lim_mask & shift_lim_mask_raw).orR
 
   val int_bit =
     Mux(exceed_lim, shift_lim_bit, int_bit_rshift_1 || int_bit_predicted)
@@ -555,7 +555,7 @@ class FCMA_ADD_1(val expWidth: Int, val precision: Int, val outPc: Int)
   val exp_diff_a_b = Cat(0.U(1.W), raw_a.exp) - Cat(0.U(1.W), raw_b.exp)
   val exp_diff_b_a = Cat(0.U(1.W), raw_b.exp) - Cat(0.U(1.W), raw_a.exp)
   // `b_overflow` means mul result is much bigger than a
-  val need_swap = exp_diff_a_b.head(1).asBool() || b_flags.overflow
+  val need_swap = exp_diff_a_b.head(1).asBool || b_flags.overflow
 
   val ea_minus_eb = Mux(need_swap, exp_diff_b_a.tail(1), exp_diff_a_b.tail(1))
   val sel_far_path = !eff_sub || ea_minus_eb > 1.U || b_flags.overflow
@@ -675,7 +675,7 @@ class FCMA_ADD_1(val expWidth: Int, val precision: Int, val outPc: Int)
     near_path_sig_rounded
   )
 
-  val near_path_of = near_path_exp_rounded === (~0.U(expWidth.W)).asUInt()
+  val near_path_of = near_path_exp_rounded === (~0.U(expWidth.W)).asUInt
   val near_path_ix = near_path_rounder.io.inexact || near_path_of
 //  val near_path_uf = near_path_out.tininess && near_path_ix
   val near_path_uf = near_path_tininess && near_path_ix

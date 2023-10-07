@@ -15,7 +15,7 @@ class CLZ(len: Int, zero: Boolean) extends Module {
     val out = Output(UInt(outWidth.W))
   })
 
-  io.out := PriorityEncoder(io.in.asBools().reverse)
+  io.out := PriorityEncoder(io.in.asBools.reverse)
 }
 
 object CLZ {

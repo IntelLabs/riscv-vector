@@ -18,9 +18,9 @@ class ShiftRightJam(val len: Int) extends Module {
   val exceed_max_shift = io.shamt > len.U
   val shamt = io.shamt(max_shift_width - 1, 0)
   val sticky_mask =
-    ((1.U << shamt).asUInt() - 1.U)(len - 1, 0) | Fill(len, exceed_max_shift)
+    ((1.U << shamt).asUInt - 1.U)(len - 1, 0) | Fill(len, exceed_max_shift)
   io.out := Mux(exceed_max_shift, 0.U, io.in >> io.shamt)
-  io.sticky := (io.in & sticky_mask).orR()
+  io.sticky := (io.in & sticky_mask).orR
 }
 
 object ShiftRightJam {

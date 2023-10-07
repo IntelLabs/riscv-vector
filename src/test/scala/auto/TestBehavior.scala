@@ -14,7 +14,7 @@ import darecreek.exu.vfu.fp._
 import darecreek.exu.vfu.div._
 import darecreek.exu.vfu.vmask._
 import darecreek.exu.vfu.reduction._
-import chipsalliance.rocketchip.config.Parameters
+import org.chipsalliance.cde.config.Parameters
 
 abstract class TestBehavior(filename : String, ctrlBundle : TestCtrlBundleBase, sign : String, instid : String) extends BundleGenHelper {
 

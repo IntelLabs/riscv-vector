@@ -7,7 +7,7 @@ import chisel3.experimental.BundleLiterals._
 import chisel3.experimental.VecLiterals._
 import darecreek.exu.vfu._
 import darecreek.exu.vfu.div._
-import chipsalliance.rocketchip.config.Parameters
+import org.chipsalliance.cde.config.Parameters
 import xiangshan._
 import xiangshan.backend.rob.RobPtr
 import darecreek.vfutest.alu._

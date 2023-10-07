@@ -10,7 +10,7 @@ import scala.reflect.runtime.universe._
 import darecreek.exu.vfu._
 import darecreek.exu.vfu.alu._
 import darecreek.exu.vfu.VInstructions._
-import chipsalliance.rocketchip.config.Parameters
+import org.chipsalliance.cde.config.Parameters
 
 class VzextVf2TestBehavior extends VzvsTestBehavior("vzext.vf2.data", ctrlBundles.vzext_vf2, "u", "vzext_vf2", 6, 2) {}
 class VsextVf2TestBehavior extends VzvsTestBehavior("vsext.vf2.data", ctrlBundles.vsext_vf2, "s", "vsext_vf2", 7, 2) {}

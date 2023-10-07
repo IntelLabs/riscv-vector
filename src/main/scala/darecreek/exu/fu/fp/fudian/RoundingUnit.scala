@@ -17,7 +17,7 @@ class RoundingUnit(val width: Int) extends Module {
     val r_up = Output(Bool())
   })
 
-  val (g, r, s) = (io.in(0).asBool(), io.roundIn, io.stickyIn)
+  val (g, r, s) = (io.in(0).asBool, io.roundIn, io.stickyIn)
   val inexact = r | s
   val r_up = MuxLookup(
     io.rm,
@@ -35,7 +35,7 @@ class RoundingUnit(val width: Int) extends Module {
   io.out := Mux(r_up, out_r_up, io.in)
   io.inexact := inexact
   // r_up && io.in === 111...1
-  io.cout := r_up && io.in.andR()
+  io.cout := r_up && io.in.andR
   io.r_up := r_up
 }
 
@@ -45,8 +45,8 @@ object RoundingUnit {
     val in_pad = if(in.getWidth < width + 2) padd_tail(in, width + 2) else in
     val rounder = Module(new RoundingUnit(width))
     rounder.io.in := in_pad.head(width)
-    rounder.io.roundIn := in_pad.tail(width).head(1).asBool()
-    rounder.io.stickyIn := in_pad.tail(width + 1).orR()
+    rounder.io.roundIn := in_pad.tail(width).head(1).asBool
+    rounder.io.stickyIn := in_pad.tail(width + 1).orR
     rounder.io.rm := rm
     rounder.io.signIn := sign
     rounder

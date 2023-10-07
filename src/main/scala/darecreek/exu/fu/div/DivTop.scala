@@ -1,6 +1,6 @@
 package darecreek.exu.fu.div
 
-import chipsalliance.rocketchip.config.{Config, Field, Parameters}
+import org.chipsalliance.cde.config.{Config, Field, Parameters}
 import chisel3._
 import chisel3.util._
 import darecreek.{BundleHelper, DarecreekParameters, LaneFUInput, LaneFUOutput, LaneWidth, xLen}

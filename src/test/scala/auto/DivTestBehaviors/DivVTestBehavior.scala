@@ -13,7 +13,7 @@ import darecreek.exu.vfu.alu._
 import darecreek.exu.vfu.fp._
 import darecreek.exu.vfu.div._
 import darecreek.exu.vfu.VInstructions._
-import chipsalliance.rocketchip.config.Parameters
+import org.chipsalliance.cde.config.Parameters
 
 
 class VdivvvTestBehavior extends VdTestBehavior("vdiv.vv.data", ctrlBundles.vdiv_vv, "-", "vdiv_vv") {}

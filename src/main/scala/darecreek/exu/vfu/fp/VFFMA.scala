@@ -19,7 +19,7 @@ package darecreek.exu.vfu.fp
 import chisel3.experimental.ChiselEnum
 import chisel3.util._
 import chisel3._
-import freechips.rocketchip.config._
+import org.chipsalliance.cde.config._
 import fudian._
 import fudian.utils.Multiplier
 import xiangshan.Redirect

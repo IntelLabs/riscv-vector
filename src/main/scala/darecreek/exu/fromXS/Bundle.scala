@@ -31,7 +31,7 @@ import xiangshan.backend.rob.RobPtr
 // import xiangshan.frontend.FtqPtr
 // import xiangshan.frontend.CGHPtr
 // import xiangshan.frontend.FtqToCtrlIO
-import chipsalliance.rocketchip.config.Parameters
+import org.chipsalliance.cde.config.Parameters
 // import chisel3.util.BitPat.bitPatToUInt
 // import xiangshan.backend.execute.fu.alu.ALUOpType
 // import xiangshan.backend.execute.fu.csr.CSROpType

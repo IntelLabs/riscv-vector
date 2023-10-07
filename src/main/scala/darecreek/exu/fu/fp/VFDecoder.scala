@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import darecreek.LaneFUInput
 import VFInsts._
-import freechips.rocketchip.config.Parameters
+import org.chipsalliance.cde.config.Parameters
 import freechips.rocketchip.rocket.DecodeLogic
 
 trait VFPDecodeConstants {

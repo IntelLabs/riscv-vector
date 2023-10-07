@@ -1,6 +1,6 @@
 package darecreek.exu.fp
 
-import chipsalliance.rocketchip.config._
+import org.chipsalliance.cde.config._
 import darecreek.{DarecreekParameters, LaneWidth, xLen}
 
 case object NAME extends Field[String]

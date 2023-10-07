@@ -8,7 +8,7 @@ import darecreek.exu.fp._
 import darecreek.exu.lanevfu.alu._
 import darecreek.exu.lanevfu.mac._
 import darecreek.exu.fu.div._
-import chipsalliance.rocketchip.config._
+import org.chipsalliance.cde.config._
 import darecreek.exu.vfu.{VFuParamsKey, VFuParameters}
 
 class DummyLaneFU extends Module {

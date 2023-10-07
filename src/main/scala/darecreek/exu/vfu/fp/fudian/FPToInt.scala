@@ -63,7 +63,7 @@ class FPToInt_s1(val expWidth: Int, val precision: Int) extends Module {
   val lpath_iv = !is_signed_int && raw_a.sign
   val lpath_may_of = is_signed_int && (raw_a.exp === max_int_exp)
   val lpath_pos_of = lpath_may_of && !raw_a.sign
-  val lpath_neg_of = lpath_may_of && raw_a.sign && raw_a.sig.tail(1).orR()
+  val lpath_neg_of = lpath_may_of && raw_a.sign && raw_a.sig.tail(1).orR
   val lpath_of = lpath_pos_of || lpath_neg_of
 
   io.to_s2.lpath_iv := lpath_iv
@@ -125,10 +125,10 @@ class FPToInt_s2(val expWidth: Int, val precision: Int) extends Module {
     rpath_rounder.io.out
   )
   val rpath_ix = rpath_rounder.io.inexact
-  val rpath_iv = !is_signed_int && raw_a.sign && rpath_sig.orR()
+  val rpath_iv = !is_signed_int && raw_a.sign && rpath_sig.orR
   val rpath_of = if (precision >= 32) {
     val rpath_exp_inc =
-      rpath_rounder.io.r_up && rpath_rounder.io.in(30, 0).andR()
+      rpath_rounder.io.r_up && rpath_rounder.io.in(30, 0).andR
     val rpath_exp_eq_31 = raw_a.exp === (FloatPoint.expBias(expWidth) + 31).U
     val rpath_exp_eq_30 = raw_a.exp === (FloatPoint.expBias(expWidth) + 30).U
     val rpath_pos_of = !raw_a.sign && Mux(
@@ -137,7 +137,7 @@ class FPToInt_s2(val expWidth: Int, val precision: Int) extends Module {
       rpath_exp_eq_31 && rpath_exp_inc
     )
     val rpath_neg_of = raw_a.sign && rpath_exp_eq_31 &&
-      (rpath_rounder.io.in(30, 0).orR() || rpath_rounder.io.r_up)
+      (rpath_rounder.io.in(30, 0).orR || rpath_rounder.io.r_up)
     // only for int32
     !is_long_int && (rpath_pos_of || rpath_neg_of)
   } else false.B

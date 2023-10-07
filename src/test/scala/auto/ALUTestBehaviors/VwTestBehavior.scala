@@ -10,7 +10,7 @@ import scala.reflect.runtime.universe._
 import darecreek.exu.vfu._
 import darecreek.exu.vfu.alu._
 import darecreek.exu.vfu.VInstructions._
-import chipsalliance.rocketchip.config.Parameters
+import org.chipsalliance.cde.config.Parameters
 
 class VwaddwvTestBehavior extends VwTestBehavior("vwadd.wv.data", ctrlBundles.vwadd_wv, "s", "vwadd_wv") {}
 class VwadduwvTestBehavior extends VwTestBehavior("vwaddu.wv.data", ctrlBundles.vwaddu_wv, "u", "vwaddu_wv") {}

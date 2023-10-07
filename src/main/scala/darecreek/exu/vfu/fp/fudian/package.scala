@@ -33,9 +33,9 @@ package object fudian {
     val exp = UInt(expWidth.W)
     val sig = UInt(sigWidth.W)
     def decode: FPDecodeBundle = {
-      val expNotZero = exp.orR()
-      val expIsOnes = exp.andR()
-      val sigNotZero = sig.orR()
+      val expNotZero = exp.orR
+      val expIsOnes = exp.andR
+      val sigNotZero = sig.orR
       val bundle = Wire(new FPDecodeBundle)
       bundle.expNotZero := expNotZero
       bundle.expIsZero := !expNotZero
@@ -46,8 +46,8 @@ package object fudian {
       bundle.isInf := bundle.expIsOnes && bundle.sigIsZero
       bundle.isZero := bundle.expIsZero && bundle.sigIsZero
       bundle.isNaN := bundle.expIsOnes && bundle.sigNotZero
-      bundle.isSNaN := bundle.isNaN && !sig.head(1).asBool()
-      bundle.isQNaN := bundle.isNaN && sig.head(1).asBool()
+      bundle.isSNaN := bundle.isNaN && !sig.head(1).asBool
+      bundle.isQNaN := bundle.isNaN && sig.head(1).asBool
       bundle
     }
   }
@@ -91,7 +91,7 @@ package object fudian {
   object RawFloat {
     def fromFP(fp: FloatPoint, expNotZero: Option[Bool] = None): RawFloat = {
       val inner = Wire(new RawFloat(fp.expWidth, fp.precision))
-      val nz = if (expNotZero.isDefined) expNotZero.get else fp.exp.orR()
+      val nz = if (expNotZero.isDefined) expNotZero.get else fp.exp.orR
       inner.sign := fp.sign
       inner.exp := fp.exp | !nz
       inner.sig := Cat(nz, fp.sig)

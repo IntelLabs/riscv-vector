@@ -26,7 +26,7 @@ import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.decode._
 import darecreek.{LaneFUInput, LaneFUOutput, SewOH, VExpdUOp, UIntSplit, MaskReorg}
-import chipsalliance.rocketchip.config._
+import org.chipsalliance.cde.config._
 import darecreek.exu.vfu.alu._
 import darecreek.exu.vfu.{VFuModule, VFuParamsKey, VFuParameters}
 

@@ -8,7 +8,7 @@ import chiseltest.WriteVcdAnnotation
 import darecreek.exu.vfu._
 import darecreek.exu.vfu.div._
 import darecreek.exu.vfu.VInstructions._
-import chipsalliance.rocketchip.config._
+import org.chipsalliance.cde.config._
 import darecreek.vfutest._
 import xiangshan._
 

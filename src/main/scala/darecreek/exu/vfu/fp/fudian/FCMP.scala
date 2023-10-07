@@ -25,7 +25,7 @@ class FCMP(val expWidth: Int, val precision: Int) extends Module {
   val same_sign = fp_a.sign === fp_b.sign
   val a_minus_b = Cat(0.U(1.W), a) - Cat(0.U(1.W), b)
   val uint_eq = a_minus_b.tail(1) === 0.U
-  val uint_less = fp_a.sign ^ a_minus_b.head(1).asBool()
+  val uint_less = fp_a.sign ^ a_minus_b.head(1).asBool
 
   val invalid = hasSNaN || (io.signaling && hasNaN)
 

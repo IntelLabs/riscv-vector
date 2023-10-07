@@ -9,7 +9,7 @@ import scala.reflect.runtime.universe._
 import darecreek.exu.vfu._
 import darecreek.exu.vfu.mac._
 import darecreek.exu.vfu.VInstructions._
-import chipsalliance.rocketchip.config.Parameters
+import org.chipsalliance.cde.config.Parameters
 
 class VmulvvTestBehavior extends VmuTestBehavior("vmul.vv.data", ctrlBundles.vmul_vv, "s", "vmul_vv") {}
 class VmulhvvTestBehavior extends VmuTestBehavior("vmulh.vv.data", ctrlBundles.vmulh_vv, "s", "vmulh_vv") {}

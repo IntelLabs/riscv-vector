@@ -16,7 +16,7 @@
 
 package vpu
 
-import chipsalliance.rocketchip.config.Config
+import org.chipsalliance.cde.config.Config
 import chisel3.{assert, _}
 import chiseltest._
 import chiseltest.ChiselScalatestTester

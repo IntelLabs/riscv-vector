@@ -12,7 +12,7 @@ import darecreek.exu.vfu.div._
 import darecreek.exu.vfu.vmask._
 import xiangshan.MicroOp
 import darecreek.exu.vfu.perm._
-import chipsalliance.rocketchip.config._
+import org.chipsalliance.cde.config._
 import xiangshan._
 import xiangshan.backend.rob.RobPtr
 

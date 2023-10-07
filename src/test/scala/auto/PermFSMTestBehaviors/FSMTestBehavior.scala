@@ -12,7 +12,7 @@ import darecreek.exu.vfu.perm._
 import darecreek.exu.vfu._
 import darecreek.exu.vfu.alu._
 import darecreek.exu.vfu.VInstructions._
-import chipsalliance.rocketchip.config.Parameters
+import org.chipsalliance.cde.config.Parameters
 
 // case class VS1DT(vs1 : String, vs1_pidx : Int)
 

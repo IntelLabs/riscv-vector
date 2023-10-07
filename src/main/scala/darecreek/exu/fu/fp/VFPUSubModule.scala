@@ -3,7 +3,7 @@ package darecreek.exu.fp
 import chisel3._
 import chisel3.util._
 import darecreek.{LaneFUInput, LaneFUOutput}
-import freechips.rocketchip.config.Parameters
+import org.chipsalliance.cde.config.Parameters
 
 abstract class VFPUBaseModule(implicit p: Parameters) extends Module with HasVFPUParams
 

@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import darecreek.exu.vfu._
 // import darecreek.exu.vfu.VFUParam._
-import chipsalliance.rocketchip.config.Parameters
+import org.chipsalliance.cde.config.Parameters
 
 class VcmprsEngine(implicit p: Parameters) extends VFuModule {
   val io = IO(new Bundle {

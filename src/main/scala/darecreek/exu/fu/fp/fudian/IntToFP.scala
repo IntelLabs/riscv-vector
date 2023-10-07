@@ -34,7 +34,7 @@ class IntToFP_prenorm extends Module {
   val in_sext = Cat(Fill(32, in(31)), in(31, 0))
   val in_zext = Cat(0.U(32.W), in(31,0))
   val in_raw = Mux(long_int, in, Mux(signed_int, in_sext, in_zext))
-  val in_abs = Mux(in_sign, (~in_raw).asUInt() + 1.U, in_raw)
+  val in_abs = Mux(in_sign, (~in_raw).asUInt + 1.U, in_raw)
 
   val lza = Module(new LZA(64))
   lza.io.a := 0.U
@@ -48,11 +48,11 @@ class IntToFP_prenorm extends Module {
   // eg: 001010 => 001000
   val one_mask = Cat((0 until 64).reverseMap {
     case i @ 63 => lza.io.f(i)
-    case i @ 0  => !lza.io.f(63, i + 1).orR()
-    case i      => lza.io.f(i) && !lza.io.f(63, i + 1).orR()
+    case i @ 0  => !lza.io.f(63, i + 1).orR
+    case i      => lza.io.f(i) && !lza.io.f(63, i + 1).orR
   })
 
-  val lzc_error = Mux(in_sign, !(in_abs & one_mask).orR(), false.B)
+  val lzc_error = Mux(in_sign, !(in_abs & one_mask).orR, false.B)
 
   val in_shift_s1 = (in_abs << lzc)(62, 0)
   val in_norm = Mux(lzc_error, Cat(in_shift_s1.tail(1), 0.U(1.W)), in_shift_s1)
@@ -77,7 +77,7 @@ class IntToFP_postnorm(val expWidth: Int, val precision: Int) extends Module {
   val exp_raw = (63 + FloatPoint.expBias(expWidth)).U(expWidth.W) - lzc
   val sig_raw = in.head(precision - 1) // exclude hidden bit
   val round_bit = in.tail(precision - 1).head(1)
-  val sticky_bit = in.tail(precision).orR()
+  val sticky_bit = in.tail(precision).orR
 
   val rounder = Module(new RoundingUnit(precision - 1))
   rounder.io.in := sig_raw

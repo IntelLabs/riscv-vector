@@ -7,34 +7,26 @@ import scalalib._
 // support BSP
 import mill.bsp._
 
-object darecreek extends RootModule with SbtModule { m =>
+object darecreek extends SbtModule { m =>
   override def millSourcePath = os.pwd
-  override def scalaVersion = "2.12.13"
+  override def scalaVersion = "2.13.10"
   override def scalacOptions = Seq(
     "-language:reflectiveCalls",
     "-deprecation",
     "-feature",
     "-Xcheckinit",
-    "-P:chiselplugin:genBundleElements"
+    // "-P:chiselplugin:genBundleElements"
   )
   override def ivyDeps = Agg(
-    ivy"edu.berkeley.cs::chisel3:3.5.5",
-    ivy"edu.berkeley.cs::rocketchip:1.2.6",
-  )
-  override def scalacPluginIvyDeps = Agg(
-    ivy"edu.berkeley.cs:::chisel3-plugin:3.5.5",
+    ivy"org.chipsalliance::chisel:5.0.0",
   )
 
-  object test extends SbtModuleTests with TestModule.ScalaTest {
-    override def ivyDeps = m.ivyDeps() ++ Agg(
-      ivy"edu.berkeley.cs::chiseltest:0.5.4"
-    )
-
-    def testFramework = "org.scalatest.tools.Framework"
-  }
-  // object test extends Tests with ScalaTest {
+  // object test extends SbtModuleTests with TestModule.ScalaTest {
   //   override def ivyDeps = m.ivyDeps() ++ Agg(
   //     ivy"edu.berkeley.cs::chiseltest:0.5.4"
   //   )
+
+  //   def testFramework = "org.scalatest.tools.Framework"
   // }
 }
+

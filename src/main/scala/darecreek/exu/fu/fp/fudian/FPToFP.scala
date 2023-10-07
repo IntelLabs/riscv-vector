@@ -75,8 +75,8 @@ class FPDownConverter(
       Normal path
    */
   val normal_sig = fp_in.sig.head(outPrecision - 1)
-  val normal_roundBit = fp_in.sig.tail(outPrecision - 1).head(1).asBool()
-  val normal_stickyBit = fp_in.sig.tail(outPrecision).orR()
+  val normal_roundBit = fp_in.sig.tail(outPrecision - 1).head(1).asBool
+  val normal_stickyBit = fp_in.sig.tail(outPrecision).orR
 
   val normal_rounder = Module(new RoundingUnit(outPrecision - 1))
   normal_rounder.io.in := normal_sig

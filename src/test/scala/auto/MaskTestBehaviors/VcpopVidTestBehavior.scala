@@ -7,7 +7,7 @@ import chiseltest.WriteVcdAnnotation
 import scala.reflect.io.File
 import scala.reflect.runtime.universe._
 import darecreek.exu.vfu.vmask._
-import chipsalliance.rocketchip.config.Parameters
+import org.chipsalliance.cde.config.Parameters
 
 class VcpopmTestBehavior extends VcpTestBehavior("vcpop.m.data", ctrlBundles.vcpop_m, "-", "vcpop_m", 0x10) {}
 class VidvTestBehavior extends VcpTestBehavior("vid.v.data", ctrlBundles.vid_v, "u", "vid_v", 0x11) {}

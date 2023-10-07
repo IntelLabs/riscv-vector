@@ -1,6 +1,6 @@
 package darecreek
 
-import chipsalliance.rocketchip.config.Parameters
+import org.chipsalliance.cde.config.Parameters
 import chisel3._
 import chiseltest._
 import chisel3.experimental.BundleLiterals._
