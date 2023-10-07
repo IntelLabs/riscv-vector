@@ -1,6 +1,6 @@
 package darecreek.exu.vfu.fp
 
-import chisel3._
+import chisel3.{util, _}
 import chisel3.util._
 import chisel3.util.experimental.decode._
 import chipsalliance.rocketchip.config.Parameters
@@ -65,6 +65,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   val idle :: calc_vs2 :: calc_vs1 :: Nil = Enum(3)
 
   val vd_vsew = Mux(widen | widen2, vsew + 1.U, vsew)
+  val eew = SewOH(vsew)
   val eewVd = SewOH(vd_vsew)
   val vsew_bytes = 1.U << vsew
   val ta_reg = RegEnable(ta, false.B, fire)
@@ -78,7 +79,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
 
   when(fire) {
     when(vfredosum_vs || vfwredosum_vs || vfwredusum_vs) {
-      vs2_rnd := vlenb.U / vsew_bytes - 1.U
+      vs2_rnd := Mux1H(eew.oneHot, VecInit(Seq(15.U, 7.U, 3.U, 1.U)))
     }.otherwise {
       vs2_rnd := vlenbWidth.U - vsew
     }
@@ -99,9 +100,17 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   val vd_mask_half = (~0.U((VLEN / 2).W))
   val red_vd_bits = Cat(0.U((VLEN / 2).W), Cat(red_out_vd.reverse))
 
+  val vs1_zero = RegInit(0.U(64.W))
+  val vs1_zero_bypass = RegInit(false.B)
+  vs1_zero := Mux1H(eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 0.U), vs1(n - 1, 0))) :+ vs1(63, 0))
+
   val old_vd_bits = RegInit(0.U(VLEN.W))
-  val red_vd_tail_one = (vd_mask << vsew_vd_bits) | (red_vd_bits & (vd_mask >> (VLEN.U - vsew_vd_bits)))
-  val red_vd_tail_vd = (old_vd_bits & (vd_mask << vsew_vd_bits)) | (red_vd_bits & (vd_mask >> (VLEN.U - vsew_vd_bits)))
+  val red_vd_tail_one = Wire(UInt(VLEN.W))
+  val red_vd_tail_vd = Wire(UInt(VLEN.W))
+  val vd_mask_vsew_vd = Wire(UInt(VLEN.W))
+  vd_mask_vsew_vd := Mux1H(eewVd.oneHot, Seq(8, 16, 32, 64).map(sew => Cat(~0.U((VLEN - sew).W), 0.U(sew.W))))
+  red_vd_tail_one := vd_mask_vsew_vd | Mux(vs1_zero_bypass, vs1_zero, (red_vd_bits & (~vd_mask_vsew_vd)))
+  red_vd_tail_vd := (old_vd_bits & vd_mask_vsew_vd) | Mux(vs1_zero_bypass, vs1_zero, (red_vd_bits & (~vd_mask_vsew_vd)))
 
   val red_vd = Mux(ta_reg, red_vd_tail_one, red_vd_tail_vd)
 
@@ -203,7 +212,6 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   }
 
   val ele64 = Wire(UInt(64.W))
-  val eew = SewOH(vsew)
   ele64 := 0.U
   when(fire) {
     when(vfredmax_vs) {
@@ -213,8 +221,18 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
     }
   }
 
-  val ele_cnt = vlenb.U / vsew_bytes
-  val vmask_bits = vmask >> (ele_cnt * uopIdx)
+  //---- Tail gen ----
+  val tail = TailGen(io.in.bits.uop.info.vl, uopIdx, eewVd, narrow)
+  //---- Prestart gen ----
+  val prestart = PrestartGen(io.in.bits.uop.info.vstart, uopIdx, eewVd, narrow)
+  //---- Mask gen ----
+  val maskIdx = Mux(narrow, uopIdx >> 1, uopIdx)
+  val mask16b = MaskExtract(io.in.bits.mask, maskIdx, eewVd)
+  val old_vd_16b = MaskExtract(io.in.bits.oldVd, maskIdx, eewVd)
+
+  val tailReorg = MaskReorg.splash(tail, eewVd)
+  val prestartReorg = MaskReorg.splash(prestart, eewVd)
+  val mask16bReorg = MaskReorg.splash(mask16b, eewVd)
 
   val vs2_bytes = VecInit(Seq.tabulate(vlenb)(i => vs2((i + 1) * 8 - 1, i * 8)))
   val vs2m_bytes = Wire(Vec(vlenb, UInt(8.W)))
@@ -222,9 +240,20 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   val vlRemainBytes = Wire(UInt(8.W))
   vlRemainBytes := Mux((vl << vsew) >= Cat(uopIdx, 0.U(4.W)), (vl << vsew) - Cat(uopIdx, 0.U(4.W)), 0.U)
 
+  val vl_vmask = Wire(UInt(VLEN.W))
+  val vmask_vl = Wire(UInt(VLEN.W))
+  vl_vmask := ~((~0.U(VLEN.W)) << vl)
+  vmask_vl := vmask & vl_vmask
+
+  when(fpu_red && fire) {
+    vs1_zero_bypass := false.B
+  }.elsewhen(!vm && !(vmask_vl.orR)) {
+    vs1_zero_bypass := true.B
+  }
+
   for (i <- 0 until vlenb) {
     vs2m_bytes(i) := vs2_bytes(i)
-    when((!vm && !vmask_bits(i.U / vsew_bytes)) || (i.U >= vlRemainBytes)) {
+    when((!vm && !mask16bReorg(i)) || (i.U >= vlRemainBytes)) {
       when(vsew === 0.U) {
         vs2m_bytes(i) := ele64(7, 0)
       }.elsewhen(vsew === 1.U) {
@@ -245,9 +274,6 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   val red_out_hi = (red_out_bits & (vd_mask_half >> ((VLEN / 2).U - (VLEN / 2).U / div_cnt))) >> (VLEN / 4).U / div_cnt
   val vs2m_bits_lo = vs2m_bits(VLEN / 2 - 1, 0)
   val red_out_lo = red_out_bits & (vd_mask_half >> ((VLEN / 2).U - (VLEN / 4).U / div_cnt))
-
-  val vs1_zero = RegInit(0.U(64.W))
-  vs1_zero := Mux1H(eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 0.U), vs1(n - 1, 0))) :+ vs1(63, 0))
 
   val red_zero = RegEnable(red_out_bits(63, 0), (red_state === calc_vs1) && red_out_valid && red_out_ready)
   val red_vs1_zero = Mux(expdIdxZero, vs1_zero, red_zero)
@@ -346,19 +372,6 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   when(output_en && (red_state === calc_vs1) && red_out_valid && red_out_ready) {
     output_data := red_vd
   }
-
-  //---- Tail gen ----
-  val tail = TailGen(io.in.bits.uop.info.vl, uopIdx, eewVd, narrow)
-  //---- Prestart gen ----
-  val prestart = PrestartGen(io.in.bits.uop.info.vstart, uopIdx, eewVd, narrow)
-  //---- Mask gen ----
-  val maskIdx = Mux(narrow, uopIdx >> 1, uopIdx)
-  val mask16b = MaskExtract(io.in.bits.mask, maskIdx, eewVd)
-  val old_vd_16b = MaskExtract(io.in.bits.oldVd, maskIdx, eewVd)
-
-  val tailReorg = MaskReorg.splash(tail, eewVd)
-  val prestartReorg = MaskReorg.splash(prestart, eewVd)
-  val mask16bReorg = MaskReorg.splash(mask16b, eewVd)
 
   val cmp_prestart = Wire(Vec(2, UInt(8.W)))
   val cmp_mask = Wire(Vec(2, UInt(8.W)))

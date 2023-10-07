@@ -158,7 +158,6 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   val rd_mask_en = RegInit(false.B)
   val rd_vs_en = RegInit(false.B)
   val vslide_rd_preg_idx = Wire(UInt(8.W))
-  val vs1_rd_idx = RegInit(0.U(3.W))
   val rdata_rd_mask_en = Wire(Bool())
   val rdata_wb_vld = Wire(Bool())
   val rdata_update_vs_idx = Wire(Bool())
