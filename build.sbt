@@ -1,19 +1,22 @@
-scalaVersion := "2.12.13"
+ThisBuild / scalaVersion     := "2.13.10"
+ThisBuild / version          := "0.1.0"
+ThisBuild / organization     := "intel"
 
-val chiselVersion = "3.5.5"
+val chiselVersion = "6.0.0-M3"
 
-scalacOptions ++= Seq(
-  "-feature",
-  "-language:reflectiveCalls",
-  "-deprecation",
-  "-Xcheckinit",
-  "-P:chiselplugin:genBundleElements",
-)
-
-addCompilerPlugin("edu.berkeley.cs" % "chisel3-plugin" % chiselVersion cross CrossVersion.full)
-libraryDependencies += "edu.berkeley.cs" %% "chisel3" % chiselVersion
-libraryDependencies += "edu.berkeley.cs" %% "chiseltest" % "0.5.4"
-libraryDependencies += "edu.berkeley.cs" %% "rocketchip" % "1.2.6"
-// libraryDependencies += "io.github.chiselverify" % "chiselverify" % "0.2.0"
-// libraryDependencies += "org.apache.poi" % "poi" % "4.1.1"
-// libraryDependencies += "org.apache.poi" % "poi-ooxml" % "4.1.1"
+lazy val root = (project in file("."))
+  .settings(
+    name := "darecreek",
+    libraryDependencies ++= Seq(
+      "org.chipsalliance" %% "chisel" % chiselVersion,
+      "edu.berkeley.cs" %% "chiseltest" % "5.0.0" % "test"
+    ),
+    scalacOptions ++= Seq(
+      "-language:reflectiveCalls",
+      "-deprecation",
+      "-feature",
+      "-Xcheckinit",
+      "-Ymacro-annotations",
+    ),
+    addCompilerPlugin("org.chipsalliance" % "chisel-plugin" % chiselVersion cross CrossVersion.full),
+  )

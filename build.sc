@@ -15,10 +15,12 @@ object darecreek extends SbtModule { m =>
     "-deprecation",
     "-feature",
     "-Xcheckinit",
-    // "-P:chiselplugin:genBundleElements"
   )
   override def ivyDeps = Agg(
-    ivy"org.chipsalliance::chisel:5.0.0",
+    ivy"org.chipsalliance::chisel:6.0.0-M3",
+  )
+  override def scalacPluginIvyDeps = Agg(
+    ivy"org.chipsalliance:::chisel-plugin:6.0.0-M3",
   )
 
   // object test extends SbtModuleTests with TestModule.ScalaTest {
@@ -29,4 +31,3 @@ object darecreek extends SbtModule { m =>
   //   def testFramework = "org.scalatest.tools.Framework"
   // }
 }
-

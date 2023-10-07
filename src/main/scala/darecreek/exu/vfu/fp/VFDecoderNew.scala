@@ -1,12 +1,15 @@
-// package darecreek.exu.vfu.fp
+package darecreek.exu.vfu.fp
 
-// import chisel3._
-// import chisel3.util._
-// // import darecreek.LaneFUInput
-// import darecreek.exu.vfu.LaneFUInput
-// import VFInsts._
-// import org.chipsalliance.cde.config.Parameters
+import chisel3._
+import circt.stage.ChiselStage
+import chisel3.util._
+// import darecreek.LaneFUInput
+import darecreek.exu.vfu.LaneFUInput
+import VFInsts._
+import org.chipsalliance.cde.config.Parameters
 // import freechips.rocketchip.rocket.DecodeLogic
+import chisel3.util.experimental.decode._
+import darecreek.exu.vfu._
 
 // trait VFPDecodeConstants {
 //   val table: Array[(BitPat, List[BitPat])]
@@ -19,6 +22,11 @@
 //   def D = BitPat(VFPU.D)
 //   def I = BitPat(VFPU.D) // Invalid
 // }
+
+trait VFPDecode {
+  val default: BitPat
+  val table: Seq[(BitPat, BitPat)]
+}
 
 // class VFMADecode extends VFPDecodeConstants {
 
@@ -138,54 +146,60 @@
 //   )
 // }
 
-// class VFRecDecode extends VFPDecodeConstants {
-//   // isRec7, isRsqrt7,
-//   val default: List[BitPat] = List(N,N)
+class VFRecDecode extends VFPDecode {
+  // isRec7, isRsqrt7,
+  val default = BitPat("b0 0")
 
-//   override val table: Array[(BitPat, List[BitPat])] = Array(
-//     VFREC7_V     ->  List(Y, N),
-//     VFRSQRT7_V   ->  List(N, Y),
-//   )
-// }
+  val table = Seq(
+    VFREC7_V     ->  BitPat("b1 0"),
+    VFRSQRT7_V   ->  BitPat("b0 1"),
+  )
+}
 
-// class VFDivDecode extends VFPDecodeConstants {
-//   // isDivSqrt, isSqrt, divReverse
-//   val default: List[BitPat] = List(N,N,N)
+class VFDivDecode extends VFPDecode {
+  // isDivSqrt, isSqrt, divReverse
+  val default = BitPat("b0 0 0")
 
-//   override val table: Array[(BitPat, List[BitPat])] = Array(
-//     VFDIV_VF     ->  List(Y, N, N),
-//     VFDIV_VV     ->  List(Y, N, N),
-//     VFRDIV_VF    ->  List(Y, N, Y),
-//     VFSQRT_V     ->  List(Y, Y, N)
-//   )
-// }
+  val table = Seq(
+    VFDIV_VF     ->  BitPat("b1 0 0"),
+    VFDIV_VV     ->  BitPat("b1 0 0"),
+    VFRDIV_VF    ->  BitPat("b1 0 1"),
+    VFSQRT_V     ->  BitPat("b1 1 0")
+  )
+}
 
-// object VFDecoder {
-//   def apply(instr: UInt)(implicit p: Parameters): VFDecoder = {
-//     require(instr.getWidth == 25)
-//     val d = Module(new VFDecoder)
-//     d.io.instr := instr
-//     d
-//   }
-// }
-// class VFDecoder(implicit val p: Parameters) extends VFPUBaseModule {
-//   val io = IO(new Bundle() {
-//     val instr = Input(UInt(25.W))
-//     val fpCtrl = Output(new VFPUCtrlSigs)
-//   })
+object VFDecoder {
+  def apply(instr: UInt): VFDecoder = {
+    require(instr.getWidth == 25)
+    val d = Module(new VFDecoder)
+    d.io.instr := instr
+    d
+  }
+}
+class VFDecoder extends Module {
+  val io = IO(new Bundle() {
+    val instr = Input(UInt(25.W))
+    val fpCtrl = Output(new VFPUCtrlSigs)
+  })
 
-//   val decoders: UInt = Cat(Seq(
-//     new VFMADecode,
-//     new VFCvtDecode,
-//     new VFMiscDecode,
-//     new VFRecDecode,
-//     new VFDivDecode,
-//   ).flatMap(d => {
-//     DecodeLogic(io.instr, d.default, d.table)
-//   }))
-//   io.fpCtrl <> decoders.asTypeOf(new VFPUCtrlSigs)
-// }
+  val decoders: UInt = Cat(Seq(
+    // new VFMADecode,
+    // new VFCvtDecode,
+    // new VFMiscDecode,
+    new VFRecDecode,
+    new VFDivDecode,
+  ).map(d => {
+    decoder(QMCMinimizer, io.instr, TruthTable(d.table, d.default))
+  }))
+  io.fpCtrl <> decoders.asTypeOf(new VFPUCtrlSigs)
+}
 
+object Main extends App {
+  ChiselStage.emitSystemVerilogFile(
+    new VFDecoder,
+    Array("--target-dir", "generated"),
+  )
+}
 
 
 

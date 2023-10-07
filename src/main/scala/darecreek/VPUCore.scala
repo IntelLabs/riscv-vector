@@ -1,6 +1,7 @@
 package darecreek
 
 import chisel3._
+import circt.stage.ChiselStage
 import chisel3.util._
 import darecreek.lsu._
 
@@ -77,10 +78,18 @@ class VPUCore extends Module {
   }
 }
 
+// object Main extends App {
+
+//   println("Generating the VPU Core hardware")
+
+//   emitVerilog(new VPUCore(), Array("--target-dir", "generated"))
+
+// }
+
+
 object Main extends App {
-
-  println("Generating the VPU Core hardware")
-
-  emitVerilog(new VPUCore(), Array("--target-dir", "generated"))
-
+  ChiselStage.emitSystemVerilogFile(
+    new VPUCore,
+    Array("--target-dir", "generated"),
+  )
 }

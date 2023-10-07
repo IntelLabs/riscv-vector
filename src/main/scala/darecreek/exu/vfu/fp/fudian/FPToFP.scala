@@ -69,7 +69,7 @@ class FPDownConverter(
   val fp_in = FloatPoint.fromUInt(io.in, inExpWidth, inPrecision)
   val decode = fp_in.decode
   val raw_in = RawFloat.fromFP(fp_in, Some(decode.expNotZero))
-  val down_exp = fp_in.exp.zext() - exp_delta.S
+  val down_exp = fp_in.exp.zext - exp_delta.S
 
   /*
       Normal path

@@ -45,7 +45,7 @@ object PipelineConnect {
   def apply[T <: Data]
   (left: DecoupledIO[T], right: DecoupledIO[T], rightOutFire: Bool, isFlush: Bool, block: Bool = false.B,
    moduleName: Option[String] = None
-  ){
+  ): Unit = {
     val pipelineConnect = Module(new PipelineConnectModule[T](left.bits.cloneType))
     if(moduleName.nonEmpty) pipelineConnect.suggestName(moduleName.get)
     pipelineConnect.io.in <> left

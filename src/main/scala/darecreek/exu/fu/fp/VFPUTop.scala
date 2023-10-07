@@ -5,6 +5,7 @@ import chisel3._
 import chisel3.util.{Arbiter, Cat, DecoupledIO}
 import darecreek.{LaneFUInput, LaneFUOutput}
 import darecreek.exu.fu.alu.MaskTailData
+import darecreek.exu.vfu.fp.VFDecoder
 
 class VFPUTop(implicit val p: Parameters = (new WithVFPUConfig).toInstance)
   extends VFPUBaseModule with HasVFPUParams {
@@ -59,7 +60,7 @@ class VFInputGen(implicit val p: Parameters) extends VFPUBaseModule {
   val ctrl = io.in.uop.ctrl
   val instCat = Cat(ctrl.funct6, ctrl.vm, ctrl.lsrc(1), ctrl.lsrc(0), ctrl.funct3, ctrl.ldest)
   val typeTag = VFPU.getTypeTagFromVSEW(io.in.uop.info.vsew)
-  val vfpCtrl = VFDecoder(instCat).io.fpCtrl
+  val vfpCtrl = darecreek.exu.vfu.fp.VFDecoder(instCat).io.fpCtrl
   // src expand
   val rs1Expd = Mux(
     ctrl.vx && typeTag === VFPU.S,
