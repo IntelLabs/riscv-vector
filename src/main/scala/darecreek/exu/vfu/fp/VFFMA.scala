@@ -87,14 +87,22 @@ class VFMASrcPreprocessPipe(implicit val p: Parameters) extends VFPUBaseModule {
   fcvt1.io.rm := 0.U  // up convert, thus no need to specify rounding mode
   fcvt2.io.rm := 0.U
 
+  // Keep SNaN signalling
+  val cvt1_fp_res = FloatPoint.fromUInt(fcvt1.io.result, VFPU.f64.expWidth, VFPU.f64.precision)
+  val cvt1_decode = cvt1_fp_res.decode
+  val cvt1_res = Mux(cvt1_decode.isNaN && fcvt1.io.fflags(4), Cat(fcvt1.io.result(63,52), ~fcvt1.io.result(51,0)), fcvt1.io.result)
+  val cvt2_fp_res = FloatPoint.fromUInt(fcvt2.io.result, VFPU.f64.expWidth, VFPU.f64.precision)
+  val cvt2_decode = cvt2_fp_res.decode
+  val cvt2_res = Mux(cvt2_decode.isNaN && fcvt2.io.fflags(4), Cat(fcvt2.io.result(63,52), ~fcvt2.io.result(51,0)), fcvt2.io.result)
+
   io.out.bits := RegEnable(io.in.bits,transfer)
   io.redirectOut := RegEnable(io.redirectIn,transfer)
   io.out.bits.vs1 := RegEnable(
-    Mux(uop.ctrl.widen || uop.ctrl.widen2, fcvt1.io.result, vs1StageFinal),
+    Mux(uop.ctrl.widen || uop.ctrl.widen2, cvt1_res, vs1StageFinal),
     transfer
   )
   io.out.bits.vs2 := RegEnable(
-    Mux(uop.ctrl.widen, fcvt2.io.result, vs2StageFinal),
+    Mux(uop.ctrl.widen, cvt2_res, vs2StageFinal),
     transfer
   )
   io.out.bits.old_vd := RegEnable(vdStageFinal,transfer)
