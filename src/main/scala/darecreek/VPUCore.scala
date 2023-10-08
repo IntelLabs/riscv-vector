@@ -21,7 +21,6 @@ class VPUCore extends Module {
     // Debug: RVFI
     val rvfi = Output(new VRvfi)
     val pc = Input(UInt(xLen.W))
-    val pc_out = Output(UInt(xLen.W))
   })
 
   val ctrlBlock = Module(new VCtrlBlock)
@@ -71,10 +70,9 @@ class VPUCore extends Module {
   rvfiBlock.io.rfRd <> issueBlock.io.rfRdRvfi
   if (debug) {
     io.rvfi := rvfiBlock.io.rvfi
-    io.pc_out := RegNext(io.pc)
+    dontTouch(io.pc)
   } else {
     io.rvfi := 0.U.asTypeOf(new VRvfi)
-    io.pc_out := 0.U
   }
 }
 

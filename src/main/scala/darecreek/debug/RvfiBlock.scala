@@ -26,7 +26,7 @@ class VRvfiBlock extends Module {
   io.rvfi.valid := RegNext(validIn && commitEnd)
   io.rvfi.sb_id := RegNext(io.sb_id)
 
-  val expdCnt = RegInit(0.U(4.W))
+  val expdCnt = RegInit(0.U(3.W))
   when (validIn) {
     when (commitEnd) {
       expdCnt := 0.U
