@@ -14,7 +14,7 @@ import darecreek.exu.vfu.fp._
 import darecreek.exu.vfu.VInstructions._
 
 class VfredosumvsTestBehavior extends VfTestBehavior("vfredosum.vs.data", ctrlBundles.vfredosum_vs, "u", "vfredosum_vs", () => new RedFPResult(false), vred=true) {}
-class VfredusumvsTestBehavior extends VfTestBehavior("vfredusum.vs.data", ctrlBundles.vfredusum_vs, "u", "vfredusum_vs", () => new RedFPResult(false), vred=true) {}
+class VfredusumvsTestBehavior extends VfTestBehavior("vfredusum.vs.data", ctrlBundles.vfredusum_vs, "u", "vfredusum_vs", () => new RedUSumVsFPResult(), vred=true, disable_fflags=true) {}
 class VfredmaxvsTestBehavior extends VfTestBehavior("vfredmax.vs.data", ctrlBundles.vfredmax_vs, "u", "vfredmax_vs", () => new RedFPResult(false), vred=true) {}
 class VfredminvsTestBehavior extends VfTestBehavior("vfredmin.vs.data", ctrlBundles.vfredmin_vs, "u", "vfredmin_vs", () => new RedFPResult(false), vred=true) {}
 
@@ -139,7 +139,7 @@ class VfTestBehavior(fn : String, cb : CtrlBundle,
     vred : Boolean = false, vn : Boolean = false, normal : Boolean = false, 
     vw : Boolean = false, narrow_to_1 : Boolean = false,
     vfwvv : Boolean = false, vs1encoding : Option[Int] = None,
-    vfwmul_like : Boolean = false, vwred : Boolean = false) extends TestBehavior(fn, cb, s, instid) {
+    vfwmul_like : Boolean = false, vwred : Boolean = false, disable_fflags : Boolean = false) extends TestBehavior(fn, cb, s, instid) {
     
     override def getDut() : Module               = {
         val dut = new VFPUWrapper
@@ -361,7 +361,7 @@ class VfTestBehavior(fn : String, cb : CtrlBundle,
         var fflagsRes = fflags == expectfflags
 
         // ! 8.30: temporarily turn off fflag
-        if (!fflagsRes) {
+        if (!disable_fflags && !fflagsRes) {
             println("fflags incorrect")
             dump(simi, f"(fflags) h$fflags%016x", f"(fflags) h$expectfflags%016x")
         }

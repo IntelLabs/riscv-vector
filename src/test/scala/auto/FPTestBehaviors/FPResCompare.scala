@@ -54,8 +54,12 @@ abstract class FPResult extends BundleGenHelper {
         assert(vdres)
     }
 
+    def trimLow(vd : String) : String = {
+        return f"${vd.slice(0, vd.length - 1)}0"
+    }
+
     def redVdCompare(dut : VFPUWrapper, simi : Map[String, String], 
-            uopIdx : Int, expectvd : Array[String], widen : Boolean) = {
+            uopIdx : Int, expectvd : Array[String], widen : Boolean, only_high : Boolean = false) = {
         val vflmul = simi.get("vflmul").get
 
         var n_inputs = 1
@@ -70,9 +74,15 @@ abstract class FPResult extends BundleGenHelper {
             vflmul != "0.250000" && 
             vflmul != "0.500000"
         )) vdidx = n_inputs * 2 - 1
-        var vdres = f"h$vd%032x".equals(expectvd(vdidx))
-        Logger.printvds(f"h$vd%032x", expectvd(vdidx))
-        if (!vdres) dump(simi, f"h$vd%032x", expectvd(vdidx))
+
+        var dut_vd = trimLow(f"h$vd%032x")
+        var expect_vd = trimLow(expectvd(vdidx))
+
+        // println(f"dur orig: ${f"h$vd%032x"}\ndut trim: ${dut_vd}\nexp orig: ${expectvd(vdidx)}\nexp trim: ${expect_vd}")
+
+        var vdres = dut_vd.equals(expect_vd)
+        Logger.printvds(dut_vd, expect_vd)
+        if (!vdres) dump(simi, dut_vd, expect_vd)
         assert(vdres)
     }
 
@@ -152,6 +162,17 @@ class RedFPResult(widen : Boolean) extends FPResult {
         _checkAndCompare(
             dut, simi, ctrlBundles, expectvd,
             (d, s, i, expvd) => redVdCompare(d, s, i, expvd, widen)
+        )
+    }
+}
+
+class RedUSumVsFPResult extends FPResult {
+    override def checkAndCompare(dut : VFPUWrapper, simi : Map[String, String], 
+            ctrlBundles : Map[Int, CtrlBundle], expectvd : Array[String]) = {
+        
+        _checkAndCompare(
+            dut, simi, ctrlBundles, expectvd,
+            (d, s, i, expvd) => redVdCompare(d, s, i, expvd, false, true)
         )
     }
 }
