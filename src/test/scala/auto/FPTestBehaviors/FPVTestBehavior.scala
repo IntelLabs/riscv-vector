@@ -14,12 +14,12 @@ import darecreek.exu.vfu.fp._
 import darecreek.exu.vfu.VInstructions._
 
 class VfredosumvsTestBehavior extends VfTestBehavior("vfredosum.vs.data", ctrlBundles.vfredosum_vs, "u", "vfredosum_vs", () => new RedFPResult(false), vred=true) {}
-class VfredusumvsTestBehavior extends VfTestBehavior("vfredusum.vs.data", ctrlBundles.vfredusum_vs, "u", "vfredusum_vs", () => new RedUSumVsFPResult(), vred=true, disable_fflags=true) {}
+class VfredusumvsTestBehavior extends VfTestBehavior("vfredusum.vs.data", ctrlBundles.vfredusum_vs, "u", "vfredusum_vs", () => new RedUSumVsFPResult(false), vred=true, disable_fflags=true) {}
 class VfredmaxvsTestBehavior extends VfTestBehavior("vfredmax.vs.data", ctrlBundles.vfredmax_vs, "u", "vfredmax_vs", () => new RedFPResult(false), vred=true) {}
 class VfredminvsTestBehavior extends VfTestBehavior("vfredmin.vs.data", ctrlBundles.vfredmin_vs, "u", "vfredmin_vs", () => new RedFPResult(false), vred=true) {}
 
 class VfwredosumvsTestBehavior extends VfTestBehavior("vfwredosum.vs.data", ctrlBundles.vfwredosum_vs, "u", "vfwredosum_vs", () => new RedFPResult(true), vred=true, vwred=true) {}
-class VfwredusumvsTestBehavior extends VfTestBehavior("vfwredusum.vs.data", ctrlBundles.vfwredusum_vs, "u", "vfwredusum_vs", () => new RedFPResult(true), vred=true, vwred=true) {}
+class VfwredusumvsTestBehavior extends VfTestBehavior("vfwredusum.vs.data", ctrlBundles.vfwredusum_vs, "u", "vfwredusum_vs", () => new RedUSumVsFPResult(true), vred=true, vwred=true, disable_fflags=true) {}
 
 // VN ============================================
 class VfncvtxufwTestBehavior extends VfTestBehavior("vfncvt.xu.f.w.data", ctrlBundles.vfncvt_xu_f_w, "u", "vfncvt_xu_f_w", () => new NarrowFPResult(), vn=true, vs1encoding=Some(0x10)) {}

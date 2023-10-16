@@ -133,3 +133,8 @@ vmv_v_x
 vmv_x_s
 vfmv_f_s
 vfmv_s_f
+vmadc_vim
+vmadc_vi
+vadc_vim
+vmerge_vim
+vmv_v_i

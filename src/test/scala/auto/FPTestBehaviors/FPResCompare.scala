@@ -166,13 +166,13 @@ class RedFPResult(widen : Boolean) extends FPResult {
     }
 }
 
-class RedUSumVsFPResult extends FPResult {
+class RedUSumVsFPResult(widen : Boolean) extends FPResult {
     override def checkAndCompare(dut : VFPUWrapper, simi : Map[String, String], 
             ctrlBundles : Map[Int, CtrlBundle], expectvd : Array[String]) = {
         
         _checkAndCompare(
             dut, simi, ctrlBundles, expectvd,
-            (d, s, i, expvd) => redVdCompare(d, s, i, expvd, false, true)
+            (d, s, i, expvd) => redVdCompare(d, s, i, expvd, widen, true)
         )
     }
 }
