@@ -228,11 +228,13 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   //---- Mask gen ----
   val maskIdx = Mux(narrow, uopIdx >> 1, uopIdx)
   val mask16b = MaskExtract(io.in.bits.mask, maskIdx, eewVd)
+  val mask16b_red = MaskExtract(io.in.bits.mask, maskIdx, eew)
   val old_vd_16b = MaskExtract(io.in.bits.oldVd, maskIdx, eewVd)
 
   val tailReorg = MaskReorg.splash(tail, eewVd)
   val prestartReorg = MaskReorg.splash(prestart, eewVd)
   val mask16bReorg = MaskReorg.splash(mask16b, eewVd)
+  val mask16bReorg_red = MaskReorg.splash(mask16b_red, eew)
 
   val vs2_bytes = VecInit(Seq.tabulate(vlenb)(i => vs2((i + 1) * 8 - 1, i * 8)))
   val vs2m_bytes = Wire(Vec(vlenb, UInt(8.W)))
@@ -253,7 +255,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
 
   for (i <- 0 until vlenb) {
     vs2m_bytes(i) := vs2_bytes(i)
-    when((!vm && !mask16bReorg(i)) || (i.U >= vlRemainBytes)) {
+    when((!vm && !mask16bReorg_red(i)) || (i.U >= vlRemainBytes)) {
       when(vsew === 0.U) {
         vs2m_bytes(i) := ele64(7, 0)
       }.elsewhen(vsew === 1.U) {
