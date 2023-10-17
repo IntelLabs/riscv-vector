@@ -179,7 +179,7 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   when(uop_valid) {
     flush := in_robIdx.needFlush(io.redirect)
   }.otherwise {
-    flush := flush || currentRobIdx.needFlush(io.redirect)
+    flush := (flush || currentRobIdx.needFlush(io.redirect)) && perm_busy
   }
 
   when(flush) {
