@@ -259,7 +259,7 @@ class Permutation(implicit p: Parameters) extends VFuModule {
 
   // vcompress read
   val vd_mask_vl = Wire(UInt(VLEN.W))
-  val vmask_vl = Wire(UInt(VLEN.W))
+  val vmask_vl = RegInit(0.U(VLEN.W))
   val vmask_uop = MaskExtract(vmask_vl, vs_idx, eew)
   val vmask_16b = Mux(rd_vs_en, MaskReorg.splash(vmask_uop, eew), 0.U)
   val current_rd_vs_ones_sum = Wire(UInt(5.W))
@@ -429,10 +429,10 @@ class Permutation(implicit p: Parameters) extends VFuModule {
     }
   }
 
-  val rdata_reg = RegNext(rdata)
+  val rdata_reg = RegEnable(rdata, 0.U, rvalid)
   val rvalid_reg = RegNext(rvalid)
 
-  val vperm_fifo = Module(new perm_RegFifo(UInt(8.W), 8))
+  val vperm_fifo = Module(new perm_RegFifo(UInt(8.W), 4))
   val vslide_fifo_wdata = Wire(UInt(8.W))
   val cmprs_fifo_wdata = Wire(UInt(8.W))
   val vrgather_fifo_wdata = Wire(UInt(8.W))
@@ -566,10 +566,9 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   vcmprsEngine.io.vd_idx := rdata_wb_idx
   vcmprsEngine.io.vs2 := rdata_reg
   vcmprsEngine.io.old_vd := rdata_reg
-  vcmprsEngine.io.vmask := mask
+  vcmprsEngine.io.vmask := vmask_vl
   vcmprsEngine.io.vd_reg := vd_reg
   vcmprsEngine.io.update_vs_idx := rdata_update_vs_idx
-  vcmprsEngine.io.cmprs_rd_wb := rdata_cmprs_rd_wb
   vcmprsEngine.io.cmprs_rd_old_vd := rdata_cmprs_rd_old_vd
   vcmprsEngine.io.calc_done := calc_done
   vcmprsEngine.io.flush := flush
@@ -616,9 +615,11 @@ class Permutation(implicit p: Parameters) extends VFuModule {
     vlRemain := Mux(vlRemain >= (1.U << vsew_shift), vlRemain - (1.U << vsew_shift), 0.U)
   }
 
+  val rdata_update_vs_idx_reg = RegNext(rdata_update_vs_idx)
+  val rdata_wb_vld_reg = RegNext(rdata_wb_vld)
   when(flush) {
     vd_reg := 0.U
-  }.elsewhen(reg_vcompress && (rdata_update_vs_idx || rdata_wb_vld)) {
+  }.elsewhen(reg_vcompress && (rdata_update_vs_idx_reg || rdata_wb_vld_reg)) {
     vd_reg := cmprs_vd
   }.elsewhen(reg_vslideup && rdata_wb_vld) {
     vd_reg := vslideup_vd
@@ -661,6 +662,8 @@ class Permutation(implicit p: Parameters) extends VFuModule {
 
   perm_vd := Mux(reg_vcompress, vd_reg, perm_tail_mask_vd)
 
+  val rd_en = rd_mask_en || rd_vs_en || cmprs_rd_old_vd
+
   io.out.uop.ctrl.funct6 := funct6_reg
   io.out.uop.ctrl.funct3 := funct3_reg
   io.out.uop.ctrl.vm := vm_reg
@@ -681,9 +684,9 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   io.out.uop.uopEnd := true.B
   io.out.uop.sysUop := RegEnable(io.in.uop.sysUop, uop_valid)
 
-  io.out.rd_en := rd_mask_en || rd_vs_en || cmprs_rd_old_vd
-  io.out.rd_preg_idx := rd_preg_idx
-  io.out.wb_vld := wb_vld & !flush
+  io.out.rd_en := RegNext(rd_en)
+  io.out.rd_preg_idx := RegEnable(rd_preg_idx, 0.U, rd_en)
+  io.out.wb_vld := Mux(reg_vcompress, RegNext(RegNext(wb_vld & !flush)), RegNext(wb_vld & !flush))
   io.out.wb_data := perm_vd
   io.out.perm_busy := perm_busy
 }
