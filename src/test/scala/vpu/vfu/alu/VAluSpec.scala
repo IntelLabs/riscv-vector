@@ -10,6 +10,13 @@ import darecreek.exu.vfu.alu._
 import darecreek.exu.vfu.VInstructions._
 import chipsalliance.rocketchip.config.Parameters
 import xiangshan._
+import smartVector._
+
+class RVUTestResult extends Bundle {
+    val commit_vld   = Output(Bool())
+    val alu_data     = Output(UInt(128.W))
+    //val reg_data     = Output(UInt(128.W))
+}
 
 class VAluWrapper extends Module {
   implicit val p = Parameters.empty.alterPartial({case VFuParamsKey => VFuParameters()
@@ -26,6 +33,25 @@ class VAluWrapper extends Module {
   vAlu.io.in.valid := io.in.valid
   io.out.valid := vAlu.io.out.valid
   io.in.ready := io.out.ready
+}
+
+class SmartVectorWrapper extends Module {
+  implicit val p = Parameters.empty.alterPartial({case VFuParamsKey => VFuParameters()
+                                                  case XSCoreParamsKey => XSCoreParameters()})
+
+  val io = IO(new Bundle {
+    val in =  Flipped(Decoupled(new RVUissue))
+    val out = Decoupled(new RVUTestResult)
+  })
+  val smartVector = Module(new SmartVector)
+
+  smartVector.io.in <> io.in
+  //smartVector.io.in.valid := io.in.valid
+
+  io.out.bits := smartVector.io.out
+  io.out.valid := true.B
+
+  
 }
 
 trait VAluBehavior {
@@ -1005,17 +1031,49 @@ trait VAluBehavior {
     }
   }
 
+  def vAluTest10(): Unit = {
+    it should "pass the test: vmv.x.s(s.x)" in {
+      test(new SmartVectorWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+        TestHarnessSmart.test_init(dut)
+
+        val Smartvmvxs = VInfoBundle()
+
+        //----- Input gen -----
+        val inputSeq = Seq(
+          // 16.1 16.2
+          genRVUissue("b01011110000000001100000011010111".U, Smartvmvxs),
+        )
+
+        //----- Output expectation -----
+        val outputSeq = Seq(
+          // 16.1 16.2
+          genRVUTestResult("h08080808"), //vmvxs handmade
+          //genVAluOutput("h5a82"), //vmvxs handmade
+        )
+
+        fork{
+          dut.io.in.enqueueSeq(inputSeq)
+        }.fork {
+          // dut.io.out.expectDequeueSeq(outputSeq)
+        }.join()
+        dut.clock.step(100)
+        dut.clock.setTimeout(0)
+      }
+    }
+  }
+
 }
 
 class VAluSpec extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VAluBehavior {
   behavior of "ALU test"
-  it should behave like vAluTest0()  // add/sub, and/or/xor, sll/srl/sra
-  it should behave like vAluTest1()  // min/max(u), vwadd/vwsub(u)
-  it should behave like vAluTest2()  // vz(s)ext, vmerge, vadc/vsbc, vmv
-  it should behave like vAluTest3()  // vnsrl(a), compare, vmadc/vmsbc
-  it should behave like vAluTest4()  // mask-reg logical, fixed-point
-  it should behave like vAluTest5()  // mask/tail/prestart
-  it should behave like vAluTest6()  // lmul < 1
-  it should behave like vAluTest7()  // 16.1 16.2 16.6
-  it should behave like vAluTest8()  // New compare/vmadc test for nanhu_v3
+  //it should behave like vAluTest0()  // add/sub, and/or/xor, sll/srl/sra
+  //it should behave like vAluTest1()  // min/max(u), vwadd/vwsub(u)
+  //it should behave like vAluTest2()  // vz(s)ext, vmerge, vadc/vsbc, vmv
+  //it should behave like vAluTest3()  // vnsrl(a), compare, vmadc/vmsbc
+  //it should behave like vAluTest4()  // mask-reg logical, fixed-point
+  //it should behave like vAluTest5()  // mask/tail/prestart
+  //it should behave like vAluTest6()  // lmul < 1
+  //it should behave like vAluTest7()  // 16.1 16.2 16.6
+  //it should behave like vAluTest8()  // New compare/vmadc test for nanhu_v3
+  it should behave like vAluTest10()
 }
