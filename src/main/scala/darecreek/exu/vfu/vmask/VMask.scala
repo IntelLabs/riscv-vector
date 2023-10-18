@@ -80,7 +80,7 @@ class VMask(implicit p: Parameters) extends VFuModule {
 
   val eew = SewOH(vsew)
   val vsew_plus1 = Wire(UInt(3.W))
-  vsew_plus1 := Cat(0.U(1.W), ~vsew(1,0)) + 1.U
+  vsew_plus1 := Cat(0.U(1.W), ~vsew(1, 0)) + 1.U
   val vsew_bytes = 1.U << vsew
   val vsew_bits = 8.U << vsew
   val ele_cnt = VLENB.U >> vsew
@@ -160,7 +160,7 @@ class VMask(implicit p: Parameters) extends VFuModule {
 
   when(uopEnd && fire) {
     one_sum := 0.U
-  }.otherwise {
+  }.elsewhen(fire) {
     one_sum := one_cnt(ele_cnt)
   }
 
@@ -225,7 +225,7 @@ class VMask(implicit p: Parameters) extends VFuModule {
   val reg_viota_m = RegEnable(viota_m, false.B, fire)
   val reg_vid_v = RegEnable(vid_v, false.B, fire)
   val vsew_plus1_reg = Wire(UInt(3.W))
-  vsew_plus1_reg := Cat(0.U(1.W), ~vsew_reg(1,0)) + 1.U
+  vsew_plus1_reg := Cat(0.U(1.W), ~vsew_reg(1, 0)) + 1.U
 
   val vmask_bits = Wire(UInt(VLEN.W))
   vmask_bits := vmask_reg >> (uopIdx_reg << vsew_plus1_reg)
