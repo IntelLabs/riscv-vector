@@ -103,33 +103,50 @@ trait BundleGenHelper {
   }
 
   def genDontCareVFuUop(c: CtrlBundle) = {
-    (new VUop).Lit(
-      _.ctrl -> (new VUopCtrl).Lit(
-        _.funct6 -> DontCare,
-        _.funct3 -> DontCare,
-        _.vm -> DontCare,
-        _.vs1_imm -> DontCare,
-        _.widen -> DontCare,
-        _.widen2 -> DontCare,
-        _.narrow -> DontCare,
-        _.narrow_to_1 -> DontCare
-      ),
-      _.info -> (new VUopInfo).Lit(
-        _.ma -> DontCare,
-        _.ta -> DontCare,
-        _.vsew -> DontCare,
-        _.vlmul -> DontCare,
-        _.vl -> DontCare,
-        _.vstart -> DontCare,
-        _.vxrm -> DontCare,
-        _.frm -> DontCare
-      ),
-    _.uopIdx -> DontCare,
-    _.uopEnd -> DontCare,
-    _.sysUop -> (new MicroOp).Lit(
-      _.robIdx -> (new RobPtr).Lit(_.flag -> c.robIdx._1.B, _.value -> c.robIdx._2.U)
-    ),
-    )
+    var vuop = Wire(new VUop)
+    var vuopCtrl = Wire(new VUopCtrl)
+    var vuopInfo = Wire(new VUopInfo)
+
+
+    
+    vuopCtrl.funct6 := DontCare
+    vuopCtrl.funct3 := DontCare
+    vuopCtrl.vm := DontCare
+    vuopCtrl.vs1_imm := DontCare
+    vuopCtrl.widen := DontCare
+    vuopCtrl.widen2 := DontCare
+    vuopCtrl.narrow := DontCare
+    vuopCtrl.narrow_to_1 := DontCare
+
+
+      
+    vuopInfo.ma := DontCare
+    vuopInfo.ta := DontCare
+    vuopInfo.vsew := DontCare
+    vuopInfo.vlmul := DontCare
+    vuopInfo.vl := DontCare
+    vuopInfo.vstart := DontCare
+    vuopInfo.vxrm := DontCare
+    vuopInfo.frm := DontCare
+      
+    vuop.uopIdx := DontCare
+    vuop.uopEnd := DontCare
+
+
+    var microOp = Wire(new MicroOp)
+
+    var robPtr = Wire(new RobPtr)
+    robPtr.flag := c.robIdx._1.B
+    robPtr.value := c.robIdx._2.U
+
+    microOp.robIdx := robPtr
+    vuop.sysUop := microOp
+    vuop.ctrl := vuopCtrl
+    vuop.info := vuopInfo
+
+    vuop
+    
+    // (new RobPtr).Lit(_.flag -> c.robIdx._1.B, _.value -> c.robIdx._2.U)
   }
 
   def genVFuInput(s: SrcBundle, c: CtrlBundle) = {
@@ -144,14 +161,15 @@ trait BundleGenHelper {
   }
 
   def genDontCareVFuInput(s: SrcBundle, c: CtrlBundle) = {
-    (new VFuInput).Lit(
-      _.uop -> genDontCareVFuUop(c),
-      _.vs1 -> DontCare,
-      _.vs2 -> DontCare,
-      _.oldVd -> DontCare,
-      _.mask -> DontCare,
-      _.rs1 -> DontCare
-    )
+    var res = Wire(new VFuInput)
+    res.uop := genDontCareVFuUop(c)
+    res.vs1 := DontCare
+    res.vs2 := DontCare
+    res.oldVd := DontCare
+    res.mask := DontCare
+    res.rs1 := DontCare
+
+    res
   }
 
   def genVAluOutput(vd: String, vxsat: Boolean = false) = {
@@ -276,7 +294,7 @@ object TestHarnessMask {
 }
 
 object TestHarnessFPU {
-  def test_init(dut: VFPUWrapper): Unit = {
+  def test_init(dut: VFPUExternalWrapper): Unit = {
     dut.clock.setTimeout(2000)
     dut.io.in.initSource()
     dut.io.in.setSourceClock(dut.clock)
