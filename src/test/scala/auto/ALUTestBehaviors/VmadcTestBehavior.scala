@@ -97,8 +97,8 @@ class VmadcsbcTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : St
             val reversej = n_ops - 1 - j
             var srcBundle = SrcBundle(
                 vs2=vs2data(reversej),
-                old_vd=prevVd
-                // old_vd=oldvddata(reversej)
+                // old_vd=prevVd
+                old_vd=oldvddata(reversej)
             )
             if (vx) {
                 srcBundle.rs1 = vs1data(0)
@@ -134,7 +134,7 @@ class VmadcsbcTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : St
             dut.clock.step(1)
             // finalVxsat = finalVxsat || dut.io.out.bits.vxsat.peek().litValue == 1
             vd = dut.io.out.bits.vd.peek().litValue
-            prevVd = f"h$vd%032x"
+            // prevVd = f"h$vd%032x"
         }
         vdres = f"h$vd%032x".equals(expectvd(n_inputs - 1))
         Logger.printvds(f"h$vd%032x", expectvd(n_inputs - 1))

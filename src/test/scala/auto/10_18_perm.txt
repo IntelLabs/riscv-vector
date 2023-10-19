@@ -1,0 +1,7 @@
+vslide1up_vx
+vslide1down_vx
+vrgather_vv
+vrgather_vx
+vcompress_vm
+vrgather_vi
+vfslide1up_vf

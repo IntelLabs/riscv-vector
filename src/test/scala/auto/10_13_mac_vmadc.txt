@@ -1,3 +1,13 @@
+vmadc_vv
+vmadc_vvm
+vmsbc_vv
+vmsbc_vvm
+vmadc_vx
+vmadc_vxm
+vmsbc_vx
+vmsbc_vxm
+vmadc_vim
+vmadc_vi
 vmul_vv
 vmulh_vv
 vmulhu_vv

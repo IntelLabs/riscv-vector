@@ -11,6 +11,7 @@ import darecreek.exu.vfu.mac._
 import darecreek.exu.vfu.div._
 import darecreek.exu.vfu.vmask._
 import darecreek.exu.vfu.VInstructions._
+import darecreek.exu.vfu.fp._
 import chipsalliance.rocketchip.config._
 import xiangshan._
 import xiangshan.backend.rob.RobPtr
@@ -67,6 +68,56 @@ class VDivWrapper extends Module {
   vdiv.io.redirect := io.in.bits.redirect
 
   vdiv.io.out <> io.out
+}
+
+class VFPUExternalWrapper extends Module {
+  implicit val p = Parameters.empty.alterPartial({case VFuParamsKey => VFuParameters()
+                                                  case XSCoreParamsKey => XSCoreParameters()})
+
+  val io = IO(new Bundle {
+    val dontCare = Input(Bool())
+    val in = Flipped(DecoupledIO(new VFuInput))
+    val redirect = Input(ValidIO(new Redirect))
+    val out = DecoupledIO(new VFpuOutput)
+  })
+  val vfpu = Module(new VFPUWrapper)
+  vfpu.io.in.valid := io.in.valid
+  when(io.dontCare) {
+    vfpu.io.in.bits := DontCare
+
+    /*vuopInfo.ma := DontCare
+    vuopInfo.ta := DontCare
+    vuopInfo.vsew := DontCare
+    vuopInfo.vlmul := DontCare
+    vuopInfo.vl := DontCare
+    vuopInfo.vstart := DontCare
+    vuopInfo.vxrm := DontCare
+    vuopInfo.frm := DontCare
+      
+    vuop.uopIdx := DontCare
+    vuop.uopEnd := DontCare
+
+    vfpu.io.in.uop.ctrl.funct6 := DontCare
+    vfpu.io.in.uop.ctrl.funct3 := DontCare
+    vfpu.io.in.uop.ctrl.vm := DontCare
+    vfpu.io.in.uop.ctrl.vs1_imm := DontCare
+    vfpu.io.in.uop.ctrl.widen := DontCare
+    vfpu.io.in.uop.ctrl.widen2 := DontCare
+    vfpu.io.in.uop.ctrl.narrow := DontCare
+    vfpu.io.in.uop.ctrl.narrow_to_1 := DontCare
+
+    vfpu.io.in.vs1 := DontCare
+    vfpu.io.in.vs2 := DontCare
+    vfpu.io.in.oldVd := DontCare
+    vfpu.io.in.mask := DontCare
+    vfpu.io.in.rs1 := DontCare*/
+  }.otherwise {
+    vfpu.io.in.bits := io.in.bits
+  }
+  io.in.ready := vfpu.io.in.ready
+  vfpu.io.redirect := io.redirect
+
+  vfpu.io.out <> io.out
 }
 
 
