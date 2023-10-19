@@ -341,6 +341,7 @@ class VfTestBehavior(fn : String, cb : CtrlBundle,
         var curIter = 0
         var fflags : Int = 0
         breakable{ while(true) {
+            
             if (!(curIter < LOOP_MAX)) {
                 println("no vd received after LOOP_MAX")
                 dump(simi, s"(no vd received after LOOP_MAX), received ${fpRes.cur_res}", "(no vd received after LOOP_MAX)")
@@ -350,6 +351,37 @@ class VfTestBehavior(fn : String, cb : CtrlBundle,
             if (fpRes.finished()) { // * fpRes
                 break
             }
+
+            var srcBundle = SrcBundle(
+                vs1=DontCare,
+                vs2=DontCare,
+                rs1=DontCare,
+                old_vd=DontCare,
+                mask=mask(0)
+            )
+            var ctrlBundle = ctrl.copy(
+                vsew=vsew,
+                narrow=vn,
+                narrow_to_1=narrow_to_1,
+                widen2=(vw && (!vfwvv)), //  || vwred,
+                widen = (vw && vfwvv),
+                vl=simi.get("vl").get.toInt,
+                vlmul = UtilFuncs.lmulconvert(vflmul).toInt, 
+                ma = (simi.get("ma").get.toInt == 1),
+                ta = (simi.get("ta").get.toInt == 1),
+                vm = vm,
+                uopIdx=uopIdx,
+                uopEnd = (j == n_ops - 1),
+                vxrm = vxrm,
+                frm=frm,
+                vstart = vstart
+            )
+
+            dut.io.in.bits.poke(genVFuInput(
+                srcBundle, 
+                ctrlBundle
+            ))
+
             fpRes.checkAndCompare(dut, simi, ctrlBundles, expectvd) // * fpRes
 
             dut.clock.step(1)
