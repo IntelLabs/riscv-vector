@@ -102,6 +102,36 @@ trait BundleGenHelper {
     )
   }
 
+  def genDontCareVFuUop(c: CtrlBundle) = {
+    (new VUop).Lit(
+      _.ctrl -> (new VUopCtrl).Lit(
+        _.funct6 -> DontCare,
+        _.funct3 -> DontCare,
+        _.vm -> DontCare,
+        _.vs1_imm -> DontCare,
+        _.widen -> DontCare,
+        _.widen2 -> DontCare,
+        _.narrow -> DontCare,
+        _.narrow_to_1 -> DontCare
+      ),
+      _.info -> (new VUopInfo).Lit(
+        _.ma -> DontCare,
+        _.ta -> DontCare,
+        _.vsew -> DontCare,
+        _.vlmul -> DontCare,
+        _.vl -> DontCare,
+        _.vstart -> DontCare,
+        _.vxrm -> DontCare,
+        _.frm -> DontCare
+      ),
+    _.uopIdx -> DontCare,
+    _.uopEnd -> DontCare,
+    _.sysUop -> (new MicroOp).Lit(
+      _.robIdx -> (new RobPtr).Lit(_.flag -> c.robIdx._1.B, _.value -> c.robIdx._2.U)
+    ),
+    )
+  }
+
   def genVFuInput(s: SrcBundle, c: CtrlBundle) = {
     (new VFuInput).Lit(
       _.uop -> genVFuUop(c),
@@ -110,6 +140,17 @@ trait BundleGenHelper {
       _.oldVd -> s.old_vd.U,
       _.mask -> s.mask.U,
       _.rs1 -> s.rs1.U
+    )
+  }
+
+  def genDontCareVFuInput(s: SrcBundle, c: CtrlBundle) = {
+    (new VFuInput).Lit(
+      _.uop -> genDontCareVFuUop(c),
+      _.vs1 -> DontCare,
+      _.vs2 -> DontCare,
+      _.oldVd -> DontCare,
+      _.mask -> DontCare,
+      _.rs1 -> DontCare
     )
   }
 

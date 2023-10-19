@@ -139,7 +139,7 @@ class VfTestBehavior(fn : String, cb : CtrlBundle,
     vred : Boolean = false, vn : Boolean = false, normal : Boolean = false, 
     vw : Boolean = false, narrow_to_1 : Boolean = false,
     vfwvv : Boolean = false, vs1encoding : Option[Int] = None,
-    vfwmul_like : Boolean = false, vwred : Boolean = false, disable_fflags : Boolean = false) extends TestBehavior(fn, cb, s, instid) {
+    vfwmul_like : Boolean = false, vwred : Boolean = false, disable_fflags : Boolean = false, ooo : Boolean = false) extends TestBehavior(fn, cb, s, instid) {
     
     override def getDut() : Module               = {
         val dut = new VFPUWrapper
@@ -225,11 +225,17 @@ class VfTestBehavior(fn : String, cb : CtrlBundle,
         var curReadyWait = 0
         var j = 0
         var ctrlBundles : Map[Int, CtrlBundle] = Map()
+
+        val uop_order = scala.util.Random.shuffle(List.range(0, n_ops))
         breakable{ while (j < n_ops){
             dut.io.in.valid.poke(true.B) // TODO randomly block
 
             // preparing input ====================================
             var uopIdx = j
+            if (ooo) {
+                uopIdx = uop_order(j)
+            }
+            
             var srcBundle = SrcBundle(
                 mask=mask(0)
             )
@@ -245,7 +251,7 @@ class VfTestBehavior(fn : String, cb : CtrlBundle,
                 ta = (simi.get("ta").get.toInt == 1),
                 vm = vm,
                 uopIdx=uopIdx,
-                uopEnd = (j == n_ops - 1),
+                uopEnd = (!ooo) && (uopIdx == n_ops - 1), // 10.19
                 vxrm = vxrm,
                 frm=frm,
                 vstart = vstart
@@ -253,37 +259,37 @@ class VfTestBehavior(fn : String, cb : CtrlBundle,
 
             if (vred) {
                 srcBundle.vs1=vs1data(n_inputs - 1)
-                srcBundle.vs2=vs2data(n_inputs - 1 - j)
+                srcBundle.vs2=vs2data(n_inputs - 1 - uopIdx)
                 srcBundle.old_vd=oldvddata(n_inputs - 1)
             }
             else if (vn) {
-                srcBundle.vs2=vs2data(n_ops - 1 - j)
-                srcBundle.old_vd=oldvddata(n_inputs - 1 - (j / 2))
+                srcBundle.vs2=vs2data(n_ops - 1 - uopIdx)
+                srcBundle.old_vd=oldvddata(n_inputs - 1 - (uopIdx / 2))
             }
             else if (vw) {
-                srcBundle.vs2=vs2data(n_ops - 1 -j)
-                srcBundle.old_vd=oldvddata(n_ops - 1 -j)
+                srcBundle.vs2=vs2data(n_ops - 1 -uopIdx)
+                srcBundle.old_vd=oldvddata(n_ops - 1 -uopIdx)
                 if (vfwvv || vfwmul_like) {
-                    srcBundle.vs2=vs2data(n_inputs - 1 - (j / 2))
+                    srcBundle.vs2=vs2data(n_inputs - 1 - (uopIdx / 2))
                 }
 
                 if (vf) {
                     srcBundle.rs1 = vs1data(0)
                 }
                 if (vv) {
-                    srcBundle.vs1 = vs1data(n_inputs - 1 - (j / 2))
+                    srcBundle.vs1 = vs1data(n_inputs - 1 - (uopIdx / 2))
                 }
             }
             else if (normal) {
                 var vs2 = "h0"
-                if(hasvs2) vs2 = vs2data(n_inputs - 1 -j)
+                if(hasvs2) vs2 = vs2data(n_inputs - 1 -uopIdx)
                 srcBundle.vs2=vs2
-                srcBundle.old_vd=oldvddata(n_inputs - 1 -j)
+                srcBundle.old_vd=oldvddata(n_inputs - 1 -uopIdx)
                 if (vf) {
                     srcBundle.rs1 = vs1data(0)
                 } 
                 if (vv) {
-                    srcBundle.vs1 = vs1data(n_inputs - 1 -j)
+                    srcBundle.vs1 = vs1data(n_inputs - 1 -uopIdx)
                 }
             }
 
@@ -352,32 +358,10 @@ class VfTestBehavior(fn : String, cb : CtrlBundle,
                 break
             }
 
-            var srcBundle = SrcBundle(
-                vs1=DontCare,
-                vs2=DontCare,
-                rs1=DontCare,
-                old_vd=DontCare,
-                mask=mask(0)
-            )
-            var ctrlBundle = ctrl.copy(
-                vsew=vsew,
-                narrow=vn,
-                narrow_to_1=narrow_to_1,
-                widen2=(vw && (!vfwvv)), //  || vwred,
-                widen = (vw && vfwvv),
-                vl=simi.get("vl").get.toInt,
-                vlmul = UtilFuncs.lmulconvert(vflmul).toInt, 
-                ma = (simi.get("ma").get.toInt == 1),
-                ta = (simi.get("ta").get.toInt == 1),
-                vm = vm,
-                uopIdx=uopIdx,
-                uopEnd = (j == n_ops - 1),
-                vxrm = vxrm,
-                frm=frm,
-                vstart = vstart
-            )
+            var srcBundle = SrcBundle()
+            var ctrlBundle = ctrl.copy()
 
-            dut.io.in.bits.poke(genVFuInput(
+            dut.io.in.bits.poke(genDontCareVFuInput(
                 srcBundle, 
                 ctrlBundle
             ))
@@ -392,7 +376,6 @@ class VfTestBehavior(fn : String, cb : CtrlBundle,
         fflags = fpRes.getFflags() // * fpRes
         var fflagsRes = fflags == expectfflags
 
-        // ! 8.30: temporarily turn off fflag
         if (!disable_fflags && !fflagsRes) {
             println("fflags incorrect")
             dump(simi, f"(fflags) h$fflags%016x", f"(fflags) h$expectfflags%016x")
