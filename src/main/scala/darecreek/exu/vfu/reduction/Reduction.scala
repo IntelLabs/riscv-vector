@@ -97,15 +97,18 @@ class Reduction(implicit p: Parameters) extends VFuModule {
   val reg2_vredand_vs = RegEnable(reg_vredand_vs, false.B, reg_fire)
   val reg2_vredor_vs = RegEnable(reg_vredor_vs, false.B, reg_fire)
   val reg2_vredxor_vs = RegEnable(reg_vredxor_vs, false.B, reg_fire)
+  val reg_uopIdx = RegEnable(uopIdx, 0.U, fire)
 
-  val vs1_zero = RegInit(0.U(64.W))
-  val vs1_zero_logical = RegInit(0.U(64.W))
+  val vs1_zero = Wire(UInt(64.W))
+  val vs1_zero_logical = Wire(UInt(64.W))
+  val red_zero = Wire(UInt(64.W))
+  val red_zero_logical = Wire(UInt(64.W))
+  val vs10_zero = RegInit(0.U(64.W))
+  val vs10_zero_logical = RegInit(0.U(64.W))
   val vd_logical = Wire(Vec(4, UInt(64.W)))
   val sum_vd = Wire(UInt(64.W))
-  // val max_vd = Wire(UInt(64.W))
   val logical_vd = Cat(0.U((VLEN - 64).W), vd_logical(~reg_vd_vsew(1, 0)))
   val red_vd = Wire(UInt(VLEN.W))
-  val vs1_mux = Mux(uopIdx === 0.U, vs1, red_vd)
 
   val vd_vsew_bits_reg = RegEnable(vd_vsew_bits, 0.U, fire)
   val vd_vsew_bits_reg2 = RegEnable(vd_vsew_bits_reg, 0.U, reg_fire)
@@ -230,12 +233,22 @@ class Reduction(implicit p: Parameters) extends VFuModule {
     Cat(UIntSplit(vs2m_bits(63, 0), sew).map(BitsExtend(_, 2 * sew, reg_signed)).reverse)))
   vs2m_bits_widen := Mux(reg_widen, Cat(vs_hi_widen, vs_lo_widen), Cat(0.U(VLEN.W), vs2m_bits))
 
-  vs1_zero := Mux1H(eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 0.U), vs1_mux(n - 1, 0))) :+ vs1_mux(63, 0))
+  vs10_zero := Mux1H(eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 0.U), vs1(n - 1, 0))) :+ vs1(63, 0))
 
-  vs1_zero_logical := Mux1H(eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 0.U), vs1_mux(n - 1, 0))) :+ vs1_mux(63, 0))
+  vs10_zero_logical := Mux1H(eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 0.U), vs1(n - 1, 0))) :+ vs1(63, 0))
   when(vredand_vs) {
-    vs1_zero_logical := Mux1H(eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 1.U), vs1_mux(n - 1, 0))) :+ vs1_mux(63, 0))
+    vs10_zero_logical := Mux1H(eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 1.U), vs1(n - 1, 0))) :+ vs1(63, 0))
   }
+
+  red_zero := Mux1H(eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 0.U), red_vd(n - 1, 0))) :+ red_vd(63, 0))
+
+  red_zero_logical := Mux1H(eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 0.U), red_vd(n - 1, 0))) :+ red_vd(63, 0))
+  when(vredand_vs) {
+    red_zero_logical := Mux1H(eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 1.U), red_vd(n - 1, 0))) :+ red_vd(63, 0))
+  }
+
+  vs1_zero := Mux(reg_uopIdx === 0.U, vs10_zero, red_zero)
+  vs1_zero_logical := Mux(reg_uopIdx === 0.U, vs10_zero_logical, red_zero_logical)
 
   for (i <- 0 until 4) {
     vd_logical(i) := 0.U
