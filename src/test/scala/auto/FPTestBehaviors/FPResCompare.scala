@@ -25,7 +25,7 @@ abstract class FPResult extends BundleGenHelper {
         this.dump = dump
     }
 
-    def narrowVdCompare(dut : VFPUExternalWrapper, simi : Map[String, String], uopIdx : Int, expectvd : Array[String]) = {
+    def narrowVdCompare(dut : VFPUWrapper, simi : Map[String, String], uopIdx : Int, expectvd : Array[String]) = {
         val vflmul = simi.get("vflmul").get
         val expectvdIdx = uopIdx / 2
         val lower = uopIdx % 2 == 0
@@ -58,7 +58,7 @@ abstract class FPResult extends BundleGenHelper {
         return f"${vd.slice(0, vd.length - 1)}0"
     }
 
-    def redVdCompare(dut : VFPUExternalWrapper, simi : Map[String, String], 
+    def redVdCompare(dut : VFPUWrapper, simi : Map[String, String], 
             uopIdx : Int, expectvd : Array[String], widen : Boolean, only_high : Boolean = false) = {
         val vflmul = simi.get("vflmul").get
 
@@ -75,8 +75,14 @@ abstract class FPResult extends BundleGenHelper {
             vflmul != "0.500000"
         )) vdidx = n_inputs * 2 - 1
 
-        var dut_vd = trimLow(f"h$vd%032x")
-        var expect_vd = trimLow(expectvd(vdidx))
+
+        var dut_vd = f"h$vd%032x"
+        var expect_vd = expectvd(vdidx)
+
+        if (only_high) {
+            dut_vd = trimLow(f"h$vd%032x")
+            expect_vd = trimLow(expectvd(vdidx))
+        }
 
         // println(f"dur orig: ${f"h$vd%032x"}\ndut trim: ${dut_vd}\nexp orig: ${expectvd(vdidx)}\nexp trim: ${expect_vd}")
 
@@ -86,7 +92,7 @@ abstract class FPResult extends BundleGenHelper {
         assert(vdres)
     }
 
-    def narrowToOneCompare(dut : VFPUExternalWrapper, simi : Map[String, String], 
+    def narrowToOneCompare(dut : VFPUWrapper, simi : Map[String, String], 
             uopIdx : Int, expectvd : Array[String]) = {
         
         val vflmul = simi.get("vflmul").get
@@ -102,7 +108,7 @@ abstract class FPResult extends BundleGenHelper {
         assert(vdres)
     }
 
-    def vCompare(dut : VFPUExternalWrapper, simi : Map[String, String], 
+    def vCompare(dut : VFPUWrapper, simi : Map[String, String], 
             uopIdx : Int, expectvd : Array[String]) = {
         var vd = dut.io.out.bits.vd.peek().litValue
         var vdres = f"h$vd%032x".equals(expectvd(n_res - 1 - uopIdx))
@@ -111,7 +117,7 @@ abstract class FPResult extends BundleGenHelper {
         assert(vdres)
     }
 
-    def fdCompare(dut : VFPUExternalWrapper, simi : Map[String, String], 
+    def fdCompare(dut : VFPUWrapper, simi : Map[String, String], 
             uopIdx : Int, expectvd : Array[String]) = {
         var vd = dut.io.out.bits.vd.peek().litValue
         var vdres = f"h$vd%x".equals(expectvd(0))
@@ -120,12 +126,12 @@ abstract class FPResult extends BundleGenHelper {
         assert(vdres)
     }
 
-    def checkAndCompare(dut : VFPUExternalWrapper, simi : Map[String, String], 
+    def checkAndCompare(dut : VFPUWrapper, simi : Map[String, String], 
             ctrlBundles : Map[Int, CtrlBundle], expectvd : Array[String]) = {println("checkAndCompare unimplemented")}
 
-    def _checkAndCompare(dut : VFPUExternalWrapper, simi : Map[String, String], 
+    def _checkAndCompare(dut : VFPUWrapper, simi : Map[String, String], 
             ctrlBundles : Map[Int, CtrlBundle], expectvd : Array[String], 
-            compFunc : (VFPUExternalWrapper, Map[String, String], 
+            compFunc : (VFPUWrapper, Map[String, String], 
                 Int, Array[String]) => Unit = vCompare) = {
         dut.io.out.ready.poke(true.B) // TODO randomly block
 
@@ -156,7 +162,7 @@ abstract class FPResult extends BundleGenHelper {
 }
 
 class RedFPResult(widen : Boolean) extends FPResult {
-    override def checkAndCompare(dut : VFPUExternalWrapper, simi : Map[String, String], 
+    override def checkAndCompare(dut : VFPUWrapper, simi : Map[String, String], 
             ctrlBundles : Map[Int, CtrlBundle], expectvd : Array[String]) = {
         
         _checkAndCompare(
@@ -167,7 +173,7 @@ class RedFPResult(widen : Boolean) extends FPResult {
 }
 
 class RedUSumVsFPResult(widen : Boolean) extends FPResult {
-    override def checkAndCompare(dut : VFPUExternalWrapper, simi : Map[String, String], 
+    override def checkAndCompare(dut : VFPUWrapper, simi : Map[String, String], 
             ctrlBundles : Map[Int, CtrlBundle], expectvd : Array[String]) = {
         
         _checkAndCompare(
@@ -178,7 +184,7 @@ class RedUSumVsFPResult(widen : Boolean) extends FPResult {
 }
 
 class NarrowFPResult extends FPResult {
-    override def checkAndCompare(dut : VFPUExternalWrapper, simi : Map[String, String], 
+    override def checkAndCompare(dut : VFPUWrapper, simi : Map[String, String], 
             ctrlBundles : Map[Int, CtrlBundle], expectvd : Array[String]) = {
         
         _checkAndCompare(
@@ -189,7 +195,7 @@ class NarrowFPResult extends FPResult {
 }
 
 class NarrowToOneFPResult extends FPResult {
-    override def checkAndCompare(dut : VFPUExternalWrapper, simi : Map[String, String], 
+    override def checkAndCompare(dut : VFPUWrapper, simi : Map[String, String], 
             ctrlBundles : Map[Int, CtrlBundle], expectvd : Array[String]) = {
         
         _checkAndCompare(
@@ -200,7 +206,7 @@ class NarrowToOneFPResult extends FPResult {
 }
 
 class FdFPResult extends FPResult {
-    override def checkAndCompare(dut : VFPUExternalWrapper, simi : Map[String, String], 
+    override def checkAndCompare(dut : VFPUWrapper, simi : Map[String, String], 
             ctrlBundles : Map[Int, CtrlBundle], expectvd : Array[String]) = {
         
         _checkAndCompare(
@@ -211,7 +217,7 @@ class FdFPResult extends FPResult {
 }
 
 class NormalFPResult extends FPResult {
-    override def checkAndCompare(dut : VFPUExternalWrapper, simi : Map[String, String], 
+    override def checkAndCompare(dut : VFPUWrapper, simi : Map[String, String], 
             ctrlBundles : Map[Int, CtrlBundle], expectvd : Array[String]) = {
         
         _checkAndCompare(

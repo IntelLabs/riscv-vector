@@ -294,7 +294,7 @@ object TestHarnessMask {
 }
 
 object TestHarnessFPU {
-  def test_init(dut: VFPUExternalWrapper): Unit = {
+  def test_init(dut: VFPUWrapper): Unit = {
     dut.clock.setTimeout(2000)
     dut.io.in.initSource()
     dut.io.in.setSourceClock(dut.clock)
