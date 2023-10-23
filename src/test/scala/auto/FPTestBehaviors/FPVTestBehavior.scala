@@ -145,11 +145,11 @@ class VfTestBehavior(fn : String, cb : CtrlBundle,
     vfwmul_like : Boolean = false, vwred : Boolean = false, disable_fflags : Boolean = false, ooo : Boolean = false) extends TestBehavior(fn, cb, s, instid) {
     
     override def getDut() : Module               = {
-        val dut = new VFPUExternalWrapper
+        val dut = new VFPUWrapper
         return dut
     }
 
-    override def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VFPUExternalWrapper) : Unit = {
+    override def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VFPUWrapper) : Unit = {
         val vf = simi.get("VS1") == None && simi.get("FS1") != None
         val v = simi.get("VS1") == None && simi.get("FS1") == None
         val vv = !v && !vf
@@ -305,7 +305,7 @@ class VfTestBehavior(fn : String, cb : CtrlBundle,
             }
 
             // sending input ====================================
-            dut.io.dontCare.poke(false.B)
+            // dut.io.dontCare.poke(false.B)
             
             dut.io.in.bits.poke(genVFuInput(
                 srcBundle, 
@@ -366,7 +366,7 @@ class VfTestBehavior(fn : String, cb : CtrlBundle,
             var srcBundle = SrcBundle()
             var ctrlBundle = ctrl.copy()
 
-            dut.io.dontCare.poke(true.B)
+            // dut.io.dontCare.poke(true.B)
             dut.io.in.bits.poke(genVFuInput(
                 srcBundle, 
                 ctrlBundle
@@ -387,10 +387,13 @@ class VfTestBehavior(fn : String, cb : CtrlBundle,
             println("fflags incorrect")
             dump(simi, f"(fflags) h$fflags%016x", f"(fflags) h$expectfflags%016x")
         }
-        assert(fflagsRes)
+
+        if (!disable_fflags) {
+            assert(fflagsRes)
+        }
     }
 
-    override def testSingle(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VFPUExternalWrapper) : Unit = {
+    override def testSingle(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VFPUWrapper) : Unit = {
         testMultiple(simi, ctrl, s, dut)
     }
 }

@@ -82,7 +82,7 @@ abstract class TestBehavior(filename : String, ctrlBundle : TestCtrlBundleBase, 
             case alu_dut : VAluWrapper => TestHarnessAlu.test_init(alu_dut)
             case mac_dut : VMacWrapper => TestHarnessMac.test_init(mac_dut)
             case mask_dut : VMask => TestHarnessMask.test_init(mask_dut)
-            case dut : VFPUExternalWrapper => TestHarnessFPU.test_init(dut)
+            case dut : VFPUWrapper => TestHarnessFPU.test_init(dut)
             case dut : VDivWrapper => TestHarnessDiv.test_init(dut)
             case dut : Reduction => {}
             case perm_dut : Permutation => TestHarnessFSM.test_init(perm_dut)
@@ -94,7 +94,7 @@ abstract class TestBehavior(filename : String, ctrlBundle : TestCtrlBundleBase, 
             case alu_dut : VAluWrapper => testMultiple(simi,ctrl.asInstanceOf[CtrlBundle],s, alu_dut)
             case mac_dut : VMacWrapper => testMultiple(simi,ctrl.asInstanceOf[CtrlBundle],s, mac_dut)
             case mask_dut : VMask => testMultiple(simi,ctrl.asInstanceOf[CtrlBundle],s, mask_dut)
-            case dut : VFPUExternalWrapper => testMultiple(simi,ctrl.asInstanceOf[CtrlBundle],s, dut)
+            case dut : VFPUWrapper => testMultiple(simi,ctrl.asInstanceOf[CtrlBundle],s, dut)
             case dut : VDivWrapper => testMultiple(simi,ctrl.asInstanceOf[CtrlBundle],s, dut)
             case dut : Reduction => testMultiple(simi,ctrl.asInstanceOf[CtrlBundle],s, dut)
             case perm_dut : Permutation => testMultiple(simi,ctrl.asInstanceOf[CtrlBundle],s, perm_dut)
@@ -106,7 +106,7 @@ abstract class TestBehavior(filename : String, ctrlBundle : TestCtrlBundleBase, 
             case alu_dut : VAluWrapper => testSingle(simi,ctrl.asInstanceOf[CtrlBundle],s, alu_dut)
             case mac_dut : VMacWrapper => testSingle(simi,ctrl.asInstanceOf[CtrlBundle],s, mac_dut)
             case mask_dut : VMask => testSingle(simi,ctrl.asInstanceOf[CtrlBundle],s, mask_dut)
-            case dut : VFPUExternalWrapper => testSingle(simi,ctrl.asInstanceOf[CtrlBundle],s, dut)
+            case dut : VFPUWrapper => testSingle(simi,ctrl.asInstanceOf[CtrlBundle],s, dut)
             case dut : VDivWrapper => testSingle(simi,ctrl.asInstanceOf[CtrlBundle],s, dut)
             case dut : Reduction => testSingle(simi,ctrl.asInstanceOf[CtrlBundle],s, dut)
             case perm_dut : Permutation => testSingle(simi,ctrl.asInstanceOf[CtrlBundle],s, perm_dut)
@@ -121,8 +121,8 @@ abstract class TestBehavior(filename : String, ctrlBundle : TestCtrlBundleBase, 
     def testSingle(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VMacWrapper) = { println("!!!!!!called unimplemented testSingle mac") }
     def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VMask) = { println("!!!!!!called unimplemented testMultiple mask")}
     def testSingle(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VMask) = { println("!!!!!!called unimplemented testSingle mask") }
-    def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VFPUExternalWrapper) = { println("!!!!!!called unimplemented testMultiple FPU")}
-    def testSingle(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VFPUExternalWrapper) = { println("!!!!!!called unimplemented testSingle FPU") }
+    def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VFPUWrapper) = { println("!!!!!!called unimplemented testMultiple FPU")}
+    def testSingle(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VFPUWrapper) = { println("!!!!!!called unimplemented testSingle FPU") }
     def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VDivWrapper) = { println("!!!!!!called unimplemented testMultiple Div")}
     def testSingle(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VDivWrapper) = { println("!!!!!!called unimplemented testSingle Div") }
     def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:Reduction) = { println("!!!!!!called unimplemented testMultiple Reduction")}
