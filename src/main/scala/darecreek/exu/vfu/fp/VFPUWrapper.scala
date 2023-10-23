@@ -65,12 +65,12 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   val idle :: calc_vs2 :: calc_vs1 :: Nil = Enum(3)
 
   val vd_vsew = Mux(widen | widen2, vsew + 1.U, vsew)
+  val vd_vsew_reg = RegEnable(vd_vsew, 0.U, fire)
   val eew = SewOH(vsew)
   val eewVd = SewOH(vd_vsew)
-  val vsew_bytes = 1.U << vsew
+  val eewVd_reg = SewOH(vd_vsew_reg)
+  val vsew_bits = RegEnable(Mux1H(eew.oneHot, Seq(8.U(7.W), 16.U(7.W), 32.U(7.W), 64.U(7.W))), 0.U, fire)
   val ta_reg = RegEnable(ta, false.B, fire)
-  val vsew_bits = RegEnable(8.U << vsew, 0.U, fire)
-  val vsew_vd_bits = RegEnable(8.U << vd_vsew, 0.U, fire)
   val red_state = RegInit(idle)
 
   val vs2_cnt = RegInit(0.U(vlenbWidth.W))
@@ -102,13 +102,16 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
 
   val vs1_zero = RegInit(0.U(64.W))
   val vs1_zero_bypass = RegInit(false.B)
-  vs1_zero := Mux1H(eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 0.U), vs1(n - 1, 0))) :+ vs1(63, 0))
+
+  when(fpu_red && fire) {
+    vs1_zero := Mux1H(eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 0.U), vs1(n - 1, 0))) :+ vs1(63, 0))
+  }
 
   val old_vd_bits = RegInit(0.U(VLEN.W))
   val red_vd_tail_one = Wire(UInt(VLEN.W))
   val red_vd_tail_vd = Wire(UInt(VLEN.W))
   val vd_mask_vsew_vd = Wire(UInt(VLEN.W))
-  vd_mask_vsew_vd := Mux1H(eewVd.oneHot, Seq(8, 16, 32, 64).map(sew => Cat(~0.U((VLEN - sew).W), 0.U(sew.W))))
+  vd_mask_vsew_vd := Mux1H(eewVd_reg.oneHot, Seq(8, 16, 32, 64).map(sew => Cat(~0.U((VLEN - sew).W), 0.U(sew.W))))
   red_vd_tail_one := vd_mask_vsew_vd | Mux(vs1_zero_bypass, vs1_zero, (red_vd_bits & (~vd_mask_vsew_vd)))
   red_vd_tail_vd := (old_vd_bits & vd_mask_vsew_vd) | Mux(vs1_zero_bypass, vs1_zero, (red_vd_bits & (~vd_mask_vsew_vd)))
 
@@ -306,31 +309,31 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
     }
   }
 
-  red_uop.ctrl.funct6 := red_uop.ctrl.funct6
-  red_uop.ctrl.funct3 := red_uop.ctrl.funct3
-  red_uop.info.vsew := red_uop.info.vsew
-  red_uop.info.destEew := red_uop.info.destEew
-  red_uop.ctrl.lsrc(0) := vs1_imm
-  red_uop.ctrl.lsrc(1) := 0.U
-  red_uop.ctrl.ldest := 0.U
-  red_uop.ctrl.vm := true.B
-  red_uop.ctrl.widen := widen
-  red_uop.ctrl.widen2 := widen2
-  red_uop.ctrl.narrow := narrow
-  red_uop.ctrl.narrow_to_1 := narrow_to_1
-  red_uop.info.vstart := vstart
-  red_uop.info.vl := Mux(vsew === 2.U, 4.U, 2.U)
-  red_uop.info.vxrm := vxrm
-  red_uop.info.frm := frm
-  red_uop.info.vlmul := 0.U
-  red_uop.info.vsew := vsew
-  red_uop.info.ma := ma
-  red_uop.info.ta := ta
-  red_uop.info.destEew := Mux(widen || widen2,
-    info.vsew + 1.U, info.vsew)
-  red_uop.pdestVal := false.B
-
   when(fire) {
+    red_uop.ctrl.funct6 := red_uop.ctrl.funct6
+    red_uop.ctrl.funct3 := red_uop.ctrl.funct3
+    red_uop.info.vsew := red_uop.info.vsew
+    red_uop.info.destEew := red_uop.info.destEew
+    red_uop.ctrl.lsrc(0) := vs1_imm
+    red_uop.ctrl.lsrc(1) := 0.U
+    red_uop.ctrl.ldest := 0.U
+    red_uop.ctrl.vm := true.B
+    red_uop.ctrl.widen := widen
+    red_uop.ctrl.widen2 := widen2
+    red_uop.ctrl.narrow := narrow
+    red_uop.ctrl.narrow_to_1 := narrow_to_1
+    red_uop.info.vstart := vstart
+    red_uop.info.vl := Mux(vsew === 2.U, 4.U, 2.U)
+    red_uop.info.vxrm := vxrm
+    red_uop.info.frm := frm
+    red_uop.info.vlmul := 0.U
+    red_uop.info.vsew := vsew
+    red_uop.info.ma := ma
+    red_uop.info.ta := ta
+    red_uop.info.destEew := Mux(widen || widen2,
+      info.vsew + 1.U, info.vsew)
+    red_uop.pdestVal := false.B
+
     red_uop.expdIdx := 0.U
     red_uop.expdEnd := true.B
     when(vfredosum_vs) {
