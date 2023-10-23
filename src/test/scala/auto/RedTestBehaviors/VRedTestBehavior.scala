@@ -82,13 +82,14 @@ class Vred(fn : String, cb : CtrlBundle, s : String, instid : String, widen : Bo
                 )
             ))
             dut.clock.step(1)
-            vd = dut.io.out.bits.vd.peek().litValue
             // sprevVds = prevVds :+ f"h$vd%032x"
         }
 
         while (dut.io.out.valid.peek().litValue != 1) {
             dut.clock.step(1) // 10.19
         }
+
+        vd = dut.io.out.bits.vd.peek().litValue
         
         var vdidx = n_inputs - 1
         if (widen && (
