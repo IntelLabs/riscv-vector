@@ -61,7 +61,6 @@ class Vred(fn : String, cb : CtrlBundle, s : String, instid : String, widen : Bo
         for(j <- 0 until n_inputs){
             vs2 = vs2data(n_inputs - 1 - j)
 
-            // dut.io.out.ready.poke(true.B)
             dut.io.in.valid.poke(true.B)
             dut.io.in.bits.poke(genVFuInput(
                 SrcBundle(
@@ -84,6 +83,8 @@ class Vred(fn : String, cb : CtrlBundle, s : String, instid : String, widen : Bo
             dut.clock.step(1)
             // sprevVds = prevVds :+ f"h$vd%032x"
         }
+
+        dut.io.in.valid.poke(false.B)
 
         while (dut.io.out.valid.peek().litValue != 1) {
             dut.clock.step(1) // 10.19
