@@ -29,6 +29,8 @@ class SVRegFileWrapper(implicit p : Parameters) extends Module{
     regFile.io.write(0).addr := io.in.rfWriteIdx
     regFile.io.write(0).data := writeData
 
+    regFile.io.read(0).ren  := io.in.rfReadEn(0)
+    regFile.io.read(1).ren  := io.in.rfReadEn(1)
     regFile.io.read(0).addr := io.in.rfReadIdx(0)
     regFile.io.read(1).addr := io.in.rfReadIdx(1)
 
@@ -38,6 +40,8 @@ class SVRegFileWrapper(implicit p : Parameters) extends Module{
     regWriteDone := regFile.io.write(0).wen
 
     io.out.writeDone := regWriteDone
-    io.out.readData(0) := regFile.io.read(0).data(0)
-    io.out.readData(1) := regFile.io.read(1).data(0)
+    io.out.readVld(0) := RegNext(io.in.rfReadEn(0))
+    io.out.readVld(1) := RegNext(io.in.rfReadEn(1))
+    io.out.readData(0) := Cat(regFile.io.read(0).data(1), regFile.io.read(0).data(0))
+    io.out.readData(1) := Cat(regFile.io.read(1).data(1), regFile.io.read(1).data(0))
 }

@@ -22,6 +22,7 @@ class regIn(implicit p: Parameters) extends Bundle {
 
 class regOut extends Bundle{
   val writeDone = Bool()
+  val readVld   = Vec(2,Bool())
   val readData  = Vec(2,UInt(VLEN.W))
 }
 

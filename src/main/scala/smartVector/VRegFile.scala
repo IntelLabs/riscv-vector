@@ -6,6 +6,7 @@ import chipsalliance.rocketchip.config
 import SmartParam._
 
 class subVRFReadPort(regLen: Int) extends Bundle {
+  val ren  = Input(Bool())
   val addr = Input(UInt(VPRegIdxWidth.W))
   val data = Output(UInt(regLen.W))
   // override def cloneType: subVRFReadPort.this.type =
@@ -29,7 +30,9 @@ class subVRegFile(numRead: Int, numWrite: Int, regLen: Int) extends Module {
 
   val rf = Reg(Vec(NVPhyRegs, UInt(regLen.W)))
   for (r <- io.read) {
-    r.data := rf(r.addr)
+    when(r.ren){
+      r.data := rf(r.addr)
+    }
   }
   for (w <- io.write) {
     when (w.wen) {
@@ -39,13 +42,14 @@ class subVRegFile(numRead: Int, numWrite: Int, regLen: Int) extends Module {
 }
 
 class VRFReadPort(regLen: Int) extends Bundle {
+  val ren  = Input(Bool())
   val addr = Input(UInt(VPRegIdxWidth.W))
   val data = Output(Vec(NLanes, UInt(regLen.W)))
   // override def cloneType: VRFReadPort.this.type =
   //   new VRFReadPort(regLen).asInstanceOf[this.type]
 }
 class VRFWritePort(regLen: Int) extends Bundle {
-  val wen = Input(Bool())
+  val wen  = Input(Bool())
   val addr = Input(UInt(VPRegIdxWidth.W))
   val data = Input(Vec(NLanes, UInt(regLen.W)))
   // override def cloneType: VRFWritePort.this.type =
@@ -61,6 +65,7 @@ class SVRegFile(numRead: Int, numWrite: Int) extends Module {
   val subRFs = Seq.fill(NLanes)(Module(new subVRegFile(numRead, numWrite, LaneWidth)))
   for (laneIdx <- 0 until NLanes) {
     for (i <- 0 until numRead) {
+      subRFs(laneIdx).io.read(i).ren := io.read(i).ren
       subRFs(laneIdx).io.read(i).addr := io.read(i).addr
       io.read(i).data(laneIdx) := subRFs(laneIdx).io.read(i).data
     }

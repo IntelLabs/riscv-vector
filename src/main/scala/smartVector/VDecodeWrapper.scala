@@ -14,7 +14,6 @@ class VDecodeOutput(implicit p: Parameters) extends Bundle{
   val scalar_opnd_2 = UInt(64.W)
   val vInfo = new VInfo
   //val valid = Bool()
-  val toReg = ValidIO(new regIn)
 }
 
 class SVDecodeUnit(implicit p: Parameters) extends Module {
@@ -42,15 +41,7 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   io.out.bits.vInfo.frm    := RegEnable(io.in.bits.vInfo.frm, io.in.valid)
 
   //The following code is only for the mv instruction. It needs to be adjusted according to different instructions later.
-  io.out.bits.toReg.bits.rfReadEn(0)  := false.B
-  io.out.bits.toReg.bits.rfReadEn(1)  := false.B
-  io.out.bits.toReg.bits.rfReadIdx(0) := decode.io.out.lsrc(0)
-  io.out.bits.toReg.bits.rfReadIdx(1) := decode.io.out.lsrc(1)
-  io.out.bits.toReg.bits.rfWriteEn    := true.B
-  io.out.bits.toReg.bits.rfWriteIdx   := DontCare
-  io.out.bits.toReg.bits.rfWriteData  := DontCare
-  io.out.bits.toReg.bits.vxsat        := false.B
-  io.out.bits.toReg.valid             := io.out.bits.toReg.bits.rfReadEn.reduce(_ || _)
+
 
   //Only receive one instruction, and then set ready to false
   io.in.ready := RegNext(io.out.ready)
