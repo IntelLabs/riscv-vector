@@ -103,6 +103,8 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
 
   val vs1_zero = RegInit(0.U(64.W))
   val vs1_zero_bypass = RegInit(false.B)
+  val output_valid = RegInit(false.B)
+  val output_data = RegInit(0.U(VLEN.W))
 
   when(fpu_red && fire) {
     vs1_zero := Mux1H(eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 0.U), vs1(n - 1, 0))) :+ vs1(63, 0))
@@ -253,7 +255,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
 
   when(fpu_red && fire && !vm && !(vmask_vl.orR)) {
     vs1_zero_bypass := true.B
-  }.elsewhen(output_en) {
+  }.elsewhen(output_valid) {
     vs1_zero_bypass := false.B
   }
 
@@ -366,9 +368,6 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
     red_in(i).mask := "hff".U
     red_in(i).tail := 0.U
   }
-
-  val output_valid = RegInit(false.B)
-  val output_data = RegInit(0.U(VLEN.W))
 
   when(io.out.valid && io.out.ready) {
     output_valid := false.B
