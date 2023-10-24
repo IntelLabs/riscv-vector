@@ -333,6 +333,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
     red_uop.info.destEew := Mux(widen || widen2,
       info.vsew + 1.U, info.vsew)
     red_uop.pdestVal := false.B
+    red_uop.sysUop := sysUop
 
     red_uop.expdIdx := 0.U
     red_uop.expdEnd := true.B
@@ -401,30 +402,30 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   val fpu = Seq.fill(NLanes)(Module(new VFPUTop))
   for (i <- 0 until NLanes / 2) {
     fpu(i).io.in.valid := (io.in.valid & !fpu_red) || red_in_valid
-    fpu(i).io.in.bits.uop.ctrl.lsrc(0) := vs1_imm
-    fpu(i).io.in.bits.uop.ctrl.lsrc(1) := 0.U
-    fpu(i).io.in.bits.uop.ctrl.ldest := 0.U
+    fpu(i).io.in.bits.uop.ctrl.lsrc(0) := Mux(red_in_valid, red_in(i).uop.ctrl.lsrc(0), vs1_imm)
+    fpu(i).io.in.bits.uop.ctrl.lsrc(1) := Mux(red_in_valid, red_in(i).uop.ctrl.lsrc(1), 0.U)
+    fpu(i).io.in.bits.uop.ctrl.ldest := Mux(red_in_valid, red_in(i).uop.ctrl.ldest, 0.U)
     fpu(i).io.in.bits.uop.ctrl.vm := Mux(red_in_valid, red_in(i).uop.ctrl.vm, vm)
     fpu(i).io.in.bits.uop.ctrl.funct6 := Mux(red_in_valid, red_in(i).uop.ctrl.funct6, funct6)
     fpu(i).io.in.bits.uop.ctrl.funct3 := Mux(red_in_valid, red_in(i).uop.ctrl.funct3, funct3)
     fpu(i).io.in.bits.uop.ctrl.widen := Mux(red_in_valid, red_in(i).uop.ctrl.widen, widen)
     fpu(i).io.in.bits.uop.ctrl.widen2 := Mux(red_in_valid, red_in(i).uop.ctrl.widen2, widen2)
-    fpu(i).io.in.bits.uop.ctrl.narrow := narrow
-    fpu(i).io.in.bits.uop.ctrl.narrow_to_1 := narrow_to_1
-    fpu(i).io.in.bits.uop.info.vstart := vstart
+    fpu(i).io.in.bits.uop.ctrl.narrow := Mux(red_in_valid, red_in(i).uop.ctrl.narrow, narrow)
+    fpu(i).io.in.bits.uop.ctrl.narrow_to_1 := Mux(red_in_valid, red_in(i).uop.ctrl.narrow_to_1, narrow_to_1)
+    fpu(i).io.in.bits.uop.info.vstart := Mux(red_in_valid, red_in(i).uop.info.vstart, vstart)
     fpu(i).io.in.bits.uop.info.vl := Mux(red_in_valid, red_in(i).uop.info.vl, vl)
-    fpu(i).io.in.bits.uop.info.vxrm := vxrm
-    fpu(i).io.in.bits.uop.info.frm := frm
+    fpu(i).io.in.bits.uop.info.vxrm := Mux(red_in_valid, red_in(i).uop.info.vxrm, vxrm)
+    fpu(i).io.in.bits.uop.info.frm := Mux(red_in_valid, red_in(i).uop.info.frm, frm)
     fpu(i).io.in.bits.uop.info.vlmul := Mux(red_in_valid, red_in(i).uop.info.vlmul, vlmul)
     fpu(i).io.in.bits.uop.info.vsew := Mux(red_in_valid, red_in(i).uop.info.vsew, vsew)
-    fpu(i).io.in.bits.uop.info.ma := ma
-    fpu(i).io.in.bits.uop.info.ta := ta
+    fpu(i).io.in.bits.uop.info.ma := Mux(red_in_valid, red_in(i).uop.info.ma, ma)
+    fpu(i).io.in.bits.uop.info.ta := Mux(red_in_valid, red_in(i).uop.info.ta, ta)
     fpu(i).io.in.bits.uop.info.destEew := Mux(red_in_valid, red_in(i).uop.info.destEew,
       Mux(widen || widen2, info.vsew + 1.U, info.vsew))
     fpu(i).io.in.bits.uop.expdIdx := Mux(red_in_valid, red_in(i).uop.expdIdx, uopIdx)
     fpu(i).io.in.bits.uop.expdEnd := Mux(red_in_valid, red_in(i).uop.expdEnd, uopEnd)
     fpu(i).io.in.bits.uop.pdestVal := false.B
-    fpu(i).io.in.bits.uop.sysUop := sysUop
+    fpu(i).io.in.bits.uop.sysUop := Mux(red_in_valid, red_in(i).uop.sysUop, sysUop)
     fpu(i).io.in.bits.vs1 := Mux(red_in_valid, red_in(i).vs1, widen_vs1(VLEN / 2, 0))
     fpu(i).io.in.bits.vs2 := Mux(red_in_valid, red_in(i).vs2, widen_vs2(VLEN / 2, 0))
     fpu(i).io.in.bits.old_vd := Mux(red_in_valid, red_in(i).old_vd, Mux(narrow_to_1, cmp_old_vd(i), narrow_old_vd(VLEN / 2, 0)))
