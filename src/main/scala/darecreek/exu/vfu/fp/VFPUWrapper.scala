@@ -71,6 +71,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   val eewVd_reg = SewOH(vd_vsew_reg)
   val vsew_bits = RegEnable(Mux1H(eew.oneHot, Seq(8.U(7.W), 16.U(7.W), 32.U(7.W), 64.U(7.W))), 0.U, fire)
   val ta_reg = RegEnable(ta, false.B, fire)
+  val vl_reg = RegEnable(vl, 0.U, fire)
   val red_state = RegInit(idle)
 
   val vs2_cnt = RegInit(0.U(vlenbWidth.W))
@@ -115,7 +116,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   red_vd_tail_one := vd_mask_vsew_vd | Mux(vs1_zero_bypass, vs1_zero, (red_vd_bits & (~vd_mask_vsew_vd)))
   red_vd_tail_vd := (old_vd_bits & vd_mask_vsew_vd) | Mux(vs1_zero_bypass, vs1_zero, (red_vd_bits & (~vd_mask_vsew_vd)))
 
-  val red_vd = Mux(ta_reg, red_vd_tail_one, red_vd_tail_vd)
+  val red_vd = Mux(vl_reg === 0.U, old_vd_bits, Mux(ta_reg, red_vd_tail_one, red_vd_tail_vd))
 
   for (i <- 0 until NLanes / 2) {
     red_out_vd(i) := red_out(i).vd
@@ -250,10 +251,10 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   vl_vmask := ~((~0.U(VLEN.W)) << vl)
   vmask_vl := vmask & vl_vmask
 
-  when(fpu_red && fire) {
-    vs1_zero_bypass := false.B
-  }.elsewhen(!vm && !(vmask_vl.orR)) {
+  when(fpu_red && fire && !vm && !(vmask_vl.orR)) {
     vs1_zero_bypass := true.B
+  }.elsewhen(output_en) {
+    vs1_zero_bypass := false.B
   }
 
   for (i <- 0 until vlenb) {
