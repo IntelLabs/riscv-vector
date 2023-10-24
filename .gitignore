@@ -7,3 +7,8 @@ build/
 *~
 .coursier
 out/
+.bloop/
+.metals/
+.vscode/
+project/.bloop/
+project/metals.sbt

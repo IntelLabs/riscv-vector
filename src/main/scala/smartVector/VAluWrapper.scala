@@ -3,8 +3,8 @@ package smartVector
 import chisel3._
 import chisel3.util._
 import darecreek.exu.vfu._
-import chipsalliance.rocketchip.config
-import chipsalliance.rocketchip.config.{Config, Field, Parameters}
+import org.chipsalliance.cde.config
+import org.chipsalliance.cde.config.{Config, Field, Parameters}
 import darecreek.exu.vfu.alu.VAlu
 import firrtl.Utils
 

@@ -2,7 +2,7 @@ package smartVector
 
 import chisel3._
 import chisel3.util._
-import chipsalliance.rocketchip.config._
+import org.chipsalliance.cde.config._
 
 case object SmartParamsKey extends Field[SmartParameters]
 

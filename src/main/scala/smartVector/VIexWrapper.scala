@@ -1,17 +1,17 @@
 package smartVector
 
-import org.scalatest.flatspec.AnyFlatSpec
+//import org.scalatest.flatspec.AnyFlatSpec
 import chisel3._
 import chisel3.util._
-import chiseltest.WriteVcdAnnotation
+//import chiseltest.WriteVcdAnnotation
 import darecreek.exu.vfu._
 import darecreek.exu.vfu.alu._
 import darecreek.exu.vfu.mac._
 import darecreek.exu.vfu.div._
 import darecreek.exu.vfu.vmask._
 import darecreek.exu.vfu.VInstructions._
-import chipsalliance.rocketchip.config.{Config, Field, Parameters}
-import chipsalliance.rocketchip.config
+import org.chipsalliance.cde.config.{Config, Field, Parameters}
+import org.chipsalliance.cde.config
 import xiangshan.backend.rob.RobPtr
 
 

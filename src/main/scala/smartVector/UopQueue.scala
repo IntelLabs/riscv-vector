@@ -5,8 +5,8 @@ import chisel3.util._
 import darecreek.VDecode
 import darecreek.exu.vfu.VUopInfo
 
-import chipsalliance.rocketchip.config
-import chipsalliance.rocketchip.config.{Config, Field, Parameters}
+import org.chipsalliance.cde.config
+import org.chipsalliance.cde.config.{Config, Field, Parameters}
 import darecreek.exu.vfu.VUop
 import xiangshan.MicroOp
 

@@ -1,8 +1,8 @@
 package smartVector
 
 import chisel3._
-import chipsalliance.rocketchip.config.{Config, Field, Parameters}
-import freechips.rocketchip.formal.MonitorDirection._
+import org.chipsalliance.cde.config.{Config, Field, Parameters}
+//import freechips.rocketchip.formal.MonitorDirection._
 import chisel3.util._
 import darecreek.exu.vfu.VFuParamsKey
 import darecreek.exu.vfu.VFuParameters

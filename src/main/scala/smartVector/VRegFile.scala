@@ -2,7 +2,7 @@ package smartVector
 
 import chisel3._
 import chisel3.util._
-import chipsalliance.rocketchip.config
+import org.chipsalliance.cde.config
 import SmartParam._
 
 class subVRFReadPort(regLen: Int) extends Bundle {

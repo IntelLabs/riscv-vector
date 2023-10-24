@@ -1,7 +1,7 @@
 package smartVector
 import chisel3._
 import chisel3.util._
-import chipsalliance.rocketchip.config.{Config, Field, Parameters}
+import org.chipsalliance.cde.config.{Config, Field, Parameters}
 
 import SmartParam._
 
