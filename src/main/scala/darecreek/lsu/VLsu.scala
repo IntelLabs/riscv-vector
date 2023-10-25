@@ -130,7 +130,8 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
     */
   // Load FSM
   when (stateLd === IDLE_LD) {
-    stateLd := Mux(io.ovi_memop.sync_start, IssueUops_LD, IDLE_LD)
+    stateLd := Mux(io.ovi_memop.sync_start, 
+               Mux(ld.fire && ld.bits.uop.expdEnd, BUSY_LD, IssueUops_LD), IDLE_LD)
   }.elsewhen (stateLd === IssueUops_LD) { //Wait for all expanded uops of one instrn issued from IQ
     stateLd := Mux(ld.fire && ld.bits.uop.expdEnd, BUSY_LD, IssueUops_LD)
   }.elsewhen (stateLd === BUSY_LD) {
@@ -233,9 +234,9 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   val sub2 = shiftElm - nElemVLEN  // shiftRight - nElemVLEN*2
   val needSub1 = shiftRight(6, 5) === 1.U
   val needSub2 = shiftRight(6, 5) === 2.U
-  val finalShiftR = Wire(UInt(5.W))
+  val finalShiftR = Wire(UInt(6.W))
   finalShiftR := Mux(needSub2, sub2, Mux(needSub1, sub1, shiftRight))
-  val shiftBytes = Wire(UInt(5.W))
+  val shiftBytes = Wire(UInt(6.W))
   shiftBytes := Mux1H(destEewOH_ld.oneHot, Seq(0, 1, 2, 3).map(finalShiftR << _))
 
   val preShift = Cat(ldDataSquash, 0.U(VLEN.W))
@@ -252,8 +253,8 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   // el_count mask
   val el_count_bytes = Wire(UInt(7.W))
   el_count_bytes := Mux1H(destEewOH_ld.oneHot, Seq(0, 1, 2, 3).map(elCountSquash << _))
-  val elCount_to_1s = Mux(el_count_bytes === 0.U, 0.U, UIntToCont1s.applySLL((el_count_bytes - 1.U)(5, 0), 6))
-  require(elCount_to_1s.getWidth == 64, "elCount_to_1s of VLSU is supposed to be 64-wide")
+  val elCount_to_1s = Wire(UInt(64.W))
+  elCount_to_1s := Mux(el_count_bytes === 0.U, 0.U, UIntToCont1s(el_count_bytes(5, 0), 6))
   val elCountMask = Wire(UInt(96.W)) // 3 * vlenb = 96
   val el_id_low_bytes = Wire(UInt(vlenbWidth.W))
   el_id_low_bytes := Mux1H(destEewOH_ld.oneHot, Seq(0, 1, 2, 3).map(el_id_low << _))
@@ -263,8 +264,10 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
 
   // mask
   val loadMask_bytes = Reg(UInt(64.W)) 
-  loadMask_bytes := Mux1H(destEewOH_ld.oneHot, Seq(1, 2, 4, 8).map(k => 
-                         Cat(io.ovi_load.mask(64/k-1, 0).asBools.map(bit => Fill(k, bit)).reverse)))
+  loadMask_bytes := Mux(io.ovi_load.mask_valid,
+                        Mux1H(destEewOH_ld.oneHot, Seq(1, 2, 4, 8).map(k => 
+                         Cat(io.ovi_load.mask(64/k-1, 0).asBools.map(bit => Fill(k, bit)).reverse))),
+                        ~(0.U(64.W)))
   val loadMask = Wire(UInt(96.W))
   loadMask := Cat(0.U(32.W), loadMask_bytes) << el_id_low_bytes
   val loadMaskFinal = Wire(UInt(96.W))
@@ -372,14 +375,14 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
     ldDataBuf.io.waddr(0) := ldBufPtrEnq
     ldDataBuf.io.wmask(0).foreach(_ := true.B)
     ldDataBuf.io.wdata(0) := Mux(ld.bits.uop.ctrl.lsrcVal(2), VecInit(UIntSplit(ld.bits.oldVd, 8)), 
-      VecInit(UIntSplit(Mux1H(destEewOH_ld_wire.oneHot, Seq(8, 16, 32, 64).map(w => Fill(VLEN/w, 1.U(w.W)))), 8)))
+      VecInit(UIntSplit(Mux1H(destEewOH_ld_wire.oneHot, Seq(8, 16, 32, 64).map(w => Fill(VLEN/w, ~(0.U(w.W))))), 8)))
   }
 
   //-------- Write-back of load --------
   val ldBufPtrDeq = RegInit(0.U(3.W))
   ldBufPtrDeq := Mux(stateLd === COMPLETE_LD && ldUopTable(ldBufPtrDeq).valid, ldBufPtrDeq + 1.U, 0.U)
   completeLd := stateLd === COMPLETE_LD && (!ldUopTable(ldBufPtrDeq + 1.U).valid || ldBufPtrDeq === 7.U)
-  io.wb.ld.valid := stateLd === COMPLETE_LD
+  io.wb.ld.valid := stateLd === COMPLETE_LD && !completeLd
   ldDataBuf.io.raddr := ldBufPtrDeq
   io.wb.ld.bits.vd := ldDataBuf.io.rdata
   io.wb.ld.bits.uop := ldUopTable(ldBufPtrDeq).uop

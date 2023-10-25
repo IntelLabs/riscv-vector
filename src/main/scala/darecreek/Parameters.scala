@@ -51,7 +51,7 @@ trait DarecreekParameters {
   val NByteLane = LaneWidth / 8
 
   val vlenb = VLEN / 8  //CSR
-  val vlenbWidth = log2Up(vlenb)
+  val vlenbWidth = log2Up(vlenb) + 1
 
   //---- Just for debug ----
   val debug = true
