@@ -80,14 +80,14 @@ object UIntToCont1s {
     }
   }
   // E.g., 0.U(3.W) => b"00000001"  7.U(3.W) => b"1111_1111"
-  def applySLL(data: UInt, dw: Int): UInt = {  // dw is width of data
-    if (dw == 1) {
-      Mux(data === 0.U, 1.U(2.W), 3.U(2.W))
-    } else {
-      Mux(data(dw-1), Cat(apply(data(dw-2, 0), dw-1), ~0.U((1 << (dw-1)).W)),
-                      Cat(0.U((1 << (dw-1)).W), apply(data(dw-2, 0), dw-1)))
-    }
-  }
+  // def applySLL(data: UInt, dw: Int): UInt = {  // dw is width of data
+  //   if (dw == 1) {
+  //     Mux(data === 0.U, 1.U(2.W), 3.U(2.W))
+  //   } else {
+  //     Mux(data(dw-1), Cat(applySLL(data(dw-2, 0), dw-1), ~0.U((1 << (dw-1)).W)),
+  //                     Cat(0.U((1 << (dw-1)).W), applySLL(data(dw-2, 0), dw-1)))
+  //   }
+  // }
 }
 
 // Tail generation: vlenb bits. Note: uopIdx < 8
