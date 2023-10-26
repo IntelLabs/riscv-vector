@@ -834,8 +834,7 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
 
   var tbs : Seq[TestBehavior] = Seq(
 
-    // new VredsumvsTestBehavior,
-    new VfaddvvTestBehavior,
+    new VredsumvsTestBehavior,
 
     // new VslideupvxFSMTestBehavior,
     // new VfaddvvTestBehavior,
