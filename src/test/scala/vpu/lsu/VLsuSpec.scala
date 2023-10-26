@@ -77,55 +77,43 @@ class VLsuTestWrapper extends Module {
   vLsu.io.fromIQ.st.valid := io.fromIQ.st.valid
   io.fromIQ.ld.ready := vLsu.io.fromIQ.ld.ready
   io.fromIQ.st.ready := vLsu.io.fromIQ.st.ready
-  
-  vLsu.io.fromIQ.ld.bits.rs2 := io.fromIQ.ld.bits.rs2
-  vLsu.io.fromIQ.ld.bits.vs2 := io.fromIQ.ld.bits.vs2
-  vLsu.io.fromIQ.ld.bits.oldVd := io.fromIQ.ld.bits.oldVd
-  vLsu.io.fromIQ.ld.bits.vmask := io.fromIQ.ld.bits.vmask
-  vLsu.io.fromIQ.ld.bits.nextVRobIdx := io.fromIQ.ld.bits.nextVRobIdx
-  vLsu.io.fromIQ.ld.bits.iqEmpty := io.fromIQ.ld.bits.iqEmpty
 
-  vLsu.io.fromIQ.st.bits.rs2 := io.fromIQ.st.bits.rs2
-  vLsu.io.fromIQ.st.bits.vs2 := io.fromIQ.st.bits.vs2
-  vLsu.io.fromIQ.st.bits.vs3 := io.fromIQ.st.bits.vs3
-  vLsu.io.fromIQ.st.bits.vmask := io.fromIQ.st.bits.vmask
-  vLsu.io.fromIQ.st.bits.nextVRobIdx := io.fromIQ.st.bits.nextVRobIdx
-  vLsu.io.fromIQ.st.bits.iqEmpty := io.fromIQ.st.bits.iqEmpty
+  Seq((vLsu.io.fromIQ.ld.bits, io.fromIQ.ld.bits), 
+      (vLsu.io.fromIQ.st.bits, io.fromIQ.st.bits)).foreach {
+    case (lsu_bits, io_bits) => {
+      lsu_bits.elements.foreach {
+        case (name, data) => {
+          if (name != "uop") {
+            data := io_bits.elements(name)
+          }
+        }
+      }
+    }
+  }
 
   vLsu.io.fromIQ.ld.bits.uop := 0.U.asTypeOf(new VExpdUOp)
   vLsu.io.fromIQ.st.bits.uop := 0.U.asTypeOf(new VExpdUOp)
 
-  vLsu.io.fromIQ.ld.bits.uop.ctrl.funct6 := io.fromIQ.ld.bits.uop.ctrl_funct6
-  vLsu.io.fromIQ.ld.bits.uop.ctrl.funct3 := io.fromIQ.ld.bits.uop.ctrl_funct3
-  vLsu.io.fromIQ.ld.bits.uop.ctrl.lsrc(1) := io.fromIQ.ld.bits.uop.ctrl_lsrc_1
-  vLsu.io.fromIQ.ld.bits.uop.ctrl.lsrcVal(2) := io.fromIQ.ld.bits.uop.ctrl_lsrcVal_2
-  vLsu.io.fromIQ.ld.bits.uop.ctrl.load := io.fromIQ.ld.bits.uop.ctrl_load
-  vLsu.io.fromIQ.ld.bits.uop.ctrl.store := io.fromIQ.ld.bits.uop.ctrl_store
-  vLsu.io.fromIQ.ld.bits.uop.pdestVal := io.fromIQ.ld.bits.uop.pdestVal
-  vLsu.io.fromIQ.ld.bits.uop.ctrl.vm := io.fromIQ.ld.bits.uop.ctrl_vm
-  vLsu.io.fromIQ.ld.bits.uop.info.ma := io.fromIQ.ld.bits.uop.info_ma
-  vLsu.io.fromIQ.ld.bits.uop.info.vsew := io.fromIQ.ld.bits.uop.info_vsew
-  vLsu.io.fromIQ.ld.bits.uop.info.vlmul := io.fromIQ.ld.bits.uop.info_vlmul
-  vLsu.io.fromIQ.ld.bits.uop.info.vl := io.fromIQ.ld.bits.uop.info_vl
-  vLsu.io.fromIQ.ld.bits.uop.info.vstart := io.fromIQ.ld.bits.uop.info_vstart
-  vLsu.io.fromIQ.ld.bits.uop.expdIdx := io.fromIQ.ld.bits.uop.expdIdx
-  vLsu.io.fromIQ.ld.bits.uop.expdEnd := io.fromIQ.ld.bits.uop.expdEnd
-
-  vLsu.io.fromIQ.st.bits.uop.ctrl.funct6 := io.fromIQ.st.bits.uop.ctrl_funct6
-  vLsu.io.fromIQ.st.bits.uop.ctrl.funct3 := io.fromIQ.st.bits.uop.ctrl_funct3
-  vLsu.io.fromIQ.st.bits.uop.ctrl.lsrc(1) := io.fromIQ.st.bits.uop.ctrl_lsrc_1
-  vLsu.io.fromIQ.st.bits.uop.ctrl.lsrcVal(2) := io.fromIQ.st.bits.uop.ctrl_lsrcVal_2
-  vLsu.io.fromIQ.st.bits.uop.ctrl.load := io.fromIQ.st.bits.uop.ctrl_load
-  vLsu.io.fromIQ.st.bits.uop.ctrl.store := io.fromIQ.st.bits.uop.ctrl_store
-  vLsu.io.fromIQ.st.bits.uop.pdestVal := io.fromIQ.st.bits.uop.pdestVal
-  vLsu.io.fromIQ.st.bits.uop.ctrl.vm := io.fromIQ.st.bits.uop.ctrl_vm
-  vLsu.io.fromIQ.st.bits.uop.info.ma := io.fromIQ.st.bits.uop.info_ma
-  vLsu.io.fromIQ.st.bits.uop.info.vsew := io.fromIQ.st.bits.uop.info_vsew
-  vLsu.io.fromIQ.st.bits.uop.info.vlmul := io.fromIQ.st.bits.uop.info_vlmul
-  vLsu.io.fromIQ.st.bits.uop.info.vl := io.fromIQ.st.bits.uop.info_vl
-  vLsu.io.fromIQ.st.bits.uop.info.vstart := io.fromIQ.st.bits.uop.info_vstart
-  vLsu.io.fromIQ.st.bits.uop.expdIdx := io.fromIQ.st.bits.uop.expdIdx
-  vLsu.io.fromIQ.st.bits.uop.expdEnd := io.fromIQ.st.bits.uop.expdEnd
+  Seq((vLsu.io.fromIQ.ld.bits.uop, io.fromIQ.ld.bits.uop), 
+      (vLsu.io.fromIQ.st.bits.uop, io.fromIQ.st.bits.uop)).foreach {
+    case (lsu_uop, io_uop) => {
+      lsu_uop.ctrl.funct6 := io_uop.ctrl_funct6
+      lsu_uop.ctrl.funct3 := io_uop.ctrl_funct3
+      lsu_uop.ctrl.lsrc(1) := io_uop.ctrl_lsrc_1
+      lsu_uop.ctrl.lsrcVal(2) := io_uop.ctrl_lsrcVal_2
+      lsu_uop.ctrl.load := io_uop.ctrl_load
+      lsu_uop.ctrl.store := io_uop.ctrl_store
+      lsu_uop.pdestVal := io_uop.pdestVal
+      lsu_uop.ctrl.vm := io_uop.ctrl_vm
+      lsu_uop.info.ma := io_uop.info_ma
+      lsu_uop.info.vsew := io_uop.info_vsew
+      lsu_uop.info.vlmul := io_uop.info_vlmul
+      lsu_uop.info.vl := io_uop.info_vl
+      lsu_uop.info.vstart := io_uop.info_vstart
+      lsu_uop.expdIdx := io_uop.expdIdx
+      lsu_uop.expdEnd := io_uop.expdEnd
+    }
+  }
 }
 
 trait VLsuBehavior {
@@ -135,64 +123,122 @@ trait VLsuBehavior {
   val vle8 = CtrlBundle(VLE8_V)
   val vse8 = CtrlBundle(VSE8_V)
   
- 
   def vLsuTest0(): Unit = {
-    it should "pass the test: unit-stride load" in {
+    it should "pass: unit-stride load (sew=8, el_count=64, el_off=0, el_id=0)" in {
       test(new VLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
         test_init(dut)
         dut.clock.step(1)
         val ldReqs = Seq(
-          (vle8.copy(uopEnd=true), ldReqSrc_default),
+          (vle8.copy(vl=64, uopIdx=0), ldReqSrc_default),
+          (vle8.copy(vl=64, uopIdx=1, uopEnd=true), ldReqSrc_default),
         )
-
+        val ldResps = Seq(
+          ("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d" + 
+           "0123456701234567_89abcdef89abcdef_0123456701234567_89abcdef89abcdef",
+           SeqId(el_count=64)),
+        )
+        next_is_load_and_step(dut)
         for ((c, s) <- ldReqs) {
-          next_is_load_and_step(dut)
           while (!dut.io.fromIQ.ld.ready.peekBoolean()) {
             dut.clock.step(1)
           }
           dut.io.fromIQ.ld.valid.poke(true.B)
           dut.io.fromIQ.ld.bits.poke(genLdInput(c, s))
-        }
-        dut.clock.step(1)
-        dut.io.fromIQ.ld.valid.poke(false.B)
-
-        dut.clock.step(4)
-
-        dut.io.ovi_memop.sync_end.poke(false.B)
-        dut.io.ovi_load.valid.poke(true.B)
-        dut.io.ovi_load.seq_id.poke(SeqId().asUInt)
-        dut.io.ovi_load.data.poke(("h1234567812345678_1234567812345678_1234567812345678_1234567812345678" + 
-                                    "1234567812345678_1234567812345678_1234567812345678_1234567812345678").U)
-        dut.io.ovi_load.mask_valid.poke(false.B)
-        dut.io.ovi_store.credit.poke(false.B)
-        dut.io.ovi_maskIdx.credit.poke(false.B)
-        dut.clock.step(1)
-        dut.io.ovi_load.valid.poke(false.B)
-
-        for (i <- 0 until 5) {
-          if (dut.io.wb.ld.valid.peekBoolean()) {
-            dut.io.wb.ld.bits.vd.expect("h1234567812345678_1234567812345678_1234567812345678_1234567812345678".U)
-          }
-          if (i == 1) {dut.io.ovi_memop.sync_end.poke(true.B)}
-          if (i == 2) {dut.io.ovi_memop.sync_end.poke(false.B)}
           dut.clock.step(1)
         }
+        dut.io.fromIQ.ld.valid.poke(false.B)
+        dut.clock.step(4)
 
+        fork {
+          for ((ldData, seqId)  <- ldResps) {
+            one_512b_load_resp(dut, ldData, seqId.asUInt)
+          }
+          dut.clock.step(1)
+          dut.io.ovi_load.valid.poke(false.B)
+          dut.io.ovi_memop.sync_end.poke(true.B)
+          dut.clock.step(1)
+          dut.io.ovi_memop.sync_end.poke(false.B)
+        }.fork {
+          var wb_cnt = 0
+          for (i <- 0 until 10) {
+            if (dut.io.wb.ld.valid.peekBoolean()) {
+              if (wb_cnt == 0) {
+                dut.io.wb.ld.bits.vd.expect("h0123456701234567_89abcdef89abcdef_0123456701234567_89abcdef89abcdef".U)
+                wb_cnt += 1
+              } else {
+                dut.io.wb.ld.bits.vd.expect("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d".U)
+              }
+            }
+          }
+        }.join()
 
-
-        // dut.io.wb.ld.valid.expect(true.B)
-        // dut.io.wb.ld.bits.vd.expect("h1234567812345678_1234567812345678_1234567812345678_1234567812345678".U)
-
+        dut.clock.step(4)
       }
     }
   }
 
- 
+  def vLsuTest1(): Unit = {
+    it should "pass: unit-stride load (sew=8, el_count=32, el_off=32, el_id=0)" in {
+      test(new VLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+        test_init(dut)
+        dut.clock.step(1)
+        val ldReqs = Seq(
+          (vle8.copy(vl=32, uopIdx=0), ldReqSrc_default),
+          (vle8.copy(vl=32, uopIdx=1, uopEnd=true), ldReqSrc_default),
+        )
+        val ldResps = Seq(
+          ("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d" + 
+            "0123456701234567_89abcdef89abcdef_0123456701234567_89abcdef89abcdef",
+           SeqId(el_count=32, el_off=32)),
+        )
+        next_is_load_and_step(dut)
+        for ((c, s) <- ldReqs) {
+          while (!dut.io.fromIQ.ld.ready.peekBoolean()) {
+            dut.clock.step(1)
+          }
+          dut.io.fromIQ.ld.valid.poke(true.B)
+          dut.io.fromIQ.ld.bits.poke(genLdInput(c, s))
+          dut.clock.step(1)
+        }
+        dut.io.fromIQ.ld.valid.poke(false.B)
+        dut.clock.step(4)
+
+        fork {
+          for ((ldData, seqId)  <- ldResps) {
+            one_512b_load_resp(dut, ldData, seqId.asUInt)
+          }
+          dut.clock.step(1)
+          dut.io.ovi_load.valid.poke(false.B)
+          dut.io.ovi_memop.sync_end.poke(true.B)
+          dut.clock.step(1)
+          dut.io.ovi_memop.sync_end.poke(false.B)
+        }.fork {
+          var wb_cnt = 0
+          for (i <- 0 until 10) {
+            if (dut.io.wb.ld.valid.peekBoolean()) {
+              if (wb_cnt == 0) {
+                dut.io.wb.ld.bits.vd.expect("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(0.U)
+                wb_cnt += 1
+              } else {
+                dut.io.wb.ld.bits.vd.expect("hffffffffffffffff_ffffffffffffffff_ffffffffffffffff_ffffffffffffffff".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(1.U)
+              }
+            }
+            dut.clock.step(1)
+          }
+        }.join()
+
+        dut.clock.step(4)
+      }
+    }
+  }
+
 
 }
 
 class VLsuSpec extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VLsuBehavior {
   behavior of "LSU test"
-  it should behave like vLsuTest0()  // unit-stride load
-
+  // it should behave like vLsuTest0()  // unit-stride load
+  it should behave like vLsuTest1()  // unit-stride load
 }
