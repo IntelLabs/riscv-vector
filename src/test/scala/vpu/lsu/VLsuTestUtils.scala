@@ -41,6 +41,17 @@ object next_is_store_and_step {
     dut.clock.step(1)
   }
 }
+object one_512b_load_resp {
+  def apply(dut: VLsuTestWrapper, data: String, seqId: UInt): Unit = {
+    dut.io.ovi_memop.sync_end.poke(false.B)
+    dut.io.ovi_load.valid.poke(true.B)
+    dut.io.ovi_load.seq_id.poke(seqId)
+    dut.io.ovi_load.data.poke(data.U)
+    dut.io.ovi_load.mask_valid.poke(false.B)
+    dut.io.ovi_store.credit.poke(false.B)
+    dut.io.ovi_maskIdx.credit.poke(false.B)
+  }
+}
 
 case class CtrlBundle(instrn: BitPat,
                       isLoad: Boolean = true,
