@@ -59,6 +59,7 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
     val oldvdbase = 120
     val vdbase = 130
     val maskbase = 140
+    var robIdxValid = false
 
     override def getDut() : Module               = {
         val dut = new Permutation
@@ -155,11 +156,21 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
                 rd_counts += 1
             }
 
+            // ================================================
+            // 10.27 add random flush
+            var robIdx = (false, 0)
+            robIdxValid = randomBool()
+            if (robIdxValid) {
+                robIdx = (true, 1)
+            }
+
+            fsmCtrl.robIdx = robIdx
+
             dut.io.in.poke(genFSMInput(
                 fsmSrcBundle,
                 fsmCtrl
             ))
-            dut.io.redirect.poke(genFSMRedirect())
+            dut.io.redirect.poke(genFSMRedirect((robIdxValid, true, 0)))
 
             // Stage 2.4: see if any wb value is there to be written =============
             val fsm_wb_vld = dut.io.out.wb_vld.peek().litValue.toInt
@@ -169,6 +180,29 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
 
             dut.clock.step(1)
             clock_counter += 1
+
+            if (robIdxValid) {
+                // flushed
+                println("flushed")
+
+                fsmSrcBundle = FSMSrcBundle(
+                    rdata="h0", rvalid=false
+                )
+                fsmCtrl = ctrl.copy()
+
+                // turning off redirect bits
+                dut.io.in.poke(genFSMInput(
+                    fsmSrcBundle,
+                    fsmCtrl
+                ))
+                dut.io.redirect.poke(genFSMRedirect())
+                
+                while(dut.io.out.perm_busy.peek().litValue.toInt == 1) {
+                    dut.clock.step(1)
+                    clock_counter += 1
+                }
+                return res_vds
+            }
         }}
 
         if(clock_counter >= LOOP_MAX) println(s"!!!!!!!! Exceeds LOOP_MAX !!!!!!!! FSM has not done work after ${LOOP_MAX} cycles")
@@ -247,12 +281,20 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
             preg_to_value = preg_to_value + ((oldvdbase + j) -> oldvddata(n_inputs - 1 - j))
             old_vd_preg_idx :+= (oldvdbase + j)
 
-            println(s"${vs1base + j} ${vs2base + j} ${oldvdbase + j}")
+            // println(s"${vs1base + j} ${vs2base + j} ${oldvdbase + j}")
         }
 
         var rs1value = "h0"
         if (hasRS1 || hasFS1) rs1value = vs1data(0)
-        // else if (!hasVS1) rs1value = f"h${getImm(simi)}%032x"
+
+        /*// ================================================
+        // 10.27 add flush
+        var robIdx = (false, 0)
+        val robIdxValid = randomBool()
+        if (robIdxValid) {
+            robIdx = (true, 1)
+        }*/
+
 
         // ==========================================================================================================================
         dut.io.in.poke(genFSMInput(
@@ -275,7 +317,8 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
                 uopIdx=0,
                 uopEnd=true,
                 vxrm = vxrm,
-                vstart = vstart
+                vstart = vstart,
+                // robIdx = robIdx
             )
         ))
 
@@ -285,6 +328,10 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
 
         // ==========================================================================================================================
         val res_vds = stageTwo(dut, preg_to_value, n_inputs, ctrl)
+        if (robIdxValid) {
+            println("robIdxValid = true, flush this instruction")
+            return
+        }
         resComp(expectvd, res_vds, n_inputs, simi)
     }
 
@@ -390,6 +437,7 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
 
     override def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:Permutation) : Unit = {
         blocks = 0
+        robIdxValid = false
         if(instid.equals("vrgatherei16_vv")) ei16FSMTestMultiple(simi, ctrl, s, dut)
         else normalFSMTestMultiple(simi, ctrl, s, dut)
     }

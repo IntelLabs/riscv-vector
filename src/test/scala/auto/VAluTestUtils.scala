@@ -14,8 +14,74 @@ import xiangshan.MicroOp
 import darecreek.exu.vfu.perm._
 import chipsalliance.rocketchip.config._
 import xiangshan._
+import scala.util._
 import xiangshan.backend.rob.RobPtr
 
+
+object UtilFuncs {
+  //string format convert
+  def stringconvert(str:String) = {
+    val stringpart = str.trim.split("0x")
+    "h"+stringpart(1)
+  }
+
+  def removespace(str:String) = {
+    val stringtemp = str.split(" ")
+    var stringout = ""
+    for(i <- 0 until stringtemp.length){
+      stringout = stringout + stringtemp(i)
+    }
+    stringout
+  }
+
+  def multilmuldatahandle(str:String) = {
+    val stringtemp = str.split(" ")
+    var stringout = stringtemp
+    for(i <- 0 until stringtemp.length/2){
+      stringout(i) = "h" + stringtemp(i*2) + stringtemp(i*2+1)
+    }
+    val temp = stringout(0).split("0x")
+    stringout(0) = "h" + temp(1)
+    stringout
+  }
+
+  def lmulconvert(lmul:String) = {
+    var lmulreg = 0
+    if(lmul=="0.125000")
+       lmulreg = 5
+    if(lmul=="0.250000")
+       lmulreg = 6
+    if(lmul=="0.500000")
+       lmulreg = 7
+    if(lmul=="1.000000")
+       lmulreg = 0
+    if(lmul=="2.000000")
+       lmulreg = 1
+    if(lmul=="4.000000")
+       lmulreg = 2
+    if(lmul=="8.000000")
+       lmulreg = 3
+    lmulreg
+  }
+
+  def vsewconvert(sew:String) : Int = {
+    sew match {
+      case "8" => return 0
+      case "16" => return 1
+      case "32" => return 2
+      case "64" => return 3
+    }
+  }
+
+  def vlremaincal(vl:String,num:Int,sew:Int) = {
+    var vlremain = vl.toInt
+    //println("vl",vlremain)
+    vlremain = vlremain - (128/sew)*num
+    if(vlremain < 0)
+      vlremain = 0
+    vlremain
+  }
+}
 
 class VFpuInput(implicit p: Parameters) extends Bundle {
   // val in = new VFuInput
@@ -49,7 +115,7 @@ case class CtrlBundle(instrn: BitPat,
                       frm : Int = 0,
                       uopIdx: Int = 0,
                       uopEnd : Boolean = false,
-                      robIdx: (Boolean, Int) = (false, 0),
+                      var robIdx: (Boolean, Int) = (false, 0),
 ) extends TestCtrlBundleBase
 
 
@@ -102,7 +168,7 @@ trait BundleGenHelper {
     )
   }
 
-  def genDontCareVFuUop(c: CtrlBundle) = {
+  /*def genDontCareVFuUop(c: CtrlBundle) = {
     var vuop = Wire(new VUop)
     var vuopCtrl = Wire(new VUopCtrl)
     var vuopInfo = Wire(new VUopInfo)
@@ -147,7 +213,7 @@ trait BundleGenHelper {
     vuop
     
     // (new RobPtr).Lit(_.flag -> c.robIdx._1.B, _.value -> c.robIdx._2.U)
-  }
+  }*/
 
   def genVFuInput(s: SrcBundle, c: CtrlBundle) = {
     (new VFuInput).Lit(
@@ -160,7 +226,7 @@ trait BundleGenHelper {
     )
   }
 
-  def genDontCareVFuInput(s: SrcBundle, c: CtrlBundle) = {
+  /*def genDontCareVFuInput(s: SrcBundle, c: CtrlBundle) = {
     var res = Wire(new VFuInput)
     res.uop := genDontCareVFuUop(c)
     res.vs1 := DontCare
@@ -170,7 +236,7 @@ trait BundleGenHelper {
     res.rs1 := DontCare
 
     res
-  }
+  }*/
 
   def genVAluOutput(vd: String, vxsat: Boolean = false) = {
     (new VAluOutput).Lit(
