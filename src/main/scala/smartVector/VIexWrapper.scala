@@ -1,9 +1,9 @@
 package smartVector
 
-import org.scalatest.flatspec.AnyFlatSpec
+//import org.scalatest.flatspec.AnyFlatSpec
 import chisel3._
 import chisel3.util._
-import chiseltest.WriteVcdAnnotation
+//import chiseltest.WriteVcdAnnotation
 import darecreek.exu.vfu._
 import darecreek.exu.vfu.alu._
 import darecreek.exu.vfu.mac._
@@ -19,7 +19,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   
   val io = IO(new Bundle {
     val in = Input(ValidIO(new UopQueueOutput))
-    val out = ValidIO(new VIexOutput)
+    val out = ValidIO(new VAluOutput)
   })
 
 
@@ -38,17 +38,18 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   SValu.io.in.bits.vfuInput.oldVd := 0.U
   SValu.io.in.bits.vfuInput.mask  := 0.U
 
-  io.out.valid := SValu.io.out.valid
-  io.out.bits.toReg.bits.rfReadEn(0) := false.B
-  io.out.bits.toReg.bits.rfReadEn(1) := false.B
-  io.out.bits.toReg.bits.rfReadIdx   := DontCare
+  io.out.bits  := SValu.io.out.bits
+  io.out.valid := RegNext(io.in.valid)
+  //io.out.bits.toReg.bits.rfReadEn(0) := false.B
+  //io.out.bits.toReg.bits.rfReadEn(1) := false.B
+  //io.out.bits.toReg.bits.rfReadIdx   := DontCare
   
-  io.out.bits.toReg.bits.rfWriteEn   := RegEnable(io.in.bits.uopRegInfo.rfWriteEn, io.in.valid)
-  io.out.bits.toReg.bits.rfWriteIdx  := RegEnable(io.in.bits.uopAttribute.ldest, io.in.valid)
-  io.out.bits.toReg.bits.rfWriteData := SValu.io.out.bits.vd
-  io.out.bits.toReg.bits.vxsat       := SValu.io.out.bits.vxsat
+  //io.out.bits.toReg.bits.rfWriteEn   := RegEnable(io.in.bits.uopRegInfo.rfWriteEn, io.in.valid)
+  //io.out.bits.toReg.bits.rfWriteIdx  := RegEnable(io.in.bits.uopAttribute.ldest, io.in.valid)
+  //io.out.bits.toReg.bits.rfWriteData := SValu.io.out.bits.vd
+  //io.out.bits.toReg.bits.vxsat       := SValu.io.out.bits.vxsat
 
-  io.out.bits.toReg.valid := io.out.bits.toReg.bits.rfWriteEn
+  //io.out.bits.toReg.valid := io.out.bits.toReg.bits.rfWriteEn
 }
 
 

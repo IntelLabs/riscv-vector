@@ -40,12 +40,12 @@ case class CtrlBundle(instrn: BitPat,
                       robIdx: (Boolean, Int) = (false, 0)
 )
 
-case class VInfoBundle(vl: Int = 32,
+case class VInfoBundle(vl: Int = 16,
                        vstart: Int = 0,
                        vma: Boolean = false,
                        vta: Boolean = false,
                        vsew: Int = 0,
-                       vlmul: Int = 4,
+                       vlmul: Int = 2,
                        vxrm : Int = 0,
                        frm : Int = 0
 )
@@ -170,8 +170,8 @@ object TestHarnessSmart {
     dut.clock.setTimeout(2000)
     dut.io.in.initSource()
     dut.io.in.setSourceClock(dut.clock)
-    dut.io.out.initSink()
-    dut.io.out.setSinkClock(dut.clock)
+    //dut.io.out.initSink()
+    //dut.io.out.setSinkClock(dut.clock)
     //dut.io.out.ready.poke(true.B)
   }
 }

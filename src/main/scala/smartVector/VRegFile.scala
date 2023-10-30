@@ -29,10 +29,8 @@ class subVRegFile(numRead: Int, numWrite: Int, regLen: Int) extends Module {
   })
 
   val rf = Reg(Vec(NVPhyRegs, UInt(regLen.W)))
-  for (r <- io.read) {
-    when(r.ren){
+  for (r <- io.read) { 
       r.data := rf(r.addr)
-    }
   }
   for (w <- io.write) {
     when (w.wen) {

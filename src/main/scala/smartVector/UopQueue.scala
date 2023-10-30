@@ -37,8 +37,9 @@ class UopQueue(implicit p : Parameters) extends Module {
             val regFileIn = Input(new regOut)
         }
         val out = new Bundle{
-            val mUop = ValidIO(new UopQueueOutput)
-            val toRegFile = ValidIO(new regIn)
+            val mUop        = ValidIO(new UopQueueOutput)
+            val toRegFile   = Output(new regReadIn)
+            val mUopRegAttr = Output(new MUopRegAttr)
         } 
     })
     
@@ -65,20 +66,91 @@ class UopQueue(implicit p : Parameters) extends Module {
         uopRegInfo(0).vs2        := Mux(io.in.regFileIn.readVld(1), io.in.regFileIn.readData(1), uopRegInfo(0).vs2)
 
         uopRegInfo(0).rfWriteEn  := io.in.decodeIn.bits.vCtrl.ldestVal
-        //uopRegInfo(0).vxsat      := io.in.decodeIn.bits.vCtrl.
+        uopRegInfo(0).vxsat      := false.B
     } 
+
+    val ctrl = io.in.decodeIn.bits.vCtrl
+    val info = io.in.decodeIn.bits.vInfo
+    val v_ext_out = ctrl.alu && ctrl.funct3 === "b010".U && ctrl.funct6 === "b010010".U 
+        
+    val lsrc1_inc = Wire(UInt(3.W))
+    when (ctrl.widen || v_ext_out && ctrl.lsrc(0)(2,1) === 3.U) {
+      lsrc1_inc := idx >> 1
+    }.elsewhen (v_ext_out && ctrl.lsrc(0)(2,1) === 2.U) {
+      lsrc1_inc := idx >> 2
+    }.elsewhen (v_ext_out && ctrl.lsrc(0)(2,1) === 1.U) {
+      lsrc1_inc := idx >> 3
+    }.elsewhen (ctrl.funct6 === "b010100".U) { //VMUNARY0
+      lsrc1_inc := 0.U
+    }.otherwise {
+      lsrc1_inc := idx
+    }
+
+    val lsrc0_inc =             //vcompress
+          Mux(ctrl.redu || (ctrl.funct6 === "b010111".U && ctrl.funct3 === 2.U), 0.U, 
+          Mux(ctrl.widen || ctrl.widen2 || ctrl.narrow, idx >> 1, idx))
+
+    val ldest_inc = Wire(UInt(3.W))
+    //ToDo: add ldst idex inc
+    //when (ldstCtrlReg(i).indexed && ctrl.isLdst) {
+    //  ldest_inc := sewSide_inc
+    when (ctrl.narrow) {
+      ldest_inc := idx >> 1
+    }.elsewhen (ctrl.redu || ctrl.narrow_to_1) {
+      ldest_inc := 0.U
+    }.otherwise {
+      ldest_inc := idx
+    }
+
+    //object Vlmul_to_lmul {
+    //// vlmul --> LMUL --> max(LMUL, 1)
+    //// Note: set result to 1 if LMUL < 1
+    //    def apply(vlmul: UInt): UInt = {
+    //        val y0 = !vlmul(1) && !vlmul(0) || vlmul(2)
+    //        val y1 = !vlmul(2) && !vlmul(1) && vlmul(0)
+    //        val y2 = !vlmul(2) && vlmul(1) && !vlmul(0)
+    //        val y3 = !vlmul(2) && vlmul(1) && vlmul(0)
+    //        Cat(y3, y2, y1, y0)
+    //    }
+    //}
+//
+    //val expdLen = Wire(UInt(4.W))
+    ////val lmul = Vlmul_to_lmul(info.vlmul)
+    //val lmul = info.vlmul
+    //when (ctrl.widen || ctrl.widen2 || ctrl.narrow) {
+    //  expdLen := Mux(info.vlmul(2), 1.U, lmul << 1)  // If lmul < 1, expdLen = 1 for widen/narrow
+    //}.elsewhen (ctrl.funct6 === "b100111".U && ctrl.funct3 === "b011".U) {//Whole register move
+    //  expdLen := ctrl.lsrc(0)(2, 0) +& 1.U
+    //}.otherwise {
+    //  expdLen := lmul
+    //}
+    //io.out.mUopRegAttr.expdLen := expdLen
+    ////
+
+    //ToDo: redu, widen2,narrow_to_1 need to be add
+    val regBackWidth = UInt(3.W)
+    when(ctrl.widen) {
+        io.out.mUopRegAttr.regBackWidth := "b111".U
+        io.out.mUopRegAttr.regWriteMuopIdx  := 0.U
+    }.elsewhen(ctrl.narrow) {
+        io.out.mUopRegAttr.regBackWidth := "b11".U
+        io.out.mUopRegAttr.regWriteMuopIdx  := idx(0)
+    }.otherwise{
+        io.out.mUopRegAttr.regBackWidth := "b111".U
+        io.out.mUopRegAttr.regWriteMuopIdx  := 0.U       
+    }
 
     when (currentState === empty && io.in.decodeIn.valid){
 
-        io.out.toRegFile.bits.rfReadEn(0)  := io.in.decodeIn.bits.vCtrl.lsrcVal(0)
-        io.out.toRegFile.bits.rfReadEn(1)  := io.in.decodeIn.bits.vCtrl.lsrcVal(1)
-        io.out.toRegFile.bits.rfReadIdx(0) := io.in.decodeIn.bits.vCtrl.lsrc(0) + idx
-        io.out.toRegFile.bits.rfReadIdx(1) := io.in.decodeIn.bits.vCtrl.lsrc(1) + idx
-        io.out.toRegFile.bits.rfWriteEn    := false.B
-        io.out.toRegFile.bits.rfWriteIdx   := DontCare
-        io.out.toRegFile.bits.rfWriteData  := DontCare
-        io.out.toRegFile.bits.vxsat        := false.B
-        io.out.toRegFile.valid             := io.out.toRegFile.bits.rfReadEn.reduce(_ || _)
+        io.out.toRegFile.rfReadEn(0)  := io.in.decodeIn.bits.vCtrl.lsrcVal(0)
+        io.out.toRegFile.rfReadEn(1)  := io.in.decodeIn.bits.vCtrl.lsrcVal(1)
+        io.out.toRegFile.rfReadIdx(0) := io.in.decodeIn.bits.vCtrl.lsrc(0) + lsrc0_inc
+        io.out.toRegFile.rfReadIdx(1) := io.in.decodeIn.bits.vCtrl.lsrc(1) + lsrc1_inc
+        //io.out.toRegFile.bits.rfWriteEn    := false.B
+        //io.out.toRegFile.bits.rfWriteIdx   := DontCare
+        //io.out.toRegFile.bits.rfWriteData  := DontCare
+        //io.out.toRegFile.vxsat        := false.B
+        //io.out.toRegFile.valid             := io.out.toRegFile.bits.rfReadEn.reduce(_ || _)
 
         io.out.mUop.valid := true.B       
         io.out.mUop.bits.uop.uopIdx := idx
@@ -113,7 +185,7 @@ class UopQueue(implicit p : Parameters) extends Module {
         io.out.mUop.bits.uopAttribute.ldest            := io.in.decodeIn.bits.vCtrl.ldest + idx
 
         io.out.mUop.bits.uopRegInfo.rfWriteEn := io.in.decodeIn.bits.vCtrl.ldestVal
-        //io.out.bits.uopRegInfo.vxsat     := io.in.decodeIn.bits.toReg.bits.vxsat
+        io.out.mUop.bits.uopRegInfo.vxsat     := false.B
         io.out.mUop.bits.uopRegInfo.vs1       := 0.U
         io.out.mUop.bits.uopRegInfo.vs2       := 0.U
         idx := idx + 1.U
@@ -148,13 +220,21 @@ class UopQueue(implicit p : Parameters) extends Module {
         //TODO: different inst type has different methods.
         //TODO: when is widen, the ldest = ldest + idx
         //TODO: when is narrow, two adjacent has same idx
-        io.out.mUop.bits.uopAttribute.ldest            := vCtrl(0).ldest + idx
+        io.out.mUop.bits.uopAttribute.ldest   := vCtrl(0).ldest + ldest_inc
 
         io.out.mUop.bits.uopRegInfo           := uopRegInfo(0)
+
+        io.out.toRegFile.rfReadEn(0)          := vCtrl(0).lsrcVal(0)
+        io.out.toRegFile.rfReadEn(1)          := vCtrl(0).lsrcVal(1)
+        io.out.toRegFile.rfReadIdx(0)         := vCtrl(0).lsrc(0) + lsrc0_inc
+        io.out.toRegFile.rfReadIdx(1)         := vCtrl(0).lsrc(1) + lsrc1_inc
+
         idx := idx + 1.U
     }.otherwise{
         io.out.mUop.valid := false.B
         io.out.mUop.bits := 0.U.asTypeOf(new UopQueueOutput)
+        io.out.mUopRegAttr := 0.U.asTypeOf(new MUopRegAttr)
+        io.out.toRegFile := 0.U.asTypeOf(new regReadIn)
     }
 
     when (currentState === empty && io.in.decodeIn.valid && io.in.decodeIn.bits.vInfo.vlmul === 1.U){

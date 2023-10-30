@@ -6,18 +6,22 @@ import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import SmartParam._
 
 
-class VIexOutput(implicit p: Parameters) extends Bundle{
-  val toReg = ValidIO(new regIn)
+class regReadIn(implicit p: Parameters) extends Bundle {
+  val rfReadEn = Vec(2,Bool())
+  //val rfWriteEn = Bool()
+  val rfReadIdx = Vec(2,UInt(5.W))
+  //val rfWriteIdx = UInt(5.W)
+  //val rfWriteData = UInt(VLEN.W)
+  //val vxsat = Bool()
 }
 
-
-class regIn(implicit p: Parameters) extends Bundle {
-  val rfReadEn = Vec(2,Bool())
+class regWriteIn(implicit p: Parameters) extends Bundle {
+  //val rfReadEn = Vec(2,Bool())
   val rfWriteEn = Bool()
-  val rfReadIdx = Vec(2,UInt(5.W))
+  //val rfReadIdx = Vec(2,UInt(5.W))
   val rfWriteIdx = UInt(5.W)
   val rfWriteData = UInt(VLEN.W)
-  val vxsat = Bool()
+  //val vxsat = Bool()
 }
 
 class regOut extends Bundle{

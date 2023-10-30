@@ -11,8 +11,10 @@ import SmartParam._
 class SVRegFileWrapper(implicit p : Parameters) extends Module{ 
 
     val io = IO(new Bundle{
-        val config = new SmartParameters {}
-        val in = Input(new regIn)
+        val in = new Bundle{
+            val readIn = Input(new regReadIn)
+            val writeIn = Input(new regWriteIn)
+        }
         val out = Output(new regOut)
     })
 
@@ -22,17 +24,17 @@ class SVRegFileWrapper(implicit p : Parameters) extends Module{
     val regFile = Module(new SVRegFile(nVRFReadPorts, nVRFWritePorts))
 
     val writeData = Wire(Vec(NLanes, UInt((VLEN/NLanes).W)))
-    writeData(0) := io.in.rfWriteData(63,0)
-    writeData(1) := io.in.rfWriteData(127, 64)  
+    writeData(0) := io.in.writeIn.rfWriteData(63,0)
+    writeData(1) := io.in.writeIn.rfWriteData(127, 64)  
     
-    regFile.io.write(0).wen  := io.in.rfWriteEn
-    regFile.io.write(0).addr := io.in.rfWriteIdx
+    regFile.io.write(0).wen  := io.in.writeIn.rfWriteEn
+    regFile.io.write(0).addr := io.in.writeIn.rfWriteIdx
     regFile.io.write(0).data := writeData
 
-    regFile.io.read(0).ren  := io.in.rfReadEn(0)
-    regFile.io.read(1).ren  := io.in.rfReadEn(1)
-    regFile.io.read(0).addr := io.in.rfReadIdx(0)
-    regFile.io.read(1).addr := io.in.rfReadIdx(1)
+    regFile.io.read(0).ren  := io.in.readIn.rfReadEn(0)
+    regFile.io.read(1).ren  := io.in.readIn.rfReadEn(1)
+    regFile.io.read(0).addr := io.in.readIn.rfReadIdx(0)
+    regFile.io.read(1).addr := io.in.readIn.rfReadIdx(1)
 
     val regWriteDone = RegInit(false.B)
 
@@ -40,8 +42,8 @@ class SVRegFileWrapper(implicit p : Parameters) extends Module{
     regWriteDone := regFile.io.write(0).wen
 
     io.out.writeDone := regWriteDone
-    io.out.readVld(0) := RegNext(io.in.rfReadEn(0))
-    io.out.readVld(1) := RegNext(io.in.rfReadEn(1))
+    io.out.readVld(0) := RegNext(io.in.readIn.rfReadEn(0))
+    io.out.readVld(1) := RegNext(io.in.readIn.rfReadEn(1))
     io.out.readData(0) := Cat(regFile.io.read(0).data(1), regFile.io.read(0).data(0))
     io.out.readData(1) := Cat(regFile.io.read(1).data(1), regFile.io.read(1).data(0))
 }

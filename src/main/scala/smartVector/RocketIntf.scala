@@ -39,7 +39,7 @@ class RVUMemory extends Bundle {
 
 class RVUCommit extends Bundle {
     val commit_vld      = Output(Bool())
-    val return_data_vld = Output(Bool())
+    val return_data_vld = Output(Bool()) // need to update scalar rf
     val return_data     = Output(UInt(64.W))
     val return_reg_idx  = Output(UInt(5.W))
     val exception_vld   = Output(Bool())

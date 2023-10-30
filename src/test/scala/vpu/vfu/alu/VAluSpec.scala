@@ -12,12 +12,6 @@ import chipsalliance.rocketchip.config.Parameters
 import xiangshan._
 import smartVector._
 
-class RVUTestResult extends Bundle {
-    val commit_vld   = Output(Bool())
-    val alu_data     = Output(UInt(128.W))
-    //val reg_data     = Output(UInt(128.W))
-}
-
 class VAluWrapper extends Module {
   implicit val p = Parameters.empty.alterPartial({case VFuParamsKey => VFuParameters()
                                                   case XSCoreParamsKey => XSCoreParameters()})
@@ -35,22 +29,29 @@ class VAluWrapper extends Module {
   io.in.ready := io.out.ready
 }
 
+class RVUTestResult extends Bundle {
+    val commit_vld   = Output(Bool())
+    val alu_data     = Output(UInt(128.W))
+    //val reg_data     = Output(UInt(128.W))
+}
 class SmartVectorWrapper extends Module {
   implicit val p = Parameters.empty.alterPartial({case VFuParamsKey => VFuParameters()
                                                   case XSCoreParamsKey => XSCoreParameters()})
 
   val io = IO(new Bundle {
     val in =  Flipped(Decoupled(new RVUissue))
-    val out = Decoupled(new RVUTestResult)
+    val out = Output(new Bundle{
+            val rvuCommit = new RVUCommit
+            val rvuExtra  = new RVUExtra
+        })
   })
   val smartVector = Module(new SmartVector)
 
   smartVector.io.in <> io.in
   //smartVector.io.in.valid := io.in.valid
 
-  io.out.bits := smartVector.io.out
-  io.out.valid := true.B
-
+  io.out := smartVector.io.out
+  
   
 }
 
@@ -1041,7 +1042,12 @@ trait VAluBehavior {
         //----- Input gen -----
         val inputSeq = Seq(
           // 16.1 16.2
-          genRVUissue("b01011110000000001100000011010111".U, Smartvmvxs),
+          //vmv.v.x
+          //genRVUissue("b01011110000000101100000011010111".U, Smartvmvxs),
+          //vmv.v.v
+          //genRVUissue("b01011110000000100000001011010111".U, Smartvmvxs),
+          //vwaddu.v.v
+          genRVUissue("b11000000011101101010110001010111".U, Smartvmvxs),
         )
 
         //----- Output expectation -----
@@ -1056,7 +1062,7 @@ trait VAluBehavior {
         }.fork {
           // dut.io.out.expectDequeueSeq(outputSeq)
         }.join()
-        dut.clock.step(100)
+        dut.clock.step(10)
         dut.clock.setTimeout(0)
       }
     }
