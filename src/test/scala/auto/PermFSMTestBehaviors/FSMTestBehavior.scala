@@ -170,7 +170,7 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
                 fsmSrcBundle,
                 fsmCtrl
             ))
-            dut.io.redirect.poke(genFSMRedirect((robIdxValid, true, 0)))
+            dut.io.redirect.poke(genFSMRedirect((robIdxValid, robIdxValid, 0)))
 
             // Stage 2.4: see if any wb value is there to be written =============
             val fsm_wb_vld = dut.io.out.wb_vld.peek().litValue.toInt
