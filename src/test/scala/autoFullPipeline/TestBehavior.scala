@@ -34,16 +34,17 @@ object TestCase {
     }
 }
 
-class TestCase(val ctrlBundles : Seq[CtrlBundle], val expectvd : Array[String]) {
+class TestCase(
+        val ctrlBundles : Seq[CtrlBundle], 
+        val expectvd : Array[String], 
+        val checkRes : (String, Array[String], Int) => (Boolean, Boolean) 
+        // (dut vd, expectvd, uopIdx) => (correctness, isCompleted)
+    ) {
     var srcBundles : Seq[SrcBundle] = Seq()
     var fsmSrcBundles : Seq[FSMSrcBundle] = Seq()
 
     var isFSM : Boolean = false
     var uopIx = 0
-
-    def isCompleted() = {
-        return this.uopIx == this.ctrlBundles.length
-    }
 
     def nextVfuInput() = {
         if (this.isFSM) println("ERROR: generating normal input for FSM test case")
@@ -73,21 +74,25 @@ class TestCase(val ctrlBundles : Seq[CtrlBundle], val expectvd : Array[String]) 
 
 abstract class TestBehavior(filename : String, ctrlBundle : TestCtrlBundleBase, sign : String, instid : String) extends BundleGenHelper {
 
-    var lmulLsOneDone : Boolean = false
-    var inputMap : Seq[Map[String, String]] = Seq()
+    var inputMaps : Seq[Map[String, String]] = Seq()
     var inputMapCurIx = 0
 
-    def setLmulLsOneDone() = {lmulLsOneDone = true}
-    def getLmulLsOneDone() = lmulLsOneDone
+    var testResult = true
 
     def getTestfilePath() : String              = Datapath.testdataRoot + filename
     def getCtrlBundle() : TestCtrlBundleBase    = ctrlBundle
-    def getSign() : String                      = sign
     def getInstid() : String                    = instid
 
     // full pipeline
     def getTargetTestEngine(): Int = ALU_TEST_ENGINE
-    def isOrdered(): Boolean = false
+    def isOrdered(): Boolean = {
+        println(s"!!!!!!!! $instid not specified isOrdered")
+    }
+    def recordFail() = {this.testResult = false}
+    def recordSuccess() = {this.testResult = true}
+    def isFinished() = {
+        return this.inputMapCurIx >= this.inputMaps.length
+    }
     
     def getDut() : Module               = {
         val dut = new VAluWrapper
@@ -168,7 +173,7 @@ abstract class TestBehavior(filename : String, ctrlBundle : TestCtrlBundleBase, 
                 
                 val keymap = ReadTxt.KeyFileUtil(key.slice(startingIndex, startingIndex + each_asisgned_lines))
 
-                this.inputMap = keymap
+                this.inputMaps = keymap
             }
         } else {
             println(s"Data file does not exist for instruction: ${tb.getInstid()} , skipping")
@@ -177,18 +182,20 @@ abstract class TestBehavior(filename : String, ctrlBundle : TestCtrlBundleBase, 
     }
 
     def getNextTestCase() = {
-        if (this.inputMap.length == 0) {
+        if (this.inputMaps.length == 0) {
             this._readInputsToMap()
         }
 
-        return this._getNextTestCase()
+        val testCase = this._getNextTestCase(this.inputMaps(this.inputMapCurIx))
+        this.inputMapCurIx += 1
+
+        return testCase
     }
 
-    def _getNextTestCase() = {
+    def _getNextTestCase(simi : Map[String, String]) = {
+        // TODO generate test case
         println("!!!!!! called unimplemented _getNextTestCase()!!")
     }
-
-    def verifyVd() = {}
 
     /*def test_init(dut : Module) {
         dut match {
