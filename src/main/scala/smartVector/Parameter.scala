@@ -23,7 +23,7 @@ trait smartParas {
   val bVstart: Int = bVL - 1
   val bVSTART = bVL 
   val VPRegIdxWidth = 5
-  val NVPhyRegs = 1
+  val NVPhyRegs = 32
   val NLanes = 2
   val LaneWidth = 64
 }

@@ -182,7 +182,7 @@ class UopQueue(implicit p : Parameters) extends Module {
         //TODO: different inst type has different methods.
         //TODO: when is widen, the ldest = ldest + idx
         //TODO: when is narrow, two adjacent has same idx
-        io.out.mUop.bits.uopAttribute.ldest            := io.in.decodeIn.bits.vCtrl.ldest + idx
+        io.out.mUop.bits.uopAttribute.ldest            := io.in.decodeIn.bits.vCtrl.ldest + ldest_inc
 
         io.out.mUop.bits.uopRegInfo.rfWriteEn := io.in.decodeIn.bits.vCtrl.ldestVal
         io.out.mUop.bits.uopRegInfo.vxsat     := false.B

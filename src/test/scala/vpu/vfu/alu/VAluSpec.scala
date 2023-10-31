@@ -1047,7 +1047,9 @@ trait VAluBehavior {
           //vmv.v.v
           //genRVUissue("b01011110000000100000001011010111".U, Smartvmvxs),
           //vwaddu.v.v
-          genRVUissue("b11000000011101101010110001010111".U, Smartvmvxs),
+          genRVUissue("b01011110000000001011000101010111".U, Smartvmvxs),
+          genRVUissue("b01011110000000010011001101010111".U, Smartvmvxs),
+          genRVUissue("b00000000001000110000011101010111".U, Smartvmvxs),
         )
 
         //----- Output expectation -----
