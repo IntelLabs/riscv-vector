@@ -1,7 +1,7 @@
-vslideup_vx
-vslidedown_vx
 vslide1up_vx
 vslide1down_vx
+vslideup_vx
+vslidedown_vx
 vrgather_vv
 vrgather_vx
 vrgatherei16_vv

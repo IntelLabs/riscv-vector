@@ -67,7 +67,7 @@ for i in $(seq 0 "$N_PROCESSES"); do
     if [ -f "$inst_file" ]; then
         pushd . > /dev/null
         cd ../../../../../..
-        sbt -J-XX:+UseG1GC -J-Xms2g -J-Xmx32g -Dinsfile="$inst_file_path" \
+        sbt -J-XX:+UseG1GC -J-Xms4g -J-Xmx8g -Dinsfile="$inst_file_path" \
             -DincorrInsts="$incorrect_inst_file_path" \
             -DdoneInsts="$done_inst_file_path" \
             -DincorrDataDire="./src/test/scala/auto/AutoTestRes/$foldername/incorrectData/" \

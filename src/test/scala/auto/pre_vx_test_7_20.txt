@@ -1,3 +1,0 @@
-vmsgtu_vx
-vmslt_vv
-vmadc_vvm

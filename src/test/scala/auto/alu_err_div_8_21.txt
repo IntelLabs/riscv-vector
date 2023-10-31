@@ -1,6 +1,0 @@
-vnclip_wx
-vnclipu_wx
-vnclip_wi
-vnclipu_wi
-vnsrl_wi
-vnsra_wi
