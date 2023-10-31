@@ -35,8 +35,8 @@ object TestCase {
 }
 
 class TestCase(val ctrlBundles : Seq[CtrlBundle], val expectvd : Array[String]) {
-    var srcBundles : Seq[SrcBundle]
-    var fsmSrcBundles : Seq[FSMSrcBundle]
+    var srcBundles : Seq[SrcBundle] = Seq()
+    var fsmSrcBundles : Seq[FSMSrcBundle] = Seq()
 
     var isFSM : Boolean = false
     var uopIx = 0
@@ -188,7 +188,7 @@ abstract class TestBehavior(filename : String, ctrlBundle : TestCtrlBundleBase, 
         println("!!!!!! called unimplemented _getNextTestCase()!!")
     }
 
-    def verifyVd()
+    def verifyVd() = {}
 
     /*def test_init(dut : Module) {
         dut match {
