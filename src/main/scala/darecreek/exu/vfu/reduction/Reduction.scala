@@ -106,7 +106,7 @@ class Reduction(implicit p: Parameters) extends VFuModule {
   val vs10_zero = RegInit(0.U(64.W))
   val vs10_zero_logical = RegInit(0.U(64.W))
   val vd_logical = Wire(Vec(4, UInt(64.W)))
-  val sum_vd = Wire(UInt(64.W))
+ // val sum_vd = Wire(UInt(64.W))
   val logical_vd = Cat(0.U((VLEN - 64).W), vd_logical(~reg_vd_vsew(1, 0)))
   val red_vd = Wire(UInt(VLEN.W))
 
@@ -176,10 +176,15 @@ class Reduction(implicit p: Parameters) extends VFuModule {
   val vs2m_bytes_sew32 = Wire(Vec(VLENB, UInt(8.W)))
   val vs2m_bytes_sew64 = Wire(Vec(VLENB, UInt(8.W)))
   val vs2m_bits = Wire(UInt((2 * VLEN).W))
-  val vs2m_bits_sew8 = RegEnable(Cat(vs2m_bytes_sew8.reverse), 0.U, fire)
-  val vs2m_bits_sew16 = RegEnable(Cat(vs2m_bytes_sew16.reverse), 0.U, fire)
-  val vs2m_bits_sew32 = RegEnable(Cat(vs2m_bytes_sew32.reverse), 0.U, fire)
-  val vs2m_bits_sew64 = RegEnable(Cat(vs2m_bytes_sew64.reverse), 0.U, fire)
+  val reg_vs2m_bits = RegEnable(vs2m_bits, 0.U, fire)
+  val vs2m_bits_sew8 = Cat(vs2m_bytes_sew8.reverse)
+  val vs2m_bits_sew16 = Cat(vs2m_bytes_sew16.reverse)
+  val vs2m_bits_sew32 = Cat(vs2m_bytes_sew32.reverse)
+  val vs2m_bits_sew64 = Cat(vs2m_bytes_sew64.reverse)
+  val reg_vs2m_bits_sew8 = RegEnable(vs2m_bits_sew8, 0.U, fire)
+  val reg_vs2m_bits_sew16 = RegEnable(vs2m_bits_sew16, 0.U, fire)
+  val reg_vs2m_bits_sew32 = RegEnable(vs2m_bits_sew32, 0.U, fire)
+  val reg_vs2m_bits_sew64 = RegEnable(vs2m_bits_sew64, 0.U, fire)
 
   for (i <- 0 until VLENB) {
     vs2m_bytes_sew8(i) := vs2_bytes(i)
@@ -225,13 +230,15 @@ class Reduction(implicit p: Parameters) extends VFuModule {
   }
 
   val vs2m_bits_widen = Wire(UInt((2 * VLEN).W))
+  val reg_vs2m_bits_widen = RegEnable(vs2m_bits_widen, 0.U, fire)
+
 
   // Widen
-  val vs_hi_widen = Mux1H(reg_eew.oneHot(2, 0), Seq(8, 16, 32).map(sew =>
-    Cat(UIntSplit(vs2m_bits(127, 64), sew).map(BitsExtend(_, 2 * sew, reg_signed)).reverse)))
-  val vs_lo_widen = Mux1H(reg_eew.oneHot(2, 0), Seq(8, 16, 32).map(sew =>
-    Cat(UIntSplit(vs2m_bits(63, 0), sew).map(BitsExtend(_, 2 * sew, reg_signed)).reverse)))
-  vs2m_bits_widen := Mux(reg_widen, Cat(vs_hi_widen, vs_lo_widen), Cat(0.U(VLEN.W), vs2m_bits))
+  val vs_hi_widen = Mux1H(eew.oneHot(2, 0), Seq(8, 16, 32).map(sew =>
+    Cat(UIntSplit(vs2m_bits(127, 64), sew).map(BitsExtend(_, 2 * sew, signed)).reverse)))
+  val vs_lo_widen = Mux1H(eew.oneHot(2, 0), Seq(8, 16, 32).map(sew =>
+    Cat(UIntSplit(vs2m_bits(63, 0), sew).map(BitsExtend(_, 2 * sew, signed)).reverse)))
+  vs2m_bits_widen := Mux(widen, Cat(vs_hi_widen, vs_lo_widen), Cat(0.U(VLEN.W), vs2m_bits))
 
   vs10_zero := Mux1H(eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 0.U), vs1(n - 1, 0))) :+ vs1(63, 0))
 
@@ -240,11 +247,11 @@ class Reduction(implicit p: Parameters) extends VFuModule {
     vs10_zero_logical := Mux1H(eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 1.U), vs1(n - 1, 0))) :+ vs1(63, 0))
   }
 
-  red_zero := Mux1H(eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 0.U), red_vd(n - 1, 0))) :+ red_vd(63, 0))
+  red_zero := Mux1H(reg_eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 0.U), red_vd(n - 1, 0))) :+ red_vd(63, 0))
 
-  red_zero_logical := Mux1H(eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 0.U), red_vd(n - 1, 0))) :+ red_vd(63, 0))
-  when(vredand_vs) {
-    red_zero_logical := Mux1H(eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 1.U), red_vd(n - 1, 0))) :+ red_vd(63, 0))
+  red_zero_logical := Mux1H(reg_eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 0.U), red_vd(n - 1, 0))) :+ red_vd(63, 0))
+  when(reg_vredand_vs) {
+    red_zero_logical := Mux1H(reg_eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 1.U), red_vd(n - 1, 0))) :+ red_vd(63, 0))
   }
 
   vs1_zero := Mux(reg_uopIdx === 0.U, vs10_zero, red_zero)
@@ -255,11 +262,11 @@ class Reduction(implicit p: Parameters) extends VFuModule {
   }
 
   when(reg_vredand_vs) {
-    vd_logical(0) := vs1_zero_logical & vs2m_bits(127, 64) & vs2m_bits(63, 0)
+    vd_logical(0) := vs1_zero_logical & reg_vs2m_bits(127, 64) & reg_vs2m_bits(63, 0)
   }.elsewhen(reg_vredor_vs) {
-    vd_logical(0) := vs1_zero_logical | vs2m_bits(127, 64) | vs2m_bits(63, 0)
+    vd_logical(0) := vs1_zero_logical | reg_vs2m_bits(127, 64) | reg_vs2m_bits(63, 0)
   }.elsewhen(reg_vredxor_vs) {
-    vd_logical(0) := vs1_zero_logical ^ vs2m_bits(127, 64) ^ vs2m_bits(63, 0)
+    vd_logical(0) := vs1_zero_logical ^ reg_vs2m_bits(127, 64) ^ reg_vs2m_bits(63, 0)
   }
 
   when(reg_vredand_vs) {
@@ -293,12 +300,12 @@ class Reduction(implicit p: Parameters) extends VFuModule {
   val vd_sew64 = Wire(UInt(64.W))
 
   val csa_3to2_sew64_0 = Module(new CSA3to2(width = 64))
-  csa_3to2_sew64_0.io.in_a := vs2m_bits_widen(63, 0)
-  csa_3to2_sew64_0.io.in_b := vs2m_bits_widen(127, 64)
-  csa_3to2_sew64_0.io.in_c := vs2m_bits_widen(191, 128)
+  csa_3to2_sew64_0.io.in_a := reg_vs2m_bits_widen(63, 0)
+  csa_3to2_sew64_0.io.in_b := reg_vs2m_bits_widen(127, 64)
+  csa_3to2_sew64_0.io.in_c := reg_vs2m_bits_widen(191, 128)
   sum_sew64(0) := csa_3to2_sew64_0.io.out_sum
   carry_sew64(0) := csa_3to2_sew64_0.io.out_car
-  sum_add_sew64 := vs2m_bits_widen(255, 192) + vs1_zero(63, 0)
+  sum_add_sew64 := reg_vs2m_bits_widen(255, 192) + vs1_zero(63, 0)
 
   val csa_3to2_sew64_1 = Module(new CSA3to2(width = 64))
   csa_3to2_sew64_1.io.in_a := sum_sew64(0)
@@ -306,7 +313,7 @@ class Reduction(implicit p: Parameters) extends VFuModule {
   csa_3to2_sew64_1.io.in_c := sum_add_sew64
   sum_sew64(1) := csa_3to2_sew64_1.io.out_sum
   carry_sew64(1) := csa_3to2_sew64_1.io.out_car
-  vd_sew64 := vd_reg(127, 64) + vd_reg(63, 0)
+  vd_sew64 := sum_sew64(1) + carry_sew64(1)
 
   // sew32 sum
   val sum0_sew32 = Wire(Vec(3, UInt(32.W)))
@@ -317,9 +324,9 @@ class Reduction(implicit p: Parameters) extends VFuModule {
   val carry2_sew32 = Wire(UInt(32.W))
   val vd_sew32 = Wire(UInt(32.W))
 
-  val in0_sew32 = Cat(vs1_zero(31, 0), vs2m_bits_widen(255, 0))
+  val in0_sew32 = Cat(vs1_zero(31, 0), reg_vs2m_bits_widen(255, 0))
   val in1_sew32 = Cat(Cat(sum0_sew32.reverse), Cat(carry0_sew32.reverse))
-  val in2_sew32 = vd_reg
+  val in2_sew32 = Cat(Cat(sum1_sew32.reverse), Cat(carry1_sew32.reverse))
 
   for (i <- 0 until 3) {
     val csa_3to2_sew32 = Module(new CSA3to2(width = 32))
@@ -359,10 +366,10 @@ class Reduction(implicit p: Parameters) extends VFuModule {
   val carry3_sew16 = Wire(UInt(16.W))
   val vd_sew16 = Wire(UInt(16.W))
 
-  val in0_sew16 = vs2m_bits_widen
+  val in0_sew16 = reg_vs2m_bits_widen
   val in1_sew16 = Cat(vs1_zero(15, 0), Cat(sum0_sew16.reverse), Cat(carry0_sew16.reverse))
   val in2_sew16 = Cat(Cat(sum1_sew16.reverse), Cat(carry1_sew16.reverse))
-  val in3_sew16 = vd_reg
+  val in3_sew16 = Cat(Cat(sum2_sew16.reverse), Cat(carry2_sew16.reverse))
 
   for (i <- 0 until 4) {
     val csa_4to2_sew16 = Module(new CSA4to2(width = 16))
@@ -412,10 +419,10 @@ class Reduction(implicit p: Parameters) extends VFuModule {
   val carry3_sew8 = Wire(UInt(8.W))
   val vd_sew8 = Wire(UInt(8.W))
 
-  val in0_sew8 = vs2m_bits_sew8(127, 0)
+  val in0_sew8 = reg_vs2m_bits_sew8(127, 0)
   val in1_sew8 = Cat(vs1_zero(7, 0), Cat(sum0_sew8.reverse), Cat(carry0_sew8.reverse))
   val in2_sew8 = Cat(Cat(sum1_sew8.reverse), Cat(carry1_sew8.reverse))
-  val in3_sew8 = vd_reg
+  val in3_sew8 = Cat(Cat(sum2_sew8.reverse), Cat(carry2_sew8.reverse))
 
   for (i <- 0 until 4) {
     val csa_4to2_sew8 = Module(new CSA4to2(width = 8))
@@ -458,8 +465,8 @@ class Reduction(implicit p: Parameters) extends VFuModule {
   val vd_max_sew64 = Wire(UInt(64.W))
 
   val compare_3to1_sew64 = Module(new compare_3to1(w = 64))
-  compare_3to1_sew64.io.a := vs2m_bits_sew64(63, 0)
-  compare_3to1_sew64.io.b := vs2m_bits_sew64(127, 64)
+  compare_3to1_sew64.io.a := reg_vs2m_bits_sew64(63, 0)
+  compare_3to1_sew64.io.b := reg_vs2m_bits_sew64(127, 64)
   compare_3to1_sew64.io.c := vs1_zero
   compare_3to1_sew64.io.max := reg_is_max
   compare_3to1_sew64.io.signed := reg_signed
@@ -470,15 +477,15 @@ class Reduction(implicit p: Parameters) extends VFuModule {
   val vd1_max_sew32 = Wire(UInt(32.W))
 
   val compare_3to1_sew32 = Module(new compare_3to1(w = 32))
-  compare_3to1_sew32.io.a := vs2m_bits_sew32(31, 0)
-  compare_3to1_sew32.io.b := vs2m_bits_sew32(63, 32)
-  compare_3to1_sew32.io.c := vs2m_bits_sew32(95, 64)
+  compare_3to1_sew32.io.a := reg_vs2m_bits_sew32(31, 0)
+  compare_3to1_sew32.io.b := reg_vs2m_bits_sew32(63, 32)
+  compare_3to1_sew32.io.c := reg_vs2m_bits_sew32(95, 64)
   compare_3to1_sew32.io.max := reg_is_max
   compare_3to1_sew32.io.signed := reg_signed
   vd0_max_sew32(0) := compare_3to1_sew32.io.d
 
   val compare0_2to1_sew32 = Module(new compare_2to1(w = 32))
-  compare0_2to1_sew32.io.a := vs2m_bits_sew32(127, 96)
+  compare0_2to1_sew32.io.a := reg_vs2m_bits_sew32(127, 96)
   compare0_2to1_sew32.io.b := vs1_zero(31, 0)
   compare0_2to1_sew32.io.max := reg_is_max
   compare0_2to1_sew32.io.signed := reg_signed
@@ -494,7 +501,7 @@ class Reduction(implicit p: Parameters) extends VFuModule {
   // sew16 max/min
   val vd0_max_sew16 = Wire(Vec(3, UInt(16.W)))
   val vd1_max_sew16 = Wire(UInt(16.W))
-  val in0_max_sew16 = Cat(vs1_zero(15, 0), vs2m_bits_sew16(127, 0))
+  val in0_max_sew16 = Cat(vs1_zero(15, 0), reg_vs2m_bits_sew16(127, 0))
 
   for (i <- 0 until 3) {
     val compare_3to1_sew16 = Module(new compare_3to1(w = 16))
@@ -523,16 +530,16 @@ class Reduction(implicit p: Parameters) extends VFuModule {
 
   for (i <- 0 until 5) {
     val compare_3to1_sew8 = Module(new compare_3to1(w = 8))
-    compare_3to1_sew8.io.a := vs2m_bits_sew8(24 * i + 7, 24 * i + 0)
-    compare_3to1_sew8.io.b := vs2m_bits_sew8(24 * i + 15, 24 * i + 8)
-    compare_3to1_sew8.io.c := vs2m_bits_sew8(24 * i + 23, 24 * i + 16)
+    compare_3to1_sew8.io.a := reg_vs2m_bits_sew8(24 * i + 7, 24 * i + 0)
+    compare_3to1_sew8.io.b := reg_vs2m_bits_sew8(24 * i + 15, 24 * i + 8)
+    compare_3to1_sew8.io.c := reg_vs2m_bits_sew8(24 * i + 23, 24 * i + 16)
     compare_3to1_sew8.io.max := reg_is_max
     compare_3to1_sew8.io.signed := reg_signed
     vd0_max_sew8(i) := compare_3to1_sew8.io.d
   }
 
   val compare0_2to1_sew8 = Module(new compare_2to1(w = 8))
-  compare0_2to1_sew8.io.a := vs2m_bits_sew8(127, 120)
+  compare0_2to1_sew8.io.a := reg_vs2m_bits_sew8(127, 120)
   compare0_2to1_sew8.io.b := vs1_zero(7, 0)
   compare0_2to1_sew8.io.max := reg_is_max
   compare0_2to1_sew8.io.signed := reg_signed
@@ -555,14 +562,14 @@ class Reduction(implicit p: Parameters) extends VFuModule {
   compare1_2to1_sew8.io.signed := reg_signed
   vd2_max_sew8 := compare1_2to1_sew8.io.c
 
-  sum_vd := vd_sew64
-  when(reg2_vd_vsew === 0.U) {
-    sum_vd := vd_sew8
-  }.elsewhen(reg2_vd_vsew === 1.U) {
-    sum_vd := vd_sew16
-  }.elsewhen(reg2_vd_vsew === 2.U) {
-    sum_vd := vd_sew32
-  }
+ // sum_vd := vd_sew64
+ // when(reg2_vd_vsew === 0.U) {
+ //   sum_vd := vd_sew8
+ // }.elsewhen(reg2_vd_vsew === 1.U) {
+ //   sum_vd := vd_sew16
+ // }.elsewhen(reg2_vd_vsew === 2.U) {
+ //   sum_vd := vd_sew32
+ // }
 
   //  max_vd := vd_reg
   //  when(reg2_vd_vsew === 0.U) {
@@ -580,10 +587,11 @@ class Reduction(implicit p: Parameters) extends VFuModule {
   //    red_vd := max_vd
   //  }
 
-  red_vd := sum_vd
-  when(reg_vredand_vs || reg_vredor_vs || reg_vredxor_vs || reg_is_max || reg_is_min) {
-    red_vd := vd_reg
-  }
+  red_vd := vd_reg
+ // red_vd := sum_vd
+ // when(reg_vredand_vs || reg_vredor_vs || reg_vredxor_vs || reg_is_max || reg_is_min) {
+ //   red_vd := vd_reg
+ // }
 
   val red_vd_tail_one = (vd_mask << vd_vsew_bits_reg2) | (red_vd & (vd_mask >> (VLEN.U - vd_vsew_bits_reg2)))
   val red_vd_tail_vd = (old_vd_reg2 & (vd_mask << vd_vsew_bits_reg2)) | (red_vd & (vd_mask >> (VLEN.U - vd_vsew_bits_reg2)))
@@ -605,13 +613,13 @@ class Reduction(implicit p: Parameters) extends VFuModule {
       }
     }.otherwise {
       when(reg_vd_vsew === 0.U) {
-        vd_reg := Cat(Cat(sum2_sew8.reverse), Cat(carry2_sew8.reverse))
+        vd_reg := vd_sew8
       }.elsewhen(reg_vd_vsew === 1.U) {
-        vd_reg := Cat(Cat(sum2_sew16.reverse), Cat(carry2_sew16.reverse))
+        vd_reg := vd_sew16
       }.elsewhen(reg_vd_vsew === 2.U) {
-        vd_reg := Cat(Cat(sum1_sew32.reverse), Cat(carry1_sew32.reverse))
+        vd_reg := vd_sew32
       }.elsewhen(reg_vd_vsew === 3.U) {
-        vd_reg := Cat(sum_sew64(1), carry_sew64(1))
+        vd_reg := vd_sew64
       }
     }
   }
