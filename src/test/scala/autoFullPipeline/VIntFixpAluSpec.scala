@@ -1,5 +1,5 @@
 
-package darecreek.vfuAutotest.alu
+package darecreek.vfuAutotest.fullPipeline
 
 import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
@@ -20,8 +20,7 @@ import scala.concurrent._
 import scala.concurrent.duration._
 import scala.util._
 import ExecutionContext.Implicits.global
-import scala.collection.concurrent.{Map => ConCurMap}
-import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.Map
 import scala.collection.convert.decorateAsScala._
 import java.util.concurrent.ConcurrentHashMap
 
@@ -72,19 +71,22 @@ object ReadTxt {
 
   def KeyFileUtil(array:Array[String]) = {
     var keyMapList = Map[String, String]()
-    var keyMapList2 = Map[Int,Map[String,String]]()
-    var number = 0
+    var keyMapList2 = Seq[Map[String,String]]()
+    // var number = 0
     for (i <- 0 until array.length) {
       val lineArray = array(i).trim.split("=")
       if(lineArray.size==2){
-        keyMapList = keyMapList ++ Map(lineArray(0).trim -> lineArray(1))
-      }else{
-        number = number + 1 
+        keyMapList += (lineArray(0).trim -> lineArray(1))
       }
-      keyMapList2 = keyMapList2 ++ Map(number -> keyMapList)
-      if(lineArray(0).equals("--------------------------test_cnt")) {
+
+      if(lineArray.size != 2 || lineArray(0).equals("--------------------------test_cnt")) {
+        keyMapList2 :+= keyMapList
+        keyMapList = Map[String, String]()
+      }
+      // keyMapList2 = keyMapList2 ++ Map(number -> keyMapList)
+      /*if(lineArray(0).equals("--------------------------test_cnt")) {
         number = number + 1
-      }
+      }*/
     }
     keyMapList2
   }
@@ -93,7 +95,7 @@ object ReadTxt {
 trait VAluBehavior {
   this: AnyFlatSpec with ChiselScalatestTester with BundleGenHelper =>
 
-  def vIntTestAll(sim:Map[Int,Map[String,String]],ctrl:TestCtrlBundleBase,s:String, tb:TestBehavior, j:Int = -1): Unit = {
+  /*def vIntTestAll(sim:Map[Int,Map[String,String]],ctrl:TestCtrlBundleBase,s:String, tb:TestBehavior, j:Int = -1): Unit = {
     var testName = "pass the test: " + tb.getInstid() + " lmul ls 1"
     if (j != -1) testName += s" datasplit $j"
     it should s"$testName" in {
@@ -117,32 +119,24 @@ trait VAluBehavior {
         Dump.recordDone(s"${tb.getInstid()}, lmul <= 1")
       }
     }
-  }
+  }*/
 
-  def vsalu(sim:Map[Int,Map[String,String]], ctrl:TestCtrlBundleBase, s:String, tb:TestBehavior, j:Int = -1): Unit = {
+  def vsalu(sim:Map[Int,Map[String,String]], ctrl:TestCtrlBundleBase, tb:TestBehavior, j:Int = -1): Unit = {
     var testName = "pass the test: " + tb.getInstid() + " lmul gt 1"
     if (j != -1) testName += s" datasplit $j"
     it should s"$testName" in {
       test(tb.getDut()).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-        if (tb.getLmulLsOneDone()) {
-          // assume lmul <= 1 tests are done before
-          tb.test_init(dut)
-        
-          val nameList=sim.map(_._1)
-          println(s"Starting test for ${tb.getInstid()}, lmul > 1")
-          println("test counts:",nameList.max)
-          for(i <- 0 until nameList.max+1){
-            val vflmul = sim(i).get("vflmul").get
-            if((vflmul == "2.000000") || (vflmul == "4.000000") || (vflmul) == "8.000000"){
-              println("lmul > 1, id: ", i)
-              tb.testMultiple(sim(i), ctrl, s, dut)
-            }
-          }
-          println(s"${tb.getInstid()}, lmul > 1 tests are done.")
-          Dump.recordDone(s"${tb.getInstid()}, lmul > 1")
-        } else {
-          println(s"lmulLsOneDone has not been set. Is lmul <= 1 tests failed for ${tb.getInstid()}?")
+        tb.test_init(dut)
+      
+        val nameList=sim.map(_._1)
+        println(s"Starting test for ${tb.getInstid()}")
+        println("test counts:",nameList.max)
+        for(i <- 0 until nameList.max+1){
+          println("test input id: ", i)
+          tb.testMultiple(sim(i), ctrl, s, dut)
         }
+        println(s"${tb.getInstid()}, tests are done.")
+        Dump.recordDone(s"${tb.getInstid()}")
       }
     }
   }
@@ -261,40 +255,6 @@ object Dump {
   }
 }
 
-/*object TestResults {
-
-  case class InstTestRes(
-    inst : String,
-    failed : Boolean = false,
-    fault_dut_out : String = "",
-    fault_golden_out : String = "",
-    fault_fsm_wb_idx : String = "",
-  )
-
-  var results: ConCurMap[String, InstTestRes] = new ConcurrentHashMap().asScala
-
-  def initResults(insts : Array[String]) : Unit = {
-    for(inst <- insts) {
-      results(inst) = InstTestRes(inst)
-    }
-  }
-
-  def addResult(testRes : InstTestRes) : Unit = {
-    results(testRes.inst) = testRes
-  }
-
-  def checkResult(inst : String) : Boolean = {
-    return results(inst).failed
-  }
-
-  def print() : Unit = {
-    println("TestResults: ")
-    results.foreach {
-        case (key, value) => println(s"$key=${value.failed}, ${value.fault_dut_out}")
-    }
-  }
-}*/
-
 object Datapath {
   // val testdataRoot = "/home/maoting/nanhu/testdata/8_23/unittest/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/8_29/unittest/"
@@ -303,8 +263,8 @@ object Datapath {
   // val testdataRoot = "/home/maoting/nanhu/testdata/9_4/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/9_6/unittest/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/10_10/unittest/"
-  val testdataRoot = "/home/maoting/nanhu/testdata/10_13/unittest/"
-  // val testdataRoot = "/home/maoting/nanhu/testdata/debug/"
+  // val testdataRoot = "/home/maoting/nanhu/testdata/10_13/unittest/"
+  val testdataRoot = "/home/maoting/nanhu/testdata/debug/"
   //val testdataRoot = "C:\\kou\\XS_Vector_Unit\\src\\test\\scala\\unittest\\"
   // val testdataRoot = "/home/kou/unittest/"
   // val testdataRoot = "/home/maoting/xs-unittest/testdata/"
@@ -530,21 +490,21 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
   var testInsts : Array[String] = Array()
 
   val param = sys.props.getOrElse("insfile", "")
-  val incorrectInstFile = sys.props.getOrElse("incorrInsts", "")
-  val doneInstFile = sys.props.getOrElse("doneInsts", "")
-  val incorrectInputFile = sys.props.getOrElse("incorrInput", "")
-
-  val incorrectDataDireFile = sys.props.getOrElse("incorrDataDire", "")
-
-  val dataSplitIx = sys.props.getOrElse("dataSplitIx", "0").toInt
-  val dataSplitN = sys.props.getOrElse("dataSplitN", "1").toInt
-  val dataSplitInst = sys.props.getOrElse("dataSplitInst", "")
-
+  val incorrectInstFile = sys.props.getOrElse("incorrInsts", "") // failed instruction names
+  val doneInstFile = sys.props.getOrElse("doneInsts", "") // successfully passed instruction names
+  val incorrectInputFile = sys.props.getOrElse("incorrInput", "") // incorrect inputs in one file
+  val incorrectDataDireFile = sys.props.getOrElse("incorrDataDire", "") // for building data file directly usable
 
   if(!incorrectInputFile.equals("")) Dump.fileName = incorrectInputFile
   if(!incorrectInstFile.equals("")) Dump.incorrectInstFilename = incorrectInstFile
   if(!doneInstFile.equals("")) Dump.doneInstFilename = doneInstFile
   if(!incorrectDataDireFile.equals("")) Dump.updateIncorrDataDire(incorrectDataDireFile)
+
+  // ===================== data split ======================================
+  val dataSplitIx = sys.props.getOrElse("dataSplitIx", "0").toInt
+  val dataSplitN = sys.props.getOrElse("dataSplitN", "1").toInt
+  val dataSplitInst = sys.props.getOrElse("dataSplitInst", "")
+  // =======================================================================
 
   val dataSplitMode : Boolean = !dataSplitInst.equals("")
 
@@ -573,6 +533,25 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
   }
 
   // val futures = new ListBuffer[Future[Unit]]
+
+  // TODO 1. Create Engines
+
+  var testEngineToTB : Array[Seq[TestBehavior]] = Array(Seq(),Seq(),Seq(),Seq(),Seq(),Seq(),Seq())
+  for(i <- 0 until tbs.length) {
+    val testEngineId = tbs(i).getTargetTestEngine()
+    testEngineToTB(testEngineId) :+= tbs(i)
+  }
+
+  var testEngines : Seq[TestEngine] = Seq()
+  for(testEngineId <- 0 until testEngineToTB.length) {
+    if (testEngineToTB(testEngineId).length != 0) {
+      testEngines :+= TestEngine.getEngine(testEngineId)
+    }
+  }
+
+  // TODO 2. Read Files into Maps
+
+
   
   for(i <- 0 until tbs.length) {
     // params
@@ -582,7 +561,7 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
     // tb.changeSwitch()
     val test_file = tb.getTestfilePath()
     val inst = tb.getCtrlBundle()
-    val sign = tb.getSign()
+    // val sign = tb.getSign()
 
     if (Files.exists(Paths.get(test_file))) {
       val key = ReadTxt.readFromTxtByline(test_file)
@@ -610,8 +589,8 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
         if (dataSplitMode) {
           reportIx = j
         }
-        it should behave like vIntTestAll(keymap, inst, sign, tb, reportIx)
-        it should behave like vsalu(keymap, inst, sign, tb, reportIx)
+        // it should behave like vIntTestAll(keymap, inst, sign, tb, reportIx)
+        it should behave like vsalu(keymap, inst, tb, reportIx)
         // println("wtf??????????")
       }
     } else {

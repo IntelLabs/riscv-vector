@@ -1,0 +1,12 @@
+vdiv_vv
+vdivu_vv
+vdiv_vx
+vdivu_vx
+vrem_vv
+vremu_vv
+vrem_vx
+vremu_vx
+vfdiv_vv
+vfdiv_vf
+vfrdiv_vf
+vfsqrt_v

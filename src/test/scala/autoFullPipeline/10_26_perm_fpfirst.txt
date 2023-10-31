@@ -1,0 +1,13 @@
+vrgather_vv
+vrgather_vx
+vrgatherei16_vv
+vfredosum_vs
+vfredusum_vs
+vfredmax_vs
+vfredmin_vs
+vfwredosum_vs
+vfwredusum_vs
+vfncvt_xu_f_w
+vfncvt_x_f_w
+vfncvt_rtz_xu_f_w
+vfncvt_rtz_x_f_w

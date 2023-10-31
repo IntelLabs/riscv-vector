@@ -1,4 +1,4 @@
-package darecreek.vfuAutotest.alu
+package darecreek.vfuAutotest.fullPipeline
 
 import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
