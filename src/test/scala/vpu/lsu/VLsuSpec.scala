@@ -121,6 +121,7 @@ trait VLsuBehavior {
 
   val ldReqSrc_default = SrcBundleLd()
   val vle8 = CtrlBundle(VLE8_V)
+  val vle16 = CtrlBundle(VLE16_V)
   val vse8 = CtrlBundle(VSE8_V)
   
   def vLsuTest0(): Unit = {
@@ -178,18 +179,18 @@ trait VLsuBehavior {
   }
 
   def vLsuTest1(): Unit = {
-    it should "pass: unit-stride load (sew=8, el_count=32, el_off=32, el_id=0)" in {
+    it should "pass: unit-stride load (sew=8, el_count=19, el_off=40, el_id=0)" in {
       test(new VLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
         test_init(dut)
         dut.clock.step(1)
         val ldReqs = Seq(
-          (vle8.copy(vl=32, uopIdx=0), ldReqSrc_default),
-          (vle8.copy(vl=32, uopIdx=1, uopEnd=true), ldReqSrc_default),
+          (vle8.copy(vl=19, uopIdx=0, ta=false, needOldVd=true), ldReqSrc_default),
+          (vle8.copy(vl=19, uopIdx=1, uopEnd=true, ta=false, needOldVd=true), ldReqSrc_default),
         )
         val ldResps = Seq(
           ("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d" + 
             "0123456701234567_89abcdef89abcdef_0123456701234567_89abcdef89abcdef",
-           SeqId(el_count=32, el_off=32)),
+           SeqId(el_count=19, el_off=40)),
         )
         next_is_load_and_step(dut)
         for ((c, s) <- ldReqs) {
@@ -217,13 +218,198 @@ trait VLsuBehavior {
           for (i <- 0 until 10) {
             if (dut.io.wb.ld.valid.peekBoolean()) {
               if (wb_cnt == 0) {
-                dut.io.wb.ld.bits.vd.expect("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d".U)
+                // dut.io.wb.ld.bits.vd.expect("hffffffffffffffff_ffffffffff020001_0008000700060005_000c000b000a0009".U)
+                dut.io.wb.ld.bits.vd.expect("h0000000000000000_0000000000020001_0008000700060005_000c000b000a0009".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(0.U)
+                wb_cnt += 1
+              } else {
+                // dut.io.wb.ld.bits.vd.expect("hffffffffffffffff_ffffffffffffffff_ffffffffffffffff_ffffffffffffffff".U)
+                dut.io.wb.ld.bits.vd.expect("h0000000000000000_0000000000000000_0000000000000000_0000000000000000".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(1.U)
+              }
+            }
+            dut.clock.step(1)
+          }
+        }.join()
+
+        dut.clock.step(4)
+      }
+    }
+  }
+
+  def vLsuTest2(): Unit = {
+    it should "pass: unit-stride load (sew=8, el_count=60, el_off=0, el_id=67)" in {
+      test(new VLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+        test_init(dut)
+        dut.clock.step(1)
+        val ldReqs = Seq(
+          (vle8.copy(vl=60, uopIdx=0), ldReqSrc_default),
+          (vle8.copy(vl=60, uopIdx=1, uopEnd=false), ldReqSrc_default),
+          (vle8.copy(vl=60, uopIdx=2, uopEnd=false), ldReqSrc_default),
+          (vle8.copy(vl=60, uopIdx=3, uopEnd=true), ldReqSrc_default),
+        )
+        val ldResps = Seq(
+          ("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d" + 
+            "0123456701234567_89abcdef89abcdef_0123456701234567_89abcdef89abcdef",
+           SeqId(el_count=60, el_off=0, el_id=67)),
+        )
+        next_is_load_and_step(dut)
+        for ((c, s) <- ldReqs) {
+          while (!dut.io.fromIQ.ld.ready.peekBoolean()) {
+            dut.clock.step(1)
+          }
+          dut.io.fromIQ.ld.valid.poke(true.B)
+          dut.io.fromIQ.ld.bits.poke(genLdInput(c, s))
+          dut.clock.step(1)
+        }
+        dut.io.fromIQ.ld.valid.poke(false.B)
+        dut.clock.step(4)
+
+        fork {
+          for ((ldData, seqId)  <- ldResps) {
+            one_512b_load_resp(dut, ldData, seqId.asUInt)
+          }
+          dut.clock.step(1)
+          dut.io.ovi_load.valid.poke(false.B)
+          dut.io.ovi_memop.sync_end.poke(true.B)
+          dut.clock.step(1)
+          dut.io.ovi_memop.sync_end.poke(false.B)
+        }.fork {
+          var wb_cnt = 0
+          for (i <- 0 until 10) {
+            if (dut.io.wb.ld.valid.peekBoolean()) {
+              if (wb_cnt == 0) {
+                dut.io.wb.ld.bits.vd.expect("hffffffffffffffff_ffffffffffffffff_ffffffffffffffff_ffffffffffffffff".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(0.U)
+                wb_cnt += 1
+              } else if (wb_cnt == 1) {
+                dut.io.wb.ld.bits.vd.expect("hffffffffffffffff_ffffffffffffffff_ffffffffffffffff_ffffffffffffffff".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(1.U)
+                wb_cnt += 1
+              } else if (wb_cnt == 2) {
+                dut.io.wb.ld.bits.vd.expect("h6701234567_89abcdef89abcdef_0123456701234567_89abcdef89abcdef_ffffff".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(2.U)
+                wb_cnt += 1
+              } else {
+                dut.io.wb.ld.bits.vd.expect("hff00020001_0008000700060005_000c000b000a0009_0001000f000e000d_012345".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(3.U)
+              }
+            }
+            dut.clock.step(1)
+          }
+        }.join()
+
+        dut.clock.step(4)
+      }
+    }
+  }
+
+  def vLsuTest3(): Unit = {
+    it should "pass: unit-stride load (sew=8, el_count=40, el_off=5, el_id=10)" in {
+      test(new VLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+        test_init(dut)
+        dut.clock.step(1)
+        val ldReqs = Seq(
+          (vle8.copy(vl=40, uopIdx=0), ldReqSrc_default),
+          (vle8.copy(vl=40, uopIdx=1, uopEnd=true), ldReqSrc_default),
+        )
+        val ldResps = Seq(
+          ("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d" + 
+            "0123456701234567_89abcdef89abcdef_0123456701234567_89abcdef89abcdef",
+           SeqId(el_count=40, el_off=5, el_id=10)),
+        )
+        next_is_load_and_step(dut)
+        for ((c, s) <- ldReqs) {
+          while (!dut.io.fromIQ.ld.ready.peekBoolean()) {
+            dut.clock.step(1)
+          }
+          dut.io.fromIQ.ld.valid.poke(true.B)
+          dut.io.fromIQ.ld.bits.poke(genLdInput(c, s))
+          dut.clock.step(1)
+        }
+        dut.io.fromIQ.ld.valid.poke(false.B)
+        dut.clock.step(4)
+
+        fork {
+          for ((ldData, seqId)  <- ldResps) {
+            one_512b_load_resp(dut, ldData, seqId.asUInt)
+          }
+          dut.clock.step(1)
+          dut.io.ovi_load.valid.poke(false.B)
+          dut.io.ovi_memop.sync_end.poke(true.B)
+          dut.clock.step(1)
+          dut.io.ovi_memop.sync_end.poke(false.B)
+        }.fork {
+          var wb_cnt = 0
+          for (i <- 0 until 10) {
+            if (dut.io.wb.ld.valid.peekBoolean()) {
+              if (wb_cnt == 0) {
+                dut.io.wb.ld.bits.vd.expect("h234567_89abcdef89abcdef_0123456701234567_89abcd_ffff_ffffffffffffffff".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(0.U)
+                wb_cnt += 1
+              } else {
+                dut.io.wb.ld.bits.vd.expect("hffffff_ffffffffffffffff_ffffff0b000a0009_0001000f000e000d_0123456701".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(1.U)
+                wb_cnt += 1
+              } 
+            }
+            dut.clock.step(1)
+          }
+        }.join()
+
+        dut.clock.step(4)
+      }
+    }
+  }
+
+  def vLsuTest4(): Unit = {
+    it should "pass: unit-stride load (sew=16, el_count=8, el_off=8, el_id=0)" in {
+      test(new VLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+        test_init(dut)
+        dut.clock.step(1)
+        val ldReqs = Seq(
+          (vle16.copy(vl=8, uopIdx=0), ldReqSrc_default),
+          (vle16.copy(vl=8, uopIdx=1, uopEnd=true), ldReqSrc_default),
+        )
+        val ldResps = Seq(
+          ("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d" + 
+            "fedcba98fedcba98_7654321076543210_0123456701234567_89abcdef89abcdef",
+           SeqId(el_count=8, el_off=8, el_id=0)),
+        )
+        next_is_load_and_step(dut)
+        for ((c, s) <- ldReqs) {
+          while (!dut.io.fromIQ.ld.ready.peekBoolean()) {
+            dut.clock.step(1)
+          }
+          dut.io.fromIQ.ld.valid.poke(true.B)
+          dut.io.fromIQ.ld.bits.poke(genLdInput(c, s))
+          dut.clock.step(1)
+        }
+        dut.io.fromIQ.ld.valid.poke(false.B)
+        dut.clock.step(4)
+
+        fork {
+          for ((ldData, seqId)  <- ldResps) {
+            one_512b_load_resp(dut, ldData, seqId.asUInt)
+          }
+          dut.clock.step(1)
+          dut.io.ovi_load.valid.poke(false.B)
+          dut.io.ovi_memop.sync_end.poke(true.B)
+          dut.clock.step(1)
+          dut.io.ovi_memop.sync_end.poke(false.B)
+        }.fork {
+          var wb_cnt = 0
+          for (i <- 0 until 10) {
+            if (dut.io.wb.ld.valid.peekBoolean()) {
+              if (wb_cnt == 0) {
+                dut.io.wb.ld.bits.vd.expect("hffffffffffffffff_ffffffffffffffff_fedcba98fedcba98_7654321076543210".U)
                 dut.io.wb.ld.bits.uop.expdIdx.expect(0.U)
                 wb_cnt += 1
               } else {
                 dut.io.wb.ld.bits.vd.expect("hffffffffffffffff_ffffffffffffffff_ffffffffffffffff_ffffffffffffffff".U)
                 dut.io.wb.ld.bits.uop.expdIdx.expect(1.U)
-              }
+                wb_cnt += 1
+              } 
             }
             dut.clock.step(1)
           }
@@ -240,5 +426,8 @@ trait VLsuBehavior {
 class VLsuSpec extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VLsuBehavior {
   behavior of "LSU test"
   // it should behave like vLsuTest0()  // unit-stride load
-  it should behave like vLsuTest1()  // unit-stride load
+  // it should behave like vLsuTest1()  // unit-stride load
+  // it should behave like vLsuTest2()  // unit-stride load
+  // it should behave like vLsuTest3()  // unit-stride load
+  it should behave like vLsuTest4()  // unit-stride load
 }
