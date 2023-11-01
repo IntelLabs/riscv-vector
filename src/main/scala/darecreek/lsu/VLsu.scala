@@ -10,6 +10,7 @@
 //        one 512-b load data (this assumption is not efficient for unit-stride op, and may cause extra complexity to CPU). The
 //        el_off is 0, the el_count is number of fields in one segment, el_id is offset inside each RF register.
 //        For segment store, so far we use same scheme as other store instrns (not friendly to CPU to handle segment).
+//  5) So far when uop.lsrcValid(2) is set, which means need-old-vd, all tails and masks are set to old vd (so you will not see FFFF).
 
 //  Todo: 1) vstart support (consider mask_idx.item)
 //        2) Optimize: send mask_idx as early as memop.sync_start; mask_idx.last_idx goes early if all remain indices are masked off
@@ -213,6 +214,10 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   elCountSquash := Mux(ldStrideIs4, elCountSquash4, Mux(ldStrideIs2, elCountSquash2, elCount))
   
   //----------- 3rd: Shift stage ---------------
+  //
+  // Three consecutive regs  |---- 256b ----||---- 256b ----||---- 256b ----|
+  // ovi_load_data           |----------   512b   ----------||----  0   ----|
+  // after shift                  |----------   512b   ----------|
   val seqIdReg = RegNext(seqId)
   val el_id_high = Wire(UInt(3.W)) // log2(8)
   val el_id_low = Wire(UInt(vlenbWidth.W))
@@ -225,8 +230,10 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   val shiftRight = shiftElm + nElemVLEN
   val sub1 = shiftElm              // shiftRight - nElemVLEN
   val sub2 = shiftElm - nElemVLEN  // shiftRight - nElemVLEN*2
-  val needSub1 = shiftRight(6, 5) === 1.U
-  val needSub2 = shiftRight(6, 5) === 2.U
+  //---- The right-shift-bytes should be in range(0, vlenb-1) to reduce hardware complexity,
+  //---- if shiftRight_bytes >= vlenb, should subtract vlenb (needSub1) or 2*vlenb (needSub2)
+  val needSub1 = Mux1H(destEewOH_ld.oneHot, Seq(0,1,2,3).map(i => shiftRight(6-i, 5-i) === 1.U))
+  val needSub2 = Mux1H(destEewOH_ld.oneHot, Seq(0,1,2,3).map(i => shiftRight(6-i, 5-i) === 2.U))
   val finalShiftR = Wire(UInt(6.W))
   finalShiftR := Mux(needSub2, sub2, Mux(needSub1, sub1, shiftRight))
   val shiftBytes = Wire(UInt(6.W))
