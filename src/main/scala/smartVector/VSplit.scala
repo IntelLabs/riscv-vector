@@ -7,6 +7,7 @@ import chipsalliance.rocketchip.config
 import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import darecreek.exu.vfu.alu.VAlu
 import firrtl.Utils
+import SmartParam._
 
 class MUopRegAttr extends Bundle{
     //000:8bit
@@ -44,6 +45,7 @@ class VSplit (implicit p : Parameters) extends VFuModule {
     })
 
     val uopQueue = Module(new UopQueue)
+    val sboard   = Module(new Scoreboard(NVPhyRegs, false))
 
     uopQueue.io.in.decodeIn.valid  := io.in.decodeIn.valid
     uopQueue.io.in.decodeIn.bits  := io.in.decodeIn.bits

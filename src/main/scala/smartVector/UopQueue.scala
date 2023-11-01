@@ -62,8 +62,8 @@ class UopQueue(implicit p : Parameters) extends Module {
 
         //To save power, when do not need to update the vs1, keep it unchanged. 
         //ALU will judge whether use the data, do not worry to send the wrong data 
-        uopRegInfo(0).vs1        := Mux(io.in.regFileIn.readVld(0), io.in.regFileIn.readData(0), uopRegInfo(0).vs1)
-        uopRegInfo(0).vs2        := Mux(io.in.regFileIn.readVld(1), io.in.regFileIn.readData(1), uopRegInfo(0).vs2)
+        //uopRegInfo(0).vs1        := Mux(io.in.regFileIn.readVld(0), io.in.regFileIn.readData(0), uopRegInfo(0).vs1)
+        //uopRegInfo(0).vs2        := Mux(io.in.regFileIn.readVld(1), io.in.regFileIn.readData(1), uopRegInfo(0).vs2)
 
         uopRegInfo(0).rfWriteEn  := io.in.decodeIn.bits.vCtrl.ldestVal
         uopRegInfo(0).vxsat      := false.B
@@ -186,8 +186,8 @@ class UopQueue(implicit p : Parameters) extends Module {
 
         io.out.mUop.bits.uopRegInfo.rfWriteEn := io.in.decodeIn.bits.vCtrl.ldestVal
         io.out.mUop.bits.uopRegInfo.vxsat     := false.B
-        io.out.mUop.bits.uopRegInfo.vs1       := 0.U
-        io.out.mUop.bits.uopRegInfo.vs2       := 0.U
+        io.out.mUop.bits.uopRegInfo.vs1       := io.in.regFileIn.readData(0)
+        io.out.mUop.bits.uopRegInfo.vs2       := io.in.regFileIn.readData(1)
         idx := idx + 1.U
     }.elsewhen(currentState === ongoing){
         io.out.mUop.valid := true.B       
@@ -222,7 +222,10 @@ class UopQueue(implicit p : Parameters) extends Module {
         //TODO: when is narrow, two adjacent has same idx
         io.out.mUop.bits.uopAttribute.ldest   := vCtrl(0).ldest + ldest_inc
 
-        io.out.mUop.bits.uopRegInfo           := uopRegInfo(0)
+        io.out.mUop.bits.uopRegInfo.rfWriteEn := uopRegInfo(0).rfWriteEn
+        io.out.mUop.bits.uopRegInfo.vxsat     := false.B          
+        io.out.mUop.bits.uopRegInfo.vs1       := io.in.regFileIn.readData(0)
+        io.out.mUop.bits.uopRegInfo.vs2       := io.in.regFileIn.readData(1)
 
         io.out.toRegFile.rfReadEn(0)          := vCtrl(0).lsrcVal(0)
         io.out.toRegFile.rfReadEn(1)          := vCtrl(0).lsrcVal(1)
