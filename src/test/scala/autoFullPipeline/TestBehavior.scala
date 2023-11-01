@@ -18,15 +18,13 @@ import scala.collection.mutable.Map
 import chipsalliance.rocketchip.config.Parameters
 
 object TestCase {
-    def newNormalCase(srcBundles : Seq[SrcBundle], ctrlBundles : Seq[CtrlBundle], 
-            expectvd : Array[String]) {
+    def newNormalCase(srcBundles : Seq[SrcBundle], ctrlBundles : Seq[CtrlBundle]) {
         var tc = new TestCase(ctrlBundles, expectvd)
         tc.srcBundles = srcBundles
         return tc
     }
 
-    def newFSMCase(fsmSrcBundles : Seq[SrcBundle], ctrlBundles : Seq[CtrlBundle], 
-            expectvd : Array[String]) {
+    def newFSMCase(fsmSrcBundles : Seq[SrcBundle], ctrlBundles : Seq[CtrlBundle]) {
         var tc = new TestCase(ctrlBundles, expectvd)
         tc.fsmSrcBundles = fsmSrcBundles
         tc.isFSM = true
@@ -36,9 +34,8 @@ object TestCase {
 
 class TestCase(
         val ctrlBundles : Seq[CtrlBundle], 
-        val expectvd : Array[String], 
-        val checkRes : (String, Array[String], Int) => (Boolean, Boolean) 
-        // (dut vd, expectvd, uopIdx) => (correctness, isCompleted)
+        val checkRes : (String, Boolean, Int, Int) => (Boolean, Boolean) 
+        // (dut vd, vxsat, fflags, uopIdx) => (correctness, isCompleted)
     ) {
     var srcBundles : Seq[SrcBundle] = Seq()
     var fsmSrcBundles : Seq[FSMSrcBundle] = Seq()

@@ -301,7 +301,7 @@ object Datapath {
   // val testdataRoot = "/home/maoting/nanhu/testdata/8_30/unittest/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/9_1/unittest/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/9_4/"
-  val testdataRoot = "/home/maoting/nanhu/testdata/9_6/unittest/"
+  // val testdataRoot = "/home/maoting/nanhu/testdata/9_6/unittest/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/10_10/unittest/"
   val testdataRoot = "/home/maoting/nanhu/testdata/10_13/unittest/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/debug/"
