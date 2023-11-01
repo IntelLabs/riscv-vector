@@ -1,4 +1,4 @@
-package darecreek.vfuAutotest.fullPipeline
+package darecreek.vfuAutotest.alu
 
 import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
@@ -148,11 +148,14 @@ class VTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String,
 
         var hasVd = simi.get("VD") != None
         var hasRd = simi.get("RD") != None
+        var hasFd = simi.get("FD") != None
         var expectvd : Array[String] = Array()
         if (hasVd)
             expectvd = UtilFuncs.multilmuldatahandle(simi.get("VD").get)
         if (hasRd)
             expectvd = UtilFuncs.multilmuldatahandle(simi.get("RD").get)
+        if (hasFd)
+            expectvd = UtilFuncs.multilmuldatahandle(simi.get("FD").get)
 
         var n_inputs = 1
         if(vflmul == "2.000000") n_inputs = 2
@@ -207,7 +210,7 @@ class VTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String,
         }
         assert(finalVxsat == vxsat)
 
-        if (hasRd) {
+        if (hasRd || hasFd) {
             vd = dut.io.out.bits.vd.peek().litValue
             vdres = f"h$vd%016x".equals(expectvd(0))
             Logger.printvds(f"h$vd%016x", expectvd(0))
