@@ -688,7 +688,7 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   io.out.rd_preg_idx := RegEnable(rd_preg_idx, 0.U, rd_en)
   io.out.wb_vld := Mux(reg_vcompress, RegNext(RegNext(wb_vld & !flush)), RegNext(wb_vld & !flush))
   io.out.wb_data := perm_vd
-  io.out.perm_busy := perm_busy
+  io.out.perm_busy := perm_busy | flush
 }
 
 import xiangshan._
