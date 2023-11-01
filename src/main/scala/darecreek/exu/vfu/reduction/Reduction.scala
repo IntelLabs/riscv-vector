@@ -90,6 +90,7 @@ class Reduction(implicit p: Parameters) extends VFuModule {
   val reg_vwredsumu_vs = RegEnable(vwredsumu_vs, false.B, fire)
   val reg_is_max = RegEnable(is_max, false.B, fire)
   val reg_is_min = RegEnable(is_min, false.B, fire)
+  val reg_uopIdx = RegEnable(uopIdx, 0.U, fire)
   val reg2_is_max = RegEnable(reg_is_max, false.B, reg_fire)
   val reg2_is_min = RegEnable(reg_is_min, false.B, reg_fire)
   val reg2_signed = RegEnable(reg_signed, false.B, reg_fire)
@@ -97,7 +98,7 @@ class Reduction(implicit p: Parameters) extends VFuModule {
   val reg2_vredand_vs = RegEnable(reg_vredand_vs, false.B, reg_fire)
   val reg2_vredor_vs = RegEnable(reg_vredor_vs, false.B, reg_fire)
   val reg2_vredxor_vs = RegEnable(reg_vredxor_vs, false.B, reg_fire)
-  val reg_uopIdx = RegEnable(uopIdx, 0.U, fire)
+  val reg2_eewVd = SewOH(reg2_vd_vsew)
 
   val vs1_zero = Wire(UInt(64.W))
   val vs1_zero_logical = Wire(UInt(64.W))
@@ -106,9 +107,7 @@ class Reduction(implicit p: Parameters) extends VFuModule {
   val vs10_zero = RegInit(0.U(64.W))
   val vs10_zero_logical = RegInit(0.U(64.W))
   val vd_logical = Wire(Vec(4, UInt(64.W)))
- // val sum_vd = Wire(UInt(64.W))
   val logical_vd = Cat(0.U((VLEN - 64).W), vd_logical(~reg_vd_vsew(1, 0)))
-  val red_vd = Wire(UInt(VLEN.W))
 
   val vd_vsew_bits_reg = RegEnable(vd_vsew_bits, 0.U, fire)
   val vd_vsew_bits_reg2 = RegEnable(vd_vsew_bits_reg, 0.U, reg_fire)
@@ -247,11 +246,11 @@ class Reduction(implicit p: Parameters) extends VFuModule {
     vs10_zero_logical := Mux1H(eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 1.U), vs1(n - 1, 0))) :+ vs1(63, 0))
   }
 
-  red_zero := Mux1H(reg_eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 0.U), red_vd(n - 1, 0))) :+ red_vd(63, 0))
+  red_zero := Mux1H(reg2_eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 0.U), vd_reg(n - 1, 0))) :+ vd_reg(63, 0))
 
-  red_zero_logical := Mux1H(reg_eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 0.U), red_vd(n - 1, 0))) :+ red_vd(63, 0))
+  red_zero_logical := Mux1H(reg2_eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 0.U), vd_reg(n - 1, 0))) :+ vd_reg(63, 0))
   when(reg_vredand_vs) {
-    red_zero_logical := Mux1H(reg_eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 1.U), red_vd(n - 1, 0))) :+ red_vd(63, 0))
+    red_zero_logical := Mux1H(reg2_eewVd.oneHot, Seq(8, 16, 32).map(n => Cat(Fill(XLEN - n, 1.U), vd_reg(n - 1, 0))) :+ vd_reg(63, 0))
   }
 
   vs1_zero := Mux(reg_uopIdx === 0.U, vs10_zero, red_zero)
@@ -562,39 +561,8 @@ class Reduction(implicit p: Parameters) extends VFuModule {
   compare1_2to1_sew8.io.signed := reg_signed
   vd2_max_sew8 := compare1_2to1_sew8.io.c
 
- // sum_vd := vd_sew64
- // when(reg2_vd_vsew === 0.U) {
- //   sum_vd := vd_sew8
- // }.elsewhen(reg2_vd_vsew === 1.U) {
- //   sum_vd := vd_sew16
- // }.elsewhen(reg2_vd_vsew === 2.U) {
- //   sum_vd := vd_sew32
- // }
-
-  //  max_vd := vd_reg
-  //  when(reg2_vd_vsew === 0.U) {
-  //    max_vd := vd2_max_sew8
-  //  }.elsewhen(reg2_vd_vsew === 1.U) {
-  //    max_vd := vd1_max_sew16
-  //  }.elsewhen(reg2_vd_vsew === 2.U) {
-  //    max_vd := vd1_max_sew32
-  //  }
-
-  //  red_vd := sum_vd
-  //  when(reg2_vredand_vs || reg2_vredor_vs || reg2_vredxor_vs) {
-  //    red_vd := vd_reg
-  //  }.elsewhen(reg2_is_max || reg2_is_min) {
-  //    red_vd := max_vd
-  //  }
-
-  red_vd := vd_reg
- // red_vd := sum_vd
- // when(reg_vredand_vs || reg_vredor_vs || reg_vredxor_vs || reg_is_max || reg_is_min) {
- //   red_vd := vd_reg
- // }
-
-  val red_vd_tail_one = (vd_mask << vd_vsew_bits_reg2) | (red_vd & (vd_mask >> (VLEN.U - vd_vsew_bits_reg2)))
-  val red_vd_tail_vd = (old_vd_reg2 & (vd_mask << vd_vsew_bits_reg2)) | (red_vd & (vd_mask >> (VLEN.U - vd_vsew_bits_reg2)))
+  val red_vd_tail_one = (vd_mask << vd_vsew_bits_reg2) | (vd_reg & (vd_mask >> (VLEN.U - vd_vsew_bits_reg2)))
+  val red_vd_tail_vd = (old_vd_reg2 & (vd_mask << vd_vsew_bits_reg2)) | (vd_reg & (vd_mask >> (VLEN.U - vd_vsew_bits_reg2)))
 
   val red_vd_tail = Mux(vl_reg2 === 0.U, old_vd_reg2, Mux(ta_reg2, red_vd_tail_one, red_vd_tail_vd))
 
