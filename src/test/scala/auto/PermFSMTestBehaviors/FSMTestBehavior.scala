@@ -163,16 +163,6 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
                 rd_counts += 1
             }
 
-            // ================================================
-            // 10.27 add random flush
-            var robIdx = (false, 0)
-            robIdxValid = randomFlush()
-            if (robIdxValid) {
-                robIdx = (true, 1)
-            }
-
-            fsmCtrl.robIdx = robIdx
-
             dut.io.in.poke(genFSMInput(
                 fsmSrcBundle,
                 fsmCtrl

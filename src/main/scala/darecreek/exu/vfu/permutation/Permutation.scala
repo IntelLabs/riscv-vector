@@ -80,30 +80,39 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   val vlmul_reg = RegInit(0.U(3.W))
 
   val vl_reg_bytes = vl_reg << vsew_reg
+  val perm_busy = RegInit(false.B)
+  val flush = RegInit(false.B)
+  val in_robIdx = io.in.uop.sysUop.robIdx
+  val currentRobIdx = RegEnable(in_robIdx, uop_valid)
+  when(uop_valid) {
+    flush := in_robIdx.needFlush(io.redirect)
+  }.otherwise {
+    flush := (flush || currentRobIdx.needFlush(io.redirect)) && perm_busy
+  }
 
-  val reg_vslideup_vx = (funct6_reg === "b001110".U) && (funct3_reg === "b100".U)
-  val reg_vslideup_vi = (funct6_reg === "b001110".U) && (funct3_reg === "b011".U)
-  val reg_vslideup = reg_vslideup_vx || reg_vslideup_vi
-  val reg_vslidedn_vx = (funct6_reg === "b001111".U) && (funct3_reg === "b100".U)
-  val reg_vslidedn_vi = (funct6_reg === "b001111".U) && (funct3_reg === "b011".U)
-  val reg_vslidedn = reg_vslidedn_vx || reg_vslidedn_vi
-  val reg_vslide1up_vx = (funct6_reg === "b001110".U) && (funct3_reg === "b110".U)
-  val reg_vfslide1up_vf = (funct6_reg === "b001110".U) && (funct3_reg === "b101".U)
-  val reg_vslide1up = reg_vslide1up_vx || reg_vfslide1up_vf
-  val reg_vslide1dn_vx = (funct6_reg === "b001111".U) && (funct3_reg === "b110".U)
-  val reg_vfslide1dn_vf = (funct6_reg === "b001111".U) && (funct3_reg === "b101".U)
-  val reg_vslide1dn = reg_vslide1dn_vx || reg_vfslide1dn_vf
-  val reg_vrgather_vv = (funct6_reg === "b001100".U) && (funct3_reg === "b000".U)
-  val reg_vrgather16 = (funct6_reg === "b001110".U) && (funct3_reg === "b000".U)
-  val reg_vrgather_vx = (funct6_reg === "b001100".U) && (funct3_reg === "b100".U)
-  val reg_vrgather_vi = (funct6_reg === "b001100".U) && (funct3_reg === "b011".U)
-  val reg_vrgather_vxi = reg_vrgather_vx || reg_vrgather_vi
-  val reg_vcompress = (funct6_reg === "b010111".U) && (funct3_reg === "b010".U)
-  val reg_vrgather16_sew8 = reg_vrgather16 && (vsew_reg === 0.U)
-  val reg_vrgather16_sew32 = reg_vrgather16 && (vsew_reg === 2.U)
-  val reg_vrgather16_sew64 = reg_vrgather16 && (vsew_reg === 3.U)
-  val reg_vslide = reg_vslideup || reg_vslidedn || reg_vslide1up || reg_vslide1dn
-  val reg_vrgather = reg_vrgather_vv || reg_vrgather_vxi || reg_vrgather16
+  val reg_vslideup_vx = (funct6_reg === "b001110".U) && (funct3_reg === "b100".U) && !flush
+  val reg_vslideup_vi = (funct6_reg === "b001110".U) && (funct3_reg === "b011".U) && !flush
+  val reg_vslideup = reg_vslideup_vx || reg_vslideup_vi && !flush
+  val reg_vslidedn_vx = (funct6_reg === "b001111".U) && (funct3_reg === "b100".U) && !flush
+  val reg_vslidedn_vi = (funct6_reg === "b001111".U) && (funct3_reg === "b011".U) && !flush
+  val reg_vslidedn = reg_vslidedn_vx || reg_vslidedn_vi && !flush
+  val reg_vslide1up_vx = (funct6_reg === "b001110".U) && (funct3_reg === "b110".U) && !flush
+  val reg_vfslide1up_vf = (funct6_reg === "b001110".U) && (funct3_reg === "b101".U) && !flush
+  val reg_vslide1up = reg_vslide1up_vx || reg_vfslide1up_vf && !flush
+  val reg_vslide1dn_vx = (funct6_reg === "b001111".U) && (funct3_reg === "b110".U) && !flush
+  val reg_vfslide1dn_vf = (funct6_reg === "b001111".U) && (funct3_reg === "b101".U) && !flush
+  val reg_vslide1dn = reg_vslide1dn_vx || reg_vfslide1dn_vf && !flush
+  val reg_vrgather_vv = (funct6_reg === "b001100".U) && (funct3_reg === "b000".U) && !flush
+  val reg_vrgather16 = (funct6_reg === "b001110".U) && (funct3_reg === "b000".U) && !flush
+  val reg_vrgather_vx = (funct6_reg === "b001100".U) && (funct3_reg === "b100".U) && !flush
+  val reg_vrgather_vi = (funct6_reg === "b001100".U) && (funct3_reg === "b011".U) && !flush
+  val reg_vrgather_vxi = reg_vrgather_vx || reg_vrgather_vi && !flush
+  val reg_vcompress = (funct6_reg === "b010111".U) && (funct3_reg === "b010".U) && !flush
+  val reg_vrgather16_sew8 = reg_vrgather16 && (vsew_reg === 0.U) && !flush
+  val reg_vrgather16_sew32 = reg_vrgather16 && (vsew_reg === 2.U) && !flush
+  val reg_vrgather16_sew64 = reg_vrgather16 && (vsew_reg === 3.U) && !flush
+  val reg_vslide = reg_vslideup || reg_vslidedn || reg_vslide1up || reg_vslide1dn && !flush
+  val reg_vrgather = reg_vrgather_vv || reg_vrgather_vxi || reg_vrgather16 && !flush
   val vs1_type = Mux(reg_vrgather16, 1.U, vsew_reg)
 
   val vslide_wb_vld = Wire(Bool())
@@ -116,7 +125,12 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   val vd_mask = Wire(UInt(VLEN.W))
   vd_mask := (~0.U(VLEN.W))
 
-  val vlRemain_reg = RegNext(vlRemain)
+  val vlRemain_reg = RegInit(0.U(8.W))
+  when(flush) {
+    vlRemain_reg := 0.U
+  }.otherwise {
+    vlRemain_reg := vlRemain
+  }
   val vlRemainBytes_reg = vlRemain_reg << vsew_reg
   val tail_bytes = Mux((vlRemainBytes_reg >= VLENB.U), 0.U, VLENB.U - vlRemainBytes_reg)
   val tail_bits = Cat(tail_bytes, 0.U(3.W))
@@ -141,7 +155,6 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   val perm_vd = Wire(UInt(VLEN.W))
   val perm_tail_mask_vd = Wire(UInt(VLEN.W))
 
-  val perm_busy = RegInit(false.B)
   val vs_idx = RegInit(0.U(3.W))
   val rdata_vs_idx = RegInit(0.U(3.W))
   val rdata_wb_idx = RegInit(0.U(3.W))
@@ -171,16 +184,6 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   val rec_done = uop_valid
   val rd_done = (wb_idx === rd_vlmul) && wb_vld
   val calc_done = RegInit(false.B)
-
-  val flush = RegInit(false.B)
-
-  val in_robIdx = io.in.uop.sysUop.robIdx
-  val currentRobIdx = RegEnable(in_robIdx, uop_valid)
-  when(uop_valid) {
-    flush := in_robIdx.needFlush(io.redirect)
-  }.otherwise {
-    flush := (flush || currentRobIdx.needFlush(io.redirect)) && perm_busy
-  }
 
   when(flush) {
     funct6_reg := 0.U
@@ -218,7 +221,9 @@ class Permutation(implicit p: Parameters) extends VFuModule {
 
   // vslide read
   vslide_cnt_max := Cat(0.U(1.W), vslide_lo_valid) + Cat(0.U(1.W), vslide_hi_valid)
-  when(rd_vs_en) {
+  when(flush) {
+    vslide_rd_cnt := 0.U
+  }.elsewhen(rd_vs_en) {
     when(vslide_rd_cnt === vslide_cnt_max) {
       vslide_rd_cnt := 0.U
     }.otherwise {
@@ -326,7 +331,9 @@ class Permutation(implicit p: Parameters) extends VFuModule {
 
   vrgather_cnt_max := 2.U + Cat(0.U(1.W), rd_vlmul)
 
-  when(rd_vs_en) {
+  when(flush) {
+    vrgather_rd_cnt := 0.U
+  }.elsewhen(rd_vs_en) {
     when(vrgather_rd_cnt === vrgather_cnt_max) {
       vrgather_rd_cnt := 0.U
     }.otherwise {
@@ -355,7 +362,12 @@ class Permutation(implicit p: Parameters) extends VFuModule {
     }
   }
 
-  val update_vd_idx = RegNext(rdata_wb_vld)
+  val update_vd_idx = RegInit(false.B)
+  when(flush) {
+    update_vd_idx := false.B
+  }.otherwise {
+    update_vd_idx := rdata_wb_vld
+  }
   update_vs_idx := vslide_update_vs_idx || cmprs_update_vs_idx || vrgather_update_vs_idx
   wb_vld := vslide_wb_vld || cmprs_wb_vld || vrgather_wb_vld
   val rd_preg_idx = Mux(reg_vcompress, cmprs_rd_preg_idx, Mux(reg_vslide, vslide_rd_preg_idx, vrgather_rd_preg_idx))
@@ -663,6 +675,26 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   perm_vd := Mux(reg_vcompress, vd_reg, perm_tail_mask_vd)
 
   val rd_en = rd_mask_en || rd_vs_en || cmprs_rd_old_vd
+  val reg_rd_en = RegInit(false.B)
+  val reg_wb_vld = RegInit(false.B)
+  val reg2_wb_vld = RegInit(false.B)
+  val reg_rd_preg_idx = RegInit(0.U(8.W))
+
+  when(flush) {
+    reg_rd_en := false.B
+    reg_wb_vld := false.B
+    reg2_wb_vld := false.B
+  }.otherwise {
+    reg_rd_en := rd_en
+    reg_wb_vld := wb_vld
+    reg2_wb_vld := reg_wb_vld
+  }
+
+  when(flush) {
+    reg_rd_preg_idx := 0.U
+  }.elsewhen(rd_en) {
+    reg_rd_preg_idx := rd_preg_idx
+  }
 
   io.out.uop.ctrl.funct6 := funct6_reg
   io.out.uop.ctrl.funct3 := funct3_reg
@@ -684,11 +716,11 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   io.out.uop.uopEnd := true.B
   io.out.uop.sysUop := RegEnable(io.in.uop.sysUop, uop_valid)
 
-  io.out.rd_en := RegNext(rd_en)
-  io.out.rd_preg_idx := RegEnable(rd_preg_idx, 0.U, rd_en)
-  io.out.wb_vld := Mux(reg_vcompress, RegNext(RegNext(wb_vld & !flush)), RegNext(wb_vld & !flush))
+  io.out.rd_en := reg_rd_en & !flush
+  io.out.rd_preg_idx := reg_rd_preg_idx
+  io.out.wb_vld := Mux(reg_vcompress, reg2_wb_vld & !flush, reg_wb_vld & !flush)
   io.out.wb_data := perm_vd
-  io.out.perm_busy := perm_busy
+  io.out.perm_busy := perm_busy | flush
 }
 
 import xiangshan._
