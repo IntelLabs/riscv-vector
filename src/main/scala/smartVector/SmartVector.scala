@@ -45,7 +45,7 @@ class SmartVector extends Module {
     iex.io.in <> split.io.out.mUop
     regFile.io.in.readIn := split.io.out.toRegFileRead
     regFile.io.in.writeIn := split.io.out.toRegFileWrite
-    
+        
     //arb register file's read and write port
     //when(uopQueue.io.out.toRegFile.valid && iex.io.out.bits.toReg.valid){
     //    regFile.io.in.rfReadEn    := uopQueue.io.out.toRegFile.bits.rfReadEn
@@ -105,20 +105,3 @@ object Main extends App {
   println("Generating the VPU Core hardware")
   emitVerilog(new SmartVector(), Array("--target-dir", "generated"))
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

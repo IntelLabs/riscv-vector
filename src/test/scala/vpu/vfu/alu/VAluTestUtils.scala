@@ -129,7 +129,7 @@ trait BundleGenHelper {
   def genRVUissue(i: UInt, info: VInfoBundle) = {
     (new RVUissue).Lit(
       _.inst -> i,
-      _.rs1 -> 8.U,
+      _.rs1 -> 1.U,
       _.rs2 -> 0.U,
       _.vInfo -> (new smartVector.VInfo).Lit(
         _.vl -> info.vl.U,

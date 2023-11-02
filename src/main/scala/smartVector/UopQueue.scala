@@ -9,6 +9,7 @@ import chipsalliance.rocketchip.config
 import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import darecreek.exu.vfu.VUop
 import xiangshan.MicroOp
+import SmartParam._
 
 class UopAttribute extends Bundle {
     val ldest = UInt(5.W)
@@ -35,6 +36,8 @@ class UopQueue(implicit p : Parameters) extends Module {
         val in = new Bundle{
             val decodeIn  = Flipped(Decoupled(new VDecodeOutput))
             val regFileIn = Input(new regOut)
+            val regWriteEn = Input(Bool())
+            val regWriteIdx = Input(UInt(5.W))
         }
         val out = new Bundle{
             val mUop        = ValidIO(new UopQueueOutput)
@@ -54,7 +57,9 @@ class UopQueue(implicit p : Parameters) extends Module {
     val currentState = RegInit(empty)
     val currentStateNext = WireDefault(empty) 
 
-    when (currentState === empty && io.in.decodeIn.valid){       
+    val instFirstIn = (currentState === empty && io.in.decodeIn.valid)
+
+    when (instFirstIn){       
         vCtrl(0)                 := io.in.decodeIn.bits.vCtrl
         vInfo(0)                 := io.in.decodeIn.bits.vInfo
         scalar_opnd_1(0)         := io.in.decodeIn.bits.scalar_opnd_1
@@ -69,8 +74,8 @@ class UopQueue(implicit p : Parameters) extends Module {
         uopRegInfo(0).vxsat      := false.B
     } 
 
-    val ctrl = io.in.decodeIn.bits.vCtrl
-    val info = io.in.decodeIn.bits.vInfo
+    val ctrl = Mux(instFirstIn,io.in.decodeIn.bits.vCtrl,vCtrl(0))
+    val info = Mux(instFirstIn,io.in.decodeIn.bits.vInfo,vInfo(0))
     val v_ext_out = ctrl.alu && ctrl.funct3 === "b010".U && ctrl.funct6 === "b010010".U 
         
     val lsrc1_inc = Wire(UInt(3.W))
@@ -140,7 +145,46 @@ class UopQueue(implicit p : Parameters) extends Module {
         io.out.mUopRegAttr.regWriteMuopIdx  := 0.U       
     }
 
-    when (currentState === empty && io.in.decodeIn.valid){
+    val sboard = new Scoreboard(NVPhyRegs, false)
+    val vs1ReadEn = Mux(instFirstIn,io.in.decodeIn.bits.vCtrl.lsrcVal(0),vCtrl(0).lsrcVal(0))
+    val vs2ReadEn = Mux(instFirstIn,io.in.decodeIn.bits.vCtrl.lsrcVal(1),vCtrl(0).lsrcVal(1))
+    val vs1Idx = Mux(instFirstIn,io.in.decodeIn.bits.vCtrl.lsrc(0),vCtrl(0).lsrc(0)) + lsrc0_inc
+    val vs2Idx = Mux(instFirstIn,io.in.decodeIn.bits.vCtrl.lsrc(1),vCtrl(0).lsrc(1)) + lsrc1_inc
+    val needStall  = Wire(Bool())
+    val hasRegConf = Wire(Vec(2,Bool()))
+    val canForWard = Wire(Vec(2,Bool()))
+   
+    when(vs1ReadEn && sboard.read(vs1Idx) && ~sboard.readBypassed(vs1Idx)){
+        canForWard(0) := true.B
+    }.otherwise{
+        canForWard(0) := false.B
+    }
+
+    when(vs2ReadEn && sboard.read(vs2Idx) && ~sboard.readBypassed(vs2Idx)){
+        canForWard(1) := true.B
+    }.otherwise{
+        canForWard(1) := false.B
+    }
+
+    when(!vs1ReadEn){
+        hasRegConf(0) := false.B
+    }.elsewhen (~sboard.read(vs1Idx) || canForWard(0)){
+        hasRegConf(0) := false.B
+    }.otherwise{
+        hasRegConf(0) := true.B
+    }
+
+    when(!vs2ReadEn){
+        hasRegConf(1) := false.B
+    }.elsewhen (~sboard.read(vs2Idx) || canForWard(1)){
+        hasRegConf(1) := false.B
+    }.otherwise{
+        hasRegConf(1) := true.B
+    }
+
+    needStall := hasRegConf(0) || hasRegConf(1)
+
+    when (currentState === empty && io.in.decodeIn.valid && ~needStall){
 
         io.out.toRegFile.rfReadEn(0)  := io.in.decodeIn.bits.vCtrl.lsrcVal(0)
         io.out.toRegFile.rfReadEn(1)  := io.in.decodeIn.bits.vCtrl.lsrcVal(1)
@@ -189,7 +233,7 @@ class UopQueue(implicit p : Parameters) extends Module {
         io.out.mUop.bits.uopRegInfo.vs1       := io.in.regFileIn.readData(0)
         io.out.mUop.bits.uopRegInfo.vs2       := io.in.regFileIn.readData(1)
         idx := idx + 1.U
-    }.elsewhen(currentState === ongoing){
+    }.elsewhen(currentState === ongoing && ~needStall){
         io.out.mUop.valid := true.B       
         io.out.mUop.bits.uop.uopIdx := idx
         io.out.mUop.bits.uop.uopEnd := (idx + 1.U === vInfo(0).vlmul)
@@ -254,6 +298,10 @@ class UopQueue(implicit p : Parameters) extends Module {
         currentStateNext := ongoing
     }
     currentState := currentStateNext
+
+    sboard.set(io.out.mUop.valid, io.out.mUop.bits.uopAttribute.ldest )
+    //sboard.set(io.out.toRegFile.rfReadEn(1), io.out.toRegFile.rfReadIdx(1))
+    sboard.clear(io.in.regWriteEn, io.in.regWriteIdx)
 
     io.in.decodeIn.ready := (currentStateNext === empty)
 

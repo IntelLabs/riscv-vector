@@ -44,6 +44,10 @@ class SVRegFileWrapper(implicit p : Parameters) extends Module{
     io.out.writeDone := regWriteDone
     io.out.readVld(0) := RegNext(io.in.readIn.rfReadEn(0))
     io.out.readVld(1) := RegNext(io.in.readIn.rfReadEn(1))
-    io.out.readData(0) := Cat(regFile.io.read(0).data(1), regFile.io.read(0).data(0))
-    io.out.readData(1) := Cat(regFile.io.read(1).data(1), regFile.io.read(1).data(0))
+
+    val readDataOUt = Wire(Vec(2, UInt(VLEN.W)))
+    readDataOUt(0) := Cat(regFile.io.read(0).data(1), regFile.io.read(0).data(0))
+    readDataOUt(1) := Cat(regFile.io.read(1).data(1), regFile.io.read(1).data(0))
+    io.out.readData(0) := Mux(io.in.readIn.rfReadIdx(0) === io.in.writeIn.rfWriteIdx, io.in.writeIn.rfWriteData, readDataOUt(0))
+    io.out.readData(1) := Mux(io.in.readIn.rfReadIdx(1) === io.in.writeIn.rfWriteIdx, io.in.writeIn.rfWriteData, readDataOUt(1))
 }

@@ -45,11 +45,12 @@ class VSplit (implicit p : Parameters) extends VFuModule {
     })
 
     val uopQueue = Module(new UopQueue)
-    val sboard   = Module(new Scoreboard(NVPhyRegs, false))
 
     uopQueue.io.in.decodeIn.valid  := io.in.decodeIn.valid
     uopQueue.io.in.decodeIn.bits  := io.in.decodeIn.bits
     uopQueue.io.in.regFileIn := io.in.regRileIn
+    uopQueue.io.in.regWriteEn := io.out.toRegFileWrite.rfWriteEn
+    uopQueue.io.in.regWriteIdx := io.out.toRegFileWrite.rfWriteIdx
     io.out.mUop := RegNext(uopQueue.io.out.mUop)
     io.out.toRegFileRead := uopQueue.io.out.toRegFile
     io.in.decodeIn.ready := uopQueue.io.in.decodeIn.ready

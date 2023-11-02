@@ -1043,16 +1043,15 @@ trait VAluBehavior {
         val inputSeq = Seq(
           // 16.1 16.2
           //vmv.v.x
-          //genRVUissue("b01011110000000101100000011010111".U, Smartvmvxs),
-          //vmv.v.v
-          //genRVUissue("b01011110000000100000001011010111".U, Smartvmvxs),
-          //vwaddu.v.v
+          //genRVUissue("b01011110000000110100000011010111".U, Smartvmvxs), 
+          //vmv.vv
           genRVUissue("b01011110000000001011000101010111".U, Smartvmvxs),
           genRVUissue("b01011110000000010011001101010111".U, Smartvmvxs),
-          genRVUissue("b01011110000000001011000111010111".U, Smartvmvxs),
-          genRVUissue("b01011110000000010011001111010111".U, Smartvmvxs),
-          genRVUissue("b01011110000000001011010111010111".U, Smartvmvxs),
-          genRVUissue("b01011110000000010011011101010111".U, Smartvmvxs),
+          //genRVUissue("b01011110000000001011000111010111".U, Smartvmvxs),
+          //genRVUissue("b01011110000000010011001111010111".U, Smartvmvxs),
+          //genRVUissue("b01011110000000001011010111010111".U, Smartvmvxs),
+          //genRVUissue("b01011110000000010011011101010111".U, Smartvmvxs),
+          //vadd.v.v
           genRVUissue("b00000010001000110000011101010111".U, Smartvmvxs),//vadd
         )
 
