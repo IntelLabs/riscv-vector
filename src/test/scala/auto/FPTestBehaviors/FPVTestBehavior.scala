@@ -363,7 +363,7 @@ class VfTestBehavior(fn : String, cb : CtrlBundle,
                 break
             }
 
-            var srcBundle = SrcBundle()
+            var srcBundle = SrcBundle(mask="h0")
             var ctrlBundle = ctrl.copy()
 
             // dut.io.dontCare.poke(true.B)
