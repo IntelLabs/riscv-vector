@@ -17,24 +17,50 @@ import darecreek.exu.vfu.reduction._
 import scala.collection.mutable.Map
 import chipsalliance.rocketchip.config.Parameters
 
-class ALUVResultChecker(
-    val nRes : Int, 
-    val expectvd : Array[String],
-    val vdOrRd : Boolean) extends ResultChecker(nRes, expectvd) {
-    
-    override def checkRes(dutVd : String, uopIdx : Int) {
-        if (vdOrRd) {
-            vd = dut.io.out.bits.vd.peek().litValue
-            vdRes = f"h$vd%032x"
-            vdres = vdRes.equals(expectvd(nRes - 1 - uopIdx))
-            Logger.printvds(vdRes, expectvd(j))
-            if (!vdres) dump(simi, vdRes, expectvd(j))
-            assert(vdres)
-        }
+object ALUVResultChecker {
+    def newChecker(
+        nRes : Int, 
+        expectvd : Array[String],
+        vdOrRd : Boolean,
+        goldenVxsat : Boolean = false,
+        dump : (String, String) => Unit = (a, b) => {}) = {
+            val resultChecker = new ALUVResultChecker(nRes, expectvd, vdOrRd, dump)
+            resultChecker.setGoldenVxsat(goldenVxsat)
+
+            return resultChecker
     }
 }
 
-class ResultChecker(val nRes : Int, val expectvd : Array[String]) {
+class ALUVResultChecker(
+    val nRes : Int, 
+    val expectvd : Array[String],
+    val vdOrRd : Boolean,
+    val dump : (String, String) => Unit = (a, b) => {}) extends ResultChecker(nRes, expectvd, dump) {
+    
+    override def checkRes(dutVd : String, uopIdx : Int) : Boolean = {
+        var correctness : Boolean
+        var vdRes : String
+        var goldenVd : String
+        if (vdOrRd) {
+            vdRes = f"h$dutVd%032x"
+            goldenVd = expectvd(nRes - 1 - uopIdx)
+        } else {
+            // RD or FD
+            if (uopIdx == 0) {
+                vdRes = f"h$dutVd%016x"
+                goldenVd = expectvd(0)
+            }
+        }
+        correctness = vdRes.equals(goldenVd)
+        Logger.printvds(vdRes, goldenVd)
+        if (!correctness) dump(dutVd, goldenVd)
+
+        return correctness
+    }
+}
+
+class ResultChecker(val nRes : Int, val expectvd : Array[String], 
+        val dump : (String, String) => Unit = (a, b) => {}) {
     val goldenVxsat : Boolean = false
     val goldenFflags : Int = false
 
@@ -66,11 +92,19 @@ class ResultChecker(val nRes : Int, val expectvd : Array[String]) {
         this.resVxsat = this.resVxsat || dutVxsat
 
         this.checkedRes += 1
-        if (this.isCompleted()) {
-            if (this.isFPDIV) {
-                res = res && (this.goldenFflags == this.resFflags)
-            } else {
-                res = res && (this.goldenVxsat == this.resVxsat)
+        if (res) {
+            if (this.isCompleted()) {
+                if (this.isFPDIV) {
+                    res = res && (this.goldenFflags == this.resFflags)
+                    if (this.goldenFflags != this.resFflags) {
+                        dump(f"(fflags) h${this.resFflags}%016x", f"(fflags) h${this.goldenFflags}%016x")
+                    }
+                } else {
+                    res = res && (this.goldenVxsat == this.resVxsat)
+                    if (this.goldenVxsat != this.resVxsat) {
+                        dump(f"(vxsat) ${this.resVxsat}", f"(vxsat) ${this.goldenVxsat}")
+                    }
+                }
             }
         }
 

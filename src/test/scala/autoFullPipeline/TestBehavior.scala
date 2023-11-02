@@ -18,14 +18,22 @@ import scala.collection.mutable.Map
 import chipsalliance.rocketchip.config.Parameters
 
 object TestCase {
-    def newNormalCase(srcBundles : Seq[SrcBundle], ctrlBundles : Seq[CtrlBundle]) {
-        var tc = new TestCase(ctrlBundles, expectvd)
+    def newNormalCase(
+        instid : String, 
+        srcBundles : Seq[SrcBundle], 
+        ctrlBundles : Seq[CtrlBundle], rc : ResultChecker) {
+        
+        var tc = new TestCase(instid, ctrlBundles, rc)
         tc.srcBundles = srcBundles
         return tc
     }
 
-    def newFSMCase(fsmSrcBundles : Seq[SrcBundle], ctrlBundles : Seq[CtrlBundle]) {
-        var tc = new TestCase(ctrlBundles, expectvd)
+    def newFSMCase(
+        instid : String, 
+        fsmSrcBundles : Seq[SrcBundle], 
+        ctrlBundles : Seq[CtrlBundle], rc : ResultChecker) {
+        
+        var tc = new TestCase(instid, ctrlBundles, rc)
         tc.fsmSrcBundles = fsmSrcBundles
         tc.isFSM = true
         return tc
@@ -33,8 +41,10 @@ object TestCase {
 }
 
 class TestCase(
+        val instid : String,
         val ctrlBundles : Seq[CtrlBundle], 
-        val checkRes : (String, Boolean, Int, Int) => (Boolean, Boolean) 
+        val rc : ResultChecker,
+        // val checkRes : (String, Boolean, Int, Int) => (Boolean, Boolean) 
         // (dut vd, vxsat, fflags, uopIdx) => (correctness, isCompleted)
     ) {
     var srcBundles : Seq[SrcBundle] = Seq()
@@ -42,6 +52,10 @@ class TestCase(
 
     var isFSM : Boolean = false
     var uopIx = 0
+
+    def isCompleted() : Boolean = {
+        return this.rc.isCompleted()
+    }
 
     def nextVfuInput() = {
         if (this.isFSM) println("ERROR: generating normal input for FSM test case")
@@ -52,7 +66,7 @@ class TestCase(
         )
         this.uopIx += 1
 
-        return vfuInput
+        return (vfuInput, this.ctrlBundles[this.uopIx].uopIdx)
     }
 
     def nextFsmInput() = {
@@ -65,28 +79,29 @@ class TestCase(
 
         this.uopIx += 1
 
-        return fsmInput
+        return (fsmInput, 0)
     }
 }
 
-abstract class TestBehavior(filename : String, ctrlBundle : TestCtrlBundleBase, sign : String, instid : String) extends BundleGenHelper {
+abstract class TestBehavior(filename : String, ctrlBundle : CtrlBundle, sign : String, instid : String) extends BundleGenHelper {
 
     var inputMaps : Seq[Map[String, String]] = Seq()
     var inputMapCurIx = 0
 
-    var testResult = true
+    // var testResult = true
 
     def getTestfilePath() : String              = Datapath.testdataRoot + filename
-    def getCtrlBundle() : TestCtrlBundleBase    = ctrlBundle
+    def getCtrlBundle() : CtrlBundle    = ctrlBundle
     def getInstid() : String                    = instid
 
     // full pipeline
-    def getTargetTestEngine(): Int = ALU_TEST_ENGINE
+    def getTargetTestEngine(): Int = TestEngine.ALU_TEST_ENGINE
     def isOrdered(): Boolean = {
         println(s"!!!!!!!! $instid not specified isOrdered")
+        false
     }
-    def recordFail() = {this.testResult = false}
-    def recordSuccess() = {this.testResult = true}
+    // def recordFail() = {this.testResult = false}
+    // def recordSuccess() = {this.testResult = true}
     def isFinished() = {
         return this.inputMapCurIx >= this.inputMaps.length
     }
@@ -186,6 +201,7 @@ abstract class TestBehavior(filename : String, ctrlBundle : TestCtrlBundleBase, 
         val testCase = this._getNextTestCase(this.inputMaps(this.inputMapCurIx))
         this.inputMapCurIx += 1
 
+        println(s"Adding ${this.instid}, number ${this.inputMapCurIx - 1} input to pool")
         return testCase
     }
 
@@ -193,56 +209,4 @@ abstract class TestBehavior(filename : String, ctrlBundle : TestCtrlBundleBase, 
         // TODO generate test case
         println("!!!!!! called unimplemented _getNextTestCase()!!")
     }
-
-    /*def test_init(dut : Module) {
-        dut match {
-            case alu_dut : VAluWrapper => TestHarnessAlu.test_init(alu_dut)
-            case mac_dut : VMacWrapper => TestHarnessMac.test_init(mac_dut)
-            case mask_dut : VMask => TestHarnessMask.test_init(mask_dut)
-            case dut : VFPUWrapper => TestHarnessFPU.test_init(dut)
-            case dut : VDivWrapper => TestHarnessDiv.test_init(dut)
-            case dut : Reduction => {}
-            case perm_dut : Permutation => TestHarnessFSM.test_init(perm_dut)
-        }
-    }
-
-    def testMultiple(simi:Map[String,String],ctrl:TestCtrlBundleBase,s:String, dut:Module) {
-        dut match {
-            case alu_dut : VAluWrapper => testMultiple(simi,ctrl.asInstanceOf[CtrlBundle],s, alu_dut)
-            case mac_dut : VMacWrapper => testMultiple(simi,ctrl.asInstanceOf[CtrlBundle],s, mac_dut)
-            case mask_dut : VMask => testMultiple(simi,ctrl.asInstanceOf[CtrlBundle],s, mask_dut)
-            case dut : VFPUWrapper => testMultiple(simi,ctrl.asInstanceOf[CtrlBundle],s, dut)
-            case dut : VDivWrapper => testMultiple(simi,ctrl.asInstanceOf[CtrlBundle],s, dut)
-            case dut : Reduction => testMultiple(simi,ctrl.asInstanceOf[CtrlBundle],s, dut)
-            case perm_dut : Permutation => testMultiple(simi,ctrl.asInstanceOf[CtrlBundle],s, perm_dut)
-        }
-    }
-
-    def testSingle(simi:Map[String,String],ctrl:TestCtrlBundleBase,s:String, dut:Module) {
-        dut match {
-            case alu_dut : VAluWrapper => testSingle(simi,ctrl.asInstanceOf[CtrlBundle],s, alu_dut)
-            case mac_dut : VMacWrapper => testSingle(simi,ctrl.asInstanceOf[CtrlBundle],s, mac_dut)
-            case mask_dut : VMask => testSingle(simi,ctrl.asInstanceOf[CtrlBundle],s, mask_dut)
-            case dut : VFPUWrapper => testSingle(simi,ctrl.asInstanceOf[CtrlBundle],s, dut)
-            case dut : VDivWrapper => testSingle(simi,ctrl.asInstanceOf[CtrlBundle],s, dut)
-            case dut : Reduction => testSingle(simi,ctrl.asInstanceOf[CtrlBundle],s, dut)
-            case perm_dut : Permutation => testSingle(simi,ctrl.asInstanceOf[CtrlBundle],s, perm_dut)
-        }
-    }
-
-    def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VAluWrapper) = { println("!!!!!!called unimplemented testMultiple alu")}
-    def testSingle(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VAluWrapper) = { println("!!!!!!called unimplemented testSingle alu") }
-    def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:Permutation) = { println("!!!!!!called unimplemented testMultiple perm")}
-    def testSingle(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:Permutation) = { println("!!!!!!called unimplemented testSingle perm") }
-    def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VMacWrapper) = { println("!!!!!!called unimplemented testMultiple mac")}
-    def testSingle(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VMacWrapper) = { println("!!!!!!called unimplemented testSingle mac") }
-    def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VMask) = { println("!!!!!!called unimplemented testMultiple mask")}
-    def testSingle(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VMask) = { println("!!!!!!called unimplemented testSingle mask") }
-    def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VFPUWrapper) = { println("!!!!!!called unimplemented testMultiple FPU")}
-    def testSingle(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VFPUWrapper) = { println("!!!!!!called unimplemented testSingle FPU") }
-    def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VDivWrapper) = { println("!!!!!!called unimplemented testMultiple Div")}
-    def testSingle(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VDivWrapper) = { println("!!!!!!called unimplemented testSingle Div") }
-    def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:Reduction) = { println("!!!!!!called unimplemented testMultiple Reduction")}
-    def testSingle(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:Reduction) = { println("!!!!!!called unimplemented testSingle Reduction") }*/
-
 }

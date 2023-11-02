@@ -121,22 +121,14 @@ trait VAluBehavior {
     }
   }*/
 
-  def vsalu(sim:Map[Int,Map[String,String]], ctrl:TestCtrlBundleBase, tb:TestBehavior, j:Int = -1): Unit = {
-    var testName = "pass the test: " + tb.getInstid() + " lmul gt 1"
+  def testMain(testEngine : TestEngine, j:Int = -1): Unit = {
+    var testName = "Tests on " + testEngine.getName()
     if (j != -1) testName += s" datasplit $j"
     it should s"$testName" in {
-      test(tb.getDut()).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-        tb.test_init(dut)
-      
-        val nameList=sim.map(_._1)
-        println(s"Starting test for ${tb.getInstid()}")
-        println("test counts:",nameList.max)
-        for(i <- 0 until nameList.max+1){
-          println("test input id: ", i)
-          tb.testMultiple(sim(i), ctrl, s, dut)
-        }
-        println(s"${tb.getInstid()}, tests are done.")
-        Dump.recordDone(s"${tb.getInstid()}")
+      test(testEngine.getDut()).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+        testEngine.test_init(dut)
+        println(s"Starting tests for ${testEngine.getName()}")
+        testEngine.run(dut)
       }
     }
   }
@@ -282,7 +274,9 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
 
     // new VredsumvsTestBehavior,
 
-    new VslideupvxFSMTestBehavior,
+    new VaddvvTestBehavior,
+
+    // new VslideupvxFSMTestBehavior,
     // new VfaddvvTestBehavior,
     // new VnclipwiTestBehavior,
     // new VnclipwxTestBehavior,
@@ -534,6 +528,13 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
 
   // val futures = new ListBuffer[Future[Unit]]
 
+  var dataN = 1
+  var j = 0
+  if (dataSplitMode) {
+    dataN = dataSplitN
+    j = dataSplitIx
+  }
+
   // TODO 1. Create Engines
 
   var testEngineToTB : Array[Seq[TestBehavior]] = Array(Seq(),Seq(),Seq(),Seq(),Seq(),Seq(),Seq())
@@ -545,15 +546,23 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
   var testEngines : Seq[TestEngine] = Seq()
   for(testEngineId <- 0 until testEngineToTB.length) {
     if (testEngineToTB(testEngineId).length != 0) {
-      testEngines :+= TestEngine.getEngine(testEngineId)
+      val testEngine = TestEngine.getEngine(testEngineId)
+      testEngine.fillTBs(testEngineToTB(testEngineId))
+      testEngines :+= testEngine
     }
   }
 
-  // TODO 2. Read Files into Maps
+  for(testEngine <- testEngines) {
+    it should behave like testMain(testEngine, j)
+  }
+
+
+
+
 
 
   
-  for(i <- 0 until tbs.length) {
+  /*for(i <- 0 until tbs.length) {
     // params
     val tb = tbs(i)
 
@@ -597,6 +606,6 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
       println(s"Data file does not exist for instruction: ${tb.getInstid()} , skipping")
       Dump.recordIncorrectInst(tb.getInstid())
     }
-  }
+  }*/
 }
 

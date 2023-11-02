@@ -18,36 +18,38 @@ import darecreek.exu.vfu.reduction._
 import chipsalliance.rocketchip.config.Parameters
 import scala.util.control.Breaks._
 
-val ALU_TEST_ENGINE = 0
-val MAC_TEST_ENGINE = 1
-val RED_TEST_ENGINE = 2
-val MASK_TEST_ENGINE = 3
-val PERM_TEST_ENGINE = 4
-val DIV_TEST_ENGINE = 5
-val FP_TEST_ENGINE = 6
-
 object TestEngine {
-    def getEngine(testEngineId : Int) : TestEngine {
+    val ALU_TEST_ENGINE = 0
+    val MAC_TEST_ENGINE = 1
+    val RED_TEST_ENGINE = 2
+    val MASK_TEST_ENGINE = 3
+    val PERM_TEST_ENGINE = 4
+    val DIV_TEST_ENGINE = 5
+    val FP_TEST_ENGINE = 6
+
+    def getEngine(testEngineId : Int) : TestEngine = {
         return testEngineId match {
-            case ALU_TEST_ENGINE : new ALUTestEngine
-            case MAC_TEST_ENGINE : {}
+            case 0 => new ALUTestEngine
+            /*case MAC_TEST_ENGINE : {}
             case RED_TEST_ENGINE : {}
             case MASK_TEST_ENGINE : {}
             case PERM_TEST_ENGINE : {}
             case DIV_TEST_ENGINE : {}
-            case FP_TEST_ENGINE : {}
+            case FP_TEST_ENGINE : {}*/
         }
     }
 }
 
 class ALUTestEngine extends TestEngine {
-    val MAX_PARA_INSTS = 3
-    val MAX_PARA_TESTCASES = 5
-    var curTestCasePool : Map[Int, TestCase] = Map()
+    val MAX_PARA_INSTS = 1
+    val MAX_PARA_TESTCASES = 3
+    var curTestCasePool : Map[Int, (TestBehavior, TestCase)] = Map()
     var testBehaviorPool : Seq[TestBehavior] = Seq()
 
     var nextNormalModeTBIx = 0
     var robIndex = 0
+
+    override def getName() = "ALUTestEngine"
 
     override def run(dut:VAluWrapper) = {
         // println("ALUTestEngine run() not implemented")
@@ -55,10 +57,17 @@ class ALUTestEngine extends TestEngine {
         // TODO 11.1: Add redirect later..
 
         breakable{ while(true) {
+            if (this.nextNormalModeTBIx >= this.normalModeTBs.length 
+                && this.testBehaviorPool.length == 0
+                && this.curTestCasePool.isEmpty()) {
+                println("TestEngine: all normal mode instructions are tested")
+                break
+            }
             // TODO 1. run tests for normal mode instructions
             //  TODO MAX parallel instruction limit
             //  TODO randomly chosen between normal mode instructions
             //  TODO record done when all inputs of one instruction are fed
+
 
             // TODO 1.1. Fill insts (TestCases from TestBehavior)
             while (this.testBehaviorPool.length < MAX_PARA_TESTCASES &&
@@ -70,29 +79,52 @@ class ALUTestEngine extends TestEngine {
             while (this.curTestCasePool.length < MAX_PARA_TESTCASES &&
             this.testBehaviorPool.length > 0) {
                 val randomTBinPool = this.testBehaviorPool(Random.nextInt(this.testBehaviorPool.length))
-                this.curTestCasePool += (this.robIndex -> randomTBinPool.getNextTestCase())
+                this.curTestCasePool += (this.robIndex -> (randomTBinPool, randomTBinPool.getNextTestCase()))
                 this.robIndex += 1
             }
 
             // TODO 1.2. Randomly choose one among TestCases
             //  TODO 1.2.1. Randomly redirect and remove 
             //  TODO 1.2.2. If not redirecting, get next uop from it and feed it to the dut
-            val chosenTestCase = Random.shuffle(myMap.toList).head._2
+            val (chosenTestBehavior, chosenTestCase) = Random.shuffle(this.curTestCasePool.toList).head._2
+            val (input, uopIdx) = chosenTestCase.nextVfuInput()
+            println(s"Sending ${chosenTestCase.instid}, uop ${uopIdx}")
 
             // ===================== manipulating dut ========================
             dut.io.out.ready.poke(true.B)
             dut.io.in.valid.poke(true.B)
 
-            dut.io.in.bits.poke(chosenTestCase.nextVfuInput())
+            dut.io.in.bits.poke(input)
             dut.clock.step(1)
+
+            val dutVd = dut.io.out.bits.vd.peek().litValue
             // ===============================================================
 
-            // TODO 1.3. check for potential results, give it to corresponding TestBehavior and get the comparison result
-            //  TODO 1.3.0. if the result is incorrect, record the incorrect result and remove the TestCase and TestBehavior
-            //  TODO 1.3.1. check if all uops' results are checked and remove the TestCase from the pool
-            //  TODO 1.3.2. check if all test cases of an TestBehavior are done and record the result, remove it from the pool
-            //  TODO 1.3.2. check if all normal mode instruction tests are done, proceed to test ordered instructions
+            // TODO 1.3. check for potential results, get the comparison result
+            val resCorrectness = chosenTestCase.rc.checkRes(dutVd, uopIdx)
 
+            //  TODO 1.3.0. if the result is incorrect, record the incorrect result and remove the TestCase and TestBehavior
+            if (!resCorrectness) {
+                println(s"${chosenTestCase.instid}, result incorrect")
+                this.curTestCasePool = this.curTestCasePool.filterNot(_._2._1 == chosenTestBehavior)
+                this.testBehaviorPool = this.testBehaviorPool.filterNot(_ == chosenTestBehavior)
+            } else {
+                //  TODO 1.3.1. check if all uops' results are checked and remove the TestCase from the pool
+                if (chosenTestCase.isCompleted()) {
+                    this.curTestCasePool = this.curTestCasePool.filterNot(_._2._2 == chosenTestCase)
+
+                    //  TODO 1.3.2. check if TestBehavior are done and record the result, remove it from the pool
+                    if (!this.curTestCasePool.values.exists(_._1 = chosenTestBehavior)) {
+                        println(s"${chosenTestBehavior.getInstid()}, tests are done.")
+                        Dump.recordDone(s"${chosenTestBehavior.getInstid()}")
+                    }
+                }
+            }
+
+            //  TODO 1.3.2. check if all test cases of an TestBehavior are fetched
+            if (chosenTestBehavior.isFinished()) {
+                this.testBehaviorPool = this.testBehaviorPool.filterNot(_ == chosenTestBehavior)
+            }
         } }
 
         // TODO 2. run tests for ordered instructions
@@ -104,10 +136,13 @@ abstract class TestEngine extends BundleGenHelper {
     var normalModeTBs : Seq[TestBehavior] = Seq()
     var orderedTBs : Seq[TestBehavior] = Seq()
     
-    def run(tbs: Seq[TestBehavior], dut:Module) = {
-        if(this.normalModeTBs.length == 0 && this.orderedTBs.length == 0) {
+    def getName() = "TestEngine"
+    def getDut() = new VAluWrapper
+    
+    def run(dut:Module) = {
+        /*if(this.normalModeTBs.length == 0 && this.orderedTBs.length == 0) {
             this.fillTBs(tbs)
-        }
+        }*/
 
         dut match {
             case alu_dut : VAluWrapper => run(alu_dut)
@@ -127,6 +162,18 @@ abstract class TestEngine extends BundleGenHelper {
             } else {
                 this.orderedTBs :+= testBehaviors(i)
             }
+        }
+    }
+
+    def test_init(dut : Module) {
+        dut match {
+            case alu_dut : VAluWrapper => TestHarnessAlu.test_init(alu_dut)
+            case mac_dut : VMacWrapper => TestHarnessMac.test_init(mac_dut)
+            case mask_dut : VMask => TestHarnessMask.test_init(mask_dut)
+            case dut : VFPUWrapper => TestHarnessFPU.test_init(dut)
+            case dut : VDivWrapper => TestHarnessDiv.test_init(dut)
+            case dut : Reduction => {}
+            case perm_dut : Permutation => TestHarnessFSM.test_init(perm_dut)
         }
     }
 

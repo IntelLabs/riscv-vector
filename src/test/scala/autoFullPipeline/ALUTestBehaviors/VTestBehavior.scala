@@ -106,7 +106,8 @@ class VadcvimTestBehavior extends VTestBehavior("vadc.vim.data", ctrlBundles.vad
 class VTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String,
     _vm : Option[Boolean] = None) extends TestBehavior(fn, cb, s, instid) {
 
-    override def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VAluWrapper) : Unit = {
+    override def _getNextTestCase(simi:Map[String,String]) : TestCase = {
+        val ctrl = this.ctrlBundle
         var vx = simi.get("RS1") != None || simi.get("FS1") != None
         var vv = simi.get("VS1") != None
         var vs1data : Array[String] = Array()
@@ -128,11 +129,10 @@ class VTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String,
         
         val hasOldvd = simi.get("OLD_VD") != None
         var oldvddata : Array[String] = Array()
-        if (hasOldvd)
-            oldvddata = UtilFuncs.multilmuldatahandle(simi.get("OLD_VD").get)
+        if (hasOldvd) oldvddata = UtilFuncs.multilmuldatahandle(simi.get("OLD_VD").get)
+        
         var mask = Array("hffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff")
-        if (simi.get("MASK") != None)
-            mask = UtilFuncs.multilmuldatahandle(simi.get("MASK").get)
+        if (simi.get("MASK") != None) mask = UtilFuncs.multilmuldatahandle(simi.get("MASK").get)
         
         val vflmul = simi.get("vflmul").get
         val vsew = UtilFuncs.vsewconvert(simi.get("vsew").get)
@@ -164,7 +164,14 @@ class VTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String,
         
         var finalVxsat = false
         var vd : BigInt = 0
-        var vdres = false  
+        var vdres = false
+
+        val nRes = if (hasVd) n_inputs; else 1
+        val resultChecker = ALUVResultChecker.newChecker(nRes, expectvd, hasVd, vxsat, 
+            (a, b) => this.dump(simi, a, b))
+
+        var srcBundles : Seq[SrcBundle] = Seq()
+        var ctrlBundles : Seq[CtrlBundle] = Seq()
         for(j <- 0 until n_inputs){
             var vs2 = "h0"
             if(hasvs2) vs2 = vs2data(j)
@@ -180,35 +187,39 @@ class VTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String,
             if (vx)
                 srcBundle.rs1 = vs1data(0)
             
-            dut.io.in.bits.poke(genVFuInput(
-                srcBundle, 
-                ctrl.copy(
-                    vsew=vsew,
-                    vs1_imm=getImm(simi),
-                    vl=simi.get("vl").get.toInt,
-                    vlmul = UtilFuncs.lmulconvert(vflmul).toInt, 
-                    ma = (simi.get("ma").get.toInt == 1),
-                    ta = (simi.get("ta").get.toInt == 1),
-                    vm = vm,
-                    uopIdx=n_inputs - 1 -j,
-                    vxrm = vxrm,
-                    frm=getfrm(simi),
-                    vstart = vstart
-                )
-            ))
-            dut.clock.step(1)
-            // println(s"??? ${finalVxsat}")
-            finalVxsat = finalVxsat || dut.io.out.bits.vxsat.peek().litValue == 1
+            val ctrlBundle = ctrl.copy(
+                vsew=vsew,
+                vs1_imm=getImm(simi),
+                vl=simi.get("vl").get.toInt,
+                vlmul = UtilFuncs.lmulconvert(vflmul).toInt, 
+                ma = (simi.get("ma").get.toInt == 1),
+                ta = (simi.get("ta").get.toInt == 1),
+                vm = vm,
+                uopIdx=n_inputs - 1 -j,
+                vxrm = vxrm,
+                frm=getfrm(simi),
+                vstart = vstart
+            )
+
+            srcBundles :+= srcBundle
+            ctrlBundles :+= ctrlBundle
             
-            if (hasVd) {
+            /*if (hasVd) {
                 vd = dut.io.out.bits.vd.peek().litValue
                 vdres = f"h$vd%032x".equals(expectvd(j))
                 Logger.printvds(f"h$vd%032x", expectvd(j))
                 if (!vdres) dump(simi, f"h$vd%032x", expectvd(j))
                 assert(vdres)
-            }
+            }*/
         }
-        assert(finalVxsat == vxsat)
+
+        return TestCase.newNormalCase(
+            this.instid,
+            srcBundles,
+            ctrlBundles,
+            resultChecker
+        )
+        /*assert(finalVxsat == vxsat)
 
         if (hasRd || hasFd) {
             vd = dut.io.out.bits.vd.peek().litValue
@@ -216,13 +227,9 @@ class VTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String,
             Logger.printvds(f"h$vd%016x", expectvd(0))
             if (!vdres) dump(simi, f"h$vd%016x", expectvd(0))
             assert(vdres)
-        }
+        }*/
 
         /*val aluOutput = genVAluOutput(f"h${0}%032x", finalVxsat)
         println(s"aluOutput == Bundle ${dut.io.out.bits.expect(aluOutput)}")*/
-    }
-
-    override def testSingle(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VAluWrapper) : Unit = {
-        testMultiple(simi, ctrl, s, dut)
     }
 }
