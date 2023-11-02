@@ -205,7 +205,8 @@ class VIntMisc64b(implicit p: Parameters) extends VFuModule {
            Mux(funct6(5, 2) === "b0010".U, bitLogical, mergeMove)))
   io.rd.bits := Mux1H(Seq(
     (funct3 === "b010".U) -> Mux1H(sew.oneHot, Seq(8, 16, 32, 64).map(k => vs2(k-1, 0).asSInt.pad(XLEN).asUInt)),
-    (funct3 === "b001".U) -> Mux1H(sew.oneHot(3,2), Seq(32, 64).map(k => vs2(k-1, 0).asUInt.pad(XLEN))),
+    // (funct3 === "b001".U) -> Mux1H(sew.oneHot(3,2), Seq(32, 64).map(k => vs2(k-1, 0).asUInt.pad(XLEN))),
+    (funct3 === "b001".U) -> Mux(sew.oneHot(3), vs2(FLEN-1, 0), Cat(~0.U(32.W), vs2(31, 0))),
   ))
   io.rd.valid := funct6 === "b010000".U && (funct3 === "b010".U || funct3 === "b001".U)
 }
