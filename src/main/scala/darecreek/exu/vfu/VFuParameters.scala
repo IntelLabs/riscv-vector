@@ -9,6 +9,7 @@ case object VFuParamsKey extends Field[VFuParameters]
 case class VFuParameters
 (
   XLEN: Int = 64,
+  FLEN: Int = 64,
   VLEN: Int = 128
 )
 
@@ -18,6 +19,8 @@ trait HasVFuParameters {
   val vfuParams = p(VFuParamsKey)
 
   val XLEN = vfuParams.XLEN
+  val FLEN = vfuParams.FLEN
+  require(XLEN == FLEN)
   val VLEN = vfuParams.VLEN
   val bVL = log2Up(VLEN) + 1
   val bVSTART = bVL - 1
