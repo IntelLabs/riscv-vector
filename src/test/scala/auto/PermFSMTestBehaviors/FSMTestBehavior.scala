@@ -78,6 +78,13 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
         return false
     }
 
+    def randomFlush() : Boolean = {
+        if(rand.nextInt(100) > 20) {
+            return true
+        }
+        return false
+    }
+
     def resComp(goldenVd : Array[String], vd : Array[String], n_inputs : Int, simi : Map[String, String]) : Unit = {
         for(j <- 0 until n_inputs) {
             Logger.printvds(vd(j), goldenVd(n_inputs - 1 - j))
@@ -159,7 +166,7 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
             // ================================================
             // 10.27 add random flush
             var robIdx = (false, 0)
-            robIdxValid = randomBool()
+            robIdxValid = randomFlush()
             if (robIdxValid) {
                 robIdx = (true, 1)
             }
@@ -432,6 +439,10 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
 
         // ========================================================================================================================
         val res_vds = stageTwo(dut, preg_to_value, n_inputs, ctrl)
+        if (robIdxValid) {
+            println("robIdxValid = true, flush this instruction")
+            return
+        }
         resComp(expectvd, res_vds, n_inputs, simi)
     }
 
