@@ -7,6 +7,7 @@ import chiseltest.WriteVcdAnnotation
 import scala.reflect.io.File
 import scala.reflect.runtime.universe._
 import scala.util.control.Breaks._
+import scala.util.Random
 
 import darecreek.exu.vfu.perm._
 import darecreek.exu.vfu._
@@ -49,9 +50,13 @@ class VrgatherviFSMTestBehavior extends slidefsm("vrgather.vi.data", ctrlBundles
 class Vfslide1upvfFSMTestBehavior extends slidefsm("vfslide1up.vf.data", ctrlBundles.vfslide1up_vf, "-", "vfslide1up_vf") {}
 class Vfslide1downvfFSMTestBehavior extends slidefsm("vfslide1down.vf.data", ctrlBundles.vfslide1down_vf, "-", "vfslide1down_vf") {}
 
+object RandomGen {
+    val rand = new Random(seed = 42)
+}
+
 class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extends TestBehavior(fn, cb, s, instid) {
     
-    val rand = new scala.util.Random
+    // val rand = new scala.util.Random
     val maxBlocks = 20
     var blocks = 0
     val vs1base = 100
@@ -75,11 +80,15 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
     case class ClkAry(clk : Int, ary: Array[String])
 
     def randomBool() : Boolean = {
-        if(rand.nextInt(100) > 50 && blocks < maxBlocks) {
+        if(RandomGen.rand.nextInt(100) > 50 && blocks < maxBlocks) {
             blocks += 1
             return true
         }
         return false
+    }
+
+    def randomFlush() : Boolean = {
+        return RandomGen.rand.nextInt(100) > 95
     }
 
     def resComp(goldenVd : Array[String], vd : Array[String], n_inputs : Int, simi : Map[String, String]) : Unit = {
@@ -163,13 +172,7 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
             // ================================================
             // 10.27 add random flush
             var robIdx = (false, 0)
-            robIdxValid = if ((testCountsDebug == 1) && useFlushDebug) {
-                true
-            } else {
-                false
-            }
-            
-            // randomBool()
+            robIdxValid = randomFlush()
             if (robIdxValid) {
                 robIdx = (true, 1)
             }
@@ -443,6 +446,10 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
 
         // ========================================================================================================================
         val res_vds = stageTwo(dut, preg_to_value, n_inputs, ctrl)
+        if (robIdxValid) {
+            println("robIdxValid = true, flush this instruction")
+            return
+        }
         resComp(expectvd, res_vds, n_inputs, simi)
     }
 

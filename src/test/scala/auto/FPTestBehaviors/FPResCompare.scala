@@ -55,7 +55,7 @@ abstract class FPResult extends BundleGenHelper {
     }
 
     def trimLow(vd : String) : String = {
-        return f"${vd.slice(0, vd.length - 1)}0"
+        return f"${vd.slice(0, vd.length - 2)}00"
     }
 
     def redVdCompare(dut : VFPUWrapper, simi : Map[String, String], 

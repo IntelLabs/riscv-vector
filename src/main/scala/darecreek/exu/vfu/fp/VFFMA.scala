@@ -75,14 +75,14 @@ class VFMASrcPreprocessPipe(implicit val p: Parameters) extends VFPUBaseModule {
   ))
   // widen fma insts do not need vdvs2 switch
   fcvt1.io.in := Mux(
-    widenState === WidenState.sEmpty,
-    vs1StageMid.tail(32),
-    vs1StageMid.head(32)
+    uop.expdIdx(0),
+    vs1StageMid.head(32),
+    vs1StageMid.tail(32)
   )
   fcvt2.io.in := Mux(
-    widenState === WidenState.sEmpty,
-    vs2StageMid.tail(32),
-    vs2StageMid.head(32)
+    uop.expdIdx(0),
+    vs2StageMid.head(32),
+    vs2StageMid.tail(32)
   )
   fcvt1.io.rm := 0.U  // up convert, thus no need to specify rounding mode
   fcvt2.io.rm := 0.U
