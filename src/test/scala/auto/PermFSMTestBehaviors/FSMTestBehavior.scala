@@ -84,7 +84,7 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
     }
 
     def randomFlush() : Boolean = {
-        return RandomGen.rand.nextInt(100) > 90
+        return RandomGen.rand.nextInt(100) > 95
     }
 
     def resComp(goldenVd : Array[String], vd : Array[String], n_inputs : Int, simi : Map[String, String]) : Unit = {
