@@ -6,6 +6,7 @@ import chisel3._
 import chiseltest.WriteVcdAnnotation
 import scala.reflect.io.File
 import scala.reflect.runtime.universe._
+import scala.collection.mutable.Map
 
 import darecreek.exu.vfu._
 import darecreek.exu.vfu.alu._
@@ -22,7 +23,8 @@ class VsextVf8TestBehavior extends VzvsTestBehavior("vsext.vf8.data", ctrlBundle
 
 class VzvsTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String, vs1_imm : Int, multiple : Int) extends TestBehavior(fn, cb, s, instid) {
     
-    override def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VAluWrapper) : Unit = {
+    override def _getNextTestCase(simi:Map[String,String]) : TestCase = {
+        val ctrl = this.getCtrlBundle()
         val vs2data = UtilFuncs.multilmuldatahandle(simi.get("VS2").get)
         val oldvddata = UtilFuncs.multilmuldatahandle(simi.get("OLD_VD").get)
         val mask = UtilFuncs.multilmuldatahandle(simi.get("MASK").get)
@@ -45,16 +47,21 @@ class VzvsTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String
             
         // println("1111")
         var n_ops = n_inputs
+
+        val nRes = n_ops
+        val resultChecker = ALUVResultChecker.newChecker(nRes, expectvd, true, vxsat, 
+            (a, b) => this.dump(simi, a, b))
+        var srcBundles : Seq[SrcBundle] = Seq()
+        var ctrlBundles : Seq[CtrlBundle] = Seq()
+        
         for(j <- 0 until n_ops){
-            dut.io.out.ready.poke(true.B)
-            dut.io.in.valid.poke(true.B)
-            dut.io.in.bits.poke(genVFuInput(
+            
                 // vs2 has been changed
-                SrcBundle(
+            val srcBundle = SrcBundle(
                     vs2=vs2data(n_ops - 1 - ((n_ops - 1 - j) / multiple)),
                     old_vd=oldvddata(j),
-                    mask=mask(0)), 
-                ctrl.copy(
+                    mask=mask(0))
+            val ctrlBundle = ctrl.copy(
                     vsew=vsew,
                     vs1_imm=vs1_imm,
                     vl=simi.get("vl").get.toInt,
@@ -65,20 +72,17 @@ class VzvsTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String
                     uopIdx=n_ops - 1 -j,
                     vxrm = vxrm,
                     vstart = getVstart(simi)
-                )
-            ))
-            dut.clock.step(1)
-            // finalVxsat = finalVxsat || dut.io.out.bits.vxsat.peek().litValue == 1
-            vd = dut.io.out.bits.vd.peek().litValue
-            vdres = f"h$vd%032x".equals(expectvd(j))
-            if (!vdres) dump(simi, f"h$vd%032x", expectvd(j))
-            Logger.printvds(f"h$vd%032x", expectvd(j))
-            assert(vdres)
+            )
+            
+            srcBundles :+= srcBundle
+            ctrlBundles :+= ctrlBundle
         }
         // assert(finalVxsat == vxsat)
-    }
-
-    override def testSingle(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VAluWrapper) : Unit = {
-        testMultiple(simi,ctrl,s, dut)
+        return TestCase.newNormalCase(
+            this.instid,
+            srcBundles,
+            ctrlBundles,
+            resultChecker
+        )
     }
 }

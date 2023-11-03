@@ -6,7 +6,9 @@ import chisel3._
 import chiseltest.WriteVcdAnnotation
 import scala.reflect.io.File
 import scala.reflect.runtime.universe._
+import scala.collection.mutable.Map
 import scala.util.Random
+
 import darecreek.exu.vfu._
 import darecreek.exu.vfu.alu._
 import darecreek.exu.vfu.VInstructions._
@@ -41,7 +43,7 @@ object TestEngine {
 }
 
 class ALUTestEngine extends TestEngine {
-    val MAX_PARA_INSTS = 1
+    val MAX_PARA_INSTS = 2
     val MAX_PARA_TESTCASES = 3
     var curTestCasePool : Map[Int, (TestBehavior, TestCase)] = Map()
     var testBehaviorPool : Seq[TestBehavior] = Seq()
@@ -59,7 +61,7 @@ class ALUTestEngine extends TestEngine {
         breakable{ while(true) {
             if (this.nextNormalModeTBIx >= this.normalModeTBs.length 
                 && this.testBehaviorPool.length == 0
-                && this.curTestCasePool.isEmpty()) {
+                && this.curTestCasePool.isEmpty) {
                 println("TestEngine: all normal mode instructions are tested")
                 break
             }
@@ -76,7 +78,7 @@ class ALUTestEngine extends TestEngine {
                 this.nextNormalModeTBIx += 1
             }
 
-            while (this.curTestCasePool.length < MAX_PARA_TESTCASES &&
+            while (this.curTestCasePool.size < MAX_PARA_TESTCASES &&
             this.testBehaviorPool.length > 0) {
                 val randomTBinPool = this.testBehaviorPool(Random.nextInt(this.testBehaviorPool.length))
                 this.curTestCasePool += (this.robIndex -> (randomTBinPool, randomTBinPool.getNextTestCase()))
@@ -86,8 +88,8 @@ class ALUTestEngine extends TestEngine {
             // TODO 1.2. Randomly choose one among TestCases
             //  TODO 1.2.1. Randomly redirect and remove 
             //  TODO 1.2.2. If not redirecting, get next uop from it and feed it to the dut
-            val (chosenTestBehavior, chosenTestCase) = Random.shuffle(this.curTestCasePool.toList).head._2
-            val (input, uopIdx) = chosenTestCase.nextVfuInput()
+            val (chosenTestBehavior, chosenTestCase) : (TestBehavior, TestCase) = Random.shuffle(this.curTestCasePool.toList).head._2
+            val (input, uopIdx) : (VFuInput, Int) = chosenTestCase.nextVfuInput()
             println(s"Sending ${chosenTestCase.instid}, uop ${uopIdx}")
 
             // ===================== manipulating dut ========================
@@ -98,14 +100,16 @@ class ALUTestEngine extends TestEngine {
             dut.clock.step(1)
 
             val dutVd = dut.io.out.bits.vd.peek().litValue
+            val dutVxsat = dut.io.out.bits.vxsat.peek().litValue == 1
             // ===============================================================
 
             // TODO 1.3. check for potential results, get the comparison result
-            val resCorrectness = chosenTestCase.rc.checkRes(dutVd, uopIdx)
+            val resCorrectness = chosenTestCase.rc.checkRes(dutVd, uopIdx, dutVxsat=dutVxsat)
 
             //  TODO 1.3.0. if the result is incorrect, record the incorrect result and remove the TestCase and TestBehavior
             if (!resCorrectness) {
                 println(s"${chosenTestCase.instid}, result incorrect")
+                chosenTestBehavior.recordFail()
                 this.curTestCasePool = this.curTestCasePool.filterNot(_._2._1 == chosenTestBehavior)
                 this.testBehaviorPool = this.testBehaviorPool.filterNot(_ == chosenTestBehavior)
             } else {
@@ -114,9 +118,10 @@ class ALUTestEngine extends TestEngine {
                     this.curTestCasePool = this.curTestCasePool.filterNot(_._2._2 == chosenTestCase)
 
                     //  TODO 1.3.2. check if TestBehavior are done and record the result, remove it from the pool
-                    if (!this.curTestCasePool.values.exists(_._1 = chosenTestBehavior)) {
+                    if (!this.curTestCasePool.values.exists(_._1 == chosenTestBehavior)) {
                         println(s"${chosenTestBehavior.getInstid()}, tests are done.")
                         Dump.recordDone(s"${chosenTestBehavior.getInstid()}")
+                        chosenTestBehavior.recordSuccess()
                     }
                 }
             }
@@ -139,7 +144,7 @@ abstract class TestEngine extends BundleGenHelper {
     def getName() = "TestEngine"
     def getDut() = new VAluWrapper
     
-    def run(dut:Module) = {
+    def run(dut:Module) : Unit = {
         /*if(this.normalModeTBs.length == 0 && this.orderedTBs.length == 0) {
             this.fillTBs(tbs)
         }*/
@@ -177,11 +182,11 @@ abstract class TestEngine extends BundleGenHelper {
         }
     }
 
-    def run(dut:VAluWrapper) = { println("!!!!!!called unimplemented run alu")}
-    def run(dut:Permutation) = { println("!!!!!!called unimplemented run perm")}
-    def run(dut:VMacWrapper) = { println("!!!!!!called unimplemented run mac")}
-    def run(dut:VMask) = { println("!!!!!!called unimplemented run mask")}
-    def run(dut:VFPUWrapper) = { println("!!!!!!called unimplemented run FPU")}
-    def run(dut:VDivWrapper) = { println("!!!!!!called unimplemented run Div")}
-    def run(dut:Reduction) = { println("!!!!!!called unimplemented run Reduction")}
+    def run(dut:VAluWrapper) : Unit = { println("!!!!!!called unimplemented run alu")}
+    def run(dut:Permutation) : Unit = { println("!!!!!!called unimplemented run perm")}
+    def run(dut:VMacWrapper) : Unit = { println("!!!!!!called unimplemented run mac")}
+    def run(dut:VMask) : Unit = { println("!!!!!!called unimplemented run mask")}
+    def run(dut:VFPUWrapper) : Unit = { println("!!!!!!called unimplemented run FPU")}
+    def run(dut:VDivWrapper) : Unit = { println("!!!!!!called unimplemented run Div")}
+    def run(dut:Reduction) : Unit = { println("!!!!!!called unimplemented run Reduction")}
 }

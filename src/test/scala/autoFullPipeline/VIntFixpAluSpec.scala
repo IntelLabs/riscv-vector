@@ -10,6 +10,8 @@ import darecreek.exu.vfu.alu._
 import darecreek.exu.vfu.VInstructions._
 import chiseltest.WriteVcdAnnotation
 import scala.reflect.runtime.universe._
+import scala.collection.mutable.Map
+
 import scala.io.Source
 import java.io.FileWriter
 import java.time.{LocalDate, LocalDateTime}
@@ -121,7 +123,7 @@ trait VAluBehavior {
     }
   }*/
 
-  def testMain(testEngine : TestEngine, j:Int = -1): Unit = {
+  def testMain(testEngine : TestEngine, j:Int = -1, printFunc : () => Unit = () => {}): Unit = {
     var testName = "Tests on " + testEngine.getName()
     if (j != -1) testName += s" datasplit $j"
     it should s"$testName" in {
@@ -130,6 +132,8 @@ trait VAluBehavior {
         println(s"Starting tests for ${testEngine.getName()}")
         testEngine.run(dut)
       }
+
+      printFunc()
     }
   }
 
@@ -274,7 +278,9 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
 
     // new VredsumvsTestBehavior,
 
-    new VaddvvTestBehavior,
+    // new VaddvvTestBehavior,
+    new VzextVf2TestBehavior,
+    // new VmvxsTestBehavior,
 
     // new VslideupvxFSMTestBehavior,
     // new VfaddvvTestBehavior,
@@ -552,12 +558,24 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
     }
   }
 
-  for(testEngine <- testEngines) {
-    it should behave like testMain(testEngine, j)
+  val printRes : (() => Unit) = () => { 
+    println("============================== TEST RESULT ==================================")
+    for(tb <- tbs) {
+      var result = "\u001b[32mSUCCESS\u001b[0m"
+      if (!tb.testResult) result = "\u001b[31mFAILED\u001b[0m"
+      println(s"${tb.getInstid()} \t ${result}")
+    }
+    println("============================== TEST RESULT ==================================")
   }
 
-
-
+  for(i <- 0 until testEngines.length) {
+    val testEngine = testEngines(i)
+    var printFunc : () => Unit = () => {}
+    if (i == testEngines.length - 1) {
+      printFunc = printRes
+    }
+    it should behave like testMain(testEngine, j, printFunc)
+  }
 
 
 

@@ -4,8 +4,13 @@ import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
 import chisel3._
 import chiseltest.WriteVcdAnnotation
+import java.io.FileWriter
+import java.time.{LocalDate, LocalDateTime}
+import java.nio.file.{Paths, Files}
 import scala.reflect.io.File
 import scala.reflect.runtime.universe._
+import scala.collection.mutable.Map
+
 import darecreek.exu.vfu._
 import darecreek.exu.vfu.alu._
 import darecreek.exu.vfu.VInstructions._
@@ -21,7 +26,7 @@ object TestCase {
     def newNormalCase(
         instid : String, 
         srcBundles : Seq[SrcBundle], 
-        ctrlBundles : Seq[CtrlBundle], rc : ResultChecker) {
+        ctrlBundles : Seq[CtrlBundle], rc : ResultChecker) : TestCase = {
         
         var tc = new TestCase(instid, ctrlBundles, rc)
         tc.srcBundles = srcBundles
@@ -30,8 +35,8 @@ object TestCase {
 
     def newFSMCase(
         instid : String, 
-        fsmSrcBundles : Seq[SrcBundle], 
-        ctrlBundles : Seq[CtrlBundle], rc : ResultChecker) {
+        fsmSrcBundles : Seq[FSMSrcBundle], 
+        ctrlBundles : Seq[CtrlBundle], rc : ResultChecker) : TestCase = {
         
         var tc = new TestCase(instid, ctrlBundles, rc)
         tc.fsmSrcBundles = fsmSrcBundles
@@ -44,40 +49,42 @@ class TestCase(
         val instid : String,
         val ctrlBundles : Seq[CtrlBundle], 
         val rc : ResultChecker,
+        var uopIx : Int = 0
         // val checkRes : (String, Boolean, Int, Int) => (Boolean, Boolean) 
         // (dut vd, vxsat, fflags, uopIdx) => (correctness, isCompleted)
-    ) {
+    ) extends BundleGenHelper {
     var srcBundles : Seq[SrcBundle] = Seq()
     var fsmSrcBundles : Seq[FSMSrcBundle] = Seq()
 
     var isFSM : Boolean = false
-    var uopIx = 0
 
     def isCompleted() : Boolean = {
         return this.rc.isCompleted()
     }
 
-    def nextVfuInput() = {
-        if (this.isFSM) println("ERROR: generating normal input for FSM test case")
+    def nextVfuInput() : (VFuInput, Int) = {
+        if (isFSM) println("ERROR: generating normal input for FSM test case")
 
-        val vfuInput = genVFuInput(
-            this.srcBundles[this.uopIx], 
-            this.ctrlBundles[this.uopIx]
+        val vfuInput: VFuInput = genVFuInput(
+            srcBundles(uopIx), 
+            ctrlBundles(uopIx)
         )
-        this.uopIx += 1
 
-        return (vfuInput, this.ctrlBundles[this.uopIx].uopIdx)
+        val idx = ctrlBundles(uopIx).uopIdx
+        uopIx += 1
+
+        return (vfuInput, idx)
     }
 
-    def nextFsmInput() = {
-        if (!this.isFSM) println("ERROR: generating FSM input for normal test case")
+    def nextFsmInput() : (VPermInput, Int) = {
+        if (!isFSM) println("ERROR: generating FSM input for normal test case")
 
-        val fsmInput = genFSMInput(
-            this.fsmSrcBundles[this.uopIx],
-            this.ctrlBundles[this.uopIx]
+        val fsmInput: VPermInput = genFSMInput(
+            fsmSrcBundles(uopIx),
+            ctrlBundles(uopIx)
         )
 
-        this.uopIx += 1
+        uopIx += 1
 
         return (fsmInput, 0)
     }
@@ -88,28 +95,25 @@ abstract class TestBehavior(filename : String, ctrlBundle : CtrlBundle, sign : S
     var inputMaps : Seq[Map[String, String]] = Seq()
     var inputMapCurIx = 0
 
-    // var testResult = true
+    var testResult = true
 
     def getTestfilePath() : String              = Datapath.testdataRoot + filename
     def getCtrlBundle() : CtrlBundle    = ctrlBundle
     def getInstid() : String                    = instid
 
-    // full pipeline
+    def recordFail() = {this.testResult = false}
+    def recordSuccess() = {this.testResult = true}
+    def isFinished() : Boolean = {
+        return this.inputMapCurIx >= this.inputMaps.length
+    }
+
+    // change depending on test behavior =================================
     def getTargetTestEngine(): Int = TestEngine.ALU_TEST_ENGINE
     def isOrdered(): Boolean = {
         println(s"!!!!!!!! $instid not specified isOrdered")
         false
     }
-    // def recordFail() = {this.testResult = false}
-    // def recordSuccess() = {this.testResult = true}
-    def isFinished() = {
-        return this.inputMapCurIx >= this.inputMaps.length
-    }
-    
-    def getDut() : Module               = {
-        val dut = new VAluWrapper
-        return dut
-    }
+    // ====================================================================
 
     def getHexfield(simi : Map[String,String], keyname : String) : Int = {
         if(simi.get(keyname) != None) {
@@ -144,14 +148,6 @@ abstract class TestBehavior(filename : String, ctrlBundle : CtrlBundle, sign : S
     }
 
     def dump(simi : Map[String,String], dut_out : String, golden_vd : String, fault_wb : String = "") = {
-        //println("fault_wb in TestBehavior", fault_wb)
-        /*TestResults.addResult(TestResults.InstTestRes(
-            this.getInstid(),
-            true,
-            dut_out,
-            golden_vd,
-            fault_wb
-        ))*/
         Dump.dump(simi, instid, dut_out, golden_vd, fault_wb=fault_wb)
     }
 
@@ -188,12 +184,12 @@ abstract class TestBehavior(filename : String, ctrlBundle : CtrlBundle, sign : S
                 this.inputMaps = keymap
             }
         } else {
-            println(s"Data file does not exist for instruction: ${tb.getInstid()} , skipping")
-            Dump.recordIncorrectInst(tb.getInstid())
+            println(s"Data file does not exist for instruction: ${getInstid()} , skipping")
+            Dump.recordIncorrectInst(getInstid())
         }
     }
 
-    def getNextTestCase() = {
+    def getNextTestCase() : TestCase = {
         if (this.inputMaps.length == 0) {
             this._readInputsToMap()
         }
@@ -205,8 +201,5 @@ abstract class TestBehavior(filename : String, ctrlBundle : CtrlBundle, sign : S
         return testCase
     }
 
-    def _getNextTestCase(simi : Map[String, String]) = {
-        // TODO generate test case
-        println("!!!!!! called unimplemented _getNextTestCase()!!")
-    }
+    def _getNextTestCase(simi : Map[String, String]) : TestCase
 }

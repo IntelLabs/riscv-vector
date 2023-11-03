@@ -6,6 +6,8 @@ import chisel3._
 import chiseltest.WriteVcdAnnotation
 import scala.reflect.io.File
 import scala.reflect.runtime.universe._
+import scala.collection.mutable.Map
+
 import darecreek.exu.vfu._
 import darecreek.exu.vfu.alu._
 import darecreek.exu.vfu.VInstructions._
@@ -23,7 +25,7 @@ object ALUVResultChecker {
         expectvd : Array[String],
         vdOrRd : Boolean,
         goldenVxsat : Boolean = false,
-        dump : (String, String) => Unit = (a, b) => {}) = {
+        dump : (String, String) => Unit = (a, b) => {}) : ALUVResultChecker = {
             val resultChecker = new ALUVResultChecker(nRes, expectvd, vdOrRd, dump)
             resultChecker.setGoldenVxsat(goldenVxsat)
 
@@ -32,28 +34,29 @@ object ALUVResultChecker {
 }
 
 class ALUVResultChecker(
-    val nRes : Int, 
-    val expectvd : Array[String],
-    val vdOrRd : Boolean,
-    val dump : (String, String) => Unit = (a, b) => {}) extends ResultChecker(nRes, expectvd, dump) {
+    nRes : Int, 
+    expectvd : Array[String],
+    vdOrRd : Boolean,
+    dump : (String, String) => Unit = (a, b) => {}) extends ResultChecker(nRes, expectvd, dump) {
     
-    override def checkRes(dutVd : String, uopIdx : Int) : Boolean = {
-        var correctness : Boolean
-        var vdRes : String
-        var goldenVd : String
+    override def _checkRes(dutVd : BigInt, uopIdx : Int) : Boolean = {
+        var correctness : Boolean = true
+        var vdRes : String = ""
+        var goldenVd : String = ""
         if (vdOrRd) {
             vdRes = f"h$dutVd%032x"
             goldenVd = expectvd(nRes - 1 - uopIdx)
+            Logger.printvds(vdRes, goldenVd)
         } else {
             // RD or FD
             if (uopIdx == 0) {
                 vdRes = f"h$dutVd%016x"
                 goldenVd = expectvd(0)
+                Logger.printvds(vdRes, goldenVd)
             }
         }
         correctness = vdRes.equals(goldenVd)
-        Logger.printvds(vdRes, goldenVd)
-        if (!correctness) dump(dutVd, goldenVd)
+        if (!correctness) dump(vdRes, goldenVd)
 
         return correctness
     }
@@ -61,8 +64,8 @@ class ALUVResultChecker(
 
 class ResultChecker(val nRes : Int, val expectvd : Array[String], 
         val dump : (String, String) => Unit = (a, b) => {}) {
-    val goldenVxsat : Boolean = false
-    val goldenFflags : Int = false
+    var goldenVxsat : Boolean = false
+    var goldenFflags : Int = 0
 
     var resVxsat : Boolean = false
     var resFflags : Int = 0
@@ -83,7 +86,7 @@ class ResultChecker(val nRes : Int, val expectvd : Array[String],
 
     def isCompleted() : Boolean = { this.checkedRes == this.nRes }
 
-    def checkRes(dutVd : String, uopIdx : Int, 
+    def checkRes(dutVd : BigInt, uopIdx : Int, 
             dutVxsat : Boolean = false, dutFflags : Int = 0) : Boolean = {
         
         var res = this._checkRes(dutVd, uopIdx)
@@ -111,7 +114,8 @@ class ResultChecker(val nRes : Int, val expectvd : Array[String],
         return res
     }
 
-    def _checkRes(dutVd : String, uopIdx : Int) : Boolean = {
+    def _checkRes(dutVd : BigInt, uopIdx : Int) : Boolean = {
         println("!!!!!! _checkRes not implemented")
+        false
     }
 }

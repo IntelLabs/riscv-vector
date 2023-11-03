@@ -9,6 +9,7 @@ import darecreek.exu.vfu.alu._
 import darecreek.exu.vfu.VInstructions._
 import chiseltest.WriteVcdAnnotation
 import scala.reflect.runtime.universe._
+import scala.collection.mutable.Map
 import scala.io.Source
 import java.io.FileWriter
 import java.time.{LocalDate, LocalDateTime}

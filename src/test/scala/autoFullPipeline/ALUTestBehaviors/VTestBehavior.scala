@@ -1,4 +1,4 @@
-package darecreek.vfuAutotest.alu
+package darecreek.vfuAutotest.fullPipeline
 
 import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
@@ -6,6 +6,7 @@ import chisel3._
 import chiseltest.WriteVcdAnnotation
 import scala.reflect.io.File
 import scala.reflect.runtime.universe._
+import scala.collection.mutable.Map
 
 import darecreek.exu.vfu._
 import darecreek.exu.vfu.alu._
@@ -107,7 +108,7 @@ class VTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String,
     _vm : Option[Boolean] = None) extends TestBehavior(fn, cb, s, instid) {
 
     override def _getNextTestCase(simi:Map[String,String]) : TestCase = {
-        val ctrl = this.ctrlBundle
+        val ctrl = this.getCtrlBundle()
         var vx = simi.get("RS1") != None || simi.get("FS1") != None
         var vv = simi.get("VS1") != None
         var vs1data : Array[String] = Array()
@@ -175,8 +176,6 @@ class VTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String,
         for(j <- 0 until n_inputs){
             var vs2 = "h0"
             if(hasvs2) vs2 = vs2data(j)
-            dut.io.out.ready.poke(true.B)
-            dut.io.in.valid.poke(true.B)
             var srcBundle = SrcBundle(
                     vs2=vs2,
                     mask=mask(0))

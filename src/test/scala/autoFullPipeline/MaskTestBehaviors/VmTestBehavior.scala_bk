@@ -10,7 +10,7 @@ import chisel3._
 import chiseltest.WriteVcdAnnotation
 import scala.reflect.io.File
 import scala.reflect.runtime.universe._
-import chipsalliance.rocketchip.config.Parameters
+import scala.collection.mutable.Mapimport chipsalliance.rocketchip.config.Parameters
 
 class VmsbfmTestBehavior extends VmTestBehavior("vmsbf.m.data", ctrlBundles.vmsbf_m, "u", "vmsbf_m", false, 0x01) {}
 class VmsifmTestBehavior extends VmTestBehavior("vmsif.m.data", ctrlBundles.vmsif_m, "u", "vmsif_m", false, 0x03) {}

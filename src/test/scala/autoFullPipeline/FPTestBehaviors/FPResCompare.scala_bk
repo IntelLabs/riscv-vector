@@ -6,7 +6,7 @@ import chisel3._
 import chiseltest.WriteVcdAnnotation
 import scala.reflect.io.File
 import scala.reflect.runtime.universe._
-import scala.util.control.Breaks._
+import scala.collection.mutable.Mapimport scala.util.control.Breaks._
 
 import darecreek.exu.vfu._
 import darecreek.exu.vfu.alu._
