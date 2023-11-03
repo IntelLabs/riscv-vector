@@ -116,7 +116,7 @@ class VLsuTestWrapper extends Module {
   }
 }
 
-trait VLsuBehavior {
+trait VLsuBehavior_ld {
   this: AnyFlatSpec with ChiselScalatestTester with BundleGenHelper =>
 
   val ldReqSrc_default = SrcBundleLd()
@@ -124,6 +124,10 @@ trait VLsuBehavior {
   val vle16 = CtrlBundle(VLE16_V)
   val vle32 = CtrlBundle(VLE32_V)
   val vle64 = CtrlBundle(VLE64_V)
+  val vlse8 = CtrlBundle(VLSE8_V)
+  val vlse16 = CtrlBundle(VLSE16_V)
+  val vlse32 = CtrlBundle(VLSE32_V)
+  val vlse64 = CtrlBundle(VLSE64_V)
   val vse8 = CtrlBundle(VSE8_V)
   
   def vLsuTest0(): Unit = {
@@ -491,7 +495,7 @@ trait VLsuBehavior {
   }
 
   def vLsuTest6(): Unit = {
-    it should "pass: unit-stride load (sew=16, el_count=8, el_off=8, el_id=0)" in {
+    it should "pass: unit-stride load (sew=64, vl=15)" in {
       test(new VLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
         test_init(dut)
         dut.clock.step(1)
@@ -564,16 +568,311 @@ trait VLsuBehavior {
     }
   }
 
+  def vLsuTest7(): Unit = {
+    it should "pass: strided load (stride=-1)" in {
+      test(new VLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+        test_init(dut)
+        dut.clock.step(1)
+        val ldReqs = Seq(
+          (vlse32.copy(vl=5, uopIdx=0, uopEnd=true), SrcBundleLd(rs2="hffffffff_ffffffff")),
+        )
+        val ldResps = Seq(
+          ("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d" + 
+            "fedcba98fedcba98_7654321076543210_0123456701234567_89abcdef89abcdef",
+           SeqId(el_count=5, el_off=5, el_id=2)),
+        )
+        next_is_load_and_step(dut)
+        for ((c, s) <- ldReqs) {
+          while (!dut.io.fromIQ.ld.ready.peekBoolean()) {
+            dut.clock.step(1)
+          }
+          dut.io.fromIQ.ld.valid.poke(true.B)
+          dut.io.fromIQ.ld.bits.poke(genLdInput(c, s))
+          dut.clock.step(1)
+        }
+        dut.io.fromIQ.ld.valid.poke(false.B)
+        dut.clock.step(4)
+
+        fork {
+          for ((ldData, seqId)  <- ldResps) {
+            one_512b_load_resp(dut, ldData, seqId.asUInt)
+            dut.clock.step(1)
+          }
+          dut.io.ovi_load.valid.poke(false.B)
+          dut.io.ovi_memop.sync_end.poke(true.B)
+          dut.clock.step(1)
+          dut.io.ovi_memop.sync_end.poke(false.B)
+        }.fork {
+          var wb_cnt = 0
+          for (i <- 0 until 14) {
+            if (dut.io.wb.ld.valid.peekBoolean()) {
+              if (wb_cnt == 0) {
+                dut.io.wb.ld.bits.vd.expect("hfffffffffedcba98_fedcba98000e000d_0001000f000a0009_ffffffffffffffff".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(0.U)
+                wb_cnt += 1
+              } /*else if (wb_cnt == 1) {
+                dut.io.wb.ld.bits.vd.expect("h0008000700060005_000c000b000a0009_0001000f000e000d_fedcba98fedcba98".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(1.U)
+                wb_cnt += 1
+              }*/
+            }
+            dut.clock.step(1)
+          }
+        }.join()
+
+        dut.clock.step(4)
+      }
+    }
+  }
+
+  def vLsuTest8(): Unit = {
+    it should "pass: strided load (stride=2, sew=16)" in {
+      test(new VLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+        test_init(dut)
+        dut.clock.step(1)
+        val ldReqs = Seq(
+          (vlse16.copy(vl=5, uopIdx=0, uopEnd=true), SrcBundleLd(rs2="h4")),
+        )
+        val ldResps = Seq(
+          ("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d" + 
+            "fedcba98fedcba98_7654321076543210_0123456701234567_89abcdef89abcdef",
+           SeqId(el_count=5, el_off=17, el_id=5)),
+        )
+        next_is_load_and_step(dut)
+        for ((c, s) <- ldReqs) {
+          while (!dut.io.fromIQ.ld.ready.peekBoolean()) {
+            dut.clock.step(1)
+          }
+          dut.io.fromIQ.ld.valid.poke(true.B)
+          dut.io.fromIQ.ld.bits.poke(genLdInput(c, s))
+          dut.clock.step(1)
+        }
+        dut.io.fromIQ.ld.valid.poke(false.B)
+        dut.clock.step(4)
+
+        fork {
+          for ((ldData, seqId)  <- ldResps) {
+            one_512b_load_resp(dut, ldData, seqId.asUInt)
+            dut.clock.step(1)
+          }
+          dut.io.ovi_load.valid.poke(false.B)
+          dut.io.ovi_memop.sync_end.poke(true.B)
+          dut.clock.step(1)
+          dut.io.ovi_memop.sync_end.poke(false.B)
+        }.fork {
+          var wb_cnt = 0
+          for (i <- 0 until 14) {
+            if (dut.io.wb.ld.valid.peekBoolean()) {
+              if (wb_cnt == 0) {
+                dut.io.wb.ld.bits.vd.expect("hffffffffffff_ffffffffffff0006_000c000a0001000e_ffffffffffffffff_ffff".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(0.U)
+                wb_cnt += 1
+              } /*else if (wb_cnt == 1) {
+                dut.io.wb.ld.bits.vd.expect("h0008000700060005_000c000b000a0009_0001000f000e000d_fedcba98fedcba98".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(1.U)
+                wb_cnt += 1
+              }*/
+            }
+            dut.clock.step(1)
+          }
+        }.join()
+
+        dut.clock.step(4)
+      }
+    }
+  }
+
+  def vLsuTest9(): Unit = {
+    it should "pass: strided load (stride=4, sew=32)" in {
+      test(new VLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+        test_init(dut)
+        dut.clock.step(1)
+        val ldReqs = Seq(
+          (vlse32.copy(vl=7, uopIdx=0), SrcBundleLd(rs2="h10")),
+          (vlse32.copy(vl=7, uopIdx=1, uopEnd=true), SrcBundleLd(rs2="h10")),
+        )
+        val ldResps = Seq(
+          ("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d" + 
+            "fedcba98fedcba98_7654321076543210_0123456701234567_89abcdef89abcdef",
+           SeqId(el_count=4, el_off=1, el_id=7)),
+          ("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d" + 
+            "fedcba98fedcba98_7654321076543210_0123456701234567_89abcdef89abcdef",
+           SeqId(el_count=3, el_off=1, el_id=11)),
+        )
+        next_is_load_and_step(dut)
+        for ((c, s) <- ldReqs) {
+          while (!dut.io.fromIQ.ld.ready.peekBoolean()) {
+            dut.clock.step(1)
+          }
+          dut.io.fromIQ.ld.valid.poke(true.B)
+          dut.io.fromIQ.ld.bits.poke(genLdInput(c, s))
+          dut.clock.step(1)
+        }
+        dut.io.fromIQ.ld.valid.poke(false.B)
+        dut.clock.step(4)
+
+        fork {
+          for ((ldData, seqId)  <- ldResps) {
+            one_512b_load_resp(dut, ldData, seqId.asUInt)
+            dut.clock.step(1)
+          }
+          dut.io.ovi_load.valid.poke(false.B)
+          dut.io.ovi_memop.sync_end.poke(true.B)
+          dut.clock.step(1)
+          dut.io.ovi_memop.sync_end.poke(false.B)
+        }.fork {
+          var wb_cnt = 0
+          for (i <- 0 until 14) {
+            if (dut.io.wb.ld.valid.peekBoolean()) {
+              if (wb_cnt == 0) {
+                dut.io.wb.ld.bits.vd.expect("h89abcdefffffffff_ffffffffffffffff_ffffffffffffffff_ffffffffffffffff".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(0.U)
+                wb_cnt += 1
+              } else if (wb_cnt == 1) {
+                dut.io.wb.ld.bits.vd.expect("hffffffffffffffff_0001000f76543210_89abcdef00080007_0001000f76543210".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(1.U)
+                wb_cnt += 1
+              }
+            }
+            dut.clock.step(1)
+          }
+        }.join()
+
+        dut.clock.step(4)
+      }
+    }
+  }
+
+  def vLsuTest10(): Unit = {
+    it should "pass: strided load (stride=-4, sew=8)" in {
+      test(new VLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+        test_init(dut)
+        dut.clock.step(1)
+        val ldReqs = Seq(
+          (vlse8.copy(vl=5, uopIdx=0, uopEnd=true), SrcBundleLd(rs2="hffffffff_fffffffc")),
+        )
+        val ldResps = Seq(
+          ("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d" + 
+            "fedcba98fedcba98_7654321076543210_0123456701234567_89abcdef89abcdef",
+           SeqId(el_count=5, el_off=45, el_id=17)),
+        )
+        next_is_load_and_step(dut)
+        for ((c, s) <- ldReqs) {
+          while (!dut.io.fromIQ.ld.ready.peekBoolean()) {
+            dut.clock.step(1)
+          }
+          dut.io.fromIQ.ld.valid.poke(true.B)
+          dut.io.fromIQ.ld.bits.poke(genLdInput(c, s))
+          dut.clock.step(1)
+        }
+        dut.io.fromIQ.ld.valid.poke(false.B)
+        dut.clock.step(4)
+
+        fork {
+          for ((ldData, seqId)  <- ldResps) {
+            one_512b_load_resp(dut, ldData, seqId.asUInt)
+            dut.clock.step(1)
+          }
+          dut.io.ovi_load.valid.poke(false.B)
+          dut.io.ovi_memop.sync_end.poke(true.B)
+          dut.clock.step(1)
+          dut.io.ovi_memop.sync_end.poke(false.B)
+        }.fork {
+          var wb_cnt = 0
+          for (i <- 0 until 14) {
+            if (dut.io.wb.ld.valid.peekBoolean()) {
+              if (wb_cnt == 0) {
+                dut.io.wb.ld.bits.vd.expect("hffffffffffffffff_ffffabab232354ff_ffffffffffffffff_ffffffffffffffff".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(0.U)
+                wb_cnt += 1
+              } /*else if (wb_cnt == 1) {
+                dut.io.wb.ld.bits.vd.expect("hffffffffffffffff_0001000f76543210_89abcdef00080007_0001000f76543210".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(1.U)
+                wb_cnt += 1
+              }*/
+            }
+            dut.clock.step(1)
+          }
+        }.join()
+
+        dut.clock.step(4)
+      }
+    }
+  }
+
+  def vLsuTest11(): Unit = {
+    it should "pass: strided load (stride=-5, sew=32)" in {
+      test(new VLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+        test_init(dut)
+        dut.clock.step(1)
+        val ldReqs = Seq(
+          (vlse32.copy(vl=1, uopIdx=0, uopEnd=true), SrcBundleLd(rs2="hffffffff_ffffffec")),
+        )
+        val ldResps = Seq(
+          ("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d" + 
+            "fedcba98fedcba98_7654321076543210_0123456701234567_89abcdef89abcdef",
+           SeqId(el_count=1, el_off=5, el_id=7)),
+        )
+        next_is_load_and_step(dut)
+        for ((c, s) <- ldReqs) {
+          while (!dut.io.fromIQ.ld.ready.peekBoolean()) {
+            dut.clock.step(1)
+          }
+          dut.io.fromIQ.ld.valid.poke(true.B)
+          dut.io.fromIQ.ld.bits.poke(genLdInput(c, s))
+          dut.clock.step(1)
+        }
+        dut.io.fromIQ.ld.valid.poke(false.B)
+        dut.clock.step(4)
+
+        fork {
+          for ((ldData, seqId)  <- ldResps) {
+            one_512b_load_resp(dut, ldData, seqId.asUInt)
+            dut.clock.step(1)
+          }
+          dut.io.ovi_load.valid.poke(false.B)
+          dut.io.ovi_memop.sync_end.poke(true.B)
+          dut.clock.step(1)
+          dut.io.ovi_memop.sync_end.poke(false.B)
+        }.fork {
+          var wb_cnt = 0
+          for (i <- 0 until 14) {
+            if (dut.io.wb.ld.valid.peekBoolean()) {
+              if (wb_cnt == 0) {
+                dut.io.wb.ld.bits.vd.expect("h000a0009ffffffff_ffffffffffffffff_ffffffffffffffff_ffffffffffffffff".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(0.U)
+                wb_cnt += 1
+              } /*else if (wb_cnt == 1) {
+                dut.io.wb.ld.bits.vd.expect("hffffffffffffffff_0001000f76543210_89abcdef00080007_0001000f76543210".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(1.U)
+                wb_cnt += 1
+              }*/
+            }
+            dut.clock.step(1)
+          }
+        }.join()
+
+        dut.clock.step(4)
+      }
+    }
+  }
+
+
 
 }
 
-class VLsuSpec extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VLsuBehavior {
+class VLsuSpec_ld extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VLsuBehavior_ld {
   behavior of "LSU test"
-  // it should behave like vLsuTest0()  // unit-stride load
-  // it should behave like vLsuTest1()  // unit-stride load
-  // it should behave like vLsuTest2()  // unit-stride load
-  // it should behave like vLsuTest3()  // unit-stride load
-  // it should behave like vLsuTest4()  // unit-stride load
-  // it should behave like vLsuTest5()  // unit-stride load
+  it should behave like vLsuTest0()  // unit-stride load
+  it should behave like vLsuTest1()  // unit-stride load
+  it should behave like vLsuTest2()  // unit-stride load
+  it should behave like vLsuTest3()  // unit-stride load
+  it should behave like vLsuTest4()  // unit-stride load
+  it should behave like vLsuTest5()  // unit-stride load
   it should behave like vLsuTest6()  // unit-stride load
+  it should behave like vLsuTest7()  // strided load
+  it should behave like vLsuTest8()  // strided load
+  it should behave like vLsuTest9()  // strided load
+  it should behave like vLsuTest10()  // strided load
+  it should behave like vLsuTest11()  // strided load
 }
