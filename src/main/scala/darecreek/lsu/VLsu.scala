@@ -186,6 +186,7 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
     *        (2) one load_data can write up to 3 regs of load data buffer (512/VLEN + 1)
     */
   val seqId = io.ovi_load.seq_id.asTypeOf(new SeqId)
+  val ovi_ldValid = io.ovi_load.valid
   val ldValid = io.ovi_load.valid && stateLd === s_busy_LD
   //----------- 1st: Reverse stage (for stride of -1, -2, -4) ------------
   val strideByElem = rs2_ld.asSInt >> destEew_ld
@@ -205,20 +206,23 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   val ldStrideIs2 = strideByElem === 2.S || strideByElem === -2.S
   val ldStrideIs4 = strideByElem === 4.S || strideByElem === -4.S
   val ldDataSquash = Reg(UInt(512.W))
-  ldDataSquash := Mux(ldStrideIs4, ldDataSquash4, Mux(ldStrideIs2, ldDataSquash2, ldDataReversed))
-  val elCount = seqId.el_count
-  val (elCountSquash2, elCountSquash4) = (Wire(UInt(7.W)), Wire(UInt(7.W)))
-  elCountSquash2 := Mux1H(destEewOH_ld.oneHot, Seq(5, 4, 3, 2).map(k => Cat(elCount(0), elCount(k, 1))))
-  elCountSquash4 := Mux1H(destEewOH_ld.oneHot, Seq(5, 4, 3, 2).map(k => Cat(elCount(1, 0), elCount(k, 2))))
-  val elCountSquash = Reg(UInt(7.W))
-  elCountSquash := Mux(ldStrideIs4, elCountSquash4, Mux(ldStrideIs2, elCountSquash2, elCount))
+  val elOff = seqId.el_off
+  val elOffSquash = Reg(UInt(6.W))
+  val (elOffSquash2, elOffSquash4) = (Wire(UInt(6.W)), Wire(UInt(6.W)))
+  elOffSquash2 := Mux1H(destEewOH_ld.oneHot, Seq(5, 4, 3, 2).map(k => Cat(elOff(0), elOff(k, 1))))
+  elOffSquash4 := Mux1H(destEewOH_ld.oneHot, Seq(5, 4, 3, 2).map(k => Cat(elOff(1, 0), elOff(k, 2))))
+  when (ovi_ldValid) { // ICG (clock gating)
+    ldDataSquash := Mux(ldStrideIs4, ldDataSquash4, Mux(ldStrideIs2, ldDataSquash2, ldDataReversed))
+    elOffSquash := Mux(ldStrideIs4, elOffSquash4, Mux(ldStrideIs2, elOffSquash2, elOff))
+  }
+  val elCountSquash = RegEnable(seqId.el_count, ovi_ldValid)
   
   //----------- 3rd: Shift stage ---------------
   //
   // Three consecutive regs  |---- 256b ----||---- 256b ----||---- 256b ----|
   // ovi_load_data           |----------   512b   ----------||----  0   ----|
   // after shift                  |----------   512b   ----------|
-  val seqIdReg = RegNext(seqId)
+  val seqIdReg = RegEnable(seqId, ovi_ldValid)
   val el_id_high = Wire(UInt(3.W)) // log2(8)
   val el_id_low = Wire(UInt(vlenbWidth.W))
   el_id_low := Mux1H(destEewOH_ld.oneHot, Seq(4, 3, 2, 1).map(i => seqIdReg.el_id(i, 0)))
@@ -226,7 +230,7 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   val nElemVLEN = Wire(UInt(vlenbWidth.W))
   nElemVLEN := Mux1H(destEewOH_ld.oneHot, Seq(vlenb.U, (vlenb/2).U, (vlenb/4).U, (vlenb/8).U))
   val shiftElm = Wire(UInt(7.W))
-  shiftElm := seqIdReg.el_off -& el_id_low
+  shiftElm := elOffSquash -& el_id_low
   val shiftRight = shiftElm + nElemVLEN
   val sub1 = shiftElm              // shiftRight - nElemVLEN
   val sub2 = shiftElm - nElemVLEN  // shiftRight - nElemVLEN*2
