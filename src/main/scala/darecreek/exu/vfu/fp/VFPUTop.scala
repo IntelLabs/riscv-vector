@@ -17,7 +17,7 @@ class VFPUTop(implicit val p: Parameters)
     val maskOff = Output(UInt(64.W))
   })
   val fpu_ready = Wire(Bool())
-  val inputGen = Module(new VFInputGen)
+  val inputGen = Module(new VFInputGenFP)
   inputGen.io.in.bits := io.in.bits
   inputGen.io.in.valid := io.in.valid
   inputGen.io.out.ready := fpu_ready
@@ -98,8 +98,56 @@ class VFPUTop(implicit val p: Parameters)
   // io.in.ready := subModules.map(_.io.in.ready).reduce(_ && _) // must all ready
 }
 
+
 // comb logic
 class VFInputGen(implicit val p: Parameters) extends VFPUBaseModule {
+  val io = IO(new Bundle() {
+    val in = Input(new LaneFUInput)
+    val out = Output(new LaneFloatFUIn)
+  })
+
+  val ctrl = io.in.uop.ctrl
+  val instCat = Cat(ctrl.funct6, ctrl.vm, ctrl.lsrc(1), ctrl.lsrc(0), ctrl.funct3, ctrl.ldest)
+  val typeTag = VFPU.getTypeTagFromVSEW(io.in.uop.info.vsew)
+  val vfpCtrl = VFDecoder(instCat).io.fpCtrl
+  // src expand
+  val rs1Expd = Mux(
+    ctrl.vx && typeTag === VFPU.S,
+    Cat(Seq.fill(2)(io.in.rs1.tail(VFPU.f32.len))),
+    Mux(ctrl.vx && typeTag === VFPU.D,
+      io.in.rs1,
+      io.in.vs1)
+  )
+
+  //---- vstart >= vl ----
+  val vstart_gte_vl = io.in.uop.info.vstart >= io.in.uop.info.vl
+
+  // mask data generation for inactive elements
+  val maskGen = Module(new MaskTailData)
+  maskGen.io.mask := io.in.mask
+  maskGen.io.tail := io.in.tail
+  maskGen.io.prestart := io.in.prestart
+  maskGen.io.vstart_gte_vl := vstart_gte_vl
+  maskGen.io.oldVd := io.in.old_vd
+  maskGen.io.uop := io.in.uop
+  maskGen.io.opi := false.B
+
+  io.out.connectFromLaneFUInput(io.in)
+  io.out.uop.typeTag := typeTag
+  io.out.uop.vfpCtrl := vfpCtrl
+  io.out.uop.fWidenEnd := false.B // default false
+  io.out.vs1 := rs1Expd
+  io.out.uop.maskKeep := Mux(isCmp, maskGen.io.maskKeep_cmp, maskGen.io.maskKeep)
+  io.out.uop.maskOff := Mux(isCmp, maskGen.io.maskOff_cmp, maskGen.io.maskOff)
+
+  def isCmp: Bool = {
+    io.in.uop.ctrl.funct6(5, 3) === "b011".U
+  }
+}
+
+
+// comb logic
+class VFInputGenFP(implicit val p: Parameters) extends VFPUBaseModule {
   val io = IO(new Bundle() {
     val in = Flipped(DecoupledIO(new LaneFUInput))
     val out = DecoupledIO(new LaneFloatFUIn)
