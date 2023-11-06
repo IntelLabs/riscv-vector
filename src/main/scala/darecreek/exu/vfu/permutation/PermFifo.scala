@@ -7,6 +7,7 @@ import chisel3.util._
   * FIFO IO with enqueue and dequeue ports using the ready/valid interface.
   */
 class perm_FifoIO[T <: Data](private val gen: T) extends Bundle {
+  val rst = Input(Bool())
   val enq = Flipped(new DecoupledIO(gen))
   val deq = new DecoupledIO(gen)
 }
@@ -25,34 +26,42 @@ abstract class perm_Fifo[T <: Data](gen: T, depth: Int) extends Module {
   */
 class perm_RegFifo[T <: Data](gen: T, depth: Int) extends perm_Fifo(gen: T, depth: Int) {
 
-  def counter(depth: Int, incr: Bool): (UInt, UInt) = {
+  def counter(rst: Bool, depth: Int, incr: Bool): (UInt, UInt) = {
     val cntReg = RegInit(0.U(log2Ceil(depth).W))
-    val nextVal = Mux(cntReg === (depth-1).U, 0.U, cntReg + 1.U)
-    when (incr) {
+    val nextVal = Mux(cntReg === (depth - 1).U, 0.U, cntReg + 1.U)
+    when(rst) {
+      cntReg := 0.U
+    }.elsewhen(incr) {
       cntReg := nextVal
     }
     (cntReg, nextVal)
   }
 
+  val rst = io.rst
   // the register based memory
   val memReg = Reg(Vec(depth, gen))
 
   val incrRead = WireInit(false.B)
   val incrWrite = WireInit(false.B)
-  val (readPtr, nextRead) = counter(depth, incrRead)
-  val (writePtr, nextWrite) = counter(depth, incrWrite)
+  val (readPtr, nextRead) = counter(rst, depth, incrRead)
+  val (writePtr, nextWrite) = counter(rst, depth, incrWrite)
 
   val emptyReg = RegInit(true.B)
   val fullReg = RegInit(false.B)
 
-  when (io.enq.valid && !fullReg) {
+  when(io.rst) {
+    emptyReg := true.B
+    fullReg := false.B
+  }
+
+  when(io.enq.valid && !fullReg) {
     memReg(writePtr) := io.enq.bits
     emptyReg := false.B
     fullReg := nextWrite === readPtr
     incrWrite := true.B
   }
 
-  when (io.deq.ready && !emptyReg) {
+  when(io.deq.ready && !emptyReg) {
     fullReg := false.B
     emptyReg := nextRead === writePtr
     incrRead := true.B

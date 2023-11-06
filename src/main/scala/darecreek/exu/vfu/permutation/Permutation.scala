@@ -277,9 +277,14 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   val wb_idx_plus1 = Wire(UInt(4.W))
   val cmprs_rd_preg_idx = Wire(UInt(8.W))
   vd_mask_vl := vd_mask >> (VLEN.U - vl_reg)
-  vmask_vl := mask & vd_mask_vl
   wb_idx_plus1 := Cat(0.U(1.W), wb_idx) + 1.U
   current_rd_vs_ones_sum := PopCount(vmask_16b)
+
+  when(flush) {
+    vmask_vl := 0.U
+  }.otherwise {
+    vmask_vl := mask & vd_mask_vl
+  }
 
   cmprs_rd_wb := reg_vcompress && ((rd_ones_sum + current_rd_vs_ones_sum) >= Cat(wb_idx_plus1, 0.U(4.W)))
   cmprs_rd_resent_en := reg_vcompress && ((rd_ones_sum + current_rd_vs_ones_sum) > Cat(wb_idx_plus1, 0.U(4.W)))
@@ -441,8 +446,20 @@ class Permutation(implicit p: Parameters) extends VFuModule {
     }
   }
 
-  val rdata_reg = RegEnable(rdata, 0.U, rvalid)
-  val rvalid_reg = RegNext(rvalid)
+  val rdata_reg = RegInit(0.U(128.W))
+  val rvalid_reg = RegInit(false.B)
+
+  when(flush) {
+    rdata_reg := 0.U
+  }.elsewhen(rvalid) {
+    rdata_reg := rdata
+  }
+
+  when(flush) {
+    rvalid_reg := false.B
+  }.otherwise {
+    rvalid_reg := rvalid
+  }
 
   val vperm_fifo = Module(new perm_RegFifo(UInt(8.W), 4))
   val vslide_fifo_wdata = Wire(UInt(8.W))
@@ -453,18 +470,19 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   cmprs_fifo_wdata := Cat(0.U(3.W), cmprs_rd_old_vd, cmprs_rd_wb, update_vs_idx, wb_vld, rd_mask_en)
   vrgather_fifo_wdata := Cat(0.U(1.W), vrgather_rd_cnt, update_vs_idx, wb_vld, rd_mask_en)
 
+  vperm_fifo.io.rst := flush
   vperm_fifo.io.enq.bits := Mux(reg_vcompress, cmprs_fifo_wdata, Mux(reg_vslide, vslide_fifo_wdata, vrgather_fifo_wdata))
   vperm_fifo.io.enq.valid := rd_mask_en || rd_vs_en || cmprs_rd_old_vd
-  vperm_fifo.io.deq.ready := rvalid_reg
-  rdata_rd_mask_en := rvalid_reg && vperm_fifo.io.deq.bits(0)
-  rdata_wb_vld := rvalid_reg && vperm_fifo.io.deq.bits(1)
-  rdata_vslide_lo_valid := rvalid_reg && vperm_fifo.io.deq.bits(2)
-  rdata_vslide_hi_valid := rvalid_reg && vperm_fifo.io.deq.bits(3)
-  rdata_vslide_rd_cnt := Mux(rvalid_reg, vperm_fifo.io.deq.bits(5, 4), 0.U)
-  rdata_update_vs_idx := rvalid_reg && vperm_fifo.io.deq.bits(2)
-  rdata_cmprs_rd_wb := rvalid_reg && vperm_fifo.io.deq.bits(3)
-  rdata_cmprs_rd_old_vd := rvalid_reg && vperm_fifo.io.deq.bits(4)
-  rdata_vrgather_rd_cnt := Mux(rvalid_reg, vperm_fifo.io.deq.bits(6, 3), 0.U)
+  vperm_fifo.io.deq.ready := rvalid_reg && vperm_fifo.io.deq.valid
+  rdata_rd_mask_en := rvalid_reg && vperm_fifo.io.deq.bits(0) && vperm_fifo.io.deq.valid
+  rdata_wb_vld := rvalid_reg && vperm_fifo.io.deq.bits(1) && vperm_fifo.io.deq.valid
+  rdata_vslide_lo_valid := rvalid_reg && vperm_fifo.io.deq.bits(2) && vperm_fifo.io.deq.valid
+  rdata_vslide_hi_valid := rvalid_reg && vperm_fifo.io.deq.bits(3) && vperm_fifo.io.deq.valid
+  rdata_vslide_rd_cnt := Mux(rvalid_reg, vperm_fifo.io.deq.bits(5, 4), 0.U) & Fill(2, vperm_fifo.io.deq.valid)
+  rdata_update_vs_idx := rvalid_reg && vperm_fifo.io.deq.bits(2) && vperm_fifo.io.deq.valid
+  rdata_cmprs_rd_wb := rvalid_reg && vperm_fifo.io.deq.bits(3) && vperm_fifo.io.deq.valid
+  rdata_cmprs_rd_old_vd := rvalid_reg && vperm_fifo.io.deq.bits(4) && vperm_fifo.io.deq.valid
+  rdata_vrgather_rd_cnt := Mux(rvalid_reg, vperm_fifo.io.deq.bits(6, 3), 0.U) & Fill(4, vperm_fifo.io.deq.valid)
 
   when(flush) {
     mask := 0.U
@@ -627,8 +645,17 @@ class Permutation(implicit p: Parameters) extends VFuModule {
     vlRemain := Mux(vlRemain >= (1.U << vsew_shift), vlRemain - (1.U << vsew_shift), 0.U)
   }
 
-  val rdata_update_vs_idx_reg = RegNext(rdata_update_vs_idx)
-  val rdata_wb_vld_reg = RegNext(rdata_wb_vld)
+  val rdata_update_vs_idx_reg = RegInit(false.B)
+  val rdata_wb_vld_reg = RegInit(false.B)
+
+  when(flush) {
+    rdata_update_vs_idx_reg := false.B
+    rdata_wb_vld_reg := false.B
+  }.otherwise {
+    rdata_update_vs_idx_reg := rdata_update_vs_idx
+    rdata_wb_vld_reg := rdata_wb_vld
+  }
+
   when(flush) {
     vd_reg := 0.U
   }.elsewhen(reg_vcompress && (rdata_update_vs_idx_reg || rdata_wb_vld_reg)) {
