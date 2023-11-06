@@ -743,11 +743,11 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   io.out.uop.uopEnd := true.B
   io.out.uop.sysUop := RegEnable(io.in.uop.sysUop, uop_valid)
 
-  io.out.rd_en := reg_rd_en & !flush
+  io.out.rd_en := reg_rd_en & !flush & !in_robIdx.needFlush(io.redirect)
   io.out.rd_preg_idx := reg_rd_preg_idx
-  io.out.wb_vld := Mux(reg_vcompress, reg2_wb_vld & !flush, reg_wb_vld & !flush)
+  io.out.wb_vld := Mux(reg_vcompress, reg2_wb_vld & !flush & !in_robIdx.needFlush(io.redirect), reg_wb_vld & !flush && !in_robIdx.needFlush(io.redirect))
   io.out.wb_data := perm_vd
-  io.out.perm_busy := perm_busy | flush
+  io.out.perm_busy := perm_busy | flush | in_robIdx.needFlush(io.redirect)
 }
 
 import xiangshan._
