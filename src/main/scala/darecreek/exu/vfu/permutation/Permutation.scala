@@ -745,7 +745,7 @@ class Permutation(implicit p: Parameters) extends VFuModule {
 
   io.out.rd_en := reg_rd_en & !flush & !in_robIdx.needFlush(io.redirect)
   io.out.rd_preg_idx := reg_rd_preg_idx
-  io.out.wb_vld := Mux(reg_vcompress, reg2_wb_vld & !flush && !in_robIdx.needFlush(io.redirect), reg_wb_vld & !flush && !in_robIdx.needFlush(io.redirect))
+  io.out.wb_vld := Mux(reg_vcompress, reg2_wb_vld & !flush & !in_robIdx.needFlush(io.redirect), reg_wb_vld & !flush && !in_robIdx.needFlush(io.redirect))
   io.out.wb_data := perm_vd
   io.out.perm_busy := perm_busy | flush | in_robIdx.needFlush(io.redirect)
 }
