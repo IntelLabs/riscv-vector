@@ -49,7 +49,7 @@ class VzvsTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String
         var n_ops = n_inputs
 
         val nRes = n_ops
-        val resultChecker = ALUVResultChecker.newChecker(nRes, expectvd, true, vxsat, 
+        val resultChecker = ALUResultChecker.newVChecker(nRes, expectvd, true, vxsat, 
             (a, b) => this.dump(simi, a, b))
         var srcBundles : Seq[SrcBundle] = Seq()
         var ctrlBundles : Seq[CtrlBundle] = Seq()

@@ -168,7 +168,7 @@ class VTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String,
         var vdres = false
 
         val nRes = if (hasVd) n_inputs; else 1
-        val resultChecker = ALUVResultChecker.newChecker(nRes, expectvd, hasVd, vxsat, 
+        val resultChecker = ALUResultChecker.newVChecker(nRes, expectvd, hasVd, vxsat, 
             (a, b) => this.dump(simi, a, b))
 
         var srcBundles : Seq[SrcBundle] = Seq()

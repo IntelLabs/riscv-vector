@@ -19,49 +19,6 @@ import darecreek.exu.vfu.reduction._
 import scala.collection.mutable.Map
 import chipsalliance.rocketchip.config.Parameters
 
-object ALUVResultChecker {
-    def newChecker(
-        nRes : Int, 
-        expectvd : Array[String],
-        vdOrRd : Boolean,
-        goldenVxsat : Boolean = false,
-        dump : (String, String) => Unit = (a, b) => {}) : ALUVResultChecker = {
-            val resultChecker = new ALUVResultChecker(nRes, expectvd, vdOrRd, dump)
-            resultChecker.setGoldenVxsat(goldenVxsat)
-
-            return resultChecker
-    }
-}
-
-class ALUVResultChecker(
-    nRes : Int, 
-    expectvd : Array[String],
-    vdOrRd : Boolean,
-    dump : (String, String) => Unit = (a, b) => {}) extends ResultChecker(nRes, expectvd, dump) {
-    
-    override def _checkRes(dutVd : BigInt, uopIdx : Int) : Boolean = {
-        var correctness : Boolean = true
-        var vdRes : String = ""
-        var goldenVd : String = ""
-        if (vdOrRd) {
-            vdRes = f"h$dutVd%032x"
-            goldenVd = expectvd(nRes - 1 - uopIdx)
-            Logger.printvds(vdRes, goldenVd)
-        } else {
-            // RD or FD
-            if (uopIdx == 0) {
-                vdRes = f"h$dutVd%016x"
-                goldenVd = expectvd(0)
-                Logger.printvds(vdRes, goldenVd)
-            }
-        }
-        correctness = vdRes.equals(goldenVd)
-        if (!correctness) dump(vdRes, goldenVd)
-
-        return correctness
-    }
-}
-
 class ResultChecker(val nRes : Int, val expectvd : Array[String], 
         val dump : (String, String) => Unit = (a, b) => {}) {
     var goldenVxsat : Boolean = false

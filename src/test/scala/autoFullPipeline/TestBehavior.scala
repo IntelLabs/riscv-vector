@@ -90,7 +90,7 @@ class TestCase(
     }
 }
 
-abstract class TestBehavior(filename : String, ctrlBundle : CtrlBundle, sign : String, instid : String) extends BundleGenHelper {
+abstract class TestBehavior(filename : String, ctrl : CtrlBundle, sign : String, instid : String) extends BundleGenHelper {
 
     var inputMaps : Seq[Map[String, String]] = Seq()
     var inputMapCurIx = 0
@@ -98,7 +98,7 @@ abstract class TestBehavior(filename : String, ctrlBundle : CtrlBundle, sign : S
     var testResult = true
 
     def getTestfilePath() : String              = Datapath.testdataRoot + filename
-    def getCtrlBundle() : CtrlBundle    = ctrlBundle
+    def getCtrlBundle() : CtrlBundle    = ctrl
     def getInstid() : String                    = instid
 
     def recordFail() = {this.testResult = false}

@@ -57,7 +57,9 @@ class VmadcvimTestBehavior extends VmadcsbcTestBehavior("vmadc.vim.data", ctrlBu
 class VmadcsbcTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String, 
     _vm : Option[Boolean] = None) extends TestBehavior(fn, cb, s, instid) {
     
-    override def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VAluWrapper) : Unit = {
+    override def isOrdered() : Boolean = true
+
+    override def _getNextTestCase(simi:Map[String,String]) : TestCase = {
         var vx = simi.get("RS1") != None
         var vv = simi.get("VS1") != None
         var vs1data : Array[String] = Array()
