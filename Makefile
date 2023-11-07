@@ -7,6 +7,9 @@ test_mac:
 test_div:
 	sbt "testOnly darecreek.vfutest.alu.VDivSpec"
 
+test_load:
+	sbt "testOnly darecreek.lsutest.VLsuSpec_ld"
+
 # test_amd: test_alu, test_mac, test_div
 test_amd: test_alu test_mac test_div
 
