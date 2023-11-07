@@ -6,11 +6,13 @@ import chisel3.util.experimental.decode._
 import darecreek.exu.vfu._
 // import darecreek.exu.vfu.VFUParam._
 import chipsalliance.rocketchip.config._
+import xiangshan.Redirect
 
 class Reduction(implicit p: Parameters) extends VFuModule {
   val io = IO(new Bundle {
     val in = Input(ValidIO(new VFuInput))
-    val out = ValidIO(new VAluOutput)
+    val redirect = Input(ValidIO(new Redirect))
+    val out = ValidIO(new VFuOutput)
   })
 
   val funct6 = io.in.bits.uop.ctrl.funct6
@@ -592,7 +594,39 @@ class Reduction(implicit p: Parameters) extends VFuModule {
     }
   }
 
-  io.out.valid := RegNext(RegNext(uopEnd && io.in.valid))
+  //  Redirect handling
+  val in_robIdx = io.in.bits.uop.sysUop.robIdx
+  val currentRobIdx = RegEnable(in_robIdx, io.in.fire)
+  val currentNeedFlush = RegInit(false.B)
+  when(io.in.fire) {
+    currentNeedFlush := in_robIdx.needFlush(io.redirect)
+  }.otherwise {
+    currentNeedFlush := currentNeedFlush || currentRobIdx.needFlush(io.redirect)
+  }
+
+  def latency = 2
+
+  def regEnable(i: Int): Bool = validVec(i - 1) && !flushVec(i - 1)
+
+  val validVec = (uopEnd && io.in.valid) +: Array.fill(latency)(RegInit(false.B))
+  val uopVec = io.in.bits.uop +: Array.fill(latency)(Reg(new VUop))
+
+  // if flush(0), valid 0 will not given, so set flushVec(0) to false.B
+  val flushVec = validVec.zip(uopVec).map(x => x._1 && x._2.sysUop.robIdx.needFlush(io.redirect))
+
+  for (i <- 1 to latency) {
+    when(regEnable(i)) {
+      validVec(i) := validVec(i - 1)
+      uopVec(i) := uopVec(i - 1)
+    }.elsewhen(flushVec(i)) {
+      validVec(i) := false.B
+    }
+  }
+
+  io.out.valid := validVec.takeRight(2).head
+  io.out.bits.uop := uopVec.takeRight(2).head
+
+  //  io.out.valid := RegNext(RegNext(uopEnd && io.in.valid))
   io.out.bits.vd := red_vd_tail
   io.out.bits.vxsat := false.B
 }
