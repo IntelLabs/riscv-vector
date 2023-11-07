@@ -12,15 +12,18 @@ class Scoreboard(n: Int, zero: Boolean = false)
   def clear(en: Bool, addr: UInt): Unit = update(en, _next & ~mask(en, addr))
   def read(addr: UInt): Bool = r(addr)
   def readBypassed(addr: UInt): Bool = _next(addr)
-  private val _r = RegInit(0.U(n.W))
-  private val r = if (zero) (_r >> 1 << 1) else _r
-  private var _next = r
-  private var ens = false.B
-  private def mask(en: Bool, addr: UInt) = Mux(en, 1.U << addr, 0.U)
-  private def update(en: Bool, update: UInt) = {
+  val _r = RegInit(0.U(n.W))
+  val r = if (zero) (_r >> 1 << 1) else _r
+  var _next = r
+  var ens = false.B
+  def mask(en: Bool, addr: UInt) = Mux(en, 1.U << addr, 0.U)
+  def update(en: Bool, update: UInt) = {
     _next = update
     ens = ens || en
     when (ens) { _r := _next }
   }
+  printf("_r = %b\n", _r)
+  printf("_next = %b\n", _next)
+  printf("r = %b\n", r)
 }
 

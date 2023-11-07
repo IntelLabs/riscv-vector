@@ -153,12 +153,16 @@ class UopQueue(implicit p : Parameters) extends Module {
     val needStall  = Wire(Bool())
     val hasRegConf = Wire(Vec(2,Bool()))
     val canForWard = Wire(Vec(2,Bool()))
+
+    sboard.clear(io.in.regWriteEn, io.in.regWriteIdx)
    
     when(vs1ReadEn && sboard.read(vs1Idx) && ~sboard.readBypassed(vs1Idx)){
         canForWard(0) := true.B
     }.otherwise{
         canForWard(0) := false.B
     }
+    printf("read=%b\n",sboard.read(vs1Idx))
+    printf("bypass=%b\n",sboard.readBypassed(vs1Idx))
 
     when(vs2ReadEn && sboard.read(vs2Idx) && ~sboard.readBypassed(vs2Idx)){
         canForWard(1) := true.B
@@ -284,26 +288,27 @@ class UopQueue(implicit p : Parameters) extends Module {
         io.out.toRegFile := 0.U.asTypeOf(new regReadIn)
     }
 
-    when (currentState === empty && io.in.decodeIn.valid && io.in.decodeIn.bits.vInfo.vlmul === 1.U){
-        currentStateNext := empty
-        idx := 0.U
-    }
-    when (currentState === empty && io.in.decodeIn.valid && io.in.decodeIn.bits.vInfo.vlmul =/= 1.U){
+    when(needStall){
         currentStateNext := ongoing
-    }
-    when (currentState === ongoing && idx + 1.U === vInfo(0).vlmul){
-        currentStateNext := empty
-        idx := 0.U
-    }.elsewhen(currentState === ongoing && idx + 1.U < vInfo(0).vlmul){
-        currentStateNext := ongoing
+    }.otherwise{
+        when (currentState === empty && io.in.decodeIn.valid && io.in.decodeIn.bits.vInfo.vlmul === 1.U){
+            currentStateNext := empty
+            idx := 0.U
+        }
+        when (currentState === empty && io.in.decodeIn.valid && io.in.decodeIn.bits.vInfo.vlmul =/= 1.U){
+            currentStateNext := ongoing
+        }
+        when (currentState === ongoing && idx + 1.U === vInfo(0).vlmul){
+            currentStateNext := empty
+            idx := 0.U
+        }.elsewhen(currentState === ongoing && idx + 1.U < vInfo(0).vlmul){
+            currentStateNext := ongoing
+        }
     }
     currentState := currentStateNext
 
-    sboard.set(io.out.mUop.valid, io.out.mUop.bits.uopAttribute.ldest )
-    //sboard.set(io.out.toRegFile.rfReadEn(1), io.out.toRegFile.rfReadIdx(1))
-    sboard.clear(io.in.regWriteEn, io.in.regWriteIdx)
-
     io.in.decodeIn.ready := (currentStateNext === empty)
+    sboard.set(io.out.mUop.valid, io.out.mUop.bits.uopAttribute.ldest)
 
     //assert(io.in.valid && currentState === ongoing, "when has ongoing inst, can not accept a new one")
 
