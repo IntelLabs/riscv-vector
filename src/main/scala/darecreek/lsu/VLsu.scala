@@ -408,7 +408,8 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
     */
   // Store FSM
   when (stateSt === s_idle_ST) {
-    stateSt := Mux(firstStFire, s_issueUops_ST, s_idle_ST)
+    stateSt := Mux(firstStFire, 
+               Mux(st.bits.uop.expdEnd, s_busy_ST, s_issueUops_ST), s_idle_ST)
   }.elsewhen (stateSt === s_issueUops_ST) { //Wait for all expanded uops of one instrn issued from IQ
     stateSt := Mux(st.fire && st.bits.uop.expdEnd, s_busy_ST, s_issueUops_ST)
   }.elsewhen (stateSt === s_busy_ST) {
@@ -442,7 +443,7 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   val stBufPtrDeq = RegInit(0.U(3.W))
   stBufPtrDeq := Mux(stateSt === s_complete_ST && stUopTable(stBufPtrDeq).valid, stBufPtrDeq + 1.U, 0.U)
   completeSt := stateSt === s_complete_ST && (!stUopTable(stBufPtrDeq + 1.U).valid || stBufPtrDeq === 7.U)
-  io.wb.st.valid := stateSt === s_complete_ST
+  io.wb.st.valid := stateSt === s_complete_ST && !completeSt
   io.wb.st.bits.uop := stUopTable(stBufPtrDeq).uop
 
   // Some ctrl signals of store

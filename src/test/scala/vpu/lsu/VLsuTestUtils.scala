@@ -34,8 +34,8 @@ object next_is_load_and_step {
 }
 object next_is_store_and_step {
   def apply(dut: VLsuTestWrapper): Unit = {
-    dut.io.fromIQ.st.bits.iqEmpty.poke(false) 
-    dut.io.fromIQ.ld.bits.iqEmpty.poke(true)
+    dut.io.fromIQ.st.bits.iqEmpty.poke(false.B) 
+    dut.io.fromIQ.ld.bits.iqEmpty.poke(true.B)
     dut.io.fromIQ.ld.valid.poke(false.B)
     dut.io.fromIQ.st.valid.poke(false.B)
     dut.clock.step(1)
@@ -71,6 +71,14 @@ case class CtrlBundle(instrn: BitPat,
 case class SrcBundleLd(rs2: String = "h0",
                        vs2: String = "h0",
                        oldVd: String = "h0",
+                       mask: String = "hffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff",
+                       nextVRobIdx: (Boolean, Int) = (false, 0),
+                       iqEmpty: Boolean = false
+)
+
+case class SrcBundleSt(rs2: String = "h0",
+                       vs2: String = "h0",
+                       vs3: String = "h0",
                        mask: String = "hffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff",
                        nextVRobIdx: (Boolean, Int) = (false, 0),
                        iqEmpty: Boolean = false
@@ -121,6 +129,20 @@ trait BundleGenHelper {
       _.rs2 -> s.rs2.U,
       _.vs2 -> s.vs2.U,
       _.oldVd -> s.oldVd.U,
+      _.vmask -> s.mask.U,
+      _.nextVRobIdx -> (new VRobPtr).Lit(
+          _.flag -> s.nextVRobIdx._1.B,
+          _.value -> s.nextVRobIdx._2.U,
+        ),
+      _.iqEmpty -> s.iqEmpty.B
+    )
+  }
+  def genStInput(c: CtrlBundle, s: SrcBundleSt) = {
+    (new VStInputTest).Lit(
+      _.uop -> genUop(c),
+      _.rs2 -> s.rs2.U,
+      _.vs2 -> s.vs2.U,
+      _.vs3 -> s.vs3.U,
       _.vmask -> s.mask.U,
       _.nextVRobIdx -> (new VRobPtr).Lit(
           _.flag -> s.nextVRobIdx._1.B,
