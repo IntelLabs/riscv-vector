@@ -10,6 +10,9 @@ test_div:
 test_load:
 	sbt "testOnly darecreek.lsutest.VLsuSpec_ld"
 
+test_store:
+	sbt "testOnly darecreek.lsutest.VLsuSpec_st"
+
 # test_amd: test_alu, test_mac, test_div
 test_amd: test_alu test_mac test_div
 
