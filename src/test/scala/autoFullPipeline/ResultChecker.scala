@@ -19,7 +19,7 @@ import darecreek.exu.vfu.reduction._
 import scala.collection.mutable.Map
 import chipsalliance.rocketchip.config.Parameters
 
-class ResultChecker(val nRes : Int, val expectvd : Array[String], 
+class ResultChecker(val n_ops : Int, val expectvd : Array[String], 
         val dump : (String, String) => Unit = (a, b) => {}) {
     var goldenVxsat : Boolean = false
     var goldenFflags : Int = 0
@@ -27,6 +27,7 @@ class ResultChecker(val nRes : Int, val expectvd : Array[String],
     var resVxsat : Boolean = false
     var resFflags : Int = 0
 
+    var testVxsatOrFflags : Boolean = false
     var isFPDIV : Boolean = false
 
     var checkedRes = 0
@@ -34,14 +35,16 @@ class ResultChecker(val nRes : Int, val expectvd : Array[String],
     def setGoldenVxsat(goldenVxsat : Boolean) = { 
         this.goldenVxsat = goldenVxsat
         this.isFPDIV = false
+        this.testVxsatOrFflags = true
     }
 
     def setGoldenFflags(goldenFflags : Int) = {
         this.goldenFflags = goldenFflags
         this.isFPDIV = true
+        this.testVxsatOrFflags = true
     }
 
-    def isCompleted() : Boolean = { this.checkedRes == this.nRes }
+    def isCompleted() : Boolean = { this.checkedRes == this.n_ops }
 
     def checkRes(dutVd : BigInt, uopIdx : Int, 
             dutVxsat : Boolean = false, dutFflags : Int = 0) : Boolean = {
@@ -53,7 +56,7 @@ class ResultChecker(val nRes : Int, val expectvd : Array[String],
 
         this.checkedRes += 1
         if (res) {
-            if (this.isCompleted()) {
+            if (this.isCompleted() && this.testVxsatOrFflags) {
                 if (this.isFPDIV) {
                     res = res && (this.goldenFflags == this.resFflags)
                     if (this.goldenFflags != this.resFflags) {

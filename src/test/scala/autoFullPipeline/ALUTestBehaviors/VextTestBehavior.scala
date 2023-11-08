@@ -48,15 +48,14 @@ class VzvsTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String
         // println("1111")
         var n_ops = n_inputs
 
-        val nRes = n_ops
-        val resultChecker = ALUResultChecker.newVChecker(nRes, expectvd, true, vxsat, 
+        // val nRes = n_ops
+        val resultChecker = ALUResultChecker.newVChecker(n_ops, expectvd, true, vxsat, 
             (a, b) => this.dump(simi, a, b))
         var srcBundles : Seq[SrcBundle] = Seq()
         var ctrlBundles : Seq[CtrlBundle] = Seq()
         
         for(j <- 0 until n_ops){
-            
-                // vs2 has been changed
+            // vs2 has been changed
             val srcBundle = SrcBundle(
                     vs2=vs2data(n_ops - 1 - ((n_ops - 1 - j) / multiple)),
                     old_vd=oldvddata(j),

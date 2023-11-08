@@ -63,10 +63,8 @@ class VmadcsbcTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : St
         var vx = simi.get("RS1") != None
         var vv = simi.get("VS1") != None
         var vs1data : Array[String] = Array()
-        if (vv)
-            vs1data = UtilFuncs.multilmuldatahandle(simi.get("VS1").get)
-        if (vx)
-            vs1data = UtilFuncs.multilmuldatahandle(simi.get("RS1").get)
+        if (vv) vs1data = UtilFuncs.multilmuldatahandle(simi.get("VS1").get)
+        if (vx) vs1data = UtilFuncs.multilmuldatahandle(simi.get("RS1").get)
 
         var wmask = simi.get("MASK") != None
         val vs2data = UtilFuncs.multilmuldatahandle(simi.get("VS2").get)
@@ -95,6 +93,12 @@ class VmadcsbcTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : St
             case Some(__vm) => vm = __vm
             case None => {}
         }
+
+
+        val resultChecker = ALUResultChecker.newN21Checker(n_ops, expectvd, (a, b) => this.dump(simi, a, b))
+        var srcBundles : Seq[SrcBundle] = Seq()
+        var ctrlBundles : Seq[CtrlBundle] = Seq()
+
         for(j <- 0 until n_ops){
             val reversej = n_ops - 1 - j
             var srcBundle = SrcBundle(
@@ -102,50 +106,41 @@ class VmadcsbcTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : St
                 // old_vd=prevVd
                 old_vd=oldvddata(reversej)
             )
-            if (vx) {
-                srcBundle.rs1 = vs1data(0)
-            }
-            if (vv) {
-                srcBundle.vs1 = vs1data(reversej)
-            }
+            if (vx) srcBundle.rs1 = vs1data(0)
+            if (vv) srcBundle.vs1 = vs1data(reversej)
 
-            if (wmask) {
-                srcBundle.mask = UtilFuncs.multilmuldatahandle(simi.get("MASK").get)(0)
-            }
+            if (wmask) srcBundle.mask = UtilFuncs.multilmuldatahandle(simi.get("MASK").get)(0)
 
-            dut.io.out.ready.poke(true.B)
-            dut.io.in.valid.poke(true.B)
-            dut.io.in.bits.poke(genVFuInput(
-                // vs2 has been changed
-                srcBundle, 
-                ctrl.copy(
-                    vsew=vsew,
-                    vs1_imm=getImm(simi),
-                    narrow_to_1=true, 
-                    vl=simi.get("vl").get.toInt,
-                    vlmul = UtilFuncs.lmulconvert(vflmul).toInt, 
-                    ma = (simi.get("ma").get.toInt == 1),
-                    ta = (simi.get("ta").get.toInt == 1), // true, // ta = 1?
-                    vm = vm,
-                    uopIdx=j,
-                    uopEnd=j == n_ops - 1,
-                    vxrm = vxrm,
-                    vstart = getVstart(simi)
-                )
-            ))
-            dut.clock.step(1)
-            // finalVxsat = finalVxsat || dut.io.out.bits.vxsat.peek().litValue == 1
-            vd = dut.io.out.bits.vd.peek().litValue
-            // prevVd = f"h$vd%032x"
+            
+            val ctrlBundle = ctrl.copy(
+                vsew=vsew,
+                vs1_imm=getImm(simi),
+                narrow_to_1=true, 
+                vl=simi.get("vl").get.toInt,
+                vlmul = UtilFuncs.lmulconvert(vflmul).toInt, 
+                ma = (simi.get("ma").get.toInt == 1),
+                ta = (simi.get("ta").get.toInt == 1), // true, // ta = 1?
+                vm = vm,
+                uopIdx=j,
+                uopEnd=j == n_ops - 1,
+                vxrm = vxrm,
+                vstart = getVstart(simi)
+            )
+            
+            srcBundles :+= srcBundle
+            ctrlBundles :+= ctrlBundle
         }
-        vdres = f"h$vd%032x".equals(expectvd(n_inputs - 1))
+        /*vdres = f"h$vd%032x".equals(expectvd(n_inputs - 1))
         Logger.printvds(f"h$vd%032x", expectvd(n_inputs - 1))
         if (!vdres) dump(simi, f"h$vd%032x", expectvd(n_inputs - 1))
         assert(vdres)
-        // assert(finalVxsat == vxsat)
-    }
+        // assert(finalVxsat == vxsat)*/
 
-    override def testSingle(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VAluWrapper) : Unit = {
-        testMultiple(simi,ctrl,s, dut)
+        return TestCase.newNormalCase(
+            this.instid,
+            srcBundles,
+            ctrlBundles,
+            resultChecker
+        )
     }
 }

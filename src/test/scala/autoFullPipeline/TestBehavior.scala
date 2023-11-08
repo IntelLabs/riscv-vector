@@ -90,7 +90,7 @@ class TestCase(
     }
 }
 
-abstract class TestBehavior(filename : String, ctrl : CtrlBundle, sign : String, instid : String) extends BundleGenHelper {
+abstract class TestBehavior(filename : String, val ctrl : CtrlBundle, sign : String, instid : String) extends BundleGenHelper {
 
     var inputMaps : Seq[Map[String, String]] = Seq()
     var inputMapCurIx = 0

@@ -32,7 +32,7 @@ class VnsrawiTestBehavior extends VnTestBehavior("vnsra.wi.data", ctrlBundles.vn
 
 class VnTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String, useVxsat : Boolean) extends TestBehavior(fn, cb, s, instid) {
     
-    override def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VAluWrapper) : Unit = {
+    override def _getNextTestCase(simi:Map[String,String]) : TestCase = {
         val vs2data = UtilFuncs.multilmuldatahandle(simi.get("VS2").get)
         var vx = simi.get("RS1") != None
         var vv = simi.get("VS1") != None
@@ -65,42 +65,43 @@ class VnTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String, 
         var vd : BigInt = 0
         var vdres = false
 
-        var prevVd = ""
+        val resultChecker = ALUResultChecker.newVnChecker(
+            n_ops, n_inputs, expectvd, useVxsat, vxsat, 
+            (a, b) => this.dump(simi, a, b))
+
+        var srcBundles : Seq[SrcBundle] = Seq()
+        var ctrlBundles : Seq[CtrlBundle] = Seq()
             
         // println("1111")
         for(j <- 0 until n_ops){
             val sewIndex = n_inputs - 1 - (j / 2)
             val sew2Index = n_ops - 1 - j
             var oldvd = oldvddata(sewIndex)
-            /* if(j % 2 == 0) 
-            oldvd = oldvddata(sewIndex) */
             
-            println(s"vs2data(sew2Index) ${vs2data(sew2Index)}, sew2Index ${sew2Index}")
             var srcBundle = SrcBundle(
                     vs2=vs2data(sew2Index), 
                     old_vd=oldvd,
                     mask=mask(0))
             if (vx) srcBundle.rs1=vs1data(0)
             if (vv) srcBundle.vs1=vs1data(sewIndex)
-            dut.io.out.ready.poke(true.B)
-            dut.io.in.valid.poke(true.B)
-            dut.io.in.bits.poke(genVFuInput(
-                srcBundle, 
-                ctrl.copy(
-                    vsew=vsew,
-                    vs1_imm=getImm(simi),
-                    narrow=true,
-                    vl=simi.get("vl").get.toInt,
-                    vlmul = UtilFuncs.lmulconvert(vflmul).toInt, 
-                    ma = (simi.get("ma").get.toInt == 1),
-                    ta = (simi.get("ta").get.toInt == 1),
-                    vm = (simi.get("vm").get.toInt == 1),
-                    uopIdx=j,
-                    vxrm = vxrm,
-                    vstart = getVstart(simi)
-                )
-            ))
-            dut.clock.step(1)
+            val ctrlBundle = ctrl.copy(
+                vsew=vsew,
+                vs1_imm=getImm(simi),
+                narrow=true,
+                vl=simi.get("vl").get.toInt,
+                vlmul = UtilFuncs.lmulconvert(vflmul).toInt, 
+                ma = (simi.get("ma").get.toInt == 1),
+                ta = (simi.get("ta").get.toInt == 1),
+                vm = (simi.get("vm").get.toInt == 1),
+                uopIdx=j,
+                vxrm = vxrm,
+                vstart = getVstart(simi)
+            )
+
+            srcBundles :+= srcBundle
+            ctrlBundles :+= ctrlBundle
+
+            /*dut.clock.step(1)
             finalVxsat = finalVxsat || dut.io.out.bits.vxsat.peek().litValue == 1
             vd = dut.io.out.bits.vd.peek().litValue
             vdres = f"h$vd%032x".equals(expectvd(sewIndex))
@@ -109,19 +110,22 @@ class VnTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String, 
                 Logger.printvds(f"h$vd%032x", expectvd(sewIndex))
                 if (!vdres) dump(simi, f"h$vd%032x", expectvd(sewIndex))
                 assert(vdres)
-            }
+            }*/
 
             /*if (j % 2 == 0)
                 prevVd = f"h$vd%032x"*/
 
         }
-        if(useVxsat) {
+        /*if(useVxsat) {
             if (finalVxsat != vxsat) dump(simi, s"(vxsat) ${finalVxsat}", s"(vxsat) ${vxsat}")
             assert(finalVxsat == vxsat)
-        }
-    }
+        }*/
 
-    override def testSingle(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VAluWrapper) : Unit = {
-        testMultiple(simi, ctrl, s, dut)
+        return TestCase.newNormalCase(
+            this.instid,
+            srcBundles,
+            ctrlBundles,
+            resultChecker
+        )
     }
 }

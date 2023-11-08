@@ -167,8 +167,8 @@ class VTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String,
         var vd : BigInt = 0
         var vdres = false
 
-        val nRes = if (hasVd) n_inputs; else 1
-        val resultChecker = ALUResultChecker.newVChecker(nRes, expectvd, hasVd, vxsat, 
+        val n_ops = n_inputs // if (hasVd) n_inputs; else 1
+        val resultChecker = ALUResultChecker.newVChecker(n_ops, expectvd, hasVd, vxsat, 
             (a, b) => this.dump(simi, a, b))
 
         var srcBundles : Seq[SrcBundle] = Seq()
@@ -202,14 +202,6 @@ class VTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String,
 
             srcBundles :+= srcBundle
             ctrlBundles :+= ctrlBundle
-            
-            /*if (hasVd) {
-                vd = dut.io.out.bits.vd.peek().litValue
-                vdres = f"h$vd%032x".equals(expectvd(j))
-                Logger.printvds(f"h$vd%032x", expectvd(j))
-                if (!vdres) dump(simi, f"h$vd%032x", expectvd(j))
-                assert(vdres)
-            }*/
         }
 
         return TestCase.newNormalCase(
@@ -218,17 +210,5 @@ class VTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String,
             ctrlBundles,
             resultChecker
         )
-        /*assert(finalVxsat == vxsat)
-
-        if (hasRd || hasFd) {
-            vd = dut.io.out.bits.vd.peek().litValue
-            vdres = f"h$vd%016x".equals(expectvd(0))
-            Logger.printvds(f"h$vd%016x", expectvd(0))
-            if (!vdres) dump(simi, f"h$vd%016x", expectvd(0))
-            assert(vdres)
-        }*/
-
-        /*val aluOutput = genVAluOutput(f"h${0}%032x", finalVxsat)
-        println(s"aluOutput == Bundle ${dut.io.out.bits.expect(aluOutput)}")*/
     }
 }

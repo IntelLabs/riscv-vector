@@ -21,23 +21,62 @@ import chipsalliance.rocketchip.config.Parameters
 
 object ALUResultChecker {
     def newVChecker(
-        nRes : Int, 
+        n_ops : Int, 
         expectvd : Array[String],
         vdOrRd : Boolean,
         goldenVxsat : Boolean = false,
-        dump : (String, String) => Unit = (a, b) => {}) : ALUVResultChecker = {
-            val resultChecker = new ALUVResultChecker(nRes, expectvd, vdOrRd, dump)
-            resultChecker.setGoldenVxsat(goldenVxsat)
+        dump : (String, String) => Unit = (a, b) => {}
+    ) : ALUVResultChecker = {
+        val resultChecker = new ALUVResultChecker(n_ops, expectvd, vdOrRd, dump)
+        resultChecker.setGoldenVxsat(goldenVxsat)
 
-            return resultChecker
+        return resultChecker
     }
+
+    def newGeneralVChecker(
+        n_ops : Int, 
+        expectvd : Array[String],
+        dump : (String, String) => Unit = (a, b) => {}
+    ) : ALUVResultChecker = {
+        val resultChecker = new ALUVResultChecker(n_ops, expectvd, true, dump)
+
+        return resultChecker
+    }
+
+    def newN21Checker(
+        n_ops : Int,
+        expectvd : Array[String],
+        dump : (String, String) => Unit = (a, b) => {}
+    ) : ALUN21ResultChecker = {
+        return new ALUN21ResultChecker(n_ops, expectvd, dump)
+    }
+
+    def newVnChecker(
+        n_ops : Int, 
+        n_inputs : Int,
+        expectvd : Array[String],
+        useVxsat : Boolean = false,
+        goldenVxsat : Boolean = false,
+        dump : (String, String) => Unit = (a, b) => {}
+    ) : ALUVnResultChecker = {
+        var rc = new ALUVnResultChecker(
+            n_ops, n_inputs, expectvd, dump
+        )
+
+        if (useVxsat) {
+            rc.setGoldenVxsat(goldenVxsat)
+        }
+
+        return rc
+    }
+
 }
 
-class ALUVResultChecker(
-    nRes : Int, 
+class ALUVmvSpecResultChecker(
+    val n_inputs : Int, 
     expectvd : Array[String],
     vdOrRd : Boolean,
-    dump : (String, String) => Unit = (a, b) => {}) extends ResultChecker(nRes, expectvd, dump) {
+    dump : (String, String) => Unit = (a, b) => {}) extends ResultChecker(1, expectvd, dump) {
     
     override def _checkRes(dutVd : BigInt, uopIdx : Int) : Boolean = {
         var correctness : Boolean = true
@@ -45,7 +84,36 @@ class ALUVResultChecker(
         var goldenVd : String = ""
         if (vdOrRd) {
             vdRes = f"h$dutVd%032x"
-            goldenVd = expectvd(nRes - 1 - uopIdx)
+            goldenVd = expectvd(n_inputs - 1 - uopIdx)
+            Logger.printvds(vdRes, goldenVd)
+        } else {
+            // RD or FD
+            if (uopIdx == 0) {
+                vdRes = f"h$dutVd%016x"
+                goldenVd = expectvd(0)
+                Logger.printvds(vdRes, goldenVd)
+            }
+        }
+        correctness = vdRes.equals(goldenVd)
+        if (!correctness) dump(vdRes, goldenVd)
+
+        return correctness
+    }
+}
+
+class ALUVResultChecker(
+    n_ops : Int, 
+    expectvd : Array[String],
+    vdOrRd : Boolean,
+    dump : (String, String) => Unit = (a, b) => {}) extends ResultChecker(n_ops, expectvd, dump) {
+    
+    override def _checkRes(dutVd : BigInt, uopIdx : Int) : Boolean = {
+        var correctness : Boolean = true
+        var vdRes : String = ""
+        var goldenVd : String = ""
+        if (vdOrRd) {
+            vdRes = f"h$dutVd%032x"
+            goldenVd = expectvd(n_ops - 1 - uopIdx)
             Logger.printvds(vdRes, goldenVd)
         } else {
             // RD or FD
@@ -63,25 +131,44 @@ class ALUVResultChecker(
 }
 
 class ALUN21ResultChecker(
+    n_ops : Int,
     expectvd : Array[String],
-    dump : (String, String) => Unit = (a, b) => {}) extends ResultChecker(1, expectvd, dump) {
+    dump : (String, String) => Unit = (a, b) => {}) extends ResultChecker(n_ops, expectvd, dump) {
     
     override def _checkRes(dutVd : BigInt, uopIdx : Int) : Boolean = {
         var correctness : Boolean = true
         var vdRes : String = ""
         var goldenVd : String = ""
-        if (vdOrRd) {
+        if (uopIdx == n_ops - 1) {
             vdRes = f"h$dutVd%032x"
-            goldenVd = expectvd(nRes - 1 - uopIdx)
+            goldenVd = expectvd(n_ops - 1)
             Logger.printvds(vdRes, goldenVd)
-        } else {
-            // RD or FD
-            if (uopIdx == 0) {
-                vdRes = f"h$dutVd%016x"
-                goldenVd = expectvd(0)
-                Logger.printvds(vdRes, goldenVd)
-            }
+            correctness = vdRes.equals(goldenVd)
+            if (!correctness) dump(vdRes, goldenVd)
+        } 
+
+        return correctness
+    }
+}
+
+class ALUVnResultChecker(
+    n_ops : Int, 
+    n_inputs : Int,
+    expectvd : Array[String],
+    dump : (String, String) => Unit = (a, b) => {}) extends ResultChecker(n_ops, expectvd, dump) {
+    
+    override def _checkRes(dutVd : BigInt, uopIdx : Int) : Boolean = {
+        var correctness : Boolean = true
+        var vdRes : String = ""
+        var goldenVd : String = ""
+        val sewIndex = n_inputs - 1 - (uopIdx / 2)
+        if (uopIdx % 2 == 1 || (n_ops == 1)) {
+            // compare when it's odd uopidx or it has only one uop
+            vdRes = f"h$dutVd%032x"
+            goldenVd = expectvd(sewIndex)
+            Logger.printvds(vdRes, goldenVd)
         }
+
         correctness = vdRes.equals(goldenVd)
         if (!correctness) dump(vdRes, goldenVd)
 

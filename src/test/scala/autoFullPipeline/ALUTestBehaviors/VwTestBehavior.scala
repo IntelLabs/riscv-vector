@@ -34,7 +34,7 @@ class VwsubuvxTestBehavior extends VwTestBehavior("vwsubu.vx.data", ctrlBundles.
 
 class VwTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String, vwvv : Boolean = false) extends TestBehavior(fn, cb, s, instid) {
     
-    override def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VAluWrapper) : Unit = {
+    override def _getNextTestCase(simi:Map[String,String]) : TestCase = {
         var vx = simi.get("RS1") != None
         var vv = simi.get("VS1") != None
         var vs1data : Array[String] = Array()
@@ -66,10 +66,13 @@ class VwTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String, 
             
         // println("1111")
         var n_ops = (n_inputs * 2.0).toInt
-        for(j <- 0 until n_ops){
-            dut.io.out.ready.poke(true.B)
-            dut.io.in.valid.poke(true.B)
 
+        var srcBundles : Seq[SrcBundle] = Seq()
+        var ctrlBundles : Seq[CtrlBundle] = Seq()
+        var expectvd1 : Array[String] = Array()
+
+        for(j <- 0 until n_ops){
+            
             var vs2idx = j
             if (vwvv) vs2idx = j / 2
             var srcBundle = SrcBundle(
@@ -80,104 +83,44 @@ class VwTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String, 
             if (vv) srcBundle.vs1=vs1data(j / 2)
                     
 
-            dut.io.in.bits.poke(genVFuInput(
-                srcBundle, 
-                ctrl.copy(
-                    vsew=vsew,
-                    widen2=(!vwvv),
-                    widen=vwvv,
+            
+            
+            val ctrlBundle = ctrl.copy(
+                vsew=vsew,
+                widen2=(!vwvv),
+                widen=vwvv,
 
-                    vl=simi.get("vl").get.toInt,
-                    vlmul = UtilFuncs.lmulconvert(vflmul).toInt, 
-                    ma = (simi.get("ma").get.toInt == 1),
-                    ta = (simi.get("ta").get.toInt == 1),
-                    vm = (simi.get("vm").get.toInt == 1),
-                    uopIdx=n_ops - 1 -j,
-                    vxrm = vxrm,
-                    vstart = getVstart(simi)
-                )
-            ))
-            dut.clock.step(1)
+                vl=simi.get("vl").get.toInt,
+                vlmul = UtilFuncs.lmulconvert(vflmul).toInt, 
+                ma = (simi.get("ma").get.toInt == 1),
+                ta = (simi.get("ta").get.toInt == 1),
+                vm = (simi.get("vm").get.toInt == 1),
+                uopIdx=n_ops - 1 - j,
+                vxrm = vxrm,
+                vstart = getVstart(simi)
+            )
+            /*dut.clock.step(1)
             // finalVxsat = finalVxsat || dut.io.out.bits.vxsat.peek().litValue == 1
             vd = dut.io.out.bits.vd.peek().litValue
             vdres = f"h$vd%032x".equals(expectvd(j))
             Logger.printvds(f"h$vd%032x", expectvd(j))
             if (!vdres) { dump(simi, f"h$vd%032x", expectvd(j)) }
-            assert(vdres)
+            assert(vdres)*/
+
+            srcBundles :+= srcBundle
+            ctrlBundles :+= ctrlBundle
+            expectvd1 = expectvd1 :+ expectvd(j)
         }
         // assert(finalVxsat == vxsat)
-    }
 
-    override def testSingle(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VAluWrapper) : Unit = {
-        testMultiple(simi,ctrl,s, dut)
+        val resultChecker = ALUResultChecker.newGeneralVChecker(n_ops, expectvd1, 
+            (a, b) => this.dump(simi, a, b))
+
+        return TestCase.newNormalCase(
+            this.instid,
+            srcBundles,
+            ctrlBundles,
+            resultChecker
+        )
     }
 }
-
-
-/*class VwvvTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String, su : Boolean = false) extends TestBehavior(fn, cb, s, instid) {
-    
-    override def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VAluWrapper) : Unit = {
-        val vs2data = UtilFuncs.multilmuldatahandle(simi.get("VS2").get)
-        val vs1data = UtilFuncs.multilmuldatahandle(simi.get("VS1").get)
-        val oldvddata = UtilFuncs.multilmuldatahandle(simi.get("OLD_VD").get)
-        val mask = UtilFuncs.multilmuldatahandle(simi.get("MASK").get)
-        val vflmul = simi.get("vflmul").get
-        val vxsat = simi.get("vxsat").get.toInt == 1
-        val expectvd = UtilFuncs.multilmuldatahandle(simi.get("VD").get)
-        // val vvtype = UtilFuncs.srctypeconvert(simi.get("vsew").get,s)
-        // val vdtype = UtilFuncs.srctypeconvert(simi.get("vsew").get,"u") + 1
-        val vsew = UtilFuncs.vsewconvert(simi.get("vsew").get)
-        val vxrm = simi.get("vxrm").get.toInt
-        // println("lmel > 1, id", i)
-
-        var n_inputs = 0.5
-        if(vflmul == "1.000000") n_inputs = 1.0
-        if(vflmul == "2.000000") n_inputs = 2.0
-        if(vflmul == "4.000000") n_inputs = 4.0
-        if(vflmul == "8.000000") n_inputs = 8.0
-        
-        // var finalVxsat = false
-        var vd : BigInt = 0
-        var vdres = false
-            
-        // println("1111")
-        var n_ops = (n_inputs * 2.0).toInt
-        for(j <- 0 until n_ops){
-            dut.io.out.ready.poke(true.B)
-            dut.io.in.valid.poke(true.B)
-            dut.io.in.bits.poke(genVFuInput(
-                SrcBundle(
-                    vs2=vs2data(j / 2), 
-                    vs1=vs1data(j / 2),
-                    old_vd=oldvddata(j),
-                    mask=mask(0)), 
-                ctrl.copy(
-                    vsew=vsew,
-                    widen=true,
-                    vl=simi.get("vl").get.toInt,
-                    vlmul = UtilFuncs.lmulconvert(vflmul).toInt, 
-                    ma = (simi.get("ma").get.toInt == 1),
-                    ta = (simi.get("ta").get.toInt == 1),
-                    vm = (simi.get("vm").get.toInt == 1),
-                    uopIdx=n_ops - 1 -j,
-                    vxrm = vxrm,
-                    vstart = getVstart(simi)
-                )
-            ))
-            dut.clock.step(1)
-            // finalVxsat = finalVxsat || dut.io.out.bits.vxsat.peek().litValue == 1
-            vd = dut.io.out.bits.vd.peek().litValue
-            vdres = f"h$vd%032x".equals(expectvd(j))
-            Logger.printvds(f"h$vd%032x", expectvd(j))
-            if (!vdres) dump(simi, f"h$vd%032x", expectvd(j))
-            assert(vdres)
-        }
-        // assert(finalVxsat == vxsat)
-    }
-
-    override def testSingle(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VAluWrapper) : Unit = {
-        testMultiple(simi,ctrl,s, dut)
-    }
-}*/
-
-

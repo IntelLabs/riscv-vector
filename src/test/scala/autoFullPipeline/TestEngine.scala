@@ -43,26 +43,25 @@ object TestEngine {
 }
 
 class ALUTestEngine extends TestEngine {
-    val MAX_PARA_INSTS = 2
-    val MAX_PARA_TESTCASES = 3
-    var curTestCasePool : Map[Int, (TestBehavior, TestCase)] = Map()
-    var testBehaviorPool : Seq[TestBehavior] = Seq()
 
-    var nextNormalModeTBIx = 0
     var robIndex = 0
 
     override def getName() = "ALUTestEngine"
 
-    override def run(dut:VAluWrapper) = {
-        // println("ALUTestEngine run() not implemented")
+    def runThroughTBs(
+        dut:VAluWrapper, tbs:Seq[TestBehavior], 
+        MAX_PARA_INSTS: Int = 2, MAX_PARA_TESTCASES: Int = 3
+    ) = {
+        
+        var tbIx : Int = 0
+        var curTestCasePool : Map[Int, (TestBehavior, TestCase)] = Map()
+        var testBehaviorPool : Seq[TestBehavior] = Seq()
 
-        // TODO 11.1: Add redirect later..
 
         breakable{ while(true) {
-            if (this.nextNormalModeTBIx >= this.normalModeTBs.length 
-                && this.testBehaviorPool.length == 0
-                && this.curTestCasePool.isEmpty) {
-                println("TestEngine: all normal mode instructions are tested")
+            if (tbIx >= tbs.length 
+                && testBehaviorPool.length == 0
+                && curTestCasePool.isEmpty) {
                 break
             }
             // TODO 1. run tests for normal mode instructions
@@ -72,23 +71,23 @@ class ALUTestEngine extends TestEngine {
 
 
             // TODO 1.1. Fill insts (TestCases from TestBehavior)
-            while (this.testBehaviorPool.length < MAX_PARA_TESTCASES &&
-            this.nextNormalModeTBIx < this.normalModeTBs.length) {
-                this.testBehaviorPool :+= this.normalModeTBs(this.nextNormalModeTBIx)
-                this.nextNormalModeTBIx += 1
+            while (testBehaviorPool.length < MAX_PARA_TESTCASES &&
+            tbIx < tbs.length) {
+                testBehaviorPool :+= tbs(tbIx)
+                tbIx += 1
             }
 
-            while (this.curTestCasePool.size < MAX_PARA_TESTCASES &&
-            this.testBehaviorPool.length > 0) {
-                val randomTBinPool = this.testBehaviorPool(Random.nextInt(this.testBehaviorPool.length))
-                this.curTestCasePool += (this.robIndex -> (randomTBinPool, randomTBinPool.getNextTestCase()))
+            while (curTestCasePool.size < MAX_PARA_TESTCASES &&
+            testBehaviorPool.length > 0) {
+                val randomTBinPool = testBehaviorPool(Random.nextInt(testBehaviorPool.length))
+                curTestCasePool += (this.robIndex -> (randomTBinPool, randomTBinPool.getNextTestCase()))
                 this.robIndex += 1
             }
 
             // TODO 1.2. Randomly choose one among TestCases
             //  TODO 1.2.1. Randomly redirect and remove 
             //  TODO 1.2.2. If not redirecting, get next uop from it and feed it to the dut
-            val (chosenTestBehavior, chosenTestCase) : (TestBehavior, TestCase) = Random.shuffle(this.curTestCasePool.toList).head._2
+            val (chosenTestBehavior, chosenTestCase) : (TestBehavior, TestCase) = Random.shuffle(curTestCasePool.toList).head._2
             val (input, uopIdx) : (VFuInput, Int) = chosenTestCase.nextVfuInput()
             println(s"Sending ${chosenTestCase.instid}, uop ${uopIdx}")
 
@@ -110,15 +109,16 @@ class ALUTestEngine extends TestEngine {
             if (!resCorrectness) {
                 println(s"${chosenTestCase.instid}, result incorrect")
                 chosenTestBehavior.recordFail()
-                this.curTestCasePool = this.curTestCasePool.filterNot(_._2._1 == chosenTestBehavior)
-                this.testBehaviorPool = this.testBehaviorPool.filterNot(_ == chosenTestBehavior)
+                curTestCasePool = curTestCasePool.filterNot(_._2._1 == chosenTestBehavior)
+                testBehaviorPool = testBehaviorPool.filterNot(_ == chosenTestBehavior)
             } else {
                 //  TODO 1.3.1. check if all uops' results are checked and remove the TestCase from the pool
                 if (chosenTestCase.isCompleted()) {
-                    this.curTestCasePool = this.curTestCasePool.filterNot(_._2._2 == chosenTestCase)
+                    curTestCasePool = curTestCasePool.filterNot(_._2._2 == chosenTestCase)
 
                     //  TODO 1.3.2. check if TestBehavior are done and record the result, remove it from the pool
-                    if (!this.curTestCasePool.values.exists(_._1 == chosenTestBehavior)) {
+                    if (!curTestCasePool.values.exists(_._1 == chosenTestBehavior) &&
+                            chosenTestBehavior.isFinished()) {
                         println(s"${chosenTestBehavior.getInstid()}, tests are done.")
                         Dump.recordDone(s"${chosenTestBehavior.getInstid()}")
                         chosenTestBehavior.recordSuccess()
@@ -128,12 +128,97 @@ class ALUTestEngine extends TestEngine {
 
             //  TODO 1.3.2. check if all test cases of an TestBehavior are fetched
             if (chosenTestBehavior.isFinished()) {
-                this.testBehaviorPool = this.testBehaviorPool.filterNot(_ == chosenTestBehavior)
+                testBehaviorPool = testBehaviorPool.filterNot(_ == chosenTestBehavior)
             }
         } }
+    }
 
-        // TODO 2. run tests for ordered instructions
+    override def run(dut:VAluWrapper) = {
 
+        // TODO 11.1: Add redirect later..
+
+        // breakable{ while(true) {
+        //     if (this.nextNormalModeTBIx >= this.normalModeTBs.length 
+        //         && this.testBehaviorPool.length == 0
+        //         && this.curTestCasePool.isEmpty) {
+        //         println("TestEngine: all normal mode instructions are tested")
+        //         break
+        //     }
+        //     // TODO 1. run tests for normal mode instructions
+        //     //  TODO MAX parallel instruction limit
+        //     //  TODO randomly chosen between normal mode instructions
+        //     //  TODO record done when all inputs of one instruction are fed
+
+
+        //     // TODO 1.1. Fill insts (TestCases from TestBehavior)
+        //     while (this.testBehaviorPool.length < MAX_PARA_TESTCASES &&
+        //     this.nextNormalModeTBIx < this.normalModeTBs.length) {
+        //         this.testBehaviorPool :+= this.normalModeTBs(this.nextNormalModeTBIx)
+        //         this.nextNormalModeTBIx += 1
+        //     }
+
+        //     while (this.curTestCasePool.size < MAX_PARA_TESTCASES &&
+        //     this.testBehaviorPool.length > 0) {
+        //         val randomTBinPool = this.testBehaviorPool(Random.nextInt(this.testBehaviorPool.length))
+        //         this.curTestCasePool += (this.robIndex -> (randomTBinPool, randomTBinPool.getNextTestCase()))
+        //         this.robIndex += 1
+        //     }
+
+        //     // TODO 1.2. Randomly choose one among TestCases
+        //     //  TODO 1.2.1. Randomly redirect and remove 
+        //     //  TODO 1.2.2. If not redirecting, get next uop from it and feed it to the dut
+        //     val (chosenTestBehavior, chosenTestCase) : (TestBehavior, TestCase) = Random.shuffle(this.curTestCasePool.toList).head._2
+        //     val (input, uopIdx) : (VFuInput, Int) = chosenTestCase.nextVfuInput()
+        //     println(s"Sending ${chosenTestCase.instid}, uop ${uopIdx}")
+
+        //     // ===================== manipulating dut ========================
+        //     dut.io.out.ready.poke(true.B)
+        //     dut.io.in.valid.poke(true.B)
+
+        //     dut.io.in.bits.poke(input)
+        //     dut.clock.step(1)
+
+        //     val dutVd = dut.io.out.bits.vd.peek().litValue
+        //     val dutVxsat = dut.io.out.bits.vxsat.peek().litValue == 1
+        //     // ===============================================================
+
+        //     // TODO 1.3. check for potential results, get the comparison result
+        //     val resCorrectness = chosenTestCase.rc.checkRes(dutVd, uopIdx, dutVxsat=dutVxsat)
+
+        //     //  TODO 1.3.0. if the result is incorrect, record the incorrect result and remove the TestCase and TestBehavior
+        //     if (!resCorrectness) {
+        //         println(s"${chosenTestCase.instid}, result incorrect")
+        //         chosenTestBehavior.recordFail()
+        //         this.curTestCasePool = this.curTestCasePool.filterNot(_._2._1 == chosenTestBehavior)
+        //         this.testBehaviorPool = this.testBehaviorPool.filterNot(_ == chosenTestBehavior)
+        //     } else {
+        //         //  TODO 1.3.1. check if all uops' results are checked and remove the TestCase from the pool
+        //         if (chosenTestCase.isCompleted()) {
+        //             this.curTestCasePool = this.curTestCasePool.filterNot(_._2._2 == chosenTestCase)
+
+        //             //  TODO 1.3.2. check if TestBehavior are done and record the result, remove it from the pool
+        //             if (!this.curTestCasePool.values.exists(_._1 == chosenTestBehavior)) {
+        //                 println(s"${chosenTestBehavior.getInstid()}, tests are done.")
+        //                 Dump.recordDone(s"${chosenTestBehavior.getInstid()}")
+        //                 chosenTestBehavior.recordSuccess()
+        //             }
+        //         }
+        //     }
+
+        //     //  TODO 1.3.2. check if all test cases of an TestBehavior are fetched
+        //     if (chosenTestBehavior.isFinished()) {
+        //         this.testBehaviorPool = this.testBehaviorPool.filterNot(_ == chosenTestBehavior)
+        //     }
+        // } }
+
+        this.runThroughTBs(dut, this.normalModeTBs)
+        println("TestEngine: All normal mode instructions are tested")
+
+        println("Starting Tests for Ordered Instructions ============================")
+
+        this.runThroughTBs(dut, this.orderedTBs, 1, 1)
+
+        println("TestEngine: All ordered mode instructions are tested")
     }
 }
 
