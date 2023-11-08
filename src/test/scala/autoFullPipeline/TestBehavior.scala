@@ -62,12 +62,14 @@ class TestCase(
         return this.rc.isCompleted()
     }
 
-    def nextVfuInput() : (VFuInput, Int) = {
+    def nextVfuInput(robIdx : (Boolean, Int) = (false, 0)) : (VFuInput, Int) = {
         if (isFSM) println("ERROR: generating normal input for FSM test case")
 
+        var ctrlBundle = ctrlBundles(uopIx)
+        ctrlBundle.robIdx = robIdx
         val vfuInput: VFuInput = genVFuInput(
             srcBundles(uopIx), 
-            ctrlBundles(uopIx)
+            ctrlBundle
         )
 
         val idx = ctrlBundles(uopIx).uopIdx
@@ -76,12 +78,14 @@ class TestCase(
         return (vfuInput, idx)
     }
 
-    def nextFsmInput() : (VPermInput, Int) = {
+    def nextFsmInput(robIdx : (Boolean, Int) = (false, 0)) : (VPermInput, Int) = {
         if (!isFSM) println("ERROR: generating FSM input for normal test case")
 
+        var ctrlBundle = ctrlBundles(uopIx)
+        ctrlBundle.robIdx = robIdx
         val fsmInput: VPermInput = genFSMInput(
             fsmSrcBundles(uopIx),
-            ctrlBundles(uopIx)
+            ctrlBundle
         )
 
         uopIx += 1
