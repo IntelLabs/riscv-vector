@@ -33,6 +33,10 @@ abstract class TestBehavior(filename : String, ctrlBundle : TestCtrlBundleBase, 
         return dut
     }
 
+    def randomFlush() : Boolean = {
+        return RandomGen.rand.nextInt(100) > 95
+    }
+
     def getHexfield(simi : Map[String,String], keyname : String) : Int = {
         if(simi.get(keyname) != None) {
             val fflags = simi.get(keyname).get
