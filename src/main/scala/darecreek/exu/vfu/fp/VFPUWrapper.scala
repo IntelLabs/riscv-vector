@@ -41,12 +41,14 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   val vmask = io.in.bits.mask
   val fire = io.in.fire
 
-  val vfredosum_vs = (funct6 === "b000011".U) && (funct3 === "b001".U)
-  val vfredusum_vs = (funct6 === "b000001".U) && (funct3 === "b001".U)
+  val vfredosum_vs = ((funct6 === "b000011".U) && (funct3 === "b001".U)) || ((funct6 === "b000001".U) && (funct3 === "b001".U))
+  // val vfredusum_vs = (funct6 === "b000001".U) && (funct3 === "b001".U)
+  val vfredusum_vs = false.B
   val vfredmax_vs = (funct6 === "b000111".U) && (funct3 === "b001".U)
   val vfredmin_vs = (funct6 === "b000101".U) && (funct3 === "b001".U)
-  val vfwredosum_vs = (funct6 === "b110011".U) && (funct3 === "b001".U)
-  val vfwredusum_vs = (funct6 === "b110001".U) && (funct3 === "b001".U)
+  val vfwredosum_vs = ((funct6 === "b110011".U) && (funct3 === "b001".U)) || ((funct6 === "b110001".U) && (funct3 === "b001".U))
+  // val vfwredusum_vs = (funct6 === "b110001".U) && (funct3 === "b001".U)
+  val vfwredusum_vs = false.B
 
   val fpu_red = vfredosum_vs ||
     vfredusum_vs ||

@@ -119,12 +119,14 @@ class VfwcvtrtzxfvTestBehavior extends VfTestBehavior("vfwcvt.rtz.x.f.v.data", c
 // ==============================================================
 
 class VfredosumvsTestBehavior extends VfTestBehavior("vfredosum.vs.data", ctrlBundles.vfredosum_vs, "u", "vfredosum_vs", () => new RedFPResult(false), vred=true) {}
-class VfredusumvsTestBehavior extends VfTestBehavior("vfredusum.vs.data", ctrlBundles.vfredusum_vs, "u", "vfredusum_vs", () => new RedUSumVsFPResult(false), vred=true, disable_fflags=true) {}
+class VfredusumvsTestBehavior extends VfTestBehavior("vfredusum.vs.data", ctrlBundles.vfredusum_vs, "u", "vfredusum_vs", () => new RedFPResult(false), vred=true) {}
+// class VfredusumvsTestBehavior extends VfTestBehavior("vfredusum.vs.data", ctrlBundles.vfredusum_vs, "u", "vfredusum_vs", () => new RedUSumVsFPResult(false), vred=true, disable_fflags=true) {}
 class VfredmaxvsTestBehavior extends VfTestBehavior("vfredmax.vs.data", ctrlBundles.vfredmax_vs, "u", "vfredmax_vs", () => new RedFPResult(false), vred=true) {}
 class VfredminvsTestBehavior extends VfTestBehavior("vfredmin.vs.data", ctrlBundles.vfredmin_vs, "u", "vfredmin_vs", () => new RedFPResult(false), vred=true) {}
 
 class VfwredosumvsTestBehavior extends VfTestBehavior("vfwredosum.vs.data", ctrlBundles.vfwredosum_vs, "u", "vfwredosum_vs", () => new RedFPResult(true), vred=true, vwred=true) {}
-class VfwredusumvsTestBehavior extends VfTestBehavior("vfwredusum.vs.data", ctrlBundles.vfwredusum_vs, "u", "vfwredusum_vs", () => new RedUSumVsFPResult(true), vred=true, vwred=true, disable_fflags=true) {}
+class VfwredusumvsTestBehavior extends VfTestBehavior("vfwredusum.vs.data", ctrlBundles.vfwredusum_vs, "u", "vfwredusum_vs", () => new RedFPResult(true), vred=true, vwred=true) {}
+// class VfwredusumvsTestBehavior extends VfTestBehavior("vfwredusum.vs.data", ctrlBundles.vfwredusum_vs, "u", "vfwredusum_vs", () => new RedUSumVsFPResult(true), vred=true, vwred=true, disable_fflags=true) {}
 
 class VmfeqvvTestBehavior extends VfTestBehavior("vmfeq.vv.data", ctrlBundles.vmfeq_vv, "u", "vmfeq_vv", () => new NarrowToOneFPResult(), normal=true, narrow_to_1=true) {}
 class VmfnevvTestBehavior extends VfTestBehavior("vmfne.vv.data", ctrlBundles.vmfne_vv, "u", "vmfne_vv", () => new NarrowToOneFPResult(), normal=true, narrow_to_1=true) {}
