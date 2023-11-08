@@ -22,6 +22,7 @@ class VcmprsEngine(implicit p: Parameters) extends VFuModule {
     val old_vd = Input(UInt(128.W))
     val vmask = Input(UInt(128.W))
     val vd_reg = Input(UInt(128.W))
+    val cmprs_rd_wb = Input(Bool())
     val update_vs_idx = Input(Bool())
     val cmprs_rd_old_vd = Input(Bool())
     val calc_done = Input(Bool())
@@ -44,6 +45,7 @@ class VcmprsEngine(implicit p: Parameters) extends VFuModule {
   val old_vd = io.old_vd
   val vmask = io.vmask
   val vd_reg = io.vd_reg
+  val cmprs_rd_wb = io.cmprs_rd_wb
   val update_vs_idx = io.update_vs_idx
   val cmprs_rd_old_vd = io.cmprs_rd_old_vd
   val calc_done = io.calc_done
@@ -52,11 +54,12 @@ class VcmprsEngine(implicit p: Parameters) extends VFuModule {
   val vcompress = (funct6 === "b010111".U) && (funct3 === "b010".U)
   val eew = SewOH(vsew)
 
+  val cmprs_rd_wb_reg = RegInit(false.B)
   val update_vs_idx_reg = RegInit(false.B)
   val cmprs_rd_old_vd_reg = RegInit(false.B)
   val old_vd_reg = RegInit(0.U(VLEN.W))
   val vs2_reg = RegInit(0.U(VLEN.W))
-  val cmprs_read = update_vs_idx_reg || cmprs_rd_old_vd_reg
+  val cmprs_read = update_vs_idx_reg || cmprs_rd_wb_reg || cmprs_rd_old_vd_reg
   val old_vd_bytes = VecInit(Seq.tabulate(VLENB)(i => old_vd_reg((i + 1) * 8 - 1, i * 8)))
   val vs2_bytes = VecInit(Seq.tabulate(VLENB)(i => vs2_reg((i + 1) * 8 - 1, i * 8)))
 
@@ -75,23 +78,21 @@ class VcmprsEngine(implicit p: Parameters) extends VFuModule {
 
   when(flush) {
     vd_idx_reg := 0.U
+    cmprs_rd_wb_reg := 0.U
     update_vs_idx_reg := 0.U
     cmprs_rd_old_vd_reg := 0.U
     old_vd_reg := 0.U
     vs2_reg := 0.U
     current_ones_sum_reg := VecInit(Seq.fill(VLENB)(0.U(8.W)))
+    vmask_16b_reg := 0.U
   }.otherwise {
     vd_idx_reg := io.vd_idx
+    cmprs_rd_wb_reg := cmprs_rd_wb
     update_vs_idx_reg := update_vs_idx
     cmprs_rd_old_vd_reg := cmprs_rd_old_vd
     old_vd_reg := old_vd
     vs2_reg := vs2
     current_ones_sum_reg := current_ones_sum
-  }
-
-  when(flush) {
-    vmask_16b_reg := 0.U
-  }.elsewhen(update_vs_idx) {
     vmask_16b_reg := vmask_16b
   }
 
@@ -109,7 +110,7 @@ class VcmprsEngine(implicit p: Parameters) extends VFuModule {
 
   for (i <- 0 until VLENB) {
     current_ones_sum(i) := ones_sum
-    when(update_vs_idx) {
+    when(update_vs_idx || cmprs_rd_wb) {
       current_ones_sum(i) := ones_sum + PopCount(vmask_16b(i, 0))
     }
   }
