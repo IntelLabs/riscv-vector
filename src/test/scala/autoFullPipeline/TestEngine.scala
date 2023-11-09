@@ -32,6 +32,7 @@ object TestEngine {
     def getEngine(testEngineId : Int) : TestEngine = {
         return testEngineId match {
             case 0 => new ALUTestEngine
+            case 6 => new FPTestEngine
             /*case MAC_TEST_ENGINE : {}
             case RED_TEST_ENGINE : {}
             case MASK_TEST_ENGINE : {}
