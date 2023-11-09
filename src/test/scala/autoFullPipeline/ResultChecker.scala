@@ -31,6 +31,7 @@ class ResultChecker(val n_ops : Int, val expectvd : Array[String],
     var isFPDIV : Boolean = false
 
     var checkedRes = 0
+    var uopIdxBitPat = 0
 
     def setGoldenVxsat(goldenVxsat : Boolean) = { 
         this.goldenVxsat = goldenVxsat
@@ -50,6 +51,9 @@ class ResultChecker(val n_ops : Int, val expectvd : Array[String],
             dutVxsat : Boolean = false, dutFflags : Int = 0) : Boolean = {
         
         var res = this._checkRes(dutVd, uopIdx)
+
+        if ((uopIdxBitPat & (1 << uopIdx)) > 0) println(s"uop ${uopIdx} has been checked twice!")
+        else uopIdxBitPat |= (1 << uopIdx)
 
         this.resFflags |= dutFflags
         this.resVxsat = this.resVxsat || dutVxsat

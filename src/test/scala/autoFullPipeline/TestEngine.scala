@@ -189,7 +189,7 @@ abstract class TestEngine extends BundleGenHelper {
     var robIndex = 0
     
     def getName() = "TestEngine"
-    def getDut() = new VAluWrapper
+    def getDut() : Module = new VAluWrapper
 
     def runThroughTBs(
         dut:Module, tbs:Seq[TestBehavior], 
@@ -199,6 +199,8 @@ abstract class TestEngine extends BundleGenHelper {
         var tbIx : Int = 0
         var curTestCasePool : Map[Int, (TestBehavior, TestCase)] = Map()
         var testBehaviorPool : Seq[TestBehavior] = Seq()
+
+        var failedTBs : Map[Int, TestBehavior] = Map()
 
         var exhaustedCount : Int = 0
 
@@ -235,6 +237,7 @@ abstract class TestEngine extends BundleGenHelper {
             val nonExhavustedTestCases = curTestCasePool.filter(!_._2._2.isExhausted()).toList
             var stepRes : (Boolean, Int) = (false, 0)
             if (nonExhavustedTestCases.length != 0) {
+                // TODO randomly flush
                 val randomTestCase = Random.shuffle(nonExhavustedTestCases).head
                 val (chosenTestBehavior, chosenTestCase) : (TestBehavior, TestCase) = randomTestCase._2
                 val sendRobIdx = randomTestCase._1
@@ -247,6 +250,7 @@ abstract class TestEngine extends BundleGenHelper {
             }
             val resCorrectness = stepRes._1
             val resRobIdx = stepRes._2
+
             // val (input, uopIdx) : (VFuInput, Int) = chosenTestCase.nextVfuInput((true, sendRobIdx))
             // println(s"Sending ${chosenTestCase.instid}, uop ${uopIdx}, robIdx ${sendRobIdx}")
 
@@ -269,6 +273,14 @@ abstract class TestEngine extends BundleGenHelper {
             if (resRobIdx != NO_RESULT_ROBIDX) {
                 //  TODO 1.3.0. if the result is incorrect, record the incorrect result and remove the TestCase and TestBehavior
                 // TODO When robIdx does not exist in the pool.. failed or flushed..
+                if (!curTestCasePool.contains(resRobIdx)) {
+                    if (failedTBs.contains(resRobIdx)) {
+                        println(s"Received result ${resRobIdx} for already incorrect ${failedTBs(resRobIdx).getInstid()}")
+                    } else {
+                        println(s"Received result ${resRobIdx} for flushed ${failedTBs(resRobIdx).getInstid()}")
+                        assert(false)
+                    }
+                }
                 val (resTestBehavior, resTestCase) : (TestBehavior, TestCase) = curTestCasePool(resRobIdx)
                 if (!resCorrectness) {
                     println(s"${resTestCase.instid}, result incorrect")
@@ -278,6 +290,8 @@ abstract class TestEngine extends BundleGenHelper {
                     testBehaviorPool = testBehaviorPool.filterNot(_ == resTestBehavior)
 
                     exhaustedCount = curTestCasePool.filter(_._2._2.isExhausted()).size
+
+                    failedTBs += (resRobIdx -> resTestBehavior)
                 } else {
                     //  TODO 1.3.1. check if all uops' results are checked and remove the TestCase from the pool
                     if (resTestCase.isCompleted()) {

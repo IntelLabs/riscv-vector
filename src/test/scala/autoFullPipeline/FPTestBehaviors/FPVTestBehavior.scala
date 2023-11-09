@@ -145,14 +145,19 @@ class VfTestBehavior(fn : String, cb : CtrlBundle,
     vred : Boolean = false, vn : Boolean = false, normal : Boolean = false, 
     vw : Boolean = false, narrow_to_1 : Boolean = false,
     vfwvv : Boolean = false, vs1encoding : Option[Int] = None,
-    vfwmul_like : Boolean = false, vwred : Boolean = false, disable_fflags : Boolean = false, ooo : Boolean = false) extends TestBehavior(fn, cb, s, instid) {
+    vfwmul_like : Boolean = false, vwred : Boolean = false, 
+    disable_fflags : Boolean = false, val ooo : Boolean = false) extends TestBehavior(fn, cb, s, instid) {
     
-    override def getDut() : Module               = {
+    /*override def getDut() : Module               = {
         val dut = new VFPUWrapper
         return dut
-    }
+    }*/
 
-    override def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VFPUWrapper) : Unit = {
+    override def isOrdered() = !ooo
+
+    override def getTargetTestEngine() = TestEngine.FP_TEST_ENGINE
+
+    override def _getNextTestCase(simi:Map[String,String]) : TestCase = {
         val vf = simi.get("VS1") == None && simi.get("FS1") != None
         val v = simi.get("VS1") == None && simi.get("FS1") == None
         val vv = !v && !vf
@@ -217,24 +222,29 @@ class VfTestBehavior(fn : String, cb : CtrlBundle,
                 n_res = n_ops
         }
 
-        // fpRes ================================================================================================================
+        // fpRes and Result checker ================================================================================================================
         var fpRes : FPResult = fpRes1()
         if (hasRd) {
             fpRes = new FdFPResult()
         }
         fpRes.setup(n_res, (a, b, c) => this.dump(a, b, c, "")) // * fpRes
 
+        var fpResultChecker = new FPResultChecker(
+            n_res, expectvd, simi, fpRes
+        )
+        fpResultChecker.setGoldenFflags(expectfflags)
+
         // ================================================================================================================
         var vd : BigInt = 0
-        var vdres = false
-        val MAX_READY_WAIT = 100
-        var curReadyWait = 0
+        
         var j = 0
-        var ctrlBundles : Map[Int, CtrlBundle] = Map()
+        
+        var srcBundles : Seq[SrcBundle] = Seq()
+        var ctrlBundles : Seq[CtrlBundle] = Seq()
 
         val uop_order = scala.util.Random.shuffle(List.range(0, n_ops))
         breakable{ while (j < n_ops){
-            dut.io.in.valid.poke(true.B) // TODO randomly block
+            // dut.io.in.valid.poke(true.B) // TODO randomly block
 
             // preparing input ====================================
             var uopIdx = j
@@ -310,13 +320,10 @@ class VfTestBehavior(fn : String, cb : CtrlBundle,
             // sending input ====================================
             // dut.io.dontCare.poke(false.B)
             
-            dut.io.in.bits.poke(genVFuInput(
-                srcBundle, 
-                ctrlBundle
-            ))
-            dut.io.redirect.poke(genFSMRedirect())
+            srcBundles :+= srcBundle
+            ctrlBundles :+= ctrlBundle
 
-            // waiting for dut's ready signal, which represents an ack of the uop ========
+            /*// waiting for dut's ready signal, which represents an ack of the uop ========
             while((dut.io.in.ready.peek().litValue != 1) &&
                     curReadyWait < MAX_READY_WAIT) {
                 
@@ -344,14 +351,12 @@ class VfTestBehavior(fn : String, cb : CtrlBundle,
             if (!fpRes.finished()) { // * fpRes
                 fpRes.checkAndCompare(dut, simi, ctrlBundles, expectvd)
             }
-            dut.clock.step(1)
+            dut.clock.step(1)*/
             j += 1
         } }
-        dut.io.in.valid.poke(false.B)
-        dut.io.in.bits.uop.uopEnd.poke(false.B)
 
         // checking for rest output vds ==============================================================================
-        val LOOP_MAX = 100
+        /*val LOOP_MAX = 100
         var curIter = 0
         var fflags : Int = 0
         breakable{ while(true) {
@@ -369,21 +374,18 @@ class VfTestBehavior(fn : String, cb : CtrlBundle,
             var srcBundle = SrcBundle()
             var ctrlBundle = ctrl.copy()
 
-            // dut.io.dontCare.poke(true.B)
-            dut.io.in.bits.poke(genVFuInput(
-                srcBundle, 
-                ctrlBundle
-            ))
-            dut.io.redirect.poke(genFSMRedirect())
-
+            
+            srcBundle, 
+            ctrlBundle
+            
             fpRes.checkAndCompare(dut, simi, ctrlBundles, expectvd) // * fpRes
 
             dut.clock.step(1)
 
             curIter += 1
-        } }
+        } }*/
 
-        fflags = fpRes.getFflags() // * fpRes
+        /*fflags = fpRes.getFflags() // * fpRes
         var fflagsRes = fflags == expectfflags
 
         if (!disable_fflags && !fflagsRes) {
@@ -393,10 +395,13 @@ class VfTestBehavior(fn : String, cb : CtrlBundle,
 
         if (!disable_fflags) {
             assert(fflagsRes)
-        }
-    }
+        }*/
 
-    override def testSingle(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VFPUWrapper) : Unit = {
-        testMultiple(simi, ctrl, s, dut)
+        return TestCase.newNormalCase(
+            this.instid,
+            srcBundles,
+            ctrlBundles,
+            fpResultChecker
+        )
     }
 }

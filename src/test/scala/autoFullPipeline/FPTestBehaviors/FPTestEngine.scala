@@ -25,16 +25,41 @@ class FPTestEngine extends TestEngine {
     var curReadyWait = 0
 
     override def getName() = "FPTestEngine"
+    override def getDut() = new VFPUWrapper
 
-    var historyTCs : List[(robIdx, uopIdx, TestCase)] = List()
+    var historyTCs : List[(Int, Int, TestCase)] = List() // robIdx, uopIdx, TestCase
     var historyTCIx = 0
+
+    var results : List[(Boolean, Int)] = List()
 
     def checkOutput(dut : VFPUWrapper) = {
         dut.io.out.ready.poke(true.B) // TODO randomly block
 
         if (dut.io.out.valid.peek().litValue == 1) {
+            
+            var robIdx = dut.io.out.bits.uop.sysUop.robIdx.value.peek().litValue.toInt
+            var uopIdx = dut.io.out.bits.uop.uopIdx.peek().litValue.toInt
 
             // TODO add result to the queue
+            while(historyTCs.length > 0 && historyTCs(0)._1 != robIdx) {
+                historyTCs = historyTCs.tail
+            }
+
+            if (historyTCs.length == 0) {
+                println(s"robIdx ${robIdx} is not in the historyTCs!!!!!!!!")
+                assert(false)
+            }
+
+            val resTestCase = historyTCs(0)._3
+            historyTCs = historyTCs.tail
+
+            val dutVd = dut.io.out.bits.vd.peek().litValue
+            val fflags = dut.io.out.bits.fflags.peek().litValue.toInt
+
+            val resCorrectness = resTestCase.rc.checkRes(dutVd, uopIdx, dutFflags=fflags)
+            val resRobIdx = robIdx
+
+            results :+= (resCorrectness, resRobIdx)
 
             /*var uopIdx = dut.io.out.bits.uop.uopIdx.peek().litValue.toInt
             // var srcBundle = srcBundles(uopIdx)
@@ -60,6 +85,8 @@ class FPTestEngine extends TestEngine {
 
         // ===================== manipulating dut ========================
 
+        val MAX_READY_WAIT = 100
+        
         if (!allExhausted) {
             dut.io.in.valid.poke(true.B) // TODO randomly block
 
@@ -81,7 +108,7 @@ class FPTestEngine extends TestEngine {
             // waits too long.. =====================================
             if (!(curReadyWait < MAX_READY_WAIT)) {
                 println(s"no io.ready signal received")
-                dump(simi, s"(no io.ready signal received), sending ${uopIdx}", "(no io.ready signal received)")
+                assert(false)
             }
             assert(curReadyWait < MAX_READY_WAIT)
             curReadyWait = 0
@@ -103,10 +130,15 @@ class FPTestEngine extends TestEngine {
         }
 
         // TODO 1.3. check for potential results, get the comparison result
-        val resCorrectness = chosenTestCase.rc.checkRes(dutVd, uopIdx, dutVxsat=dutVxsat)
-        val resRobIdx = sendRobIdx
-
-        return (resCorrectness, resRobIdx)
+        // val resCorrectness = chosenTestCase.rc.checkRes(dutVd, uopIdx, dutVxsat=dutVxsat)
+        // val resRobIdx = sendRobIdx
+        if (results.length > 0) {
+            val resCorrectness = results(0)._1
+            val resRobIdx = results(0)._2
+            results = results.tail
+            return (resCorrectness, resRobIdx)
+        }
+        return (false, NO_RESULT_ROBIDX)
     }
 
 }
