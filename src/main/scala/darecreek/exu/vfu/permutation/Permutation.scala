@@ -598,6 +598,7 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   vcmprsEngine.io.old_vd := rdata_reg
   vcmprsEngine.io.vmask := vmask_vl
   vcmprsEngine.io.vd_reg := vd_reg
+  vcmprsEngine.io.cmprs_rd_wb := rdata_cmprs_rd_wb
   vcmprsEngine.io.update_vs_idx := rdata_update_vs_idx
   vcmprsEngine.io.cmprs_rd_old_vd := rdata_cmprs_rd_old_vd
   vcmprsEngine.io.calc_done := calc_done

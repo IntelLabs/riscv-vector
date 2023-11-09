@@ -6,14 +6,14 @@ import chisel3.util.experimental.decode._
 import darecreek.exu.vfu._
 // import darecreek.exu.vfu.VFUParam._
 import chipsalliance.rocketchip.config._
+import xiangshan.Redirect
 
 class VMask(implicit p: Parameters) extends VFuModule {
   val io = IO(new Bundle {
     val in = Input(ValidIO(new VFuInput))
-    val out = ValidIO(new VAluOutput)
+    val redirect = Input(ValidIO(new Redirect))
+    val out = ValidIO(new VFuOutput)
   })
-
-  io.out.valid := RegNext(io.in.valid)
 
   val funct6 = io.in.bits.uop.ctrl.funct6
   val funct3 = io.in.bits.uop.ctrl.funct3
@@ -341,6 +341,27 @@ class VMask(implicit p: Parameters) extends VFuModule {
     vd_out := vid_tail_mask_vd
   }
 
+  //  Redirect handling
+  def latency = 1
+
+  def regEnable(i: Int): Bool = validVec(i - 1) && !flushVec(i - 1)
+
+  val validVec = io.in.valid +: Array.fill(latency)(RegInit(false.B))
+  val uopVec = io.in.bits.uop +: Array.fill(latency)(Reg(new VUop))
+
+  val flushVec = validVec.zip(uopVec).map(x => x._1 && x._2.sysUop.robIdx.needFlush(io.redirect))
+
+  for (i <- 1 to latency) {
+    when(regEnable(i)) {
+      validVec(i) := validVec(i - 1)
+      uopVec(i) := uopVec(i - 1)
+    }.otherwise {
+      validVec(i) := false.B
+    }
+  }
+
+  io.out.valid := validVec(latency)
+  io.out.bits.uop := uopVec(latency)
   io.out.bits.vd := vd_out
   io.out.bits.vxsat := false.B
 }
