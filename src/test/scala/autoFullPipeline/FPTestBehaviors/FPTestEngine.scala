@@ -22,7 +22,12 @@ import scala.util.control.Breaks._
 
 class FPTestEngine extends TestEngine {
 
+    var curReadyWait = 0
+
     override def getName() = "FPTestEngine"
+
+    var historyTCs : List[(robIdx, uopIdx, TestCase)] = List()
+    var historyTCIx = 0
 
     def checkOutput(dut : VFPUWrapper) = {
         dut.io.out.ready.poke(true.B) // TODO randomly block
@@ -55,10 +60,7 @@ class FPTestEngine extends TestEngine {
 
         // ===================== manipulating dut ========================
 
-        breakable{ while (j < n_ops){
-            if (!allExhausted) {
-
-            }
+        if (!allExhausted) {
             dut.io.in.valid.poke(true.B) // TODO randomly block
 
             // sending input ====================================
@@ -71,10 +73,7 @@ class FPTestEngine extends TestEngine {
             while((dut.io.in.ready.peek().litValue != 1) &&
                     curReadyWait < MAX_READY_WAIT) {
                 
-                // before ticking clock, check if any vd comes out from dut
-                if (!fpRes.finished()) { // * fpRes
-                    fpRes.checkAndCompare(dut, simi, ctrlBundles, expectvd)
-                }
+                checkOutput(dut)
                 dut.clock.step(1)
                 curReadyWait += 1
             }
@@ -82,7 +81,7 @@ class FPTestEngine extends TestEngine {
             // waits too long.. =====================================
             if (!(curReadyWait < MAX_READY_WAIT)) {
                 println(s"no io.ready signal received")
-                dump(simi, s"(no io.ready signal received), sent ${j} uops", "(no io.ready signal received)")
+                dump(simi, s"(no io.ready signal received), sending ${uopIdx}", "(no io.ready signal received)")
             }
             assert(curReadyWait < MAX_READY_WAIT)
             curReadyWait = 0
@@ -96,8 +95,8 @@ class FPTestEngine extends TestEngine {
                 fpRes.checkAndCompare(dut, simi, ctrlBundles, expectvd)
             }
             dut.clock.step(1)
-            j += 1
-        } }
+        }
+        
         dut.io.in.valid.poke(false.B)
         dut.io.in.bits.uop.uopEnd.poke(false.B)
 
