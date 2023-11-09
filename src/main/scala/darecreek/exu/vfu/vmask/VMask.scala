@@ -138,6 +138,25 @@ class VMask(implicit p: Parameters) extends VFuModule {
   vmsbf := sbf(Cat(vs2m.reverse))
   vmfirst := BitsExtend(vfirst(Cat(vs2m.reverse)), XLEN, true.B)
 
+  //  Redirect handling
+  def latency = 1
+
+  def regEnable(i: Int): Bool = validVec(i - 1) && !flushVec(i - 1)
+
+  val validVec = io.in.valid +: Array.fill(latency)(RegInit(false.B))
+  val uopVec = io.in.bits.uop +: Array.fill(latency)(Reg(new VUop))
+
+  val flushVec = validVec.zip(uopVec).map(x => x._1 && x._2.sysUop.robIdx.needFlush(io.redirect))
+
+  for (i <- 1 to latency) {
+    when(regEnable(i)) {
+      validVec(i) := validVec(i - 1)
+      uopVec(i) := uopVec(i - 1)
+    }.otherwise {
+      validVec(i) := false.B
+    }
+  }
+
   // viota/vid/vcpop
   val vs2m_uop = MaskExtract(Cat(vs2m.reverse), uopIdx, eew)
   val vs2m_uop_vid = Mux(vid_v, Fill(16, vid_v), vs2m_uop)
@@ -158,7 +177,9 @@ class VMask(implicit p: Parameters) extends VFuModule {
     one_cnt_uop(i + 1) := PopCount(vs2m_uop_vid(i, 0))
   }
 
-  when(uopEnd && fire) {
+  when(flushVec(0)) {
+    one_sum := 0.U
+  }.elsewhen(uopEnd && fire) {
     one_sum := 0.U
   }.elsewhen(fire) {
     one_sum := one_cnt(ele_cnt)
@@ -341,24 +362,6 @@ class VMask(implicit p: Parameters) extends VFuModule {
     vd_out := vid_tail_mask_vd
   }
 
-  //  Redirect handling
-  def latency = 1
-
-  def regEnable(i: Int): Bool = validVec(i - 1) && !flushVec(i - 1)
-
-  val validVec = io.in.valid +: Array.fill(latency)(RegInit(false.B))
-  val uopVec = io.in.bits.uop +: Array.fill(latency)(Reg(new VUop))
-
-  val flushVec = validVec.zip(uopVec).map(x => x._1 && x._2.sysUop.robIdx.needFlush(io.redirect))
-
-  for (i <- 1 to latency) {
-    when(regEnable(i)) {
-      validVec(i) := validVec(i - 1)
-      uopVec(i) := uopVec(i - 1)
-    }.otherwise {
-      validVec(i) := false.B
-    }
-  }
 
   io.out.valid := validVec(latency)
   io.out.bits.uop := uopVec(latency)
