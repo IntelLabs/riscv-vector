@@ -117,4 +117,7 @@ object MaskReorg {
   def splash(bits: UInt, sew: SewOH): UInt = {
     Mux1H(sew.oneHot, Seq(1,2,4,8).map(k => Cat(bits(NByteLane/k -1, 0).asBools.map(Fill(k, _)).reverse)))
   }
+  def splash(bits: UInt, sew: SewOH, vlenb_in: Int): UInt = {
+    Mux1H(sew.oneHot, Seq(1,2,4,8).map(k => Cat(bits(vlenb_in/k -1, 0).asBools.map(Fill(k, _)).reverse)))
+  }
 }

@@ -42,12 +42,14 @@ object next_is_store_and_step {
   }
 }
 object one_512b_load_resp {
-  def apply(dut: VLsuTestWrapper, data: String, seqId: UInt): Unit = {
+  def apply(dut: VLsuTestWrapper, data: String, seqId: UInt, 
+            mask: (String, Boolean) = ("h0", false)): Unit = {
     dut.io.ovi_memop.sync_end.poke(false.B)
     dut.io.ovi_load.valid.poke(true.B)
     dut.io.ovi_load.seq_id.poke(seqId)
     dut.io.ovi_load.data.poke(data.U)
-    dut.io.ovi_load.mask_valid.poke(false.B)
+    dut.io.ovi_load.mask_valid.poke(mask._2.B)
+    dut.io.ovi_load.mask.poke(mask._1.U)
     dut.io.ovi_store.credit.poke(false.B)
     dut.io.ovi_maskIdx.credit.poke(false.B)
   }
@@ -70,7 +72,7 @@ case class CtrlBundle(instrn: BitPat,
 
 case class SrcBundleLd(rs2: String = "h0",
                        vs2: String = "h0",
-                       oldVd: String = "h0",
+                       oldVd: String = "h201f1e1d1c1b1a19_1817161514131211_100f0e0d0c0b0a09_0807060504030201",
                        mask: String = "hffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff",
                        nextVRobIdx: (Boolean, Int) = (false, 0),
                        iqEmpty: Boolean = false
@@ -114,6 +116,7 @@ trait BundleGenHelper {
       _.pdestVal -> c.isLoad.B,
       _.ctrl_vm -> c.vm.B,
       _.info_ma -> c.ma.B,
+      _.info_ta -> c.ta.B,
       _.info_vsew -> c.vsew.U,
       _.info_vlmul -> c.vlmul.U,
       _.info_vl -> c.vl.U,
