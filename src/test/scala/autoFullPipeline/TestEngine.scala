@@ -181,6 +181,8 @@ class ALUTestEngine extends TestEngine {
 }
 
 abstract class TestEngine extends BundleGenHelper {
+    val NO_RESULT_ROBIDX = -1
+
     var normalModeTBs : Seq[TestBehavior] = Seq()
     var orderedTBs : Seq[TestBehavior] = Seq()
 
@@ -264,35 +266,40 @@ abstract class TestEngine extends BundleGenHelper {
             // // val resRobIdx = sendRobIdx
             // ===============================================================
 
-            //  TODO 1.3.0. if the result is incorrect, record the incorrect result and remove the TestCase and TestBehavior
-            val (resTestBehavior, resTestCase) : (TestBehavior, TestCase) = curTestCasePool(resRobIdx)
-            if (!resCorrectness) {
-                println(s"${resTestCase.instid}, result incorrect")
+            if (resRobIdx != NO_RESULT_ROBIDX) {
+                //  TODO 1.3.0. if the result is incorrect, record the incorrect result and remove the TestCase and TestBehavior
+                // TODO When robIdx does not exist in the pool.. failed or flushed..
+                val (resTestBehavior, resTestCase) : (TestBehavior, TestCase) = curTestCasePool(resRobIdx)
+                if (!resCorrectness) {
+                    println(s"${resTestCase.instid}, result incorrect")
 
-                resTestBehavior.recordFail()
-                curTestCasePool = curTestCasePool.filterNot(_._2._1 == resTestBehavior)
-                testBehaviorPool = testBehaviorPool.filterNot(_ == resTestBehavior)
+                    resTestBehavior.recordFail()
+                    curTestCasePool = curTestCasePool.filterNot(_._2._1 == resTestBehavior)
+                    testBehaviorPool = testBehaviorPool.filterNot(_ == resTestBehavior)
 
-                exhaustedCount = curTestCasePool.filter(_._2._2.isExhausted()).size
-            } else {
-                //  TODO 1.3.1. check if all uops' results are checked and remove the TestCase from the pool
-                if (resTestCase.isCompleted()) {
-                    curTestCasePool = curTestCasePool.filterNot(_._2._2 == resTestCase)
-                    exhaustedCount -= 1
+                    exhaustedCount = curTestCasePool.filter(_._2._2.isExhausted()).size
+                } else {
+                    //  TODO 1.3.1. check if all uops' results are checked and remove the TestCase from the pool
+                    if (resTestCase.isCompleted()) {
+                        curTestCasePool = curTestCasePool.filterNot(_._2._2 == resTestCase)
+                        exhaustedCount -= 1
 
-                    //  TODO 1.3.2. check if TestBehavior are done and record the result, remove it from the pool
-                    if (!curTestCasePool.values.exists(_._1 == resTestBehavior) &&
-                            resTestBehavior.isFinished()) {
-                        println(s"${resTestBehavior.getInstid()}, tests are done.")
-                        Dump.recordDone(s"${resTestBehavior.getInstid()}")
-                        resTestBehavior.recordSuccess()
+                        //  TODO 1.3.2. check if TestBehavior are done and record the result, remove it from the pool
+                        if (!curTestCasePool.values.exists(_._1 == resTestBehavior) &&
+                                resTestBehavior.isFinished()) {
+                            println(s"${resTestBehavior.getInstid()}, tests are done.")
+                            Dump.recordDone(s"${resTestBehavior.getInstid()}")
+                            resTestBehavior.recordSuccess()
+                        }
                     }
                 }
-            }
 
-            //  TODO 1.3.2. check if all test cases of an TestBehavior are fetched
-            if (resTestBehavior.isFinished()) {
-                testBehaviorPool = testBehaviorPool.filterNot(_ == resTestBehavior)
+                //  TODO 1.3.2. check if all test cases of an TestBehavior are fetched
+                if (resTestBehavior.isFinished()) {
+                    testBehaviorPool = testBehaviorPool.filterNot(_ == resTestBehavior)
+                }
+            } else {
+                println("Waiting for TestCase result..")
             }
         } }
     }
