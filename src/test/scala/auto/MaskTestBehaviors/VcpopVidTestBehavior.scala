@@ -113,6 +113,8 @@ class VcpTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String,
                 // flushed
                 println("flushed")
 
+                dut.io.in.valid.poke(false.B)
+
                 var srcBundle = SrcBundle()
                 ctrlBundle = ctrl.copy()
 
