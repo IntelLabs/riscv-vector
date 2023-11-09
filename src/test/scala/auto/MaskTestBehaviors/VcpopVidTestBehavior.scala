@@ -106,6 +106,7 @@ class VcpTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String,
                     mask=mask(0)), 
                 ctrlBundle
             ))
+            dut.io.redirect.poke(genFSMRedirect((robIdxValid, robIdxValid, 0)))
             dut.clock.step(1)
 
             if (robIdxValid) {
