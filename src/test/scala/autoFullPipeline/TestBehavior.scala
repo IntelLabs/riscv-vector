@@ -62,6 +62,10 @@ class TestCase(
         return this.rc.isCompleted()
     }
 
+    def isExhausted() : Boolean = {
+        return uopIx >= ctrlBundles.length
+    }
+
     def nextVfuInput(robIdx : (Boolean, Int) = (false, 0)) : (VFuInput, Int) = {
         if (isFSM) println("ERROR: generating normal input for FSM test case")
 
