@@ -82,6 +82,13 @@ class VAluOutput extends Bundle {
   val vd = UInt(128.W)
   val vxsat = Bool()
 }
+
+class VFuOutput(implicit p: Parameters) extends Bundle {
+  val uop = new VUop
+  val vd = UInt(128.W)
+  val vxsat = Bool()
+}
+
 // class VFpuOutput extends Bundle {
 //   val vd = UInt(128.W)
 //   val fflags = UInt(5.W) // Floating-point accrued exception flag

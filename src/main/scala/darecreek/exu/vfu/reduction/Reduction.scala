@@ -6,11 +6,146 @@ import chisel3.util.experimental.decode._
 import darecreek.exu.vfu._
 // import darecreek.exu.vfu.VFUParam._
 import chipsalliance.rocketchip.config._
+import xiangshan.Redirect
+
+
+class Adder_xb(w: Int) extends Module {
+  val io = IO(new Bundle() {
+    val in1 = Input(UInt(w.W))
+    val in2 = Input(UInt(w.W))
+    val cin = Input(UInt(1.W))
+    val cout = Output(UInt(1.W))
+  })
+
+  private val bits = Cat(0.U(1.W), io.in1, io.cin) + Cat(0.U(1.W), io.in2, io.cin)
+  io.cout := bits(w + 1)
+}
+
+class compare_2to1(w: Int) extends Module {
+  val io = IO(new Bundle() {
+    val a = Input(UInt(w.W))
+    val b = Input(UInt(w.W))
+    val max = Input(Bool())
+    val signed = Input(Bool())
+    val c = Output(UInt(w.W))
+  })
+
+  // a-b
+  val b_inv = ~io.b
+  val cout = Wire(Bool())
+  val less = Wire(Bool())
+
+  val adder_xb = Module(new Adder_xb(w = w))
+  adder_xb.io.in1 := b_inv
+  adder_xb.io.in2 := io.a
+  adder_xb.io.cin := 1.U
+  cout := adder_xb.io.cout
+  less := Mux(io.signed, io.a(w - 1) ^ b_inv(w - 1) ^ cout, !cout)
+  io.c := Mux(less === io.max, io.b, io.a)
+}
+
+class compare_3to1(w: Int) extends Module {
+  val io = IO(new Bundle() {
+    val a = Input(UInt(w.W))
+    val b = Input(UInt(w.W))
+    val c = Input(UInt(w.W))
+    val max = Input(Bool())
+    val signed = Input(Bool())
+    val d = Output(UInt(w.W))
+  })
+
+  // a-b, a-c, b-c
+  val vs_hi = Cat(io.a, io.a, io.b)
+  val vs_lo = Cat(io.b, io.c, io.c)
+  val vs_lo_inv = ~vs_lo
+  val cout = Wire(Vec(3, Bool()))
+  val less = Wire(Vec(3, Bool()))
+
+  for (i <- 0 until 3) {
+    val adder_xb = Module(new Adder_xb(w = w))
+    adder_xb.io.in1 := vs_lo_inv(w * (i + 1) - 1, w * i)
+    adder_xb.io.in2 := vs_hi(w * (i + 1) - 1, w * i)
+    adder_xb.io.cin := 1.U
+    cout(i) := adder_xb.io.cout
+    less(i) := Mux(io.signed, vs_hi(w * (i + 1) - 1) ^ vs_lo_inv(w * (i + 1) - 1) ^ cout(i), !cout(i))
+  }
+
+  io.d := 0.U
+  when((less(2) && less(1) && !io.max) || (!less(2) && !less(1) && io.max)) {
+    io.d := io.a
+  }.elsewhen((!less(2) && less(0) && !io.max) || (less(2) && !less(0) && io.max)) {
+    io.d := io.b
+  }.elsewhen((!less(1) && !less(0) && !io.max) || (less(1) && less(0) && io.max)) {
+    io.d := io.c
+  }
+}
+
+
+class CSA3to2(width: Int) extends Module {
+  val io = IO(new Bundle() {
+    val in_a = Input(UInt(width.W))
+    val in_b = Input(UInt(width.W))
+    val in_c = Input(UInt(width.W))
+    val out_sum = Output(UInt(width.W))
+    val out_car = Output(UInt(width.W))
+
+  })
+  io.out_sum := io.in_a ^ io.in_b ^ io.in_c
+  io.out_car := Cat(((io.in_a & io.in_b) | (io.in_a & io.in_c) | (io.in_b & io.in_c)) (width - 2, 0), 0.U)
+
+
+}
+
+class CSA4to2(width: Int) extends Module {
+  val io = IO(new Bundle() {
+    val in_a = Input(UInt(width.W))
+    val in_b = Input(UInt(width.W))
+    val in_c = Input(UInt(width.W))
+    val in_d = Input(UInt(width.W))
+    val out_sum = Output(UInt(width.W))
+    val out_car = Output(UInt(width.W))
+
+  })
+  val cout_vec = Wire(Vec(width, UInt(1.W)))
+  val sum_vec = Wire(Vec(width, UInt(1.W)))
+  val carry_vec = Wire(Vec(width, UInt(1.W)))
+  val cin_0 = 0.U
+  for (i <- 0 until width) {
+    cout_vec(i) := Mux(io.in_a(i) ^ io.in_b(i), io.in_c(i), io.in_a(i))
+    if (i == 0) {
+      sum_vec(i) := io.in_a(i) ^ io.in_b(i) ^ io.in_c(i) ^ io.in_d(i)
+      carry_vec(i) := Mux(io.in_a(i) ^ io.in_b(i) ^ io.in_c(i) ^ io.in_d(i), cin_0, io.in_d(i))
+    }
+    else {
+      sum_vec(i) := io.in_a(i) ^ io.in_b(i) ^ io.in_c(i) ^ io.in_d(i) ^ cout_vec(i - 1)
+      carry_vec(i) := Mux(io.in_a(i) ^ io.in_b(i) ^ io.in_c(i) ^ io.in_d(i), cout_vec(i - 1), io.in_d(i))
+    }
+  }
+
+  val sum_temp_vec = Wire(Vec(width, UInt(1.W)))
+  val carry_temp_vec = Wire(Vec(width, UInt(1.W)))
+  carry_temp_vec(0) := 0.U
+  sum_temp_vec(0) := sum_vec(0)
+  for (i <- 1 until width) {
+    if (i % 2 == 1) {
+      carry_temp_vec(i) := sum_vec(i)
+      sum_temp_vec(i) := carry_vec(i - 1)
+    }
+    else {
+      carry_temp_vec(i) := carry_vec(i - 1)
+      sum_temp_vec(i) := sum_vec(i)
+    }
+  }
+
+  io.out_sum := sum_temp_vec.asUInt
+  io.out_car := carry_temp_vec.asUInt
+}
 
 class Reduction(implicit p: Parameters) extends VFuModule {
   val io = IO(new Bundle {
     val in = Input(ValidIO(new VFuInput))
-    val out = ValidIO(new VAluOutput)
+    val redirect = Input(ValidIO(new Redirect))
+    val out = ValidIO(new VFuOutput)
   })
 
   val funct6 = io.in.bits.uop.ctrl.funct6
@@ -592,141 +727,29 @@ class Reduction(implicit p: Parameters) extends VFuModule {
     }
   }
 
-  io.out.valid := RegNext(RegNext(uopEnd && io.in.valid))
+  //  Redirect handling
+  def latency = 2
+
+  def regEnable(i: Int): Bool = validVec(i - 1) && !flushVec(i - 1)
+
+  val validVec = (uopEnd && io.in.valid) +: Array.fill(latency)(RegInit(false.B))
+  val uopVec = io.in.bits.uop +: Array.fill(latency)(Reg(new VUop))
+
+  val flushVec = validVec.zip(uopVec).map(x => x._1 && x._2.sysUop.robIdx.needFlush(io.redirect))
+
+  for (i <- 1 to latency) {
+    when(regEnable(i)) {
+      validVec(i) := validVec(i - 1)
+      uopVec(i) := uopVec(i - 1)
+    }.otherwise {
+      validVec(i) := false.B
+    }
+  }
+
+  io.out.valid := validVec(latency)
+  io.out.bits.uop := uopVec(latency)
   io.out.bits.vd := red_vd_tail
   io.out.bits.vxsat := false.B
-}
-
-class Adder_xb(w: Int) extends Module {
-  val io = IO(new Bundle() {
-    val in1 = Input(UInt(w.W))
-    val in2 = Input(UInt(w.W))
-    val cin = Input(UInt(1.W))
-    val cout = Output(UInt(1.W))
-  })
-
-  private val bits = Cat(0.U(1.W), io.in1, io.cin) + Cat(0.U(1.W), io.in2, io.cin)
-  io.cout := bits(w + 1)
-}
-
-class compare_2to1(w: Int) extends Module {
-  val io = IO(new Bundle() {
-    val a = Input(UInt(w.W))
-    val b = Input(UInt(w.W))
-    val max = Input(Bool())
-    val signed = Input(Bool())
-    val c = Output(UInt(w.W))
-  })
-
-  // a-b
-  val b_inv = ~io.b
-  val cout = Wire(Bool())
-  val less = Wire(Bool())
-
-  val adder_xb = Module(new Adder_xb(w = w))
-  adder_xb.io.in1 := b_inv
-  adder_xb.io.in2 := io.a
-  adder_xb.io.cin := 1.U
-  cout := adder_xb.io.cout
-  less := Mux(io.signed, io.a(w - 1) ^ b_inv(w - 1) ^ cout, !cout)
-  io.c := Mux(less === io.max, io.b, io.a)
-}
-
-class compare_3to1(w: Int) extends Module {
-  val io = IO(new Bundle() {
-    val a = Input(UInt(w.W))
-    val b = Input(UInt(w.W))
-    val c = Input(UInt(w.W))
-    val max = Input(Bool())
-    val signed = Input(Bool())
-    val d = Output(UInt(w.W))
-  })
-
-  // a-b, a-c, b-c
-  val vs_hi = Cat(io.a, io.a, io.b)
-  val vs_lo = Cat(io.b, io.c, io.c)
-  val vs_lo_inv = ~vs_lo
-  val cout = Wire(Vec(3, Bool()))
-  val less = Wire(Vec(3, Bool()))
-
-  for (i <- 0 until 3) {
-    val adder_xb = Module(new Adder_xb(w = w))
-    adder_xb.io.in1 := vs_lo_inv(w * (i + 1) - 1, w * i)
-    adder_xb.io.in2 := vs_hi(w * (i + 1) - 1, w * i)
-    adder_xb.io.cin := 1.U
-    cout(i) := adder_xb.io.cout
-    less(i) := Mux(io.signed, vs_hi(w * (i + 1) - 1) ^ vs_lo_inv(w * (i + 1) - 1) ^ cout(i), !cout(i))
-  }
-
-  io.d := 0.U
-  when((less(2) && less(1) && !io.max) || (!less(2) && !less(1) && io.max)) {
-    io.d := io.a
-  }.elsewhen((!less(2) && less(0) && !io.max) || (less(2) && !less(0) && io.max)) {
-    io.d := io.b
-  }.elsewhen((!less(1) && !less(0) && !io.max) || (less(1) && less(0) && io.max)) {
-    io.d := io.c
-  }
-}
-
-
-class CSA3to2(width: Int) extends Module {
-  val io = IO(new Bundle() {
-    val in_a = Input(UInt(width.W))
-    val in_b = Input(UInt(width.W))
-    val in_c = Input(UInt(width.W))
-    val out_sum = Output(UInt(width.W))
-    val out_car = Output(UInt(width.W))
-
-  })
-  io.out_sum := io.in_a ^ io.in_b ^ io.in_c
-  io.out_car := Cat(((io.in_a & io.in_b) | (io.in_a & io.in_c) | (io.in_b & io.in_c)) (width - 2, 0), 0.U)
-
-
-}
-
-class CSA4to2(width: Int) extends Module {
-  val io = IO(new Bundle() {
-    val in_a = Input(UInt(width.W))
-    val in_b = Input(UInt(width.W))
-    val in_c = Input(UInt(width.W))
-    val in_d = Input(UInt(width.W))
-    val out_sum = Output(UInt(width.W))
-    val out_car = Output(UInt(width.W))
-
-  })
-  val cout_vec = Wire(Vec(width, UInt(1.W)))
-  val sum_vec = Wire(Vec(width, UInt(1.W)))
-  val carry_vec = Wire(Vec(width, UInt(1.W)))
-  val cin_0 = 0.U
-  for (i <- 0 until width) {
-    cout_vec(i) := Mux(io.in_a(i) ^ io.in_b(i), io.in_c(i), io.in_a(i))
-    if (i == 0) {
-      sum_vec(i) := io.in_a(i) ^ io.in_b(i) ^ io.in_c(i) ^ io.in_d(i)
-      carry_vec(i) := Mux(io.in_a(i) ^ io.in_b(i) ^ io.in_c(i) ^ io.in_d(i), cin_0, io.in_d(i))
-    }
-    else {
-      sum_vec(i) := io.in_a(i) ^ io.in_b(i) ^ io.in_c(i) ^ io.in_d(i) ^ cout_vec(i - 1)
-      carry_vec(i) := Mux(io.in_a(i) ^ io.in_b(i) ^ io.in_c(i) ^ io.in_d(i), cout_vec(i - 1), io.in_d(i))
-    }
-  }
-
-  val sum_temp_vec = Wire(Vec(width, UInt(1.W)))
-  val carry_temp_vec = Wire(Vec(width, UInt(1.W)))
-  carry_temp_vec(0) := 0.U
-  sum_temp_vec(0) := sum_vec(0)
-  for (i <- 1 until width) {
-    if (i % 2 == 1) {
-      carry_temp_vec(i) := sum_vec(i)
-      sum_temp_vec(i) := carry_vec(i - 1)
-    }
-    else {
-      carry_temp_vec(i) := carry_vec(i - 1)
-      sum_temp_vec(i) := sum_vec(i)
-    }
-  }
-
-  io.out_sum := sum_temp_vec.asUInt
-  io.out_car := carry_temp_vec.asUInt
 }
 
 import xiangshan._
