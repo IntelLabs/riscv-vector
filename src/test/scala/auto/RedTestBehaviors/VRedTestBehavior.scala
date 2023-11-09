@@ -98,6 +98,8 @@ class Vred(fn : String, cb : CtrlBundle, s : String, instid : String, widen : Bo
             if (robIdxValid) {
                 // flushed
                 println("flushed")
+                
+                dut.io.in.valid.poke(false.B)
 
                 var srcBundle = SrcBundle()
                 ctrlBundle = ctrl.copy()
