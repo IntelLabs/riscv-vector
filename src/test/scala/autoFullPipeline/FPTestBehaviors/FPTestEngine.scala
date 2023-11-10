@@ -78,11 +78,12 @@ class FPTestEngine extends TestEngine {
 
     override def iterate(
         dut : VFPUWrapper, chosenTestCase : TestCase, 
-        sendRobIdx : Int, allExhausted : Boolean
+        sendRobIdx : Int, allExhausted : Boolean, 
+        flush : Boolean, flushedRobIdx : Int
     ) : (Boolean, Int) = {
+        
         val (input, uopIdx) : (VFuInput, Int) = chosenTestCase.nextVfuInput((true, sendRobIdx))
-        println(s"Sending ${chosenTestCase.instid}, uop ${uopIdx}, robIdx ${sendRobIdx}")
-
+        println(s"1. Sending ${chosenTestCase.instid}, uop ${uopIdx}/${chosenTestCase.ctrlBundles.length}, robIdx ${sendRobIdx}")
         // ===================== manipulating dut ========================
 
         val MAX_READY_WAIT = 100
@@ -94,7 +95,11 @@ class FPTestEngine extends TestEngine {
             // dut.io.dontCare.poke(false.B)
             
             dut.io.in.bits.poke(input)
-            dut.io.redirect.poke(genFSMRedirect())
+            if (flush) {
+                dut.io.redirect.poke(genFSMRedirect(flush, flush, flushedRobIdx))
+            } else {
+                dut.io.redirect.poke(genFSMRedirect())
+            }
 
             // waiting for dut's ready signal, which represents an ack of the uop ========
             while((dut.io.in.ready.peek().litValue != 1) &&
