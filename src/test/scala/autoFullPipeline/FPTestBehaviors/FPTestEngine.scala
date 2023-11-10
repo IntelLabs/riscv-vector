@@ -59,6 +59,7 @@ class FPTestEngine extends TestEngine {
             val resCorrectness = resTestCase.rc.checkRes(dutVd, uopIdx, dutFflags=fflags)
             val resRobIdx = robIdx
 
+            println(s"2.2. Received result for robIdx ${resRobIdx}, uopIdx ${uopIdx}, in FPTestEngine")
             results :+= (resCorrectness, resRobIdx)
 
             /*var uopIdx = dut.io.out.bits.uop.uopIdx.peek().litValue.toInt
@@ -96,6 +97,7 @@ class FPTestEngine extends TestEngine {
             
             dut.io.in.bits.poke(input)
             if (flush) {
+                println(s"2. Flushed (all < ${flushedRobIdx}), from FPTestEngine")
                 dut.io.redirect.poke(genFSMRedirect(flush, flush, flushedRobIdx))
             } else {
                 dut.io.redirect.poke(genFSMRedirect())
@@ -107,12 +109,13 @@ class FPTestEngine extends TestEngine {
                 
                 checkOutput(dut)
                 dut.clock.step(1)
+                // dut.io.redirect.poke(genFSMRedirect())
                 curReadyWait += 1
             }
 
             // waits too long.. =====================================
             if (!(curReadyWait < MAX_READY_WAIT)) {
-                println(s"no io.ready signal received")
+                println(s"ERROR!!! no io.ready signal received")
                 assert(false)
             }
             assert(curReadyWait < MAX_READY_WAIT)

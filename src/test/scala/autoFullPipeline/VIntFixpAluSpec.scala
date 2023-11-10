@@ -97,33 +97,10 @@ object ReadTxt {
 trait VAluBehavior {
   this: AnyFlatSpec with ChiselScalatestTester with BundleGenHelper =>
 
-  /*def vIntTestAll(sim:Map[Int,Map[String,String]],ctrl:TestCtrlBundleBase,s:String, tb:TestBehavior, j:Int = -1): Unit = {
-    var testName = "pass the test: " + tb.getInstid() + " lmul ls 1"
-    if (j != -1) testName += s" datasplit $j"
-    it should s"$testName" in {
-      test(tb.getDut()).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-        tb.test_init(dut)
-        val nameList=sim.map(_._1)
-        println(s"Starting test for ${tb.getInstid()}, lmul <= 1")
-        println("test input counts",nameList.max+1)
-        var i = 0
-        do{
-          val vflmul = sim(i).get("vflmul").get
-          if((vflmul != "2.000000") && (vflmul != "4.000000") && (vflmul) != "8.000000"){
-            println("lmul <= 1, id: ", i)
-            tb.testSingle(sim(i), ctrl, s, dut)
-          }
-          i = i + 1
-        }while(i <= nameList.max)
-
-        println(s"${tb.getInstid()}, lmul <= 1 tests are done.")
-        tb.setLmulLsOneDone()
-        Dump.recordDone(s"${tb.getInstid()}, lmul <= 1")
-      }
-    }
-  }*/
-
-  def testMain(testEngine : TestEngine, j:Int = -1, printFunc : () => Unit = () => {}): Unit = {
+  def testMain(
+    testEngine : TestEngine, j:Int = -1, 
+    printFunc : () => Unit = () => {}
+  ): Unit = {
     var testName = "Tests on " + testEngine.getName()
     if (j != -1) testName += s" datasplit $j"
     it should s"$testName" in {
@@ -269,7 +246,7 @@ object Datapath {
 
 class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
   with BundleGenHelper with VAluBehavior {
-  behavior of "Int fixP test"
+  behavior of "Test"
 
   println(s"============\nTEST STARTED\n============")
   if(Dump.DUMP) println(s"DUMP is turned on. Incorrect inputs will be saved to ${Dump.fileName}")
@@ -538,16 +515,12 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
     println(s"Testing $dataSplitInst with Data Split .. $dataSplitIx / $dataSplitN")
   }
 
-  // val futures = new ListBuffer[Future[Unit]]
-
   var dataN = 1
   var j = 0
   if (dataSplitMode) {
     dataN = dataSplitN
     j = dataSplitIx
   }
-
-  // TODO 1. Create Engines
 
   var testEngineToTB : Array[Seq[TestBehavior]] = Array(Seq(),Seq(),Seq(),Seq(),Seq(),Seq(),Seq())
   for(i <- 0 until tbs.length) {
@@ -583,53 +556,5 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
     it should behave like testMain(testEngine, j, printFunc)
   }
 
-
-
-  
-  /*for(i <- 0 until tbs.length) {
-    // params
-    val tb = tbs(i)
-
-    // test code
-    // tb.changeSwitch()
-    val test_file = tb.getTestfilePath()
-    val inst = tb.getCtrlBundle()
-    // val sign = tb.getSign()
-
-    if (Files.exists(Paths.get(test_file))) {
-      val key = ReadTxt.readFromTxtByline(test_file)
-      val hasvstart1 = ReadTxt.hasVstart(key)
-      println(s"hasVstart $hasvstart1")
-      var each_input_n_lines = ReadTxt.getEachInputNLines(key)
-      println("each_input_n_lines", each_input_n_lines)
-
-      var dataN = 1
-      var j = 0
-      if (dataSplitMode) {
-        dataN = dataSplitN
-        j = dataSplitIx
-      }
-
-      val each_asisgned_lines = ReadTxt.getNEachAssignedLines(key.length, j, dataN, each_input_n_lines)
-      val startingIndex = j * each_asisgned_lines
-      if (startingIndex < key.length) {
-        println(s"Data Split $j / $dataN: $startingIndex + $each_asisgned_lines, total ${key.length}")
-        // val testFuture : Future[Unit] = Future 
-        
-        val keymap = ReadTxt.KeyFileUtil(key.slice(startingIndex, startingIndex + each_asisgned_lines))
-        // println(s"$j Future is looking at ${tb.getInstid()}, $startingIndex + $each_asisgned_lines")
-        var reportIx = -1
-        if (dataSplitMode) {
-          reportIx = j
-        }
-        // it should behave like vIntTestAll(keymap, inst, sign, tb, reportIx)
-        it should behave like vsalu(keymap, inst, tb, reportIx)
-        // println("wtf??????????")
-      }
-    } else {
-      println(s"Data file does not exist for instruction: ${tb.getInstid()} , skipping")
-      Dump.recordIncorrectInst(tb.getInstid())
-    }
-  }*/
 }
 
