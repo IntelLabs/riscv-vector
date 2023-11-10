@@ -62,6 +62,9 @@ class VcpTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String,
         // println("1111")
         var vs2 = "h0"
         var oldvd = "h0"
+
+        var robIdxValid = false
+
         for(j <- 0 until n_ops){
             if (hasVs2)
                 vs2 = vs2data(n_inputs - 1)
@@ -74,27 +77,58 @@ class VcpTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String,
                 oldvd = "h0"
             // dut.io.out.ready.poke(true.B)
             dut.io.in.valid.poke(true.B)
+
+            var ctrlBundle = ctrl.copy(
+                vsew=vsew,
+                vs1_imm=vs1_imm,
+                vl=simi.get("vl").get.toInt,
+                vlmul = UtilFuncs.lmulconvert(vflmul).toInt, 
+                ma = (simi.get("ma").get.toInt == 1),
+                ta = (simi.get("ta").get.toInt == 1),
+                vm = (simi.get("vm").get.toInt == 1),
+                uopIdx=j,
+                uopEnd = (j == n_ops - 1),
+                vxrm = vxrm,
+                vstart = getVstart(simi)
+            )
+
+            var robIdx = (false, 0)
+            robIdxValid = randomFlush()
+            if (robIdxValid) {
+                robIdx = (true, 1)
+            }
+            ctrlBundle.robIdx = robIdx
             dut.io.in.bits.poke(genVFuInput(
                 SrcBundle(
                     old_vd=oldvd,
                     vs2=vs2, 
                     vs1="h0",
                     mask=mask(0)), 
-                ctrl.copy(
-                    vsew=vsew,
-                    vs1_imm=vs1_imm,
-                    vl=simi.get("vl").get.toInt,
-                    vlmul = UtilFuncs.lmulconvert(vflmul).toInt, 
-                    ma = (simi.get("ma").get.toInt == 1),
-                    ta = (simi.get("ta").get.toInt == 1),
-                    vm = (simi.get("vm").get.toInt == 1),
-                    uopIdx=j,
-                    uopEnd = (j == n_ops - 1),
-                    vxrm = vxrm,
-                    vstart = getVstart(simi)
-                )
+                ctrlBundle
             ))
+            dut.io.redirect.poke(genFSMRedirect((robIdxValid, robIdxValid, 0)))
             dut.clock.step(1)
+
+            if (robIdxValid) {
+                // flushed
+                println("flushed")
+
+                dut.io.in.valid.poke(false.B)
+
+                var srcBundle = SrcBundle()
+                ctrlBundle = ctrl.copy()
+
+                // turning off redirect bits
+                dut.io.in.bits.poke(genVFuInput(
+                    srcBundle,
+                    ctrlBundle
+                ))
+                dut.io.redirect.poke(genFSMRedirect())
+                
+                dut.clock.step(1)
+                return
+            }
+
             vd = dut.io.out.bits.vd.peek().litValue
             // prevVd = f"h$vd%016x"
             if (!hasRd) {

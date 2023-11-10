@@ -52,6 +52,8 @@ class VmTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String, 
         // var finalVxsat = false
         var vd : BigInt = 0
         var vdres = false
+
+        var robIdxValid = false
             
         // println("1111")
         // dut.io.out.ready.poke(true.B)
@@ -73,22 +75,52 @@ class VmTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String, 
             )
         }
 
+        var ctrlBundle = ctrl.copy(
+            vsew=vsew,
+            vs1_imm=vs1_imm,
+            vl=simi.get("vl").get.toInt,
+            vlmul = UtilFuncs.lmulconvert(vflmul).toInt, 
+            ma = (simi.get("ma").get.toInt == 1),
+            ta = (simi.get("ta").get.toInt == 1),
+            vm = (simi.get("vm").get.toInt == 1),
+            uopIdx=0,
+            vxrm = vxrm,
+            vstart = getVstart(simi)
+        )
+        var robIdx = (false, 0)
+        robIdxValid = randomFlush()
+        if (robIdxValid) {
+            robIdx = (true, 1)
+        }
+        ctrlBundle.robIdx = robIdx
+
         dut.io.in.bits.poke(genVFuInput(
             srcBundle, 
-            ctrl.copy(
-                vsew=vsew,
-                vs1_imm=vs1_imm,
-                vl=simi.get("vl").get.toInt,
-                vlmul = UtilFuncs.lmulconvert(vflmul).toInt, 
-                ma = (simi.get("ma").get.toInt == 1),
-                ta = (simi.get("ta").get.toInt == 1),
-                vm = (simi.get("vm").get.toInt == 1),
-                uopIdx=0,
-                vxrm = vxrm,
-                vstart = getVstart(simi)
-            )
+            ctrlBundle
         ))
+        dut.io.redirect.poke(genFSMRedirect((robIdxValid, robIdxValid, 0)))
         dut.clock.step(1)
+
+        if (robIdxValid) {
+            // flushed
+            println("flushed")
+
+            dut.io.in.valid.poke(false.B)
+
+            var srcBundle = SrcBundle()
+            ctrlBundle = ctrl.copy()
+
+            // turning off redirect bits
+            dut.io.in.bits.poke(genVFuInput(
+                srcBundle,
+                ctrlBundle
+            ))
+            dut.io.redirect.poke(genFSMRedirect())
+            
+            dut.clock.step(1)
+            return
+        }
+
         // finalVxsat = finalVxsat || dut.io.out.bits.vxsat.peek().litValue == 1
         vd = dut.io.out.bits.vd.peek().litValue
         vdres = f"h$vd%032x".equals(expectvd(n_inputs - 1))
