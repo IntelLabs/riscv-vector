@@ -6,6 +6,7 @@ import chisel3._
 import chiseltest.WriteVcdAnnotation
 import scala.reflect.io.File
 import scala.reflect.runtime.universe._
+import scala.collection.mutable.Map
 
 import darecreek.exu.vfu._
 import darecreek.exu.vfu.alu._
@@ -26,13 +27,12 @@ class VwredsumuvsTestBehavior extends Vred("vwredsumu.vs.data", ctrlBundles.vwre
 class VwredsumvsTestBehavior extends Vred("vwredsum.vs.data", ctrlBundles.vwredsum_vs, "s", "vwredsum_vs", true) {}
 
 class Vred(fn : String, cb : CtrlBundle, s : String, instid : String, widen : Boolean = false) extends TestBehavior(fn, cb, s, instid) {
-    
-    override def getDut() : Module               = {
-        val dut = new Reduction
-        return dut
-    }
 
-    override def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:Reduction) : Unit = {
+    override def isOrdered() = true
+
+    override def getTargetTestEngine() = TestEngine.RED_TEST_ENGINE
+
+    override def _getNextTestCase(simi:Map[String,String]) : TestCase = {
         val vs2data = UtilFuncs.multilmuldatahandle(simi.get("VS2").get)
         val vs1data = UtilFuncs.multilmuldatahandle(simi.get("VS1").get)
         val oldvddata = UtilFuncs.multilmuldatahandle(simi.get("OLD_VD").get)
@@ -60,6 +60,14 @@ class Vred(fn : String, cb : CtrlBundle, s : String, instid : String, widen : Bo
         var vs1 = vs1data(n_inputs - 1)
         var vs2 = vs2data(n_inputs - 1)
         var oldvd = oldvddata(n_inputs - 1)
+
+        val resultChecker = new RedResultChecker(
+            n_inputs, widen, vflmul, expectvd,
+            (a, b) => this.dump(simi, a, b)
+        )
+
+        var srcBundles : Seq[SrcBundle] = Seq()
+        var ctrlBundles : Seq[CtrlBundle] = Seq()
         for(j <- 0 until n_inputs){
             vs2 = vs2data(n_inputs - 1 - j)
 
@@ -77,68 +85,19 @@ class Vred(fn : String, cb : CtrlBundle, s : String, instid : String, widen : Bo
                 vstart = getVstart(simi)
             )
 
-            var robIdx = (false, 0)
-            robIdxValid = randomFlush()
-            if (robIdxValid) {
-                robIdx = (true, 1)
-            }
-            ctrlBundle.robIdx = robIdx
+            val srcBundle = SrcBundle(
+                vs2=vs2, vs1=vs1,
+                old_vd=oldvd,mask=mask(0))
 
-            dut.io.in.valid.poke(true.B)
-            dut.io.in.bits.poke(genVFuInput(
-                SrcBundle(
-                    vs2=vs2, vs1=vs1,
-                    old_vd=oldvd,mask=mask(0)), 
-                ctrlBundle
-            ))
-            dut.io.redirect.poke(genFSMRedirect((robIdxValid, robIdxValid, 0)))
-
-            dut.clock.step(1)
-
-            if (robIdxValid) {
-                // flushed
-                println("flushed")
-                
-                dut.io.in.valid.poke(false.B)
-
-                var srcBundle = SrcBundle()
-                ctrlBundle = ctrl.copy()
-
-                // turning off redirect bits
-                dut.io.in.bits.poke(genVFuInput(
-                    srcBundle,
-                    ctrlBundle
-                ))
-                dut.io.redirect.poke(genFSMRedirect())
-                
-                dut.clock.step(1)
-                return
-            }
-
-            // sprevVds = prevVds :+ f"h$vd%032x"
+            srcBundles :+= srcBundle
+            ctrlBundles :+= ctrlBundle
         }
 
-        dut.io.in.valid.poke(false.B)
-
-        while (dut.io.out.valid.peek().litValue != 1) {
-            dut.clock.step(1) // 10.19
-        }
-
-        vd = dut.io.out.bits.vd.peek().litValue
-        
-        var vdidx = n_inputs - 1
-        if (widen && (
-            vflmul != "0.125000" && 
-            vflmul != "0.250000" && 
-            vflmul != "0.500000"
-        )) vdidx = n_inputs * 2 - 1
-        vdres = f"h$vd%032x".equals(expectvd(vdidx))
-        if (!vdres) dump(simi, f"h$vd%032x", expectvd(vdidx))
-        Logger.printvds(f"h$vd%032x", expectvd(vdidx))
-        assert(vdres)
-    }
-
-    override def testSingle(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:Reduction) : Unit = {
-        testMultiple(simi, ctrl, s, dut)
+        return TestCase.newNormalCase(
+            this.instid,
+            srcBundles,
+            ctrlBundles,
+            resultChecker
+        )
     }
 }

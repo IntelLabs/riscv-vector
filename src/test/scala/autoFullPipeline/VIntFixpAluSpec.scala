@@ -127,7 +127,7 @@ object Dump {
 
   val name = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy_MM_dd_kk_mm"))
   // var fileDire = "./src/test/scala/log/"
-  var fileDire = "./src/test/scala/auto/IncorrectInputs/"
+  var fileDire = "./src/test/scala/autoFullPipeline/IncorrectInputs/"
   var fileName = fileDire + s"${name}.txt"
   var incorrectDataFilePath = fileDire + s"${name}_data"
   Files.createDirectories(Paths.get(incorrectDataFilePath));
@@ -255,8 +255,7 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
 
     // new VredsumvsTestBehavior,
 
-    new VfaddvvTestBehavior,
-    new VmfeqvvTestBehavior,
+    new VredsumvsTestBehavior,
     // new VzextVf2TestBehavior,
     // new Vmv2rvTestBehavior,
     // new VmvsxTestBehavior,

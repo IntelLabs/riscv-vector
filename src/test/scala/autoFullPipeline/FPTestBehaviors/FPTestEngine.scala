@@ -32,6 +32,10 @@ class FPTestEngine extends TestEngine {
 
     var results : List[(Boolean, Int)] = List()
 
+    def clearFlushedRes(robIdx : Int) = {
+        results = results.filter(_._2 != robIdx)
+    }
+
     def checkOutput(dut : VFPUWrapper) = {
         dut.io.out.ready.poke(true.B) // TODO randomly block
 
@@ -40,8 +44,10 @@ class FPTestEngine extends TestEngine {
             var robIdx = dut.io.out.bits.uop.sysUop.robIdx.value.peek().litValue.toInt
             var uopIdx = dut.io.out.bits.uop.uopIdx.peek().litValue.toInt
 
-            // TODO add result to the queue
-            while(historyTCs.length > 0 && historyTCs(0)._1 != robIdx) {
+            while(
+                historyTCs.length > 0
+                && (historyTCs(0)._1 != robIdx || historyTCs(0)._2 != uopIdx)
+            ) {
                 historyTCs = historyTCs.tail
             }
 
@@ -102,6 +108,8 @@ class FPTestEngine extends TestEngine {
             } else {
                 dut.io.redirect.poke(genFSMRedirect())
             }
+
+            clearFlushedRes(flushedRobIdx)
 
             // waiting for dut's ready signal, which represents an ack of the uop ========
             while((dut.io.in.ready.peek().litValue != 1) &&

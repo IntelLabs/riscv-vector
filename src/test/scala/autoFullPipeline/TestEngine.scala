@@ -36,7 +36,7 @@ object TestEngine {
     def getEngine(testEngineId : Int) : TestEngine = {
         return testEngineId match {
             case 0 => new ALUTestEngine
-            // case 2 => new RedTestEngine
+            case 2 => new RedTestEngine
             case 6 => new FPTestEngine
             /*case MAC_TEST_ENGINE : {}
             case RED_TEST_ENGINE : {}
@@ -90,7 +90,7 @@ abstract class TestEngine extends BundleGenHelper {
     def getDut() : Module = new VAluWrapper
 
     def randomFlush() : Boolean = {
-        return RandomGen.rand.nextInt(100) > 101
+        return RandomGen.rand.nextInt(100) > 60
     }
 
     def runThroughTBs(
@@ -151,6 +151,9 @@ abstract class TestEngine extends BundleGenHelper {
                 // TODO randomly flush
                 flush = randomFlush()
                 
+                if (flush) {
+                    println(s"1.1. Flushed (all < ${sendRobIdx})")
+                }
                 stepRes = iterate(dut, chosenTestCase, sendRobIdx, flush=flush, flushedRobIdx=sendRobIdx)
                 if (chosenTestCase.isExhausted()) 
                     exhaustedCount += 1
@@ -158,7 +161,7 @@ abstract class TestEngine extends BundleGenHelper {
                 if (flush) {
                     val prevSize = curTestCasePool.size
                     curTestCasePool = curTestCasePool.filterNot(_._1 < sendRobIdx)
-                    println(s"3. Flushed (all < ${sendRobIdx}), curTestCasePool shrinked from ${prevSize} to ${curTestCasePool.size}")
+                    println(s"3. (After flush) curTestCasePool shrinked from ${prevSize} to ${curTestCasePool.size}")
                     exhaustedCount = curTestCasePool.filter(_._2._2.isExhausted()).size
                 }
             } else {
@@ -174,13 +177,12 @@ abstract class TestEngine extends BundleGenHelper {
                     if (failedTBs.contains(resRobIdx)) {
                         println(s"Received result ${resRobIdx} for already incorrect ${failedTBs(resRobIdx).getInstid()}..")
                     } else {
-                        println(s"ERROR!!! Received result ${resRobIdx} for flushed robIdx ${resRobIdx}!!!")
-                        assert(false)
+                        assert(false, s"ERROR!!! Received result ${resRobIdx} for flushed robIdx ${resRobIdx}!!!")
                     }
                 }
 
                 val (resTestBehavior, resTestCase) : (TestBehavior, TestCase) = curTestCasePool(resRobIdx)
-                println(s"4. Received results for ${resTestCase.instid}, robIdx ${resRobIdx}")
+                // println(s"4. Received results for ${resTestCase.instid}, robIdx ${resRobIdx}")
                 if (!resCorrectness) {
                     println(s"${resTestCase.instid}, result incorrect")
 
