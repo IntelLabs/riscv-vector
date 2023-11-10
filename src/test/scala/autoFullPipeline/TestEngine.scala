@@ -131,6 +131,7 @@ abstract class TestEngine extends BundleGenHelper {
             ) {
                 val randomTBinPool = testBehaviorPool(Random.nextInt(testBehaviorPool.length))
                 curTestCasePool += (this.robIndex -> (randomTBinPool, randomTBinPool.getNextTestCase()))
+                println(s"0. Adding ${randomTBinPool.getInstid()}, robIdx ${robIndex} to the pool")
                 this.robIndex += 1
             }
 

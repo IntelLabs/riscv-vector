@@ -205,7 +205,7 @@ abstract class TestBehavior(filename : String, val ctrl : CtrlBundle, sign : Str
         val testCase = this._getNextTestCase(this.inputMaps(this.inputMapCurIx))
         this.inputMapCurIx += 1
 
-        println(s"Adding ${this.instid}, number ${this.inputMapCurIx - 1} input to pool")
+        // println(s"Adding ${this.instid}, number ${this.inputMapCurIx - 1} input to pool")
         return testCase
     }
 
