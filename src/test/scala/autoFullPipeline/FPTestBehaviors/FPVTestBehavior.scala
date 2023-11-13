@@ -267,7 +267,7 @@ class VfTestBehavior(fn : String, cb : CtrlBundle,
                 ta = (simi.get("ta").get.toInt == 1),
                 vm = vm,
                 uopIdx=uopIdx,
-                uopEnd = (!ooo) && (uopIdx == n_ops - 1), // 10.19
+                uopEnd = (uopIdx == n_ops - 1), // 10.19
                 vxrm = vxrm,
                 frm=frm,
                 vstart = vstart

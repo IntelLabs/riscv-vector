@@ -19,7 +19,8 @@ class RedTestEngine extends TestEngine {
     override def getName() = "RedTestEngine"
     override def getDut() = new Reduction
 
-    var historyTCs : List[(Int, Int, TestCase)] = List() // robIdx, uopIdx, TestCase
+    var historyTCs : List[(Int, Int, TestCase, Boolean)] = 
+        List() // robIdx, uopIdx, TestCase, flushed
     var historyTCIx = 0
 
     var results : List[(Boolean, Int)] = List()
@@ -46,16 +47,21 @@ class RedTestEngine extends TestEngine {
             }
 
             val resTestCase = historyTCs(0)._3
+            val testCaseFlushed = historyTCs(0)._4
             historyTCs = historyTCs.tail
 
             val dutVd = dut.io.out.bits.vd.peek().litValue
 
             println(s"2.2. Received result for ${resTestCase.instid} robIdx ${robIdx}, uopIdx ${uopIdx}, in RedTestEngine:")
 
-            val resCorrectness = resTestCase.rc.checkRes(dutVd, uopIdx)
-            val resRobIdx = robIdx
+            if (testCaseFlushed) {
+                println(".. 2.2.1. flushed! so not comparing")
+            } else {
+                val resCorrectness = resTestCase.rc.checkRes(dutVd, uopIdx)
+                val resRobIdx = robIdx
 
-            results :+= (resCorrectness, resRobIdx)
+                results :+= (resCorrectness, resRobIdx)
+            }
         }
     }
 
@@ -74,12 +80,25 @@ class RedTestEngine extends TestEngine {
             dut.io.in.valid.poke(true.B)
 
             dut.io.in.bits.poke(input)
+
+            if (flush) {
+                for (i <- 0 until historyTCs.length) {
+                    if(historyTCs(i)._1 < flushedRobIdx) {
+                        historyTcs(i) = (
+                            historyTCs(i)._1,
+                            historyTCs(i)._2,
+                            historyTCs(i)._3,
+                            true
+                        )
+                    }
+                }
+            }
             /*if (flush) {
                 dut.io.redirect.poke(genFSMRedirect((flush, flush, flushedRobIdx)))
             } else {*/
-            dut.io.redirect.poke(genFSMRedirect())
+            // dut.io.redirect.poke(genFSMRedirect())
             // }
-            historyTCs :+= (sendRobIdx, uopIdx, chosenTestCase)
+            historyTCs :+= (sendRobIdx, uopIdx, chosenTestCase, false)
 
             clearFlushedRes(flushedRobIdx)
         }
