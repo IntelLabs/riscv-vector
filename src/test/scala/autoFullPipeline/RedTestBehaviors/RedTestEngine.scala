@@ -41,7 +41,7 @@ class RedTestEngine extends TestEngine {
             }
 
             if (historyTCs.length == 0) {
-                println(s"robIdx ${robIdx}, uopIdx ${uopIdx} is not in the historyTCs!!!!!!!!")
+                println(s"ERROR!!!!!! robIdx ${robIdx}, uopIdx ${uopIdx} is not in the historyTCs!!!!!!!!\nIs it flushed before?")
                 assert(false)
             }
 
@@ -74,11 +74,11 @@ class RedTestEngine extends TestEngine {
             dut.io.in.valid.poke(true.B)
 
             dut.io.in.bits.poke(input)
-            if (flush) {
+            /*if (flush) {
                 dut.io.redirect.poke(genFSMRedirect((flush, flush, flushedRobIdx)))
-            } else {
-                dut.io.redirect.poke(genFSMRedirect())
-            }
+            } else {*/
+            dut.io.redirect.poke(genFSMRedirect())
+            // }
             historyTCs :+= (sendRobIdx, uopIdx, chosenTestCase)
 
             clearFlushedRes(flushedRobIdx)
