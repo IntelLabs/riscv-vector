@@ -73,7 +73,7 @@ class VfirTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String
             ), 
             ctrlBundle
         ))
-        dut.io.redirect.poke(genFSMRedirect((robIdxValid, robIdxValid, 0)))
+        // dut.io.redirect.poke(genFSMRedirect((robIdxValid, robIdxValid, 0)))
         dut.clock.step(1)
 
         if (robIdxValid) {
@@ -90,7 +90,7 @@ class VfirTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String
                 srcBundle,
                 ctrlBundle
             ))
-            dut.io.redirect.poke(genFSMRedirect())
+            // dut.io.redirect.poke(genFSMRedirect())
             
             dut.clock.step(1)
             return
