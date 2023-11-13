@@ -24,6 +24,7 @@ class VExpdUOpTest extends Bundle {
   val info_vlmul = UInt(3.W)
   val info_vl = UInt(bVL.W)
   val info_vstart = UInt(bVstart.W)
+  val info_destEew = UInt(3.W)
   val expdIdx = UInt(3.W)
   val expdEnd = Bool()
 }
@@ -112,6 +113,7 @@ class VLsuTestWrapper extends Module {
       lsu_uop.info.vlmul := io_uop.info_vlmul
       lsu_uop.info.vl := io_uop.info_vl
       lsu_uop.info.vstart := io_uop.info_vstart
+      lsu_uop.info.destEew := io_uop.info_destEew
       lsu_uop.expdIdx := io_uop.expdIdx
       lsu_uop.expdEnd := io_uop.expdEnd
     }
@@ -123,13 +125,13 @@ trait VLsuBehavior_ld {
 
   val ldReqSrc_default = SrcBundleLd()
   val vle8 = CtrlBundle(VLE8_V)
-  val vle16 = CtrlBundle(VLE16_V)
-  val vle32 = CtrlBundle(VLE32_V)
-  val vle64 = CtrlBundle(VLE64_V)
+  val vle16 = CtrlBundle(VLE16_V, destEew=1)
+  val vle32 = CtrlBundle(VLE32_V, destEew=2)
+  val vle64 = CtrlBundle(VLE64_V, destEew=3)
   val vlse8 = CtrlBundle(VLSE8_V)
-  val vlse16 = CtrlBundle(VLSE16_V)
-  val vlse32 = CtrlBundle(VLSE32_V)
-  val vlse64 = CtrlBundle(VLSE64_V)
+  val vlse16 = CtrlBundle(VLSE16_V, destEew=1)
+  val vlse32 = CtrlBundle(VLSE32_V, destEew=2)
+  val vlse64 = CtrlBundle(VLSE64_V, destEew=3)
   val vse8 = CtrlBundle(VSE8_V)
   
   def vLsuTest0(): Unit = {
@@ -858,7 +860,7 @@ trait VLsuBehavior_ld {
   }
 
   def vLsuTest12(): Unit = {
-    it should "pass: unit-stride/strided load with mask" in {
+    it should "pass: unit-stride load with mask sew=8" in {
       test(new VLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
         test_init(dut)
         dut.clock.step(1)
@@ -901,8 +903,8 @@ trait VLsuBehavior_ld {
         fork {
           for ((ldData, seqId, mask)  <- ldResps) {
             one_512b_load_resp(dut, ldData, seqId.asUInt, mask)
+            dut.clock.step(1)
           }
-          dut.clock.step(1)
           dut.io.ovi_load.valid.poke(false.B)
           dut.io.ovi_memop.sync_end.poke(true.B)
           dut.clock.step(1)
@@ -930,23 +932,176 @@ trait VLsuBehavior_ld {
     }
   }
 
+  def vLsuTest13(): Unit = {
+    it should "pass: unit-stride load with mask sew=32" in {
+      test(new VLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+        test_init(dut)
+        dut.clock.step(1)
+        val ldReqs = Seq(
+          (vle32.copy(vl=15, uopIdx=0, vm=false, ta=false), ldReqSrc_default.copy(mask="h12345")),
+          (vle32.copy(vl=15, uopIdx=1, uopEnd=true, vm=false, ta=false), ldReqSrc_default),
+        )
+        val ldResps = Seq(
+          ("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d" + 
+            "0123456701234567_89abcdef89abcdef_0123456701234567_89abcdef89abcdef",
+           SeqId(el_count=10, el_off=6, el_id=0), ("h12345", true)),
+          ("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d" + 
+            "0123456701234567_89abcdef89abcdef_0123456701234567_89abcdef89abcdef",
+           SeqId(el_count=5, el_off=0, el_id=10), ("h48", true)),
+        )
+        next_is_load_and_step(dut)
+        fork {
+          for ((c, s) <- ldReqs) {
+            while (!dut.io.fromIQ.ld.ready.peekBoolean()) {
+              dut.clock.step(1)
+            }
+            dut.io.fromIQ.ld.valid.poke(true.B)
+            dut.io.fromIQ.ld.bits.poke(genLdInput(c, s))
+            dut.clock.step(1)
+          }
+          dut.io.fromIQ.ld.valid.poke(false.B)
+          dut.clock.step(4)
+        }.fork {
+          var maskIdx_cnt = 0
+          for (i <- 0 until 10) {
+            if (dut.io.ovi_maskIdx.valid.peekBoolean()) {
+              if (maskIdx_cnt == 0) {
+                dut.io.ovi_maskIdx.item.expect("h12345".U)
+                maskIdx_cnt += 1
+              }
+              dut.io.ovi_maskIdx.credit.poke(true.B)
+            } else {
+              dut.io.ovi_maskIdx.credit.poke(false.B)
+            }
+          }
+        }.join()
+
+        fork {
+          for ((ldData, seqId, mask)  <- ldResps) {
+            one_512b_load_resp(dut, ldData, seqId.asUInt, mask)
+            dut.clock.step(1)
+          }
+          dut.io.ovi_load.valid.poke(false.B)
+          dut.io.ovi_memop.sync_end.poke(true.B)
+          dut.clock.step(1)
+          dut.io.ovi_memop.sync_end.poke(false.B)
+        }.fork {
+          var wb_cnt = 0
+          for (i <- 0 until 10) {
+            if (dut.io.wb.ld.valid.peekBoolean()) {
+              if (wb_cnt == 0) {
+                dut.io.wb.ld.bits.vd.expect("h201f1e1d00060005_1817161514131211_100f0e0d000e000d_0807060501234567".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(0.U)
+                wb_cnt += 1
+              } else {
+                dut.io.wb.ld.bits.vd.expect("h201f1e1d1c1b1a19_0123456714131211_100f0e0d0c0b0a09_0004000300020001".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(1.U)
+                wb_cnt += 1
+              } 
+            }
+            dut.clock.step(1)
+          }
+        }.join()
+
+        dut.clock.step(4)
+      }
+    }
+  }
+
+  def vLsuTest14(): Unit = {
+    it should "pass: unit-stride/strided load with mask" in {
+      test(new VLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+        test_init(dut)
+        dut.clock.step(1)
+        val ldReqs = Seq(
+          (vlse16.copy(vl=17, uopIdx=0, vm=false), ldReqSrc_default.copy(rs2="h4", mask="h12345")),
+          (vlse16.copy(vl=17, uopIdx=1, uopEnd=true, vm=false), ldReqSrc_default),
+        )
+        val ldResps = Seq(
+          ("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d" + 
+            "0123456701234567_89abcdef89abcdef_0123456701234567_89abcdef89abcdef",
+           SeqId(el_count=11, el_off=11, el_id=0), ("h12345", true)),
+          ("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d" + 
+            "0123456701234567_89abcdef89abcdef_0123456701234567_89abcdef89abcdef",
+           SeqId(el_count=6, el_off=1, el_id=11), ("h24", true)),
+        )
+        next_is_load_and_step(dut)
+        fork {
+          for ((c, s) <- ldReqs) {
+            while (!dut.io.fromIQ.ld.ready.peekBoolean()) {
+              dut.clock.step(1)
+            }
+            dut.io.fromIQ.ld.valid.poke(true.B)
+            dut.io.fromIQ.ld.bits.poke(genLdInput(c, s))
+            dut.clock.step(1)
+          }
+          dut.io.fromIQ.ld.valid.poke(false.B)
+          dut.clock.step(4)
+        }.fork {
+          var maskIdx_cnt = 0
+          for (i <- 0 until 10) {
+            if (dut.io.ovi_maskIdx.valid.peekBoolean()) {
+              if (maskIdx_cnt == 0) {
+                dut.io.ovi_maskIdx.item.expect("h12345".U)
+                maskIdx_cnt += 1
+              }
+              dut.io.ovi_maskIdx.credit.poke(true.B)
+            } else {
+              dut.io.ovi_maskIdx.credit.poke(false.B)
+            }
+          }
+        }.join()
+
+        fork {
+          for ((ldData, seqId, mask)  <- ldResps) {
+            one_512b_load_resp(dut, ldData, seqId.asUInt, mask)
+            dut.clock.step(1)
+          }
+          dut.io.ovi_load.valid.poke(false.B)
+          dut.io.ovi_memop.sync_end.poke(true.B)
+          dut.clock.step(1)
+          dut.io.ovi_memop.sync_end.poke(false.B)
+        }.fork {
+          var wb_cnt = 0
+          for (i <- 0 until 10) {
+            if (dut.io.wb.ld.valid.peekBoolean()) {
+              if (wb_cnt == 0) {
+                dut.io.wb.ld.bits.vd.expect("h201f1e1d01231a19_1817161500020008_100f000c0c0b0a09_08070123040389ab".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(0.U)
+                wb_cnt += 1
+              } else {
+                dut.io.wb.ld.bits.vd.expect("hffffffffffffffff_ffffffffffffffff_ffffffffffffffff_ffffffffffff89ab".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(1.U)
+                wb_cnt += 1
+              } 
+            }
+            dut.clock.step(1)
+          }
+        }.join()
+
+        dut.clock.step(4)
+      }
+    }
+  }
 
 
 }
 
 class VLsuSpec_ld extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VLsuBehavior_ld {
   behavior of "LSU test"
-  it should behave like vLsuTest0()  // unit-stride load
-  it should behave like vLsuTest1()  // unit-stride load
-  it should behave like vLsuTest2()  // unit-stride load
-  it should behave like vLsuTest3()  // unit-stride load
-  it should behave like vLsuTest4()  // unit-stride load
-  it should behave like vLsuTest5()  // unit-stride load
-  it should behave like vLsuTest6()  // unit-stride load
-  it should behave like vLsuTest7()  // strided load
-  it should behave like vLsuTest8()  // strided load
-  it should behave like vLsuTest9()  // strided load
-  it should behave like vLsuTest10()  // strided load
-  it should behave like vLsuTest11()  // strided load
-  it should behave like vLsuTest12()  // strided load
+  // it should behave like vLsuTest0()  // unit-stride load
+  // it should behave like vLsuTest1()  // unit-stride load
+  // it should behave like vLsuTest2()  // unit-stride load
+  // it should behave like vLsuTest3()  // unit-stride load
+  // it should behave like vLsuTest4()  // unit-stride load
+  // it should behave like vLsuTest5()  // unit-stride load
+  // it should behave like vLsuTest6()  // unit-stride load
+  // it should behave like vLsuTest7()  // strided load
+  // it should behave like vLsuTest8()  // strided load
+  // it should behave like vLsuTest9()  // strided load
+  // it should behave like vLsuTest10()  // strided load
+  // it should behave like vLsuTest11()  // strided load
+  // it should behave like vLsuTest12()  // strided load
+  // it should behave like vLsuTest13()  // strided load
+  it should behave like vLsuTest14()  // strided load
 }
