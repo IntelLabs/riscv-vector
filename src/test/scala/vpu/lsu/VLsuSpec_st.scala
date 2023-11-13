@@ -54,6 +54,7 @@ trait VLsuBehavior_st {
                 wb_cnt += 1
               }
             }
+            dut.clock.step(1)
           }
         }.fork {
           dut.clock.step(4)
