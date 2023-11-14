@@ -396,8 +396,8 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   val tail = TailGen(evl, uopIdx, eewVd)
   val tailReorg = MaskReorg.splash(tail, eewVd, vlenb)
   val vstart_gte_vl = vstart >= evl
-  val prestart = 0.U(vlenb.W) // Todo: support vstart !!
-  val prestartReorg = 0.U(vlenb.W) // Todo: support vstart !!
+  val prestart = PrestartGen(vstart, uopIdx, eewVd)
+  val prestartReorg = MaskReorg.splash(prestart, eewVd, vlenb)
   val updateType = Wire(Vec(vlenb, UInt(1.W))) // 0: old_vd  1: write 1s
   for (i <- 0 until vlenb) {
     when (prestartReorg(i) || vstart_gte_vl) {
