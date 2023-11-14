@@ -69,6 +69,16 @@ class TestCase(
         return uopIx >= ctrlBundles.length
     }
 
+    def getCtrlBundleByUopIdx(uopIdx : Int) : CtrlBundle = {
+        for (cb <- ctrlBundles) {
+            if (cb.uopIdx == uopIdx) {
+                return cb
+            }
+        }
+        assert(false, s"inst id ${instid} cannot find uop uopIdx=${uopIdx}")
+        return ctrlBundles(0)
+    }
+
     def nextVfuInput(robIdx : (Boolean, Int) = (false, 0)) : (VFuInput, Int) = {
         if (isFSM) println("ERROR: generating normal input for FSM test case")
 

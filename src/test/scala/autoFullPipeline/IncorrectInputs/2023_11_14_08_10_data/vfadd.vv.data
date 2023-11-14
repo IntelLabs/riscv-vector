@@ -1,0 +1,17 @@
+frm=0x0
+ta=0
+vxrm=0
+vsew=64
+vm=0
+MASK=0x00eb3d30f587dbac d8856e1aa5936ff1
+OLD_VD=0x00ff55aa75cd39e1 f05a7a1e0fdca593
+vl=2
+VS2=0x6b0770d96717400b 54d2aa41317c6384
+ma=0
+fflags=0x1
+VD=0x00ff55aa75cd39e1 54d2aa41317c6384
+VSTART=0x0
+vflmul=1.000000
+vxsat=0
+VS1=0x532914ff69532914 02010055aaccff69
+--------------------------test_cnt=2--------------------------
