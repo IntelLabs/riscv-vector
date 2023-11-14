@@ -389,9 +389,13 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   val (vl, uopIdx, vstart) = (ld.bits.uop.info.vl, ld.bits.uop.expdIdx, ld.bits.uop.info.vstart)
   val (vm, ma, ta) = (ld.bits.uop.ctrl.vm, ld.bits.uop.info.ma, ld.bits.uop.info.ta)
   val eewVd = SewOH(ld.bits.uop.info.destEew)
-  val tail = TailGen(vl, uopIdx, eewVd)
+  // For mask load/store: vlm.v vsm.v
+  val vl_mask = Wire(UInt((bVL-3).W))
+  vl_mask := (vl >> 3) + Mux(vl(2, 0) === 0.U, 0.U, 1.U)
+  val evl = Mux(ctrl_ld_wire.mask, vl_mask, vl)
+  val tail = TailGen(evl, uopIdx, eewVd)
   val tailReorg = MaskReorg.splash(tail, eewVd, vlenb)
-  val vstart_gte_vl = vstart >= vl
+  val vstart_gte_vl = vstart >= evl
   val prestart = 0.U(vlenb.W) // Todo: support vstart !!
   val prestartReorg = 0.U(vlenb.W) // Todo: support vstart !!
   val updateType = Wire(Vec(vlenb, UInt(1.W))) // 0: old_vd  1: write 1s
