@@ -128,6 +128,7 @@ trait VLsuBehavior_ld {
   val vle16 = CtrlBundle(VLE16_V, destEew=1)
   val vle32 = CtrlBundle(VLE32_V, destEew=2)
   val vle64 = CtrlBundle(VLE64_V, destEew=3)
+  val vlm = CtrlBundle(VLM_V)
   val vlse8 = CtrlBundle(VLSE8_V)
   val vlse16 = CtrlBundle(VLSE16_V, destEew=1)
   val vlse32 = CtrlBundle(VLSE32_V, destEew=2)
@@ -1009,7 +1010,7 @@ trait VLsuBehavior_ld {
   }
 
   def vLsuTest14(): Unit = {
-    it should "pass: unit-stride/strided load with mask" in {
+    it should "pass: unit-stride/strided load with mask sew=16" in {
       test(new VLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
         test_init(dut)
         dut.clock.step(1)
@@ -1084,24 +1085,78 @@ trait VLsuBehavior_ld {
     }
   }
 
+  def vLsuTest15(): Unit = {
+    it should "pass: unit-stride mask load: vlm.v" in {
+      test(new VLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+        test_init(dut)
+        dut.clock.step(1)
+        val ldReqs = Seq(
+          (vlm.copy(vl=27, uopIdx=0, uopEnd=true), ldReqSrc_default),
+        )
+        val ldResps = Seq(
+          ("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d" + 
+            "0123456701234567_89abcdef89abcdef_0123456701234567_89abcdef89abcdef",
+           SeqId(el_count=4, el_off=18, el_id=0)),
+        )
+        next_is_load_and_step(dut)
+        for ((c, s) <- ldReqs) {
+          while (!dut.io.fromIQ.ld.ready.peekBoolean()) {
+            dut.clock.step(1)
+          }
+          dut.io.fromIQ.ld.valid.poke(true.B)
+          dut.io.fromIQ.ld.bits.poke(genLdInput(c, s))
+          dut.clock.step(1)
+        }
+        dut.io.fromIQ.ld.valid.poke(false.B)
+        dut.clock.step(4)
+
+        fork {
+          for ((ldData, seqId)  <- ldResps) {
+            one_512b_load_resp(dut, ldData, seqId.asUInt)
+            dut.clock.step(1)
+          }
+          dut.io.ovi_load.valid.poke(false.B)
+          dut.io.ovi_memop.sync_end.poke(true.B)
+          dut.clock.step(1)
+          dut.io.ovi_memop.sync_end.poke(false.B)
+        }.fork {
+          var wb_cnt = 0
+          for (i <- 0 until 14) {
+            if (dut.io.wb.ld.valid.peekBoolean()) {
+              if (wb_cnt == 0) {
+                dut.io.wb.ld.bits.vd.expect("hffffffffffffffff_ffffffffffffffff_ffffffffffffffff_ffffffffcdef89ab".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(0.U)
+                wb_cnt += 1
+              } 
+            }
+            dut.clock.step(1)
+          }
+        }.join()
+
+        dut.clock.step(4)
+      }
+    }
+  }
+
 
 }
 
 class VLsuSpec_ld extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VLsuBehavior_ld {
   behavior of "LSU test"
-  // it should behave like vLsuTest0()  // unit-stride load
-  // it should behave like vLsuTest1()  // unit-stride load
-  // it should behave like vLsuTest2()  // unit-stride load
-  // it should behave like vLsuTest3()  // unit-stride load
-  // it should behave like vLsuTest4()  // unit-stride load
-  // it should behave like vLsuTest5()  // unit-stride load
-  // it should behave like vLsuTest6()  // unit-stride load
-  // it should behave like vLsuTest7()  // strided load
-  // it should behave like vLsuTest8()  // strided load
-  // it should behave like vLsuTest9()  // strided load
-  // it should behave like vLsuTest10()  // strided load
-  // it should behave like vLsuTest11()  // strided load
-  // it should behave like vLsuTest12()  // strided load
-  // it should behave like vLsuTest13()  // strided load
+  it should behave like vLsuTest0()  // unit-stride load
+  it should behave like vLsuTest1()  // unit-stride load
+  it should behave like vLsuTest2()  // unit-stride load
+  it should behave like vLsuTest3()  // unit-stride load
+  it should behave like vLsuTest4()  // unit-stride load
+  it should behave like vLsuTest5()  // unit-stride load
+  it should behave like vLsuTest6()  // unit-stride load
+  it should behave like vLsuTest7()  // strided load
+  it should behave like vLsuTest8()  // strided load
+  it should behave like vLsuTest9()  // strided load
+  it should behave like vLsuTest10()  // strided load
+  it should behave like vLsuTest11()  // strided load
+  it should behave like vLsuTest12()  // strided load
+  it should behave like vLsuTest13()  // strided load
   it should behave like vLsuTest14()  // strided load
+  it should behave like vLsuTest15()  // strided load
 }
