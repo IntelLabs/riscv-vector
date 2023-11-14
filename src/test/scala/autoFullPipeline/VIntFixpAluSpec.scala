@@ -255,7 +255,7 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
 
     // new VredsumvsTestBehavior,
 
-    new VredsumvsTestBehavior,
+    new VfredmaxvsTestBehavior,
     // new VzextVf2TestBehavior,
     // new Vmv2rvTestBehavior,
     // new VmvsxTestBehavior,
