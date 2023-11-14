@@ -1,6 +1,6 @@
 #!/bin/bash
 
-N_PROCESSES=6
+N_PROCESSES=4
 
 if [ -z "$1" ]; then
     echo "Usage: $0 <file of instruction names>"
@@ -56,13 +56,13 @@ function intfunc() {
 }
 trap intfunc 2
 
-incorrect_inst_file_path="./src/test/scala/auto/AutoTestRes/$foldername/all_incorrect_insts.txt"
-done_inst_file_path="./src/test/scala/auto/AutoTestRes/$foldername/done_insts.txt"
+incorrect_inst_file_path="./src/test/scala/autoFullPipeline/AutoTestRes/$foldername/all_incorrect_insts.txt"
+done_inst_file_path="./src/test/scala/autoFullPipeline/AutoTestRes/$foldername/done_insts.txt"
 for i in $(seq 0 "$N_PROCESSES"); do
     inst_file="instructions_$i.txt"
-    inst_file_path="./src/test/scala/auto/AutoTestRes/$foldername/$inst_file"
-    out_file_path1="./src/test/scala/auto/AutoTestRes/$foldername/$inst_file.out.txt"
-    out_file_path2="./src/test/scala/auto/AutoTestRes/$foldername/$inst_file.stderr_out.txt"
+    inst_file_path="./src/test/scala/autoFullPipeline/AutoTestRes/$foldername/$inst_file"
+    out_file_path1="./src/test/scala/autoFullPipeline/AutoTestRes/$foldername/$inst_file.out.txt"
+    out_file_path2="./src/test/scala/autoFullPipeline/AutoTestRes/$foldername/$inst_file.stderr_out.txt"
     # echo "$inst_file"
     if [ -f "$inst_file" ]; then
         pushd . > /dev/null
@@ -70,7 +70,7 @@ for i in $(seq 0 "$N_PROCESSES"); do
         sbt -J-XX:+UseG1GC -J-Xms4g -J-Xmx8g -Dinsfile="$inst_file_path" \
             -DincorrInsts="$incorrect_inst_file_path" \
             -DdoneInsts="$done_inst_file_path" \
-            -DincorrDataDire="./src/test/scala/auto/AutoTestRes/$foldername/incorrectData/" \
+            -DincorrDataDire="./src/test/scala/autoFullPipeline/AutoTestRes/$foldername/incorrectData/" \
             "testOnly darecreek.vfuAutotest.alu.VAluSpec" \
             1> "$out_file_path1" 2> "$out_file_path2" &   # run the command via bash in subshell
         popd > /dev/null
