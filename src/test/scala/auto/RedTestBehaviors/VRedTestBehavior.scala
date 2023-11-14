@@ -91,7 +91,7 @@ class Vred(fn : String, cb : CtrlBundle, s : String, instid : String, widen : Bo
                     old_vd=oldvd,mask=mask(0)), 
                 ctrlBundle
             ))
-            dut.io.redirect.poke(genFSMRedirect((robIdxValid, robIdxValid, 0)))
+            // dut.io.redirect.poke(genFSMRedirect((robIdxValid, robIdxValid, 0)))
 
             dut.clock.step(1)
 
@@ -110,7 +110,7 @@ class Vred(fn : String, cb : CtrlBundle, s : String, instid : String, widen : Bo
                     srcBundle,
                     ctrlBundle
                 ))
-                dut.io.redirect.poke(genFSMRedirect())
+                // dut.io.redirect.poke(genFSMRedirect())
                 
                 dut.clock.step(1)
                 return
