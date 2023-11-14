@@ -84,7 +84,7 @@ abstract class TestEngine extends BundleGenHelper {
     var normalModeTBs : Seq[TestBehavior] = Seq()
     var orderedTBs : Seq[TestBehavior] = Seq()
 
-    var robIndex = 0
+    var robIndex : Int = 0
 
     var flush = false
     var flushedRobIdx = 0
@@ -92,8 +92,12 @@ abstract class TestEngine extends BundleGenHelper {
     def getName() = "TestEngine"
     def getDut() : Module = new VAluWrapper
 
+    def advRobIdx() = {
+        robIndex = (robIndex + 1) % 256
+    }
+
     def randomFlush() : Boolean = {
-        return RandomGen.rand.nextInt(100) > 60
+        return RandomGen.rand.nextInt(100) > 90
     }
 
     def runThroughTBs(
@@ -137,7 +141,7 @@ abstract class TestEngine extends BundleGenHelper {
                 val randomTBinPool = testBehaviorPool(Random.nextInt(testBehaviorPool.length))
                 curTestCasePool += (this.robIndex -> (randomTBinPool, randomTBinPool.getNextTestCase()))
                 println(s"0. Adding ${randomTBinPool.getInstid()}, robIdx ${robIndex} to the pool")
-                this.robIndex += 1
+                advRobIdx()
             }
 
             // TODO 1.2. Randomly choose one among TestCases

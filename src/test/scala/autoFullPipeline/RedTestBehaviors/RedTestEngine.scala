@@ -26,7 +26,7 @@ class RedTestEngine extends TestEngine {
     var results : List[(Boolean, Int)] = List()
 
     def clearFlushedRes(robIdx : Int) = {
-        results = results.filter(_._2 > robIdx)
+        results = results.filter(_._2 >= robIdx)
     }
 
     def checkOutput(dut : Reduction) = {
@@ -56,7 +56,7 @@ class RedTestEngine extends TestEngine {
 
             val dutVd = dut.io.out.bits.vd.peek().litValue
 
-            println(s"2.2. Received result, \nComparing with ${resTestCase.instid} robIdx ${robIdx}, uopIdx ${uopIdx}, in RedTestEngine:")
+            println(s"2.2. Received result, Comparing with ${resTestCase.instid} robIdx ${robIdx}, uopIdx ${uopIdx}, in RedTestEngine:")
 
             val resCorrectness = resTestCase.rc.checkRes(dutVd, uopIdx)
             val resRobIdx = robIdx
