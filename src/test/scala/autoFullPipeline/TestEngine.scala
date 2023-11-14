@@ -85,6 +85,9 @@ abstract class TestEngine extends BundleGenHelper {
     var orderedTBs : Seq[TestBehavior] = Seq()
 
     var robIndex = 0
+
+    var flush = false
+    var flushedRobIdx = 0
     
     def getName() = "TestEngine"
     def getDut() : Module = new VAluWrapper
@@ -96,7 +99,7 @@ abstract class TestEngine extends BundleGenHelper {
     def runThroughTBs(
         dut:Module, tbs:Seq[TestBehavior], 
         MAX_PARA_INSTS: Int = 3, MAX_PARA_TESTCASES: Int = 6
-    ) = {
+    ) : Unit = {
         
         var curTestCasePool : Map[Int, (TestBehavior, TestCase)] = Map()
         var exhaustedCount : Int = 0
@@ -106,14 +109,15 @@ abstract class TestEngine extends BundleGenHelper {
         var failedTBs : Map[Int, TestBehavior] = Map()
 
 
-        breakable{ while(true) {
+        while(true) {
+        breakable{
             if (
                 tbIx >= tbs.length 
                 && testBehaviorPool.length == 0
                 && curTestCasePool.isEmpty
             ) {
                 // no more test case and test behavior
-                break
+                return
             }
             
             // refill test behavior
@@ -142,28 +146,39 @@ abstract class TestEngine extends BundleGenHelper {
             // println(s"curTestCasePool.size: ${curTestCasePool.size}, exhaustedCount: ${exhaustedCount}")
             val nonExhavustedTestCases = curTestCasePool.filter(!_._2._2.isExhausted()).toList
             var stepRes : (Boolean, Int) = (false, 0)
-            var flush = false
+            
             if (nonExhavustedTestCases.length != 0) {
                 val randomTestCase = Random.shuffle(nonExhavustedTestCases).head
                 val (chosenTestBehavior, chosenTestCase) : (TestBehavior, TestCase) = randomTestCase._2
                 val sendRobIdx = randomTestCase._1
 
                 // TODO randomly flush
-                flush = randomFlush()
-                
-                if (flush) {
-                    println(s"1.1. Flushed (all < ${sendRobIdx})")
+                if (!flush) {
+                    flush = randomFlush()
+                    if (flush) {
+                        flushedRobIdx = sendRobIdx + 1
+                        println(s"1.1. Flush (all < ${flushedRobIdx})")
+
+                        val prevSize = curTestCasePool.size
+                        curTestCasePool = curTestCasePool.filterNot(_._1 < flushedRobIdx)
+                        println(s"1.2. curTestCasePool shrinked from ${prevSize} to ${curTestCasePool.size}")
+                        exhaustedCount = curTestCasePool.filter(_._2._2.isExhausted()).size
+                        
+                        break
+                    }
                 }
-                stepRes = iterate(dut, chosenTestCase, sendRobIdx, flush=flush, flushedRobIdx=sendRobIdx)
+                println(s"1.3. Before sending to the dut, flush=${flush}, flushedRobIdx=${flushedRobIdx}")
+                stepRes = iterate(dut, chosenTestCase, sendRobIdx, flush=flush, flushedRobIdx=flushedRobIdx)
                 if (chosenTestCase.isExhausted()) 
                     exhaustedCount += 1
                 
-                if (flush) {
+                /*if (flush) {
                     val prevSize = curTestCasePool.size
                     curTestCasePool = curTestCasePool.filterNot(_._1 < sendRobIdx)
                     println(s"3. (After flush) curTestCasePool shrinked from ${prevSize} to ${curTestCasePool.size}")
                     exhaustedCount = curTestCasePool.filter(_._2._2.isExhausted()).size
-                }
+                }*/
+                flush = false
             } else {
                 stepRes = iterate(dut, curTestCasePool.toList.head._2._2, -1, true)
             }

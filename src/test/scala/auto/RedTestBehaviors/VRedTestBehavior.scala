@@ -99,7 +99,7 @@ class Vred(fn : String, cb : CtrlBundle, s : String, instid : String, widen : Bo
                 // flushed
                 println("flushed")
 
-                dut.io.in.valid.poke(false.B)
+                /*dut.io.in.valid.poke(false.B)
 
 
                 var srcBundle = SrcBundle()
@@ -112,7 +112,7 @@ class Vred(fn : String, cb : CtrlBundle, s : String, instid : String, widen : Bo
                 ))
                 // dut.io.redirect.poke(genFSMRedirect())
                 
-                dut.clock.step(1)
+                dut.clock.step(1)*/
                 return
             }
 

@@ -80,7 +80,7 @@ class VfirTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String
             // flushed
             println("flushed")
 
-            dut.io.in.valid.poke(false.B)
+            /*dut.io.in.valid.poke(false.B)
 
             var srcBundle = SrcBundle()
             ctrlBundle = ctrl.copy()
@@ -92,7 +92,7 @@ class VfirTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String
             ))
             // dut.io.redirect.poke(genFSMRedirect())
             
-            dut.clock.step(1)
+            dut.clock.step(1)*/
             return
         }
 

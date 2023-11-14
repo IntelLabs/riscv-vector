@@ -18,6 +18,10 @@ class DivResult(n_res : Int, dump : (Map[String,String], String, String) => Unit
     var cur_res = 0
     var fflags : Int = 0
 
+    def randomBlock() : Boolean = {
+        return RandomGen.rand.nextInt(100) > 80
+    }
+
     def vCompare(dut : VDivWrapper, simi : Map[String, String], 
             uopIdx : Int, expectvd : Array[String]) = {
         var vd = dut.io.out.bits.vd.peek().litValue
@@ -31,9 +35,10 @@ class DivResult(n_res : Int, dump : (Map[String,String], String, String) => Unit
             ctrlBundles : Map[Int, CtrlBundle], expectvd : Array[String], 
             compFunc : (VDivWrapper, Map[String, String], 
                 Int, Array[String]) => Unit = vCompare) = {
-        dut.io.out.ready.poke(true.B) // TODO randomly block
+        val block = randomBlock()
+        dut.io.out.ready.poke((!block).B) // TODO randomly block
         // println(s"dut.io.out.valid.peek().litValue ${dut.io.out.valid.peek().litValue}")
-        if (dut.io.out.valid.peek().litValue == 1) {
+        if ((!block) && dut.io.out.valid.peek().litValue == 1) {
 
             var uopIdx = dut.io.out.bits.uop.uopIdx.peek().litValue.toInt
             var ctrlBundle = ctrlBundles(uopIdx)
