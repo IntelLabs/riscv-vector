@@ -159,7 +159,7 @@ class FPTestEngine extends TestEngine {
             }
             assert(curReadyWait < MAX_READY_WAIT)
             curReadyWait = 0
-
+          
             if (
                 chosenTestCase.rc.n_ops != 1 ||
                 (chosenTestCase.rc.n_ops == 1 && chosenTestCase.isExhausted())

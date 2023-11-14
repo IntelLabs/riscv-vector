@@ -384,14 +384,41 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
 
 
   /**
-    *---- Initial ldDataBuf: Old_vd  or  1s (when stateLd === s_issueUops_LD or s_idle_LD)
+    *---- Initialize ldDataBuf: Old_vd  or  1s (when stateLd === s_issueUops_LD or s_idle_LD)
     */
+  val (vl, uopIdx, vstart) = (ld.bits.uop.info.vl, ld.bits.uop.expdIdx, ld.bits.uop.info.vstart)
+  val (vm, ma, ta) = (ld.bits.uop.ctrl.vm, ld.bits.uop.info.ma, ld.bits.uop.info.ta)
+  val eewVd = SewOH(ld.bits.uop.info.destEew)
+  // For mask load/store: vlm.v vsm.v
+  val vl_mask = Wire(UInt((bVL-3).W))
+  vl_mask := (vl >> 3) + Mux(vl(2, 0) === 0.U, 0.U, 1.U)
+  val evl = Mux(ctrl_ld_wire.mask, vl_mask, vl)
+  val tail = TailGen(evl, uopIdx, eewVd)
+  val tailReorg = MaskReorg.splash(tail, eewVd, vlenb)
+  val vstart_gte_vl = vstart >= evl
+  val prestart = PrestartGen(vstart, uopIdx, eewVd)
+  val prestartReorg = MaskReorg.splash(prestart, eewVd, vlenb)
+  val updateType = Wire(Vec(vlenb, UInt(1.W))) // 0: old_vd  1: write 1s
+  for (i <- 0 until vlenb) {
+    when (prestartReorg(i) || vstart_gte_vl) {
+      updateType(i) := 0.U
+    }.elsewhen (tailReorg(i)) {
+      updateType(i) := Mux(ta, 1.U, 0.U)
+    }.elsewhen (!vm && !ma) {
+      updateType(i) := 0.U
+    }.otherwise {
+      updateType(i) := 1.U
+    }
+  }
   when (ld.fire) {
     ldDataBuf.io.wen(0) := true.B
     ldDataBuf.io.waddr(0) := ldBufPtrEnq
     ldDataBuf.io.wmask(0).foreach(_ := true.B)
-    ldDataBuf.io.wdata(0) := Mux(ld.bits.uop.ctrl.lsrcVal(2), VecInit(UIntSplit(ld.bits.oldVd, 8)), 
-      VecInit(UIntSplit(Mux1H(destEewOH_ld_wire.oneHot, Seq(8, 16, 32, 64).map(w => Fill(VLEN/w, ~(0.U(w.W))))), 8)))
+    // ldDataBuf.io.wdata(0) := Mux(ld.bits.uop.ctrl.lsrcVal(2), VecInit(UIntSplit(ld.bits.oldVd, 8)), 
+      // VecInit(UIntSplit(Mux1H(destEewOH_ld_wire.oneHot, Seq(8, 16, 32, 64).map(w => Fill(VLEN/w, ~(0.U(w.W))))), 8)))
+    for (i <- 0 until vlenb) {
+      ldDataBuf.io.wdata(0)(i) := Mux(updateType(i)(0), ~0.U(8.W), UIntSplit(ld.bits.oldVd, 8)(i))
+    }
   }
 
   //-------- Write-back of load --------
@@ -408,7 +435,8 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
     */
   // Store FSM
   when (stateSt === s_idle_ST) {
-    stateSt := Mux(firstStFire, s_issueUops_ST, s_idle_ST)
+    stateSt := Mux(firstStFire, 
+               Mux(st.bits.uop.expdEnd, s_busy_ST, s_issueUops_ST), s_idle_ST)
   }.elsewhen (stateSt === s_issueUops_ST) { //Wait for all expanded uops of one instrn issued from IQ
     stateSt := Mux(st.fire && st.bits.uop.expdEnd, s_busy_ST, s_issueUops_ST)
   }.elsewhen (stateSt === s_busy_ST) {
@@ -442,7 +470,7 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   val stBufPtrDeq = RegInit(0.U(3.W))
   stBufPtrDeq := Mux(stateSt === s_complete_ST && stUopTable(stBufPtrDeq).valid, stBufPtrDeq + 1.U, 0.U)
   completeSt := stateSt === s_complete_ST && (!stUopTable(stBufPtrDeq + 1.U).valid || stBufPtrDeq === 7.U)
-  io.wb.st.valid := stateSt === s_complete_ST
+  io.wb.st.valid := stateSt === s_complete_ST && !completeSt
   io.wb.st.bits.uop := stUopTable(stBufPtrDeq).uop
 
   // Some ctrl signals of store
@@ -490,8 +518,9 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   val stopSendingMaskIdx = ldMaskOffsetUpdate >= nLdMask
   when (io.ovi_memop.sync_start && (ctrl_ldst_wire.indexed || !ctrl_ldst_wire.mask && !vm_ldst)) {
     sendingMaskIdx := true.B
-  }.elsewhen (stopSendingMaskIdx || stateLd === s_idle_LD || stateLd === s_issueUops_LD
-                                 || stateSt === s_idle_ST || stateSt === s_issueUops_ST) {
+  // }.elsewhen (stopSendingMaskIdx || stateLd === s_idle_LD || stateLd === s_issueUops_LD
+                                 // || stateSt === s_idle_ST || stateSt === s_issueUops_ST) {
+  }.elsewhen (stopSendingMaskIdx) {
     sendingMaskIdx := false.B
   }
   when (io.ovi_memop.sync_start) {
