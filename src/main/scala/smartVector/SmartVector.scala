@@ -22,6 +22,8 @@ class SmartVector extends Module {
             val rvuCommit = new RVUCommit
             val rvuExtra  = new RVUExtra
         })
+        //TODO: This is reserved for verification, delete it later
+        val rfData = Output(Vec(NVPhyRegs, UInt(regLen.W)))
     })
 
 
@@ -32,8 +34,8 @@ class SmartVector extends Module {
     })
 
     val decoder = Module(new SVDecodeUnit()(p))
-    val split = Module(new VSplit()(p))
-    val iex = Module(new VIexWrapper()(p))
+    val split   = Module(new VSplit()(p))
+    val iex     = Module(new VIexWrapper()(p))
     val regFile = Module(new SVRegFileWrapper()(p))
     
     decoder.io.in.bits  := io.in.bits
@@ -45,28 +47,10 @@ class SmartVector extends Module {
     iex.io.in <> split.io.out.mUop
     regFile.io.in.readIn := split.io.out.toRegFileRead
     regFile.io.in.writeIn := split.io.out.toRegFileWrite
-        
-    //arb register file's read and write port
-    //when(uopQueue.io.out.toRegFile.valid && iex.io.out.bits.toReg.valid){
-    //    regFile.io.in.rfReadEn    := uopQueue.io.out.toRegFile.bits.rfReadEn
-    //    regFile.io.in.rfReadIdx   := uopQueue.io.out.toRegFile.bits.rfReadIdx
-    //    regFile.io.in.rfWriteEn   := iex.io.out.bits.toReg.bits.rfWriteEn
-    //    regFile.io.in.rfWriteData := iex.io.out.bits.toReg.bits.rfWriteData
-    //    regFile.io.in.rfWriteIdx  := iex.io.out.bits.toReg.bits.rfWriteIdx
-    //    regFile.io.in.vxsat       := iex.io.out.bits.toReg.bits.vxsat
-    //}.elsewhen(uopQueue.io.out.toRegFile.valid && !iex.io.out.bits.toReg.valid){
-    //    regFile.io.in := uopQueue.io.out.toRegFile.bits
-    //}.elsewhen(!uopQueue.io.out.toRegFile.valid && iex.io.out.bits.toReg.valid){
-    //    regFile.io.in := iex.io.out.bits.toReg.bits
-    //}.otherwise{
-    //    regFile.io.in.rfReadEn(0) := false.B
-    //    regFile.io.in.rfReadEn(1) := false.B
-    //    regFile.io.in.rfWriteEn   := false.B
-    //    regFile.io.in.rfWriteData := DontCare
-    //    regFile.io.in.rfWriteIdx  := DontCare
-    //    regFile.io.in.rfReadIdx   := DontCare
-    //    regFile.io.in.vxsat       := false.B
-    //}
+
+    //TODO: This is reserved for verification, delete it later
+    io.rfData := regFile.io.rfData
+
 //
     //The code is based on the "all the muop is done in one cycle"
     //val scalarRegWriteEn_E3 = Reg(Bool())

@@ -15,7 +15,7 @@ class MUopRegAttr extends Bundle{
     //010:32bit
     //011:64bit
     //111:128bit
-    val regBackWidth = UInt(3.W)
+    val regBackWidth     = UInt(3.W)
     val regWriteMuopIdx  = UInt(4.W)
     //val expdLen = UInt(4.W)
 }

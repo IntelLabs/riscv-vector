@@ -44,6 +44,6 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
 
 
   //Only receive one instruction, and then set ready to false
-  io.in.ready := RegNext(io.out.ready)
+  io.in.ready := io.out.ready
 }
 

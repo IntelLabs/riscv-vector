@@ -16,6 +16,8 @@ class SVRegFileWrapper(implicit p : Parameters) extends Module{
             val writeIn = Input(new regWriteIn)
         }
         val out = Output(new regOut)
+        //TODO: This is reserved for verification, delete it later
+        val rfData = Output(Vec(NVPhyRegs, UInt(regLen.W)))
     })
 
     val nVRFReadPorts = 2
@@ -50,4 +52,7 @@ class SVRegFileWrapper(implicit p : Parameters) extends Module{
     readDataOUt(1) := Cat(regFile.io.read(1).data(1), regFile.io.read(1).data(0))
     io.out.readData(0) := Mux(io.in.readIn.rfReadIdx(0) === io.in.writeIn.rfWriteIdx, io.in.writeIn.rfWriteData, readDataOUt(0))
     io.out.readData(1) := Mux(io.in.readIn.rfReadIdx(1) === io.in.writeIn.rfWriteIdx, io.in.writeIn.rfWriteData, readDataOUt(1))
+
+    //TODO: This is reserved for verification, delete it later
+    io.rfData := regFile.rfData
 }
