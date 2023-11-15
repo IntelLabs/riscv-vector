@@ -71,7 +71,7 @@ object TBMap {
         ("vnsrl_wi" -> (() => new VnsrlwiTestBehavior)),
         ("vnsra_wi" -> (() => new VnsrawiTestBehavior)),*/
         ("vadd_vv" -> (() => new VaddvvTestBehavior)),
-        /*("vsub_vv" -> (() => new VsubvvTestBehavior)),
+        ("vsub_vv" -> (() => new VsubvvTestBehavior)),
         ("vand_vv" -> (() => new VandvvTestBehavior)),
         ("vor_vv" -> (() => new VorvvTestBehavior)),
         ("vxor_vv" -> (() => new VxorvvTestBehavior)),
@@ -162,7 +162,7 @@ object TBMap {
         ("vsext_vf4" -> (() => new VsextVf4TestBehavior)),
         ("vzext_vf8" -> (() => new VzextVf8TestBehavior)),
         ("vsext_vf8" -> (() => new VsextVf8TestBehavior)),
-        ("vdiv_vv" -> (() => new VdivvvTestBehavior)),
+        /*("vdiv_vv" -> (() => new VdivvvTestBehavior)),
         ("vdivu_vv" -> (() => new VdivuvvTestBehavior)),
         ("vdiv_vx" -> (() => new VdivvxTestBehavior)),
         ("vdivu_vx" -> (() => new VdivuvxTestBehavior)),
@@ -173,7 +173,7 @@ object TBMap {
         ("vfdiv_vv" -> (() => new VfdivvvTestBehavior)),
         ("vfdiv_vf" -> (() => new VfdivvfTestBehavior)),
         ("vfrdiv_vf" -> (() => new VfrdivvfTestBehavior)),
-        ("vfsqrt_v" -> (() => new VfsqrtvTestBehavior)),
+        ("vfsqrt_v" -> (() => new VfsqrtvTestBehavior)),*/
         ("vfredosum_vs" -> (() => new VfredosumvsTestBehavior)),
         ("vfredusum_vs" -> (() => new VfredusumvsTestBehavior)),
         ("vfredmax_vs" -> (() => new VfredmaxvsTestBehavior)),
@@ -267,7 +267,7 @@ object TBMap {
         ("vfwcvt_f_f_v" -> (() => new VfwcvtffvTestBehavior)),
         ("vfwcvt_rtz_xu_f_v" -> (() => new VfwcvtrtzxufvTestBehavior)),
         ("vfwcvt_rtz_x_f_v" -> (() => new VfwcvtrtzxfvTestBehavior)),
-        ("vmacc_vv" -> (() => new VmaccvvTestBehavior)),
+        /*("vmacc_vv" -> (() => new VmaccvvTestBehavior)),
         ("vnmsac_vv" -> (() => new VnmsacvvTestBehavior)),
         ("vmadd_vv" -> (() => new VmaddvvTestBehavior)),
         ("vnmsub_vv" -> (() => new VnmsubvvTestBehavior)),
@@ -325,7 +325,8 @@ object TBMap {
         ("vslidedown_vi" -> (() => new VslidedownviFSMTestBehavior)),
         ("vrgather_vi" -> (() => new VrgatherviFSMTestBehavior)),
         ("vfslide1up_vf" -> (() => new Vfslide1upvfFSMTestBehavior)),
-        ("vfslide1down_vf" -> (() => new Vfslide1downvfFSMTestBehavior)),
+        ("vfslide1down_vf" -> (() => new Vfslide1downvfFSMTestBehavior)),*/
+        
         ("vredsum_vs" -> (() => new VredsumvsTestBehavior)),
         ("vredmaxu_vs" -> (() => new VredmaxuvsTestBehavior)),
         ("vredmax_vs" -> (() => new VredmaxvsTestBehavior)),
@@ -335,7 +336,7 @@ object TBMap {
         ("vredor_vs" -> (() => new VredorvsTestBehavior)),
         ("vredxor_vs" -> (() => new VredxorvsTestBehavior)),
         ("vwredsumu_vs" -> (() => new VwredsumuvsTestBehavior)),
-        ("vwredsum_vs" -> (() => new VwredsumvsTestBehavior)),*/
+        ("vwredsum_vs" -> (() => new VwredsumvsTestBehavior)),
 
     )
 }

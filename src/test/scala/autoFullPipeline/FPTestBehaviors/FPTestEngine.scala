@@ -104,14 +104,14 @@ class FPTestEngine extends TestEngine {
         sendRobIdx : Int, allExhausted : Boolean, 
         flush : Boolean, flushedRobIdx : Int
     ) : (Boolean, Int) = {
-        
-        val (input, uopIdx) : (VFuInput, Int) = chosenTestCase.nextVfuInput((true, sendRobIdx))
-        println(s"1. Sending ${chosenTestCase.instid}, uop ${uopIdx}/${chosenTestCase.ctrlBundles.length}, robIdx ${sendRobIdx}")
-        // ===================== manipulating dut ========================
 
         val MAX_READY_WAIT = 100
         
         if (!allExhausted) {
+            val (input, uopIdx) : (VFuInput, Int) = chosenTestCase.nextVfuInput((true, sendRobIdx))
+            println(s"1. Sending ${chosenTestCase.instid}, uop ${uopIdx}/${chosenTestCase.ctrlBundles.length}, robIdx ${sendRobIdx}")
+            // ===================== manipulating dut ========================
+
             dut.io.in.valid.poke(true.B) // TODO randomly block
 
             // sending input ====================================
@@ -174,7 +174,7 @@ class FPTestEngine extends TestEngine {
             dut.io.in.bits.uop.uopEnd.poke(false.B)
 
             // dut.io.dontCare.poke(true.B)
-            dut.io.in.bits.poke(input) // don't care..
+            dut.io.in.bits.poke(getEmptyVFuInput()) // don't care..
             dut.io.redirect.poke(genFSMRedirect())
 
             checkOutput(dut)

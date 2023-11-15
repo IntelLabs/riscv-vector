@@ -186,6 +186,10 @@ trait BundleGenHelper {
     )
   }
 
+  def getEmptyVFuInput() = {
+    genVFuInput(SrcBundle(), ctrlBundles.vadd_vv)
+  }
+
   def genVFpuInput(s: SrcBundle, c: CtrlBundle,
                    redirect: (Boolean, Boolean, Int) = (false, false, 0)) = {
     (new VFpuInput).Lit(
