@@ -168,7 +168,8 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   val eew_ld = Reg(UInt(3.W))
   val eew_ld_wire = Cat(false.B, ld.bits.uop.ctrl.funct3(1, 0))
   val destEew_ld = Reg(UInt(3.W))
-  val destEew_ld_wire = Mux(ctrl_ld_wire.indexed, ld.bits.uop.info.vsew, eew_ld_wire)
+  // val destEew_ld_wire = Mux(ctrl_ld_wire.indexed, ld.bits.uop.info.vsew, eew_ld_wire)
+  val destEew_ld_wire = ld.bits.uop.info.destEew
   val destEewOH_ld = Reg(new SewOH)
   val destEewOH_ld_wire = SewOH(destEew_ld_wire)
   val vstart_ld = Reg(UInt(bVstart.W))
@@ -388,7 +389,7 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
     */
   val (vl, uopIdx, vstart) = (ld.bits.uop.info.vl, ld.bits.uop.expdIdx, ld.bits.uop.info.vstart)
   val (vm, ma, ta) = (ld.bits.uop.ctrl.vm, ld.bits.uop.info.ma, ld.bits.uop.info.ta)
-  val eewVd = SewOH(ld.bits.uop.info.destEew)
+  val eewVd = SewOH(destEew_ld_wire)
   // For mask load/store: vlm.v vsm.v
   val vl_mask = Wire(UInt((bVL-3).W))
   vl_mask := (vl >> 3) + Mux(vl(2, 0) === 0.U, 0.U, 1.U)
@@ -490,18 +491,8 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   /**
     * Mask_idx generation: shared by load and store
     */
-  //--- Mask Buffer: shared by load and store
   val stateIsSTORE = state === s_store
   io.stateIsStore := stateIsSTORE
-  val vmask_shift = Wire(UInt(VLEN.W))
-  vmask_shift := Mux(stateIsSTORE, st.bits.vmask, ld.bits.vmask) >>
-                 Mux(stateIsSTORE, st.bits.uop.info.vstart, ld.bits.uop.info.vstart)
-  val maskBuf = RegEnable(vmask_shift, firstLdFire || firstStFire)
-  //---- Index Buffer (for vector indexed instrn): shared by load and store
-  val idxBuf = Reg(Vec(8, Vec(vlenb, UInt(8.W))))
-  val bufPtrEnq = Mux(stateIsSTORE, stBufPtrEnq, ldBufPtrEnq)
-  when (ld.fire || st.fire) {idxBuf(bufPtrEnq) := UIntSplit(Mux(stateIsSTORE, st.bits.vs2, ld.bits.vs2), 8)}
-
   //---- Some ctrl signals shared by load and store
   val vl_ldst = Mux(stateIsSTORE, vl_st, vl_ld)
   val vstart_ldst = Mux(stateIsSTORE, vstart_st, vstart_ld)
@@ -509,6 +500,17 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   val ctrl_ldst_wire = Mux(stateIsSTORE, ctrl_st_wire, ctrl_ld_wire)
   val vm_ldst = Mux(stateIsSTORE, st.bits.uop.ctrl.vm, ld.bits.uop.ctrl.vm)
   val eew_ldst = Mux(stateIsSTORE, eew_st, eew_ld)
+  //--- Mask Buffer: shared by load and store
+  val vmask_shift = Wire(UInt(VLEN.W))
+  vmask_shift := Mux(vm_ldst, ~0.U(VLEN.W),
+                 Mux(stateIsSTORE, st.bits.vmask, ld.bits.vmask) >>
+                 Mux(stateIsSTORE, st.bits.uop.info.vstart, ld.bits.uop.info.vstart))
+  val maskBuf = RegEnable(vmask_shift, firstLdFire || firstStFire)
+  //---- Index Buffer (for vector indexed instrn): shared by load and store
+  val idxBuf = Reg(Vec(8, Vec(vlenb, UInt(8.W))))
+  val bufPtrEnq = Mux(stateIsSTORE, stBufPtrEnq, ldBufPtrEnq)
+  when (ld.fire || st.fire) {idxBuf(bufPtrEnq) := UIntSplit(Mux(stateIsSTORE, st.bits.vs2, ld.bits.vs2), 8)}
+
   //---- Begin generate mask_idx
   val cntMaskIdxCredit = RegInit(0.U(2.W))
   val nLdMask = vl_ldst - vstart_ldst
@@ -541,7 +543,9 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   val maskIdx_itemIdx = Cat(Seq.tabulate(8)(
     i => idxBuf(ldIdxOffsetArray(i)(vlenbWidth+2, vlenbWidth))(ldIdxOffsetArray(i)(vlenbWidth-1, 0))
   ).reverse)
-  io.ovi_maskIdx.item := Mux(ctrl_ldst.indexed, Cat(maskIdx_itemIdx_H, maskIdx_itemIdx),
+  val maskIdx_itemIdx_reorg = Mux1H(eewLdIdx.oneHot, Seq(8,16,32,64).map(k => 
+                                    maskIdx_itemIdx(k-1, 0).asSInt.pad(64).asUInt))
+  io.ovi_maskIdx.item := Mux(ctrl_ldst.indexed, Cat(maskIdx_itemIdx_H, maskIdx_itemIdx_reorg),
                                               Cat(false.B, maskIdx_itemMask))
   io.ovi_maskIdx.last_idx := Mux(ctrl_ldst.indexed, ldMaskOffset === nLdMask - 1.U, false.B)
   cntMaskIdxCredit := Mux(io.ovi_maskIdx.credit === io.ovi_maskIdx.valid, cntMaskIdxCredit,
