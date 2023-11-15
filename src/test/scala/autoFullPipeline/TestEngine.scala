@@ -100,6 +100,10 @@ abstract class TestEngine extends BundleGenHelper {
         return RandomGen.rand.nextInt(100) > 90
     }
 
+    def randomBlock() : Boolean = {
+        return RandomGen.rand.nextInt(100) > 80
+    }
+
     def runThroughTBs(
         dut:Module, tbs:Seq[TestBehavior], 
         MAX_PARA_INSTS: Int = 3, MAX_PARA_TESTCASES: Int = 6

@@ -37,9 +37,10 @@ class FPTestEngine extends TestEngine {
     }
 
     def checkOutput(dut : VFPUWrapper) = {
-        dut.io.out.ready.poke(true.B) // TODO randomly block
+        val block = randomBlock()
+        dut.io.out.ready.poke((!block).B) // TODO randomly block
 
-        if (dut.io.out.valid.peek().litValue == 1) {
+        if (!block && dut.io.out.valid.peek().litValue == 1) {
             
             var robIdx = dut.io.out.bits.uop.sysUop.robIdx.value.peek().litValue.toInt
             var uopIdx = dut.io.out.bits.uop.uopIdx.peek().litValue.toInt
