@@ -72,7 +72,7 @@ case class CtrlBundle(instrn: BitPat,
 )
 
 case class SrcBundleLd(rs2: String = "h0",
-                       vs2: String = "h0",
+                       vs2: String = "hc0bfbebdbcbbbab9_b8b7b6b5b4b3b2b1_b0afaeadacabaaa9_a8a7a6a5a4a3a2a1",
                        oldVd: String = "h201f1e1d1c1b1a19_1817161514131211_100f0e0d0c0b0a09_0807060504030201",
                        mask: String = "hffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff",
                        nextVRobIdx: (Boolean, Int) = (false, 0),
