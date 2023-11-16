@@ -1,7 +1,7 @@
 package smartVector
 
 import chisel3._
-import chipsalliance.rocketchip.config.{Config, Field, Parameters}
+import org.chipsalliance.cde.config.{Config, Field, Parameters}
 import freechips.rocketchip.formal.MonitorDirection._
 import chisel3.util._
 import darecreek.exu.vfu.VFuParamsKey
@@ -102,7 +102,7 @@ class SmartVector extends Module {
     io.in.ready := decoder.io.in.ready
 }
 
-object Main extends App {
-  println("Generating the VPU Core hardware")
-  emitVerilog(new SmartVector(), Array("--target-dir", "generated"))
-}
+// object Main extends App {
+//   println("Generating the VPU Core hardware")
+//   emitVerilog(new SmartVector(), Array("--target-dir", "generated"))
+// }
