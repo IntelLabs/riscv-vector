@@ -140,14 +140,14 @@ class FPTestEngine extends TestEngine {
 
             // clear past results of test case with less robIdx
             clearFlushedRes(flushedRobIdx)
-            dut.clock.step(1)
-            dut.io.redirect.poke(genFSMRedirect())
+            // dut.clock.step(1)
+            // dut.io.redirect.poke(genFSMRedirect())
 
             // waiting for dut's ready signal, which represents an ack of the uop ========
             while((dut.io.in.ready.peek().litValue != 1) &&
                     curReadyWait < MAX_READY_WAIT) {
                 
-                checkOutput(dut)
+                if (curReadyWait != 0) checkOutput(dut)
                 dut.clock.step(1)
                 dut.io.redirect.poke(genFSMRedirect())
                 curReadyWait += 1
