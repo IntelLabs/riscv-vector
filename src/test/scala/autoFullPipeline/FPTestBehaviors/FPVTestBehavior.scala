@@ -242,7 +242,7 @@ class VfTestBehavior(fn : String, cb : CtrlBundle,
         var srcBundles : Seq[SrcBundle] = Seq()
         var ctrlBundles : Seq[CtrlBundle] = Seq()
 
-        val uop_order = scala.util.Random.shuffle(List.range(0, n_ops))
+        val uop_order = RandomGen.rand.shuffle(List.range(0, n_ops))
         breakable{ while (j < n_ops){
             // dut.io.in.valid.poke(true.B) // TODO randomly block
 

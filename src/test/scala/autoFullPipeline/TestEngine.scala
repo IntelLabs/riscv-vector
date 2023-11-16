@@ -148,7 +148,7 @@ abstract class TestEngine extends BundleGenHelper {
                 (curTestCasePool.size - exhaustedCount) < MAX_PARA_TESTCASES &&
                 testBehaviorPool.length > 0
             ) {
-                val randomTBinPool = testBehaviorPool(Random.nextInt(testBehaviorPool.length))
+                val randomTBinPool = testBehaviorPool(RandomGen.rand.nextInt(testBehaviorPool.length))
                 curTestCasePool += (this.robIndex -> (randomTBinPool, randomTBinPool.getNextTestCase()))
                 println(s"0. Adding ${randomTBinPool.getInstid()}, robIdx ${robIndex} to the pool")
                 advRobIdx()
@@ -162,7 +162,7 @@ abstract class TestEngine extends BundleGenHelper {
             var stepRes : (Boolean, Int) = (false, 0)
             
             if (nonExhavustedTestCases.length != 0) {
-                val randomTestCase = Random.shuffle(nonExhavustedTestCases).head
+                val randomTestCase = RandomGen.rand.shuffle(nonExhavustedTestCases).head
                 val (chosenTestBehavior, chosenTestCase) : (TestBehavior, TestCase) = randomTestCase._2
                 val sendRobIdx = randomTestCase._1
 
