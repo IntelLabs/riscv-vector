@@ -78,7 +78,7 @@ class RedTestEngine extends TestEngine {
 
         // ===================== manipulating dut ========================
         if(!allExhausted) {
-            val (input, uopIdx) : (VFuInput, Int) = chosenTestCase.nextVfuInput((true, sendRobIdx))
+            val (input, uopIdx) : (VFuInput, Int) = chosenTestCase.nextVfuInput((false, sendRobIdx))
             println(s"2. Sending ${chosenTestCase.instid}, uop ${uopIdx}, robIdx ${sendRobIdx}")
 
             dut.io.in.valid.poke(true.B)
