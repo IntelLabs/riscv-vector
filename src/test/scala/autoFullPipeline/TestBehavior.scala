@@ -23,12 +23,19 @@ import scala.collection.mutable.Map
 import chipsalliance.rocketchip.config.Parameters
 
 
-abstract class TestBehavior(filename : String, val ctrl : CtrlBundle, sign : String, instid : String) extends BundleGenHelper {
+abstract class TestBehavior(filename : String, val ctrl : CtrlBundle, sign : String, val instid : String) extends BundleGenHelper {
 
     var inputMaps : Seq[Map[String, String]] = Seq()
     var inputMapCurIx = 0
 
     var testResult = true
+
+    override def equals(obj: Any): Boolean = {
+        obj match {
+            case other: TestBehavior => this.instid == other.getInstid()
+            case _ => false
+        }
+    }
 
     def getTestfilePath() : String              = Datapath.testdataRoot + filename
     def getCtrlBundle() : CtrlBundle    = ctrl

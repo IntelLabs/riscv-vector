@@ -104,6 +104,12 @@ abstract class TestEngine extends BundleGenHelper {
         return RandomGen.rand.nextInt(100) > 80
     }
 
+    def tbSuccess(tb : TestBehavior) = {
+        println(s"${tb.getInstid()}, tests are done.")
+        Dump.recordDone(s"${tb.getInstid()}")
+        tb.recordSuccess()
+    }
+
     def runThroughTBs(
         dut:Module, tbs:Seq[TestBehavior], 
         MAX_PARA_INSTS: Int = 3, MAX_PARA_TESTCASES: Int = 6
@@ -142,7 +148,7 @@ abstract class TestEngine extends BundleGenHelper {
                 (curTestCasePool.size - exhaustedCount) < MAX_PARA_TESTCASES &&
                 testBehaviorPool.length > 0
             ) {
-                val randomTBinPool = testBehaviorPool(Random.nextInt(testBehaviorPool.length))
+                val randomTBinPool = testBehaviorPool(RandomGen.rand.nextInt(testBehaviorPool.length))
                 curTestCasePool += (this.robIndex -> (randomTBinPool, randomTBinPool.getNextTestCase()))
                 println(s"0. Adding ${randomTBinPool.getInstid()}, robIdx ${robIndex} to the pool")
                 advRobIdx()
@@ -156,7 +162,7 @@ abstract class TestEngine extends BundleGenHelper {
             var stepRes : (Boolean, Int) = (false, 0)
             
             if (nonExhavustedTestCases.length != 0) {
-                val randomTestCase = Random.shuffle(nonExhavustedTestCases).head
+                val randomTestCase = RandomGen.rand.shuffle(nonExhavustedTestCases).head
                 val (chosenTestBehavior, chosenTestCase) : (TestBehavior, TestCase) = randomTestCase._2
                 val sendRobIdx = randomTestCase._1
 
@@ -168,14 +174,36 @@ abstract class TestEngine extends BundleGenHelper {
                         println(s"1.1. Flush (all < ${flushedRobIdx})")
 
                         val prevSize = curTestCasePool.size
-                        curTestCasePool = curTestCasePool.filterNot(_._1 < flushedRobIdx)
+                        var deletedTBs : Set[TestBehavior] = Set()
+
+                        // delete flushed test cases, so TestEngine will not
+                        // give new uops of them to the next level detailed TestEngine
+                        curTestCasePool = curTestCasePool.filterNot(x => {
+                            if (x._1 < flushedRobIdx) {
+                                val tb : TestBehavior = x._2._1
+                                deletedTBs = deletedTBs + tb
+                            }
+                            x._1 < flushedRobIdx
+                        })
+
+                        // if any TB has no test case left, record success
+                        for (tb <- deletedTBs) {
+                            if (!curTestCasePool.values.exists(_._1 == tb) &&
+                                tb.isFinished()
+                            ) {
+                                tbSuccess(tb)
+                            }
+                        }
+
                         println(s"1.2. curTestCasePool shrinked from ${prevSize} to ${curTestCasePool.size}")
                         exhaustedCount = curTestCasePool.filter(_._2._2.isExhausted()).size
                         
-                        break
+                        // give uop and flush info in the next iteration
+                        break // continue
                     }
                 }
-                println(s"1.3. Before sending to the dut, flush=${flush}, flushedRobIdx=${flushedRobIdx}")
+
+                println(s"0.1. Before sending to the dut, flush=${flush}, flushedRobIdx=${flushedRobIdx}")
                 stepRes = iterate(dut, chosenTestCase, sendRobIdx, flush=flush, flushedRobIdx=flushedRobIdx)
                 if (chosenTestCase.isExhausted()) 
                     exhaustedCount += 1
@@ -188,6 +216,7 @@ abstract class TestEngine extends BundleGenHelper {
                 }*/
                 flush = false
             } else {
+                // Rest test cases are all waiting for results, no more uop to give
                 stepRes = iterate(dut, curTestCasePool.toList.head._2._2, -1, true)
             }
             val resCorrectness = stepRes._1
@@ -223,22 +252,25 @@ abstract class TestEngine extends BundleGenHelper {
                         exhaustedCount -= 1
 
                         //  TODO 1.3.2. check if TestBehavior are done and record the result, remove it from the pool
-                        if (!curTestCasePool.values.exists(_._1 == resTestBehavior) &&
-                                resTestBehavior.isFinished()) {
-                            println(s"${resTestBehavior.getInstid()}, tests are done.")
-                            Dump.recordDone(s"${resTestBehavior.getInstid()}")
-                            resTestBehavior.recordSuccess()
+                        if (
+                            !curTestCasePool.values.exists(_._1 == resTestBehavior) &&
+                            resTestBehavior.isFinished()
+                        ) {
+                            tbSuccess(resTestBehavior)
                         }
                     }
                 }
 
-                //  TODO 1.3.2. check if all test cases of an TestBehavior are fetched
+                //  check if all test cases of an TestBehavior are fetched
+                // NOTICE that after this, there might still be some test cases 
+                // of the removed TestBehavior running
                 if (resTestBehavior.isFinished()) {
                     testBehaviorPool = testBehaviorPool.filterNot(_ == resTestBehavior)
                 }
             } else {
                 println("Waiting for TestCase result..")
             }
+            println("=============================================================================")
         } }
     }
 
@@ -255,21 +287,6 @@ abstract class TestEngine extends BundleGenHelper {
         println("TestEngine: All ordered mode instructions are tested")
     }
     
-    /*def run(dut:Module) : Unit = {
-        /*if(this.normalModeTBs.length == 0 && this.orderedTBs.length == 0) {
-            this.fillTBs(tbs)
-        }*/
-
-        dut match {
-            case alu_dut : VAluWrapper => run(alu_dut)
-            case mac_dut : VMacWrapper => run(mac_dut)
-            case mask_dut : VMask => run(mask_dut)
-            case dut : VFPUWrapper => run(dut)
-            case dut : VDivWrapper => run(dut)
-            case dut : Reduction => run(dut)
-            case perm_dut : Permutation => run(perm_dut)
-        }
-    }*/
 
     def fillTBs(testBehaviors : Seq[TestBehavior]) = {
         for (i <- 0 until testBehaviors.length) {

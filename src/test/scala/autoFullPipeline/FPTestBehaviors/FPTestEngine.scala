@@ -109,8 +109,8 @@ class FPTestEngine extends TestEngine {
         val MAX_READY_WAIT = 100
         
         if (!allExhausted) {
-            val (input, uopIdx) : (VFuInput, Int) = chosenTestCase.nextVfuInput((true, sendRobIdx))
-            println(s"1. Sending ${chosenTestCase.instid}, uop ${uopIdx}/${chosenTestCase.ctrlBundles.length}, robIdx ${sendRobIdx}")
+            val (input, uopIdx) : (VFuInput, Int) = chosenTestCase.nextVfuInput((false, sendRobIdx))
+            println(s"1. Sending ${chosenTestCase.instid}, robIdx ${sendRobIdx}, uop ${uopIdx}/(0-${chosenTestCase.ctrlBundles.length - 1})")
             // ===================== manipulating dut ========================
 
             dut.io.in.valid.poke(true.B) // TODO randomly block
@@ -120,18 +120,18 @@ class FPTestEngine extends TestEngine {
             
             dut.io.in.bits.poke(input)
             if (flush) {
-                println(s"2. Flushed (all < ${flushedRobIdx}), from FPTestEngine")
                 dut.io.redirect.poke(genFSMRedirect(flush, flush, flushedRobIdx))
             } else {
                 dut.io.redirect.poke(genFSMRedirect())
             }
 
-            // in the same cycle, check output
+            // in the same cycle, before marking flushed instructions, check output
             //  If there's any, the historyTCs item will be removed
             //  and one result will be added
             checkOutput(dut)
 
-            // Tag test cases' uops that has less robIdx and no vd received yet
+            // Tag test cases' uops that should be flushed
+            // and no vd received yet
             for (i <- 0 until historyTCs.length) {
                 if(historyTCs(i)._1 < flushedRobIdx) {
                     historyTCs(i)._3.flush()
@@ -140,14 +140,15 @@ class FPTestEngine extends TestEngine {
 
             // clear past results of test case with less robIdx
             clearFlushedRes(flushedRobIdx)
-            dut.clock.step(1)
-            dut.io.redirect.poke(genFSMRedirect())
+            println(s"2. Flushed (all < ${flushedRobIdx}), from FPTestEngine")
+            // dut.clock.step(1)
+            // dut.io.redirect.poke(genFSMRedirect())
 
             // waiting for dut's ready signal, which represents an ack of the uop ========
             while((dut.io.in.ready.peek().litValue != 1) &&
                     curReadyWait < MAX_READY_WAIT) {
                 
-                checkOutput(dut)
+                if (curReadyWait != 0) checkOutput(dut)
                 dut.clock.step(1)
                 dut.io.redirect.poke(genFSMRedirect())
                 curReadyWait += 1
