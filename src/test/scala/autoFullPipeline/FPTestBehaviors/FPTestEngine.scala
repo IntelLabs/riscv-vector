@@ -37,9 +37,10 @@ class FPTestEngine extends TestEngine {
     }
 
     def checkOutput(dut : VFPUWrapper) = {
-        dut.io.out.ready.poke(true.B) // TODO randomly block
+        val block = randomBlock()
+        dut.io.out.ready.poke((!block).B) // TODO randomly block
 
-        if (dut.io.out.valid.peek().litValue == 1) {
+        if (!block && dut.io.out.valid.peek().litValue == 1) {
             
             var robIdx = dut.io.out.bits.uop.sysUop.robIdx.value.peek().litValue.toInt
             var uopIdx = dut.io.out.bits.uop.uopIdx.peek().litValue.toInt
@@ -104,14 +105,14 @@ class FPTestEngine extends TestEngine {
         sendRobIdx : Int, allExhausted : Boolean, 
         flush : Boolean, flushedRobIdx : Int
     ) : (Boolean, Int) = {
-        
-        val (input, uopIdx) : (VFuInput, Int) = chosenTestCase.nextVfuInput((true, sendRobIdx))
-        println(s"1. Sending ${chosenTestCase.instid}, uop ${uopIdx}/${chosenTestCase.ctrlBundles.length}, robIdx ${sendRobIdx}")
-        // ===================== manipulating dut ========================
 
         val MAX_READY_WAIT = 100
         
         if (!allExhausted) {
+            val (input, uopIdx) : (VFuInput, Int) = chosenTestCase.nextVfuInput((true, sendRobIdx))
+            println(s"1. Sending ${chosenTestCase.instid}, uop ${uopIdx}/${chosenTestCase.ctrlBundles.length}, robIdx ${sendRobIdx}")
+            // ===================== manipulating dut ========================
+
             dut.io.in.valid.poke(true.B) // TODO randomly block
 
             // sending input ====================================
@@ -174,7 +175,7 @@ class FPTestEngine extends TestEngine {
             dut.io.in.bits.uop.uopEnd.poke(false.B)
 
             // dut.io.dontCare.poke(true.B)
-            dut.io.in.bits.poke(input) // don't care..
+            dut.io.in.bits.poke(getEmptyVFuInput()) // don't care..
             dut.io.redirect.poke(genFSMRedirect())
 
             checkOutput(dut)

@@ -71,7 +71,7 @@ for i in $(seq 0 "$N_PROCESSES"); do
             -DincorrInsts="$incorrect_inst_file_path" \
             -DdoneInsts="$done_inst_file_path" \
             -DincorrDataDire="./src/test/scala/autoFullPipeline/AutoTestRes/$foldername/incorrectData/" \
-            "testOnly darecreek.vfuAutotest.alu.VAluSpec" \
+            "testOnly darecreek.vfuAutotest.fullPipeline.VAluSpec" \
             1> "$out_file_path1" 2> "$out_file_path2" &   # run the command via bash in subshell
         popd > /dev/null
 

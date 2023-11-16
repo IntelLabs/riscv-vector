@@ -99,10 +99,12 @@ trait VAluBehavior {
 
   def testMain(
     testEngine : TestEngine, j:Int = -1, 
-    printFunc : () => Unit = () => {}
+    printFunc : () => Unit = () => {},
+    vcdFileSuffix : String = ""
   ): Unit = {
     var testName = "Tests on " + testEngine.getName()
     if (j != -1) testName += s" datasplit $j"
+    testName += vcdFileSuffix
     it should s"$testName" in {
       test(testEngine.getDut()).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
         testEngine.test_init(dut)
@@ -546,13 +548,20 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
     println("============================== TEST RESULT ==================================")
   }
 
+  val currentDateTime: String = 
+    LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy_MM_dd_HH_mm_ss"))  // Get the current date and time
+  // val formatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")  // Define the desired format
+  // val dateTimeString: String = currentDateTime.format(formatter)
+
+  println(s"NOTICE vcds will have suffix: ${currentDateTime}")
+
   for(i <- 0 until testEngines.length) {
     val testEngine = testEngines(i)
     var printFunc : () => Unit = () => {}
     if (i == testEngines.length - 1) {
       printFunc = printRes
     }
-    it should behave like testMain(testEngine, j, printFunc)
+    it should behave like testMain(testEngine, j, printFunc, currentDateTime)
   }
 
 }
