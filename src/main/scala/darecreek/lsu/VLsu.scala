@@ -15,21 +15,16 @@
 //  1) Only support VLEN = 256
 //  2) Load and store are serial and ordered
 //  3) The elements past vstart_vlfof may alter architectural state (depends on the load.seq_id from CPU)
-//  4) A. Fault-only-first load acts the same as unit-stride load (active elements past reported-VL may be 1 or old value).
+//  4) So far, set constant 0 to OVI_COMPLETED.vstart (does not support load retry)
+//  5) A. Fault-only-first load acts the same as unit-stride load (active elements past reported-VL may be 1 or old value).
 //     B. Whole Register instrn (OVI not mentioned): same as unit-stride operations.
 //     C. vlm, vsm (OVI not mentioned): same as unit-stride with eew=8. Need pay attention: tail is agnostic, and vstart is in units of bytes.
 //     D. Segment instrn (OVI not supported): for load data, assume only one segment is transmitted from CPU and it is confined in
 //        one 512-b load data (this assumption is not efficient for unit-stride op, and may cause extra complexity to CPU). The
 //        el_off is 0, the el_count is number of fields in one segment, el_id is offset inside each RF register.
 //        For segment store, so far we use same scheme as other store instrns (not friendly to CPU to handle segment).
-//  5) So far when uop.lsrcValid(2) is set, which means need-old-vd, all tails and masks are set to old vd (so you will not see FFFF).
-
-//  Todo: 1) vstart support (consider mask_idx.item)
-//        2) Optimize: send mask_idx as early as memop.sync_start; mask_idx.last_idx goes early if all remain indices are masked off
-//        3) vlm, vsm: tail is agnostic, and vstart is in units of bytes.
-
-//  Question: 1) Will el_count = 0 and sync_end.vstart = 0 if exception occurs at elemnt 0 ?
-//            2) Will seq_id.el_id from CPU be guaranteed to be >= vstart?
+//
+//  Todo: 1) Optimize: send mask_idx as early as memop.sync_start; mask_idx.last_idx goes early if all remain indices are masked off
 
 package darecreek.lsu
 
@@ -552,7 +547,6 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
                           Mux(io.ovi_maskIdx.credit, cntMaskIdxCredit - 1.U, cntMaskIdxCredit + 1.U))
   assert(cntMaskIdxCredit =/= 3.U, "cntMaskIdxCredit should < 3")
 
-  // io.ovi_memop.load := io.ovi_memop.sync_start && !io.ovi_store.valid
 }
 
 object Main extends App {
