@@ -148,10 +148,15 @@ abstract class TestEngine extends BundleGenHelper {
                 (curTestCasePool.size - exhaustedCount) < MAX_PARA_TESTCASES &&
                 testBehaviorPool.length > 0
             ) {
-                val randomTBinPool = testBehaviorPool(RandomGen.rand.nextInt(testBehaviorPool.length))
-                curTestCasePool += (this.robIndex -> (randomTBinPool, randomTBinPool.getNextTestCase()))
-                println(s"0. Adding ${randomTBinPool.getInstid()}, robIdx ${robIndex} to the pool")
-                advRobIdx()
+                val randIx = RandomGen.rand.nextInt(testBehaviorPool.length)
+                val randomTBinPool = testBehaviorPool(randIx)
+                if (randomTBinPool.isFinished()) {
+                    testBehaviorPool = testBehaviorPool.filterNot(_ == randomTBinPool)
+                } else {
+                    curTestCasePool += (this.robIndex -> (randomTBinPool, randomTBinPool.getNextTestCase()))
+                    println(s"0. Adding ${randomTBinPool.getInstid()}, robIdx ${robIndex} to the pool")
+                    advRobIdx()
+                }
             }
 
             // TODO 1.2. Randomly choose one among TestCases
@@ -216,6 +221,7 @@ abstract class TestEngine extends BundleGenHelper {
                 }*/
                 flush = false
             } else {
+                if (curTestCasePool.size == 0) break
                 // Rest test cases are all waiting for results, no more uop to give
                 stepRes = iterate(dut, curTestCasePool.toList.head._2._2, -1, true)
             }

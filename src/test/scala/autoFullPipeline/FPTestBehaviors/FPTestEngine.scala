@@ -135,17 +135,19 @@ class FPTestEngine extends TestEngine {
 
             // Tag test cases' uops that should be flushed
             // and no vd received yet
-            for (i <- 0 until historyTCs.length) {
-                if(historyTCs(i)._1 < flushedRobIdx) {
-                    historyTCs(i)._3.flush()
+            if (flush) {
+                for (i <- 0 until historyTCs.length) {
+                    if(historyTCs(i)._1 < flushedRobIdx) {
+                        historyTCs(i)._3.flush()
+                    }
                 }
-            }
 
-            // clear past results of test case with less robIdx
-            clearFlushedRes(flushedRobIdx)
-            println(s"2. Flushed (all < ${flushedRobIdx}), from FPTestEngine")
-            // dut.clock.step(1)
-            // dut.io.redirect.poke(genFSMRedirect())
+                // clear past results of test case with less robIdx
+                clearFlushedRes(flushedRobIdx)
+                println(s"2. Flushed (all < ${flushedRobIdx}), from FPTestEngine")
+                // dut.clock.step(1)
+                // dut.io.redirect.poke(genFSMRedirect())
+            }
 
             // waiting for dut's ready signal, which represents an ack of the uop ========
             while((dut.io.in.ready.peek().litValue != 1) &&

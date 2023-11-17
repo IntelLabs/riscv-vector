@@ -30,6 +30,8 @@ abstract class TestBehavior(filename : String, val ctrl : CtrlBundle, sign : Str
 
     var testResult = true
 
+    var mapLoaded : Boolean = false
+
     override def equals(obj: Any): Boolean = {
         obj match {
             case other: TestBehavior => this.instid == other.getInstid()
@@ -44,7 +46,7 @@ abstract class TestBehavior(filename : String, val ctrl : CtrlBundle, sign : Str
     def recordFail() = {this.testResult = false}
     def recordSuccess() = {this.testResult = true}
     def isFinished() : Boolean = {
-        return this.inputMapCurIx >= this.inputMaps.length
+        return mapLoaded && (this.inputMapCurIx >= this.inputMaps.length)
     }
 
     // change depending on test behavior =================================
@@ -127,6 +129,8 @@ abstract class TestBehavior(filename : String, val ctrl : CtrlBundle, sign : Str
             println(s"Data file does not exist for instruction: ${getInstid()} , skipping")
             Dump.recordIncorrectInst(getInstid())
         }
+
+        mapLoaded = true
     }
 
     def getNextTestCase() : TestCase = {
