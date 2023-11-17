@@ -22,8 +22,6 @@ import scala.util.control.Breaks._
 
 class FPTestEngine extends TestEngine {
 
-    var curReadyWait = 0
-
     override def getName() = "FPTestEngine"
     override def getDut() = new VFPUWrapper
 
@@ -111,6 +109,7 @@ class FPTestEngine extends TestEngine {
     ) : (Boolean, Int) = {
 
         val MAX_READY_WAIT = 100
+        var curReadyWait = 0
         
         if (!allExhausted) {
             val (input, uopIdx) : (VFuInput, Int) = chosenTestCase.nextVfuInput((false, sendRobIdx))
@@ -164,7 +163,6 @@ class FPTestEngine extends TestEngine {
                 assert(false)
             }
             assert(curReadyWait < MAX_READY_WAIT)
-            curReadyWait = 0
 
             // dut.io.in.valid.poke(false.B)
 
@@ -175,7 +173,17 @@ class FPTestEngine extends TestEngine {
                 historyTCs :+= (sendRobIdx, uopIdx, chosenTestCase)
             }
 
-            checkOutput(dut)
+            if (curReadyWait > 0) {
+                // Here, the Engine passed through the while loop,
+                //  clock ticked inside it
+                //  then one should check one more time for the result
+                
+                // if the Engine didn't enter the while loop (curReadyWait == 0),
+                //  then the engine didn't tick after "sending the input and checking
+                //  the result for the first time".
+                //  then here we should not check for the result second time.
+                checkOutput(dut)
+            }
             dut.clock.step(1)
         } else {
             dut.io.in.valid.poke(false.B)
