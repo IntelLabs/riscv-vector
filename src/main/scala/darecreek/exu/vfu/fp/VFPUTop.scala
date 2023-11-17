@@ -1,10 +1,11 @@
 package darecreek.exu.vfu.fp
 
 import chipsalliance.rocketchip.config.Parameters
-import chisel3._
+import chisel3.{util, _}
 import chisel3.util._
-import darecreek.exu.vfu.{LaneFUInput, LaneFUOutput}
-import darecreek.exu.vfu.MaskTailData
+// import darecreek.exu.vfu.{LaneFUInput, LaneFUOutput}
+import darecreek.exu.vfu._
+// import darecreek.exu.vfu.MaskTailData
 import xiangshan.Redirect
 
 class VFPUTop(implicit val p: Parameters)
@@ -41,16 +42,50 @@ class VFPUTop(implicit val p: Parameters)
     case (in, out) => in <> out
   }
 
-  val fpu_out = Reg(new LaneFUOutput)
-  outArbiter.io.out.bits.outputToLaneFU(fpu_out)
+  val fpu_out_w = Wire(new LaneFUOutput)
+  outArbiter.io.out.bits.outputToLaneFU(fpu_out_w)
 
-  io.out.bits := fpu_out
-  io.out.bits.vd := RegEnable(outArbiter.io.out.bits.vd, 0.U, outArbiter.io.out.valid)
 
-  io.out.valid := RegNext(outArbiter.io.out.valid)
-  io.maskKeep := RegEnable(outArbiter.io.out.bits.uop.maskKeep, 0.U, outArbiter.io.out.valid)
-  io.maskOff := RegEnable(outArbiter.io.out.bits.uop.maskOff, 0.U, outArbiter.io.out.valid)
-  outArbiter.io.out.ready := io.out.ready
+  //  Redirect handling
+  def latency = 1
+
+
+  val validVec = outArbiter.io.out.valid +: Array.fill(latency)(RegInit(false.B))
+  val rdyVec = Array.fill(latency)(Wire(Bool())) :+ io.out.ready
+  val uopVec = fpu_out_w.uop +: Array.fill(latency)(Reg(new VExpdUOp))
+  val flushVec = validVec.zip(uopVec).map(x => x._1 && x._2.sysUop.robIdx.needFlush(io.redirect))
+
+  def regEnable(i: Int): Bool = validVec(i - 1) && rdyVec(i - 1) && !flushVec(i - 1)
+
+  for (i <- 0 until latency) {
+    rdyVec(i) := !validVec(i + 1) || rdyVec(i + 1)
+  }
+
+  for (i <- 1 to latency) {
+    when(regEnable(i)) {
+      validVec(i) := validVec(i - 1)
+      uopVec(i) := uopVec(i - 1)
+    }.elsewhen(flushVec(i) || rdyVec(i)) {
+      validVec(i) := false.B
+    }
+  }
+
+  io.out.valid := validVec.last
+  outArbiter.io.out.ready := rdyVec(0)
+
+
+//  val fpu_out = Reg(new LaneFUOutput)
+//  outArbiter.io.out.bits.outputToLaneFU(fpu_out)
+//  io.out.bits := fpu_out
+  io.out.bits.uop := RegEnable(fpu_out_w.uop, regEnable(1))
+  io.out.bits.vd := RegEnable(outArbiter.io.out.bits.vd, 0.U, regEnable(1))
+  io.out.bits.fflags := RegEnable(outArbiter.io.out.bits.fflags, 0.U, regEnable(1))
+  io.out.bits.vxsat := false.B
+
+  // io.out.valid := RegNext(outArbiter.io.out.valid)
+  io.maskKeep := RegEnable(outArbiter.io.out.bits.uop.maskKeep, 0.U, regEnable(1))
+  io.maskOff := RegEnable(outArbiter.io.out.bits.uop.maskOff, 0.U, regEnable(1))
+  // outArbiter.io.out.ready := io.out.ready
 
 
   //  outArbiter.io.out.bits.outputToLaneFU(io.out.bits)
@@ -167,6 +202,32 @@ class VFInputGenFP(implicit val p: Parameters) extends VFPUBaseModule {
       io.in.bits.vs1)
   )
 
+  //  Redirect handling
+  def latency = 1
+
+
+  val validVec = (io.in.valid) +: Array.fill(latency)(RegInit(false.B))
+  val rdyVec = Array.fill(latency)(Wire(Bool())) :+ io.out.ready
+  // val uopVec = io.in.bits.uop +: Array.fill(latency)(Reg(new VExpdUOp))
+ // val flushVec = validVec.zip(uopVec).map(x => x._1 && x._2.sysUop.robIdx.needFlush(io.redirect))
+
+  // def regEnable(i: Int): Bool = validVec(i - 1) && rdyVec(i - 1) && !flushVec(i - 1)
+  def regEnable(i: Int): Bool = validVec(i - 1) && rdyVec(i - 1)
+
+  for (i <- 0 until latency) {
+    rdyVec(i) := !validVec(i + 1) || rdyVec(i + 1)
+  }
+
+  for (i <- 1 to latency) {
+    when(regEnable(i)) {
+      validVec(i) := validVec(i - 1)
+     // uopVec(i) := uopVec(i - 1)
+    // }.elsewhen(flushVec(i) || rdyVec(i)) {
+    }.elsewhen(rdyVec(i)) {
+      validVec(i) := false.B
+    }
+  }
+
   //---- vstart >= vl ----
   val vstart_gte_vl = io.in.bits.uop.info.vstart >= io.in.bits.uop.info.vl
 
@@ -181,25 +242,18 @@ class VFInputGenFP(implicit val p: Parameters) extends VFPUBaseModule {
   maskGen.io.opi := false.B
 
   val fuop = Reg(new LaneFloatFUIn)
-  fuop.connectFromLaneFUInput(io.in.bits)
+  when (regEnable(1)) {fuop.connectFromLaneFUInput(io.in.bits)}
 
   io.out.bits := fuop
-  io.out.bits.uop.typeTag := RegEnable(typeTag, fire)
-  io.out.bits.uop.vfpCtrl := RegEnable(vfpCtrl, fire)
+  io.out.bits.uop.typeTag := RegEnable(typeTag, regEnable(1))
+  io.out.bits.uop.vfpCtrl := RegEnable(vfpCtrl, regEnable(1))
   io.out.bits.uop.fWidenEnd := false.B // default false
-  io.out.bits.vs1 := RegEnable(rs1Expd, fire)
-  io.out.bits.uop.maskKeep := RegEnable(Mux(isCmp, maskGen.io.maskKeep_cmp, maskGen.io.maskKeep), fire)
-  io.out.bits.uop.maskOff := RegEnable(Mux(isCmp, maskGen.io.maskOff_cmp, maskGen.io.maskOff), fire)
+  io.out.bits.vs1 := RegEnable(rs1Expd, regEnable(1))
+  io.out.bits.uop.maskKeep := RegEnable(Mux(isCmp, maskGen.io.maskKeep_cmp, maskGen.io.maskKeep), regEnable(1))
+  io.out.bits.uop.maskOff := RegEnable(Mux(isCmp, maskGen.io.maskOff_cmp, maskGen.io.maskOff), regEnable(1))
 
-  io.out.valid := RegNext(io.in.valid)
-  io.in.ready := io.out.ready
-  //  io.out.bits.connectFromLaneFUInput(io.in.bits)
-  //  io.out.bits.uop.typeTag := typeTag
-  //  io.out.bits.uop.vfpCtrl := vfpCtrl
-  //  io.out.bits.uop.fWidenEnd := false.B // default false
-  //  io.out.bits.vs1 := rs1Expd
-  //  io.out.bits.uop.maskKeep := Mux(isCmp, maskGen.io.maskKeep_cmp, maskGen.io.maskKeep)
-  //  io.out.bits.uop.maskOff := Mux(isCmp, maskGen.io.maskOff_cmp, maskGen.io.maskOff)
+  io.out.valid := validVec.last
+  io.in.ready := rdyVec(0)
 
   def isCmp: Bool = {
     io.in.bits.uop.ctrl.funct6(5, 3) === "b011".U
