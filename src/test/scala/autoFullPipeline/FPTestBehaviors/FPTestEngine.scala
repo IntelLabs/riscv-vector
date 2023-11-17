@@ -40,7 +40,11 @@ class FPTestEngine extends TestEngine {
         val block = randomBlock()
         dut.io.out.ready.poke((!block).B) // TODO randomly block
 
+        println(s".. checkOutput block = ${block}, ready = ${!block}")
+
         if (!block && dut.io.out.valid.peek().litValue == 1) {
+
+            println(".. valid == true, checking results..")
             
             var robIdx = dut.io.out.bits.uop.sysUop.robIdx.value.peek().litValue.toInt
             var uopIdx = dut.io.out.bits.uop.uopIdx.peek().litValue.toInt
@@ -161,6 +165,8 @@ class FPTestEngine extends TestEngine {
             }
             assert(curReadyWait < MAX_READY_WAIT)
             curReadyWait = 0
+
+            dut.io.in.valid.poke(false.B)
 
             if (
                 chosenTestCase.rc.n_ops != 1 ||
