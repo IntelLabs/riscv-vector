@@ -166,7 +166,7 @@ class FPTestEngine extends TestEngine {
             assert(curReadyWait < MAX_READY_WAIT)
             curReadyWait = 0
 
-            dut.io.in.valid.poke(false.B)
+            // dut.io.in.valid.poke(false.B)
 
             if (
                 chosenTestCase.rc.n_ops != 1 ||
