@@ -67,10 +67,9 @@ class VFMASrcPreprocessPipe(implicit val p: Parameters) extends VFPUBaseModule {
   //  Redirect handling
   def latency = 1
 
-
   val validVec = (io.in.valid) +: Array.fill(latency)(RegInit(false.B))
   val rdyVec = Array.fill(latency)(Wire(Bool())) :+ io.out.ready
-  val uopVec = io.in.bits.uop +: Array.fill(latency)(Reg(new VExpdUOp))
+  val uopVec = io.in.bits.uop +: Array.fill(latency)(Reg(new VFPUOp))
   val flushVec = validVec.zip(uopVec).map(x => x._1 && x._2.sysUop.robIdx.needFlush(io.redirect))
 
   def regEnable(i: Int): Bool = validVec(i - 1) && rdyVec(i - 1) && !flushVec(i - 1)
@@ -89,8 +88,7 @@ class VFMASrcPreprocessPipe(implicit val p: Parameters) extends VFPUBaseModule {
   }
 
   io.out.valid := validVec.last
-  // io.in.ready := io.out.ready
-  // io.in.ready := rdyVec(0)
+  io.in.ready := rdyVec(0)
 
 
   // val transfer = io.in.valid && io.in.ready
@@ -149,7 +147,7 @@ class VFMASrcPreprocessPipe(implicit val p: Parameters) extends VFPUBaseModule {
 
   // FSM & ready/valid interface
   // always accept new input, no matter if it is a widening
-  io.in.ready := io.out.ready || !io.out.valid
+  // io.in.ready := io.out.ready || !io.out.valid
   // io.out.valid := validReg
 
 
