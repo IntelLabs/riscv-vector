@@ -173,23 +173,21 @@ class VRob extends Module with HasCircularQueuePtrHelper {
 
   /**
     * Write back
+    * Note: So far, set constant 0 to OVI_COMPLETED.vstart (does not support load retry)
     */
   // Write back of arith
   val wbA = io.wbArith.bits.uop
-  when (io.wbArith.valid) {
-    busy(wbA.vRobIdx.value) := !wbA.expdEnd  // Only support in-order write-backs under the same instruction
-    oviCompltSigs(wbA.vRobIdx.value) := Cat(io.wbArith.bits.fflags, io.wbArith.bits.vxsat).asTypeOf(new OviCompltSigs)
-  }
   // Write back of ld
   val wbL = io.wbLSU(0).bits
-  when (io.wbLSU(0).valid) {
-    busy(wbL.vRobIdx.value) := !wbL.expdEnd
-  }
   // Write back of st
   val wbS = io.wbLSU(1).bits
-  when (io.wbLSU(1).valid) {
-    busy(wbS.vRobIdx.value) := !wbS.expdEnd
-  }
+  val wb_valid = io.wbArith.valid || io.wbLSU(0).valid || io.wbLSU(1).valid
+  val wb_expdEnd = Mux(io.wbArith.valid, wbA.expdEnd, Mux(io.wbLSU(0).valid, wbL.expdEnd, wbS.expdEnd))
+  val wb_vRobIdx_value = Mux(io.wbArith.valid, wbA.vRobIdx.value, Mux(io.wbLSU(0).valid, wbL.vRobIdx.value, wbS.vRobIdx.value))
+  // Only support in-order write-backs under the same instruction
+  when (wb_valid) { busy(wb_vRobIdx_value) := !wb_expdEnd }
+  val wb_oviComplt = Cat(io.wbArith.bits.fflags, io.wbArith.bits.vxsat).asTypeOf(new OviCompltSigs)
+  when (wb_valid) { oviCompltSigs(wb_vRobIdx_value) := wb_oviComplt }
 
   /**
     * Complete
