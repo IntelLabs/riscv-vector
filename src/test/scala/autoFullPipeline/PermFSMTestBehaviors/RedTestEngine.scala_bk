@@ -14,10 +14,10 @@ import darecreek.exu.vfu.vmask._
 import darecreek.exu.vfu.reduction._
 import darecreek.exu.vfu.VInstructions._
 
-class RedTestEngine extends TestEngine {
+class PermTestEngine extends TestEngine {
 
-    override def getName() = "RedTestEngine"
-    override def getDut() = new Reduction
+    override def getName() = "PermTestEngine"
+    override def getDut() = new Permutation
 
     var historyTCs : List[(Int, Int, TestCase)] = 
         List() // robIdx, uopIdx, TestCase, flushed
@@ -26,7 +26,7 @@ class RedTestEngine extends TestEngine {
     var results : List[(Boolean, Int)] = List()
 
     def clearFlushedRes(robIdx : Int) = {
-        results = results.filter(_._2 > robIdx) // flush compare
+        results = results.filter(_._2 >= robIdx)
     }
 
     def checkOutput(dut : Reduction) = {
@@ -55,48 +55,37 @@ class RedTestEngine extends TestEngine {
 
 
     override def iterate(
-        dut : Reduction, chosenTestCase : TestCase, 
+        dut : Permutation, chosenTestCase : TestCase, 
         sendRobIdx : Int, allExhausted : Boolean, 
         flush : Boolean, flushedRobIdx : Int
     ) : (Boolean, Int) = {
 
         // ===================== manipulating dut ========================
         if(!allExhausted) {
-            val (input, uopIdx) : (VFuInput, Int) = chosenTestCase.nextVfuInput((false, sendRobIdx))
-            println(s"2. Sending ${chosenTestCase.instid}, uop ${uopIdx}, robIdx ${sendRobIdx}")
+            val (input, uopIdx) : (VFuInput, Int) = chosenTestCase.nextFsmInput((false, sendRobIdx))
+            println(s"2. Sending ${chosenTestCase.instid}, robIdx ${sendRobIdx}, uop ${uopIdx}")
 
-            dut.io.in.valid.poke(true.B)
+            // dut.io.in.valid.poke(true.B)
 
             dut.io.in.bits.poke(input)
-
             if (flush) {
+                dut.io.redirect.poke(genFSMRedirect((flush, flush, flushedRobIdx)))
+            } else {
+                dut.io.redirect.poke(genFSMRedirect())
+            }
+
+            dut.clock.step(1)
+
+            /*if (flush) {
                 for (i <- 0 until historyTCs.length) {
-                    if(historyTCs(i)._1 <= flushedRobIdx) { // flush compare
+                    if(historyTCs(i)._1 < flushedRobIdx) {
                         historyTCs(i)._3.flush()
                     }
                 }
-            }
+            }*/
 
-            // Only check for the result after the last uop
-            if (chosenTestCase.isExhausted()) 
-                historyTCs :+= (sendRobIdx, uopIdx, chosenTestCase)
-
-            // TestEngine (outside) needs not know the flushed result.
-            clearFlushedRes(flushedRobIdx)
         }
 
-        dut.clock.step(1)
-
-        dut.io.in.valid.poke(false.B)
-        // dut.io.redirect.poke(genFSMRedirect())
-        checkOutput(dut)
-
-        if (results.length > 0) {
-            val resCorrectness = results(0)._1
-            val resRobIdx = results(0)._2
-            results = results.tail
-            return (resCorrectness, resRobIdx)
-        }
 
         return (false, NO_RESULT_ROBIDX)
     }

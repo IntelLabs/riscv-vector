@@ -316,7 +316,7 @@ object TestHarnessFPU {
 }
 
 object TestHarnessDiv {
-  def test_init(dut: VDivWrapper): Unit = {
+  def test_init(dut: VDiv): Unit = {
     dut.clock.setTimeout(1000)
     dut.io.in.initSource()
     dut.io.in.setSourceClock(dut.clock)

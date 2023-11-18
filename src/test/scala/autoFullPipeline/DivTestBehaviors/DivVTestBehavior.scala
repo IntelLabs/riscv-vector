@@ -6,7 +6,8 @@ import chisel3._
 import chiseltest.WriteVcdAnnotation
 import scala.reflect.io.File
 import scala.reflect.runtime.universe._
-import scala.collection.mutable.Mapimport scala.util.control.Breaks._
+import scala.collection.mutable.Map
+import scala.util.control.Breaks._
 
 import darecreek.exu.vfu._
 import darecreek.exu.vfu.alu._
@@ -37,12 +38,11 @@ class VfsqrtvTestBehavior extends VdTestBehavior("vfsqrt.v.data", ctrlBundles.vf
 
 class VdTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String) extends TestBehavior(fn, cb, s, instid) {
     
-    override def getDut() : Module               = {
-        val dut = new VDivWrapper
-        return dut
-    }
+    override def isOrdered() = false
 
-    override def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VDivWrapper) : Unit = {
+    override def getTargetTestEngine() = TestEngine.DIV_TEST_ENGINE
+
+    override def _getNextTestCase(simi:Map[String,String]) : TestCase = {
         var vf = simi.get("VS1") == None && (simi.get("RS1") != None || simi.get("FS1") != None)
         val v = simi.get("VS1") == None && simi.get("RS1") == None && simi.get("FS1") == None
         val vv = simi.get("VS1") != None
@@ -93,22 +93,30 @@ class VdTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String) 
         // ===========================================================
         var fpRes = new DivResult(n_res, (a, b, c) => this.dump(a, b, c, "")) // * fpRes
 
+        var fpResultChecker = new DivResultChecker(
+            n_res, expectvd, simi, fpRes
+        )
+        fpResultChecker.setGoldenFflags(expectfflags)
+
         // ===========================================================
         val MAX_READY_WAIT = 100
         var curReadyWait = 0
         var j = 0
-        var ctrlBundles : Map[Int, CtrlBundle] = Map()
-        breakable{ while (j < n_inputs){
-            dut.io.in.valid.poke(true.B) // TODO randomly block
+        
+        var srcBundles : Seq[SrcBundle] = Seq()
+        var ctrlBundles : Seq[CtrlBundle] = Seq()
 
+        while (j < n_inputs){
+            
             // preparing input ============================
             var vs2 = "h0"
             if(hasvs2) vs2 = vs2data(n_inputs - 1 -j)
             var uopIdx = j
             var srcBundle = SrcBundle(
-                    vs2=vs2,
-                    old_vd=oldvddata(n_inputs - 1 -j),
-                    mask=mask(0))
+                vs2=vs2,
+                old_vd=oldvddata(n_inputs - 1 -j),
+                mask=mask(0)
+            )
             if (vf) {
                 srcBundle.rs1 = vs1data(0)
             } 
@@ -117,89 +125,31 @@ class VdTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String) 
             }
 
             var ctrlBundle = ctrl.copy(
-                    vsew=vsew,
-                    vl=simi.get("vl").get.toInt,
-                    vlmul = UtilFuncs.lmulconvert(vflmul).toInt, 
-                    ma = (simi.get("ma").get.toInt == 1),
-                    ta = (simi.get("ta").get.toInt == 1),
-                    vm = vm,
-                    uopIdx=uopIdx,
-                    vxrm = vxrm,
-                    frm=frm,
-                    vstart = vstart
-                )
+                vsew=vsew,
+                vl=simi.get("vl").get.toInt,
+                vlmul = UtilFuncs.lmulconvert(vflmul).toInt, 
+                ma = (simi.get("ma").get.toInt == 1),
+                ta = (simi.get("ta").get.toInt == 1),
+                vm = vm,
+                uopIdx=uopIdx,
+                vxrm = vxrm,
+                frm=frm,
+                vstart = vstart
+            )
 
-            // sending input ============================
-            dut.io.in.bits.poke(genVFpuInput(
-                srcBundle, 
-                ctrlBundle
-            ))
+            srcBundles :+= srcBundle
+            ctrlBundles :+= ctrlBundle
 
-            // waiting for dut in.ready ===================
-            while((dut.io.in.ready.peek().litValue != 1) &&
-                    curReadyWait < MAX_READY_WAIT) {
-                // check vd before clock tick ==============
-                if (!fpRes.finished()) { // * fpRes
-                    fpRes.checkAndCompare(dut, simi, ctrlBundles, expectvd)
-                }
-                dut.clock.step(1)
-                curReadyWait += 1
-            }
-
-            // when it waits too long ====================
-            if (!(curReadyWait < MAX_READY_WAIT)) {
-                println(s"no io.ready signal received")
-                dump(simi, s"(no io.ready signal received), sent ${j} uops", "(no io.ready signal received)")
-            }
-            assert(curReadyWait < MAX_READY_WAIT)
-
-            println(s"sent uop ${uopIdx}")
-            curReadyWait = 0
-
-            ctrlBundles = ctrlBundles + (uopIdx -> ctrlBundle)
-            
-            // check vd before clock tick ==================
-            if (!fpRes.finished()) { // * fpRes
-                fpRes.checkAndCompare(dut, simi, ctrlBundles, expectvd)
-            }
-            dut.clock.step(1)
             j += 1
-        } }
-        dut.io.in.valid.poke(false.B)
-        dut.io.in.bits.in.uop.uopEnd.poke(false.B)
-
-        // check rest vds ======================================================================
-        j = 0
-        val LOOP_MAX = 100
-        var curIter = 0
-        var fflags : Int = 0
-        breakable{ while(true) {
-            if (!(curIter < LOOP_MAX)) {
-                println("no vd received after LOOP_MAX")
-                dump(simi, s"(no vd received after LOOP_MAX), received ${fpRes.cur_res}", "(no vd received after LOOP_MAX)")
-            }
-            assert(curIter < LOOP_MAX)
-
-            if (fpRes.finished()) { // * fpRes
-                break
-            }
-            fpRes.checkAndCompare(dut, simi, ctrlBundles, expectvd) // * fpRes
-
-            dut.clock.step(1)
-
-            curIter += 1
-        } }
-
-        fflags = fpRes.getFflags() // * fpRes
-        var fflagsRes = fflags == expectfflags
-        if (!fflagsRes) {
-            println("fflags incorrect")
-            dump(simi, f"(fflags) h$fflags%016x", f"(fflags) h$expectfflags%016x")
         }
-        assert(fflagsRes)
+
+        return TestCase.newNormalCase(
+            this.instid,
+            srcBundles,
+            ctrlBundles,
+            fpResultChecker
+        )
+        
     }
 
-    override def testSingle(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VDivWrapper) : Unit = {
-        testMultiple(simi, ctrl, s, dut)
-    }
 }

@@ -20,10 +20,10 @@ import darecreek.exu.vfu.reduction._
 import chipsalliance.rocketchip.config.Parameters
 import scala.util.control.Breaks._
 
-class FPTestEngine extends TestEngine {
+class DivTestEngine extends TestEngine {
 
-    override def getName() = "FPTestEngine"
-    override def getDut() = new VFPUWrapper
+    override def getName() = "DivTestEngine"
+    override def getDut() = new VDiv
 
     var historyTCs : List[(Int, Int, TestCase)] = List() // robIdx, uopIdx, TestCase
     var historyTCIx = 0
@@ -34,15 +34,15 @@ class FPTestEngine extends TestEngine {
         results = results.filter(_._2 > robIdx) // flush compare
     }
 
-    def checkOutput(dut : VFPUWrapper) = {
+    def checkOutput(dut : VDiv) = {
         val block = randomBlock()
         dut.io.out.ready.poke((!block).B) // TODO randomly block
 
-        println(s".. checkOutput block = ${block}, ready = ${!block}")
+        // println(s".. checkOutput block = ${block}, ready = ${!block}")
 
         if (!block && dut.io.out.valid.peek().litValue == 1) {
 
-            println(".. valid == true, checking results..")
+            // println(".. valid == true, checking results..")
             
             var robIdx = dut.io.out.bits.uop.sysUop.robIdx.value.peek().litValue.toInt
             var uopIdx = dut.io.out.bits.uop.uopIdx.peek().litValue.toInt
@@ -70,7 +70,7 @@ class FPTestEngine extends TestEngine {
             val testCaseFlushed = resTestCase.flushed
             historyTCs = historyTCs.tail
             
-            println(s"2.2. Received result for robIdx ${robIdx}, uopIdx ${uopIdx}, in FPTestEngine:")
+            println(s"2.2. Received result for robIdx ${robIdx}, uopIdx ${uopIdx}, in DivTestEngine:")
             if (testCaseFlushed) {
                 println(".. 2.2.1. flushed! so not comparing")
             } else {
@@ -90,7 +90,7 @@ class FPTestEngine extends TestEngine {
     }
 
     override def iterate(
-        dut : VFPUWrapper, chosenTestCase : TestCase, 
+        dut : VDiv, chosenTestCase : TestCase, 
         sendRobIdx : Int, allExhausted : Boolean, 
         flush : Boolean, flushedRobIdx : Int
     ) : (Boolean, Int) = {
@@ -131,7 +131,7 @@ class FPTestEngine extends TestEngine {
 
                 // clear past results of test case with less robIdx
                 clearFlushedRes(flushedRobIdx)
-                println(s"2. Flushed (all <= ${flushedRobIdx}), from FPTestEngine")
+                println(s"2. Flushed (all <= ${flushedRobIdx}), from DivTestEngine")
                 // dut.clock.step(1)
                 // dut.io.redirect.poke(genFSMRedirect())
             }
