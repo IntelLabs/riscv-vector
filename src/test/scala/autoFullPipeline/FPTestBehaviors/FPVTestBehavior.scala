@@ -322,80 +322,8 @@ class VfTestBehavior(fn : String, cb : CtrlBundle,
             
             srcBundles :+= srcBundle
             ctrlBundles :+= ctrlBundle
-
-            /*// waiting for dut's ready signal, which represents an ack of the uop ========
-            while((dut.io.in.ready.peek().litValue != 1) &&
-                    curReadyWait < MAX_READY_WAIT) {
-                
-                // before ticking clock, check if any vd comes out from dut
-                if (!fpRes.finished()) { // * fpRes
-                    fpRes.checkAndCompare(dut, simi, ctrlBundles, expectvd)
-                }
-                dut.clock.step(1)
-                curReadyWait += 1
-            }
-
-            // waits too long.. =====================================
-            if (!(curReadyWait < MAX_READY_WAIT)) {
-                println(s"no io.ready signal received")
-                dump(simi, s"(no io.ready signal received), sent ${j} uops", "(no io.ready signal received)")
-            }
-            assert(curReadyWait < MAX_READY_WAIT)
-            curReadyWait = 0
-
-            // add ctrlBundle to the uopIdx -> ctrlBundle map ========
-            ctrlBundles = ctrlBundles + (uopIdx -> ctrlBundle)
-            println(s"uop $uopIdx has been sent")
-
-            // before ticking clock, check if any vd comes out from dut
-            if (!fpRes.finished()) { // * fpRes
-                fpRes.checkAndCompare(dut, simi, ctrlBundles, expectvd)
-            }
-            dut.clock.step(1)*/
             j += 1
         } }
-
-        // checking for rest output vds ==============================================================================
-        /*val LOOP_MAX = 100
-        var curIter = 0
-        var fflags : Int = 0
-        breakable{ while(true) {
-            
-            if (!(curIter < LOOP_MAX)) {
-                println("no vd received after LOOP_MAX")
-                dump(simi, s"(no vd received after LOOP_MAX), received ${fpRes.cur_res}", "(no vd received after LOOP_MAX)")
-            }
-            assert(curIter < LOOP_MAX)
-
-            if (fpRes.finished()) { // * fpRes
-                break
-            }
-
-            var srcBundle = SrcBundle()
-            var ctrlBundle = ctrl.copy()
-
-            
-            srcBundle, 
-            ctrlBundle
-            
-            fpRes.checkAndCompare(dut, simi, ctrlBundles, expectvd) // * fpRes
-
-            dut.clock.step(1)
-
-            curIter += 1
-        } }*/
-
-        /*fflags = fpRes.getFflags() // * fpRes
-        var fflagsRes = fflags == expectfflags
-
-        if (!disable_fflags && !fflagsRes) {
-            println("fflags incorrect")
-            dump(simi, f"(fflags) h$fflags%016x", f"(fflags) h$expectfflags%016x")
-        }
-
-        if (!disable_fflags) {
-            assert(fflagsRes)
-        }*/
 
         return TestCase.newNormalCase(
             this.instid,

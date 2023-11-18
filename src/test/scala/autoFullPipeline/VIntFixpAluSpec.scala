@@ -238,8 +238,8 @@ object Datapath {
   // val testdataRoot = "/home/maoting/nanhu/testdata/9_4/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/9_6/unittest/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/10_10/unittest/"
-  // val testdataRoot = "/home/maoting/nanhu/testdata/10_13/unittest/"
-  val testdataRoot = "/home/maoting/nanhu/testdata/debug/"
+  val testdataRoot = "/home/maoting/nanhu/testdata/10_13/unittest/"
+  // val testdataRoot = "/home/maoting/nanhu/testdata/debug/"
   //val testdataRoot = "C:\\kou\\XS_Vector_Unit\\src\\test\\scala\\unittest\\"
   // val testdataRoot = "/home/kou/unittest/"
   // val testdataRoot = "/home/maoting/xs-unittest/testdata/"
@@ -250,14 +250,14 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
   with BundleGenHelper with VAluBehavior {
   behavior of "Test"
 
-  println(s"============\nTEST STARTED\n============")
+  println(s"===========\nTEST STARTED\n============")
   if(Dump.DUMP) println(s"DUMP is turned on. Incorrect inputs will be saved to ${Dump.fileName}")
 
   var tbs : Seq[TestBehavior] = Seq(
 
     // new VredsumvsTestBehavior,
 
-    new VfaddvvTestBehavior,
+    new VwmulvvTestBehavior,
     // new VzextVf2TestBehavior,
     // new Vmv2rvTestBehavior,
     // new VmvsxTestBehavior,

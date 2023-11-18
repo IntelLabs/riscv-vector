@@ -22,7 +22,7 @@ import chipsalliance.rocketchip.config.Parameters
 // map of string to test behavior class
 object TBMap {
     val tbMap = Map(
-        /*("vmadc_vv" -> (() => new VmadcvvTestBehavior)),
+        ("vmadc_vv" -> (() => new VmadcvvTestBehavior)),
         ("vmadc_vvm" -> (() => new VmadcvvmTestBehavior)),
         ("vmsbc_vv" -> (() => new VmsbcvvTestBehavior)),
         ("vmsbc_vvm" -> (() => new VmsbcvvmTestBehavior)),
@@ -69,7 +69,7 @@ object TBMap {
         ("vnclip_wi" -> (() => new VnclipwiTestBehavior)),
         ("vnclipu_wi" -> (() => new VnclipuwiTestBehavior)),
         ("vnsrl_wi" -> (() => new VnsrlwiTestBehavior)),
-        ("vnsra_wi" -> (() => new VnsrawiTestBehavior)),*/
+        ("vnsra_wi" -> (() => new VnsrawiTestBehavior)),
         ("vadd_vv" -> (() => new VaddvvTestBehavior)),
         ("vsub_vv" -> (() => new VsubvvTestBehavior)),
         ("vand_vv" -> (() => new VandvvTestBehavior)),
@@ -162,7 +162,7 @@ object TBMap {
         ("vsext_vf4" -> (() => new VsextVf4TestBehavior)),
         ("vzext_vf8" -> (() => new VzextVf8TestBehavior)),
         ("vsext_vf8" -> (() => new VsextVf8TestBehavior)),
-        /*("vdiv_vv" -> (() => new VdivvvTestBehavior)),
+        ("vdiv_vv" -> (() => new VdivvvTestBehavior)),
         ("vdivu_vv" -> (() => new VdivuvvTestBehavior)),
         ("vdiv_vx" -> (() => new VdivvxTestBehavior)),
         ("vdivu_vx" -> (() => new VdivuvxTestBehavior)),
@@ -173,7 +173,7 @@ object TBMap {
         ("vfdiv_vv" -> (() => new VfdivvvTestBehavior)),
         ("vfdiv_vf" -> (() => new VfdivvfTestBehavior)),
         ("vfrdiv_vf" -> (() => new VfrdivvfTestBehavior)),
-        ("vfsqrt_v" -> (() => new VfsqrtvTestBehavior)),*/
+        ("vfsqrt_v" -> (() => new VfsqrtvTestBehavior)),
         ("vfredosum_vs" -> (() => new VfredosumvsTestBehavior)),
         ("vfredusum_vs" -> (() => new VfredusumvsTestBehavior)),
         ("vfredmax_vs" -> (() => new VfredmaxvsTestBehavior)),
@@ -297,7 +297,7 @@ object TBMap {
         ("vwmacc_vx" -> (() => new VwmaccvxTestBehavior)),
         ("vwmaccu_vx" -> (() => new VwmaccuvxTestBehavior)),
         ("vwmaccsu_vx" -> (() => new VwmaccsuvxTestBehavior)),
-        ("vwmaccus_vx" -> (() => new VwmaccusvxTestBehavior)),
+        ("vwmaccus_vx" -> (() => new VwmaccusvxTestBehavior)),*/
         ("vcpop_m" -> (() => new VcpopmTestBehavior)),
         ("vid_v" -> (() => new VidvTestBehavior)),
         ("viota_m" -> (() => new ViotamTestBehavior)),
@@ -313,7 +313,7 @@ object TBMap {
         ("vmnor_mm" -> (() => new VmnormmTestBehavior)),
         ("vmorn_mm" -> (() => new VmornmmTestBehavior)),
         ("vmxnor_mm" -> (() => new VmxnormmTestBehavior)),
-        ("vslideup_vx" -> (() => new VslideupvxFSMTestBehavior)),
+        /*("vslideup_vx" -> (() => new VslideupvxFSMTestBehavior)),
         ("vslidedown_vx" -> (() => new VslidedownvxFSMTestBehavior)),
         ("vslide1up_vx" -> (() => new Vslide1upvxFSMTestBehavior)),
         ("vslide1down_vx" -> (() => new Vslide1downvxFSMTestBehavior)),

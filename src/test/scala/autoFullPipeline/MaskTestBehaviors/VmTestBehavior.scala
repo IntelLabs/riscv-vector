@@ -1,4 +1,5 @@
 package darecreek.vfuAutotest.fullPipeline
+
 import darecreek.exu.vfu._
 import darecreek.exu.vfu.alu._
 import darecreek.exu.vfu.VInstructions._
@@ -10,7 +11,8 @@ import chisel3._
 import chiseltest.WriteVcdAnnotation
 import scala.reflect.io.File
 import scala.reflect.runtime.universe._
-import scala.collection.mutable.Mapimport chipsalliance.rocketchip.config.Parameters
+import scala.collection.mutable.Map
+import chipsalliance.rocketchip.config.Parameters
 
 class VmsbfmTestBehavior extends VmTestBehavior("vmsbf.m.data", ctrlBundles.vmsbf_m, "u", "vmsbf_m", false, 0x01) {}
 class VmsifmTestBehavior extends VmTestBehavior("vmsif.m.data", ctrlBundles.vmsif_m, "u", "vmsif_m", false, 0x03) {}
@@ -27,13 +29,10 @@ class VmxnormmTestBehavior extends VmTestBehavior("vmxnor.mm.data", ctrlBundles.
 
 class VmTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String, hasVs1 : Boolean, vs1_imm : Int = 0) extends TestBehavior(fn, cb, s, instid) {
     
-    override def getDut() : Module               = {
-        val dut = new VMask
-        // TestHarnessPerm.test_init(dut)
-        return dut
-    }
+    override def isOrdered() : Boolean = false
+    override def getTargetTestEngine() = TestEngine.MASK_TEST_ENGINE
 
-    override def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VMask) : Unit = {
+    override def _getNextTestCase(simi:Map[String,String]) : TestCase = {
         val vs2data = UtilFuncs.multilmuldatahandle(simi.get("VS2").get)
         val oldvddata = UtilFuncs.multilmuldatahandle(simi.get("OLD_VD").get)
         val vflmul = simi.get("vflmul").get
@@ -48,14 +47,9 @@ class VmTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String, 
         if(vflmul == "2.000000") n_inputs = 2
         if(vflmul == "4.000000") n_inputs = 4
         if(vflmul == "8.000000") n_inputs = 8
-        
-        // var finalVxsat = false
-        var vd : BigInt = 0
-        var vdres = false
-            
-        // println("1111")
-        // dut.io.out.ready.poke(true.B)
-        dut.io.in.valid.poke(true.B)
+
+        val resultChecker = new MaskVmResultChecker(n_inputs, expectvd,
+            (a, b) => this.dump(simi, a, b))
 
         var srcBundle = SrcBundle()
 
@@ -73,32 +67,36 @@ class VmTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String, 
             )
         }
 
-        dut.io.in.bits.poke(genVFuInput(
-            srcBundle, 
-            ctrl.copy(
-                vsew=vsew,
-                vs1_imm=vs1_imm,
-                vl=simi.get("vl").get.toInt,
-                vlmul = UtilFuncs.lmulconvert(vflmul).toInt, 
-                ma = (simi.get("ma").get.toInt == 1),
-                ta = (simi.get("ta").get.toInt == 1),
-                vm = (simi.get("vm").get.toInt == 1),
-                uopIdx=0,
-                vxrm = vxrm,
-                vstart = getVstart(simi)
-            )
-        ))
-        dut.clock.step(1)
+        var ctrlBundle = ctrl.copy(
+            vsew=vsew,
+            vs1_imm=vs1_imm,
+            vl=simi.get("vl").get.toInt,
+            vlmul = UtilFuncs.lmulconvert(vflmul).toInt, 
+            ma = (simi.get("ma").get.toInt == 1),
+            ta = (simi.get("ta").get.toInt == 1),
+            vm = (simi.get("vm").get.toInt == 1),
+            uopIdx=0,
+            vxrm = vxrm,
+            vstart = getVstart(simi)
+        )
+
+        var srcBundles : Seq[SrcBundle] = Seq(srcBundle)
+        var ctrlBundles : Seq[CtrlBundle] = Seq(ctrlBundle)
+        
+        return TestCase.newNormalCase(
+            this.instid,
+            srcBundles,
+            ctrlBundles,
+            resultChecker
+        )
+        
+
         // finalVxsat = finalVxsat || dut.io.out.bits.vxsat.peek().litValue == 1
-        vd = dut.io.out.bits.vd.peek().litValue
+        /*vd = dut.io.out.bits.vd.peek().litValue
         vdres = f"h$vd%032x".equals(expectvd(n_inputs - 1))
         Logger.printvds(f"h$vd%032x", expectvd(n_inputs - 1))
         if (!vdres) dump(simi, f"h$vd%032x", expectvd(n_inputs - 1))
-        assert(vdres)
+        assert(vdres)*/
         // assert(finalVxsat == vxsat)
-    }
-
-    override def testSingle(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VMask) : Unit = {
-        testMultiple(simi,ctrl,s, dut)
     }
 }

@@ -6,7 +6,8 @@ import chisel3._
 import chiseltest.WriteVcdAnnotation
 import scala.reflect.io.File
 import scala.reflect.runtime.universe._
-import scala.collection.mutable.Mapimport darecreek.exu.vfu._
+import scala.collection.mutable.Map
+import darecreek.exu.vfu._
 import darecreek.exu.vfu.mac._
 import darecreek.exu.vfu.VInstructions._
 import chipsalliance.rocketchip.config.Parameters
@@ -16,12 +17,10 @@ class VsmulvxTestBehavior extends VsMacTestBehavior("vsmul.vx.data", ctrlBundles
 
 class VsMacTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String) extends TestBehavior(fn, cb, s, instid) {
     
-    override def getDut() : Module               = {
-        val dut = new VMacWrapper
-        return dut
-    }
+    override def isOrdered() : Boolean = false
+    override def getTargetTestEngine() = TestEngine.MAC_TEST_ENGINE
 
-    override def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VMacWrapper) : Unit = {
+    override def _getNextTestCase(simi:Map[String,String]) : TestCase = {
         val vs2data = UtilFuncs.multilmuldatahandle(simi.get("VS2").get)
 
         var vx = simi.get("RS1") != None || simi.get("FS1") != None
@@ -58,10 +57,13 @@ class VsMacTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : Strin
         var vdStr = ""
         var vdres = false
             
-        println("1111")
+        val resultChecker = ALUResultChecker.newVChecker(n_inputs, expectvd, true, vxsat, 
+            (a, b) => this.dump(simi, a, b))
+
+        var srcBundles : Seq[SrcBundle] = Seq()
+        var ctrlBundles : Seq[CtrlBundle] = Seq()
+
         for(j <- 0 until n_inputs){
-            dut.io.out.ready.poke(true.B)
-            dut.io.in.valid.poke(true.B)
             var srcBundle = SrcBundle(
                     vs2=vs2data(j), 
                     // vs1=vs1data(j),
@@ -71,9 +73,8 @@ class VsMacTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : Strin
                 srcBundle.vs1=vs1data(j)
             if (vx)
                 srcBundle.rs1=vs1data(0)
-            dut.io.in.bits.poke(genVFuInput(
-                srcBundle, 
-                ctrl.copy(
+
+            val ctrlBundle = ctrl.copy(
                     vsew=vsew,
                     vl=simi.get("vl").get.toInt,
                     vlmul = UtilFuncs.lmulconvert(vflmul).toInt, 
@@ -84,21 +85,26 @@ class VsMacTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : Strin
                     vxrm = vxrm,
                     vstart = getVstart(simi)
                 )
-            ))
-            dut.clock.step(2)
+
+            
+            /*dut.clock.step(2)
             finalVxsat = finalVxsat || dut.io.out.bits.vxsat.peek().litValue == 1
             vd = dut.io.out.bits.vd.peek().litValue
             vdStr = f"h$vd%032x"
             vdres = vdStr.equals(expectvd(j))
             Logger.printvds(vdStr, expectvd(j))
             if (!vdres) dump(simi, vdStr, expectvd(j))
-            assert(vdres)
+            assert(vdres)*/
+            srcBundles :+= srcBundle
+            ctrlBundles :+= ctrlBundle
         }
-        println("finalVxsat, vxsat", finalVxsat, vxsat)
-        assert(finalVxsat == vxsat)
-    }
-
-    override def testSingle(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:VMacWrapper) : Unit = {
-        testMultiple(simi, ctrl, s, dut)
+        /*println("finalVxsat, vxsat", finalVxsat, vxsat)
+        assert(finalVxsat == vxsat)*/
+        return TestCase.newNormalCase(
+            this.instid,
+            srcBundles,
+            ctrlBundles,
+            resultChecker
+        )
     }
 }

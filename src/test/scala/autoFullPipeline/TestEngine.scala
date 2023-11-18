@@ -36,47 +36,18 @@ object TestEngine {
     def getEngine(testEngineId : Int) : TestEngine = {
         return testEngineId match {
             case 0 => new ALUTestEngine
+            case 1 => new MacTestEngine
             case 2 => new RedTestEngine
+            case 3 => new MaskTestEngine
+            case 5 => new DivTestEngine
             case 6 => new FPTestEngine
             /*case MAC_TEST_ENGINE : {}
-            case RED_TEST_ENGINE : {}
-            case MASK_TEST_ENGINE : {}
             case PERM_TEST_ENGINE : {}
-            case DIV_TEST_ENGINE : {}
-            case FP_TEST_ENGINE : {}*/
+            case DIV_TEST_ENGINE : {}*/
         }
     }
 }
 
-class ALUTestEngine extends TestEngine {
-
-    override def getName() = "ALUTestEngine"
-
-    override def iterate(
-        dut : VAluWrapper, chosenTestCase : TestCase, 
-        sendRobIdx : Int, allExhausted : Boolean, flush : Boolean, flushedRobIdx : Int
-    ) : (Boolean, Int) = {
-        val (input, uopIdx) : (VFuInput, Int) = chosenTestCase.nextVfuInput((true, sendRobIdx))
-        println(s"Sending ${chosenTestCase.instid}, uop ${uopIdx}, robIdx ${sendRobIdx}")
-
-        // ===================== manipulating dut ========================
-
-        dut.io.out.ready.poke(true.B)
-        dut.io.in.valid.poke(true.B)
-
-        dut.io.in.bits.poke(input)
-        dut.clock.step(1)
-
-        val dutVd = dut.io.out.bits.vd.peek().litValue
-        val dutVxsat = dut.io.out.bits.vxsat.peek().litValue == 1
-
-        // TODO 1.3. check for potential results, get the comparison result
-        val resCorrectness = chosenTestCase.rc.checkRes(dutVd, uopIdx, dutVxsat=dutVxsat)
-        val resRobIdx = sendRobIdx
-
-        return (resCorrectness, resRobIdx)
-    }
-}
 
 abstract class TestEngine extends BundleGenHelper {
     val NO_RESULT_ROBIDX = -1
@@ -176,7 +147,7 @@ abstract class TestEngine extends BundleGenHelper {
                     flush = randomFlush()
                     if (flush) {
                         flushedRobIdx = sendRobIdx + 1
-                        println(s"1.1. Flush (all < ${flushedRobIdx})")
+                        println(s"1.1. Flush (all <= ${flushedRobIdx})")
 
                         val prevSize = curTestCasePool.size
                         var deletedTBs : Set[TestBehavior] = Set()
@@ -184,11 +155,11 @@ abstract class TestEngine extends BundleGenHelper {
                         // delete flushed test cases, so TestEngine will not
                         // give new uops of them to the next level detailed TestEngine
                         curTestCasePool = curTestCasePool.filterNot(x => {
-                            if (x._1 < flushedRobIdx) {
+                            if (x._1 <= flushedRobIdx) { // flush compare
                                 val tb : TestBehavior = x._2._1
                                 deletedTBs = deletedTBs + tb
                             }
-                            x._1 < flushedRobIdx
+                            x._1 <= flushedRobIdx // flush compare
                         })
 
                         // if any TB has no test case left, record success
@@ -310,7 +281,7 @@ abstract class TestEngine extends BundleGenHelper {
             case mac_dut : VMacWrapper => TestHarnessMac.test_init(mac_dut)
             case mask_dut : VMask => TestHarnessMask.test_init(mask_dut)
             case dut : VFPUWrapper => TestHarnessFPU.test_init(dut)
-            case dut : VDivWrapper => TestHarnessDiv.test_init(dut)
+            case dut : VDiv => TestHarnessDiv.test_init(dut)
             case dut : Reduction => {}
             case perm_dut : Permutation => TestHarnessFSM.test_init(perm_dut)
         }
@@ -324,7 +295,7 @@ abstract class TestEngine extends BundleGenHelper {
             case mac_dut : VMacWrapper => iterate(mac_dut, chosenTestCase, sendRobIdx, allExhausted, flush, flushedRobIdx)
             case mask_dut : VMask => iterate(mask_dut, chosenTestCase, sendRobIdx, allExhausted, flush, flushedRobIdx)
             case dut : VFPUWrapper => iterate(dut, chosenTestCase, sendRobIdx, allExhausted, flush, flushedRobIdx)
-            case dut : VDivWrapper => iterate(dut, chosenTestCase, sendRobIdx, allExhausted, flush, flushedRobIdx)
+            case dut : VDiv => iterate(dut, chosenTestCase, sendRobIdx, allExhausted, flush, flushedRobIdx)
             case dut : Reduction => iterate(dut, chosenTestCase, sendRobIdx, allExhausted, flush, flushedRobIdx)
             case perm_dut : Permutation => iterate(perm_dut, chosenTestCase, sendRobIdx, allExhausted, flush, flushedRobIdx)
         }
@@ -335,6 +306,6 @@ abstract class TestEngine extends BundleGenHelper {
     def iterate(dut:VMacWrapper, chosenTestCase : TestCase, sendRobIdx : Int, allExhausted : Boolean, flush : Boolean, flushedRobIdx : Int) : (Boolean, Int) = {println("!!!!!!called unimplemented run mac"); return (false, 0)}
     def iterate(dut:VMask, chosenTestCase : TestCase, sendRobIdx : Int, allExhausted : Boolean, flush : Boolean, flushedRobIdx : Int) : (Boolean, Int) = {println("!!!!!!called unimplemented run mask"); return (false, 0)}
     def iterate(dut:VFPUWrapper, chosenTestCase : TestCase, sendRobIdx : Int, allExhausted : Boolean, flush : Boolean, flushedRobIdx : Int) : (Boolean, Int) = {println("!!!!!!called unimplemented run FPU"); return (false, 0)}
-    def iterate(dut:VDivWrapper, chosenTestCase : TestCase, sendRobIdx : Int, allExhausted : Boolean, flush : Boolean, flushedRobIdx : Int) : (Boolean, Int) = {println("!!!!!!called unimplemented run Div"); return (false, 0)}
+    def iterate(dut:VDiv, chosenTestCase : TestCase, sendRobIdx : Int, allExhausted : Boolean, flush : Boolean, flushedRobIdx : Int) : (Boolean, Int) = {println("!!!!!!called unimplemented run Div"); return (false, 0)}
     def iterate(dut:Reduction, chosenTestCase : TestCase, sendRobIdx : Int, allExhausted : Boolean, flush : Boolean, flushedRobIdx : Int) : (Boolean, Int) = {println("!!!!!!called unimplemented run Reduction"); return (false, 0)}
 }

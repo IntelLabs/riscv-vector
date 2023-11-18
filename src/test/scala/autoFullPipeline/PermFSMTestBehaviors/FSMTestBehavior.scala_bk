@@ -5,30 +5,16 @@ import org.scalatest.flatspec.AnyFlatSpec
 import chisel3._
 import chiseltest.WriteVcdAnnotation
 import scala.reflect.io.File
+import scala.collection.mutable.Map
 import scala.reflect.runtime.universe._
-import scala.collection.mutable.Mapimport scala.util.control.Breaks._
+import scala.util.control.Breaks._
+import scala.util.Random
 
 import darecreek.exu.vfu.perm._
 import darecreek.exu.vfu._
 import darecreek.exu.vfu.alu._
 import darecreek.exu.vfu.VInstructions._
 import chipsalliance.rocketchip.config.Parameters
-
-// case class VS1DT(vs1 : String, vs1_pidx : Int)
-
-// object Vs1Funcs {
-//     def firstRs1(vs1data : Array[String], j : Int, n_inputs : Int) : VS1DT = {
-//         return VS1DT(vs1data(0), 0)
-//     }
-
-//     def firstVs1(vs1data : Array[String], j : Int, n_inputs : Int) : VS1DT = {
-//         return VS1DT(vs1data(n_inputs - 1), 0)
-//     }
-
-//     def jthVs1(vs1data : Array[String], j : Int, n_inputs : Int) : VS1DT = {
-//         return VS1DT(vs1data(n_inputs - 1 - j), j)
-//     }
-// }
 
 class VslideupvxFSMTestBehavior extends slidefsm("vslideup.vx.data", ctrlBundles.vslideup_vx, "-", "vslideup_vx") {}
 class VslidedownvxFSMTestBehavior extends slidefsm("vslidedown.vx.data", ctrlBundles.vslidedown_vx, "-", "vslidedown_vx") {}
@@ -51,7 +37,7 @@ class Vfslide1downvfFSMTestBehavior extends slidefsm("vfslide1down.vf.data", ctr
 
 class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extends TestBehavior(fn, cb, s, instid) {
     
-    val rand = new scala.util.Random
+    // val rand = new scala.util.Random
     val maxBlocks = 20
     var blocks = 0
     val vs1base = 100
@@ -75,7 +61,7 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
     case class ClkAry(clk : Int, ary: Array[String])
 
     def randomBool() : Boolean = {
-        if(rand.nextInt(100) > 50 && blocks < maxBlocks) {
+        if(RandomGen.rand.nextInt(100) > 50 && blocks < maxBlocks) {
             blocks += 1
             return true
         }
@@ -163,13 +149,7 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
             // ================================================
             // 10.27 add random flush
             var robIdx = (false, 0)
-            robIdxValid = if ((testCountsDebug == 1) && useFlushDebug) {
-                true
-            } else {
-                false
-            }
-            
-            // randomBool()
+            robIdxValid = randomFlush()
             if (robIdxValid) {
                 robIdx = (true, 1)
             }
@@ -298,16 +278,6 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
         var rs1value = "h0"
         if (hasRS1 || hasFS1) rs1value = vs1data(0)
 
-        /*// ================================================
-        // 10.27 add flush
-        var robIdx = (false, 0)
-        val robIdxValid = randomBool()
-        if (robIdxValid) {
-            robIdx = (true, 1)
-        }*/
-
-
-        // ==========================================================================================================================
         dut.io.in.poke(genFSMInput(
             FSMSrcBundle(
                 rs1=rs1value,
@@ -443,6 +413,10 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
 
         // ========================================================================================================================
         val res_vds = stageTwo(dut, preg_to_value, n_inputs, ctrl)
+        if (robIdxValid) {
+            println("robIdxValid = true, flush this instruction")
+            return
+        }
         resComp(expectvd, res_vds, n_inputs, simi)
     }
 
