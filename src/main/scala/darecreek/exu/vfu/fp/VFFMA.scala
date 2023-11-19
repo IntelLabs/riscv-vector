@@ -456,7 +456,8 @@ class VFFMA(implicit val p: Parameters) extends VFPUSubModule {
   // For FMUL:
   // (1) It always accept FMA from FADD (if an FMA wants FMUL, it's never blocked).
   // (2) It has lower writeback arbitration priority than FADD (and may be blocked when FMUL.out.valid).
-  mul_pipe.io.out.ready := mulOutIsFMA || (io.out.ready && !add_pipe.io.out.valid)
+  // mul_pipe.io.out.ready := mulOutIsFMA || (io.out.ready && !add_pipe.io.out.valid)
+  mul_pipe.io.out.ready := (mulOutIsFMA && io.out.ready) || (io.out.ready && !add_pipe.io.out.valid)
   add_pipe.io.out.ready := io.out.ready
 
 //    io.out.bits.uop := RegNext(Mux(add_pipe.io.out.valid,
