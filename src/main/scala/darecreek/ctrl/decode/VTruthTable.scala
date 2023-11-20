@@ -204,9 +204,9 @@ class VecDecode1 extends VecDecode {
     VMERGE_VVM        -> BitPat("b1 011 10   00    10   1 0 0 0 0 0 0 0  0000"),
     VMERGE_VXM        -> BitPat("b1 010 10   00    10   1 0 0 0 0 0 0 0  0000"),
     VMERGE_VIM        -> BitPat("b1 010 10   00    10   1 0 0 0 0 0 0 0  0000"),
-    VMV_V_V           -> BitPat("b1 011 10   00    10   1 0 0 0 0 0 0 0  0000"),
-    VMV_V_X           -> BitPat("b1 010 10   00    10   1 0 0 0 0 0 0 0  0000"),
-    VMV_V_I           -> BitPat("b1 010 10   00    10   1 0 0 0 0 0 0 0  0000"),
+    VMV_V_V           -> BitPat("b1 001 10   00    10   1 0 0 0 0 0 0 0  0000"),
+    VMV_V_X           -> BitPat("b1 000 10   00    10   1 0 0 0 0 0 0 0  0000"),
+    VMV_V_I           -> BitPat("b1 000 10   00    10   1 0 0 0 0 0 0 0  0000"),
   )
 }
 
