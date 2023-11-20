@@ -8,7 +8,7 @@ import darecreek.exu.vfu.VFuParamsKey
 import darecreek.exu.vfu.VFuParameters
 import xiangshan.XSCoreParamsKey
 import xiangshan.XSCoreParameters
-import freechips.rocketchip.tile.TileKey
+import freechips.rocketchip.rocket._
 
 class RVUTestResult extends Bundle {
     val commit_vld   = Output(Bool())
@@ -16,14 +16,14 @@ class RVUTestResult extends Bundle {
     //val reg_data     = Output(UInt(128.W))
 }
 
-class SmartVector(implicit tileParams: Parameters) extends Module {
+class SmartVector extends Module {
     val io = IO(new Bundle{
         val in = Flipped(Decoupled(new RVUissue))
         val out = Output(new Bundle{
             val rvuCommit = new RVUCommit
             val rvuExtra  = new RVUExtra
         })
-        val hellacache = new freechips.rocketchip.rocket.HellaCacheIO
+        val dmem = new RVUMemory()
     })
 
 
@@ -48,36 +48,30 @@ class SmartVector(implicit tileParams: Parameters) extends Module {
     regFile.io.in.readIn := split.io.out.toRegFileRead
     regFile.io.in.writeIn := split.io.out.toRegFileWrite
 
-    val lsu = Module(new SVlsu()(tileParams, p))
+    val lsu = Module(new SVlsu()(p))
     lsu.io.mUop <> split.io.out.mUop
 
     // /*******************hellacache******************/
-    lsu.io.hellacache.req <> io.hellacache.req
-    io.hellacache.s1_kill := lsu.io.hellacache.s1_kill
-    io.hellacache.s1_data := lsu.io.hellacache.s1_data
-    io.hellacache.s2_kill := lsu.io.hellacache.s2_kill
-    lsu.io.hellacache.s2_paddr := io.hellacache.s2_paddr
-    lsu.io.hellacache.s2_uncached := io.hellacache.s2_uncached
+    io.dmem.req.valid := lsu.io.dataExchange.req.valid
+    lsu.io.dataExchange.req.ready := io.dmem.req.ready
+    io.dmem.req.bits.cmd := lsu.io.dataExchange.req.bits.cmd
+    io.dmem.req.bits.size := lsu.io.dataExchange.req.bits.size
+    io.dmem.req.bits.signed := lsu.io.dataExchange.req.bits.signed
+    io.dmem.req.bits.addr := lsu.io.dataExchange.req.bits.addr
+    io.dmem.req.bits.phys := lsu.io.dataExchange.req.bits.phys
+    io.dmem.req.bits.idx := lsu.io.dataExchange.req.bits.idx
+    // store data
+    io.dmem.req.bits.data := lsu.io.dataExchange.req.bits.data
+    io.dmem.req.bits.mask := lsu.io.dataExchange.req.bits.mask
 
-    // 使用 <> 连接 resp、replay_next、s2_xcpt、s2_gpa、s2_gpa_is_pte、uncached_resp、ordered、perf
-    lsu.io.hellacache.resp <> io.hellacache.resp
-    lsu.io.hellacache.replay_next := io.hellacache.replay_next
-    lsu.io.hellacache.s2_xcpt := io.hellacache.s2_xcpt
-    lsu.io.hellacache.s2_gpa := io.hellacache.s2_gpa
-    lsu.io.hellacache.s2_gpa_is_pte := io.hellacache.s2_gpa_is_pte
-    lsu.io.hellacache.s2_nack := io.hellacache.s2_nack
-    lsu.io.hellacache.s2_nack_cause_raw := io.hellacache.s2_nack_cause_raw
-    // lsu.io.hellacache.uncached_resp <> io.hellacache.uncached_resp
-    lsu.io.hellacache.uncached_resp.foreach { ucResp =>
-        ucResp.valid := io.hellacache.uncached_resp.get.valid
-        io.hellacache.uncached_resp.get.ready := ucResp.ready
-        ucResp.bits := io.hellacache.uncached_resp.get.bits
-    }
-    lsu.io.hellacache.ordered := io.hellacache.ordered
-    lsu.io.hellacache.perf := io.hellacache.perf
+    lsu.io.dataExchange.resp.valid := io.dmem.resp.valid
+    lsu.io.dataExchange.resp.bits.data := io.dmem.resp.bits.data
+    lsu.io.dataExchange.resp.bits.mask := io.dmem.resp.bits.mask
+    lsu.io.dataExchange.resp.bits.replay := io.dmem.resp.bits.replay
+    lsu.io.dataExchange.resp.bits.has_data := io.dmem.resp.bits.has_data
 
-    io.hellacache.keep_clock_enabled := lsu.io.hellacache.keep_clock_enabled
-    lsu.io.hellacache.clock_enabled := io.hellacache.clock_enabled
+    lsu.io.dataExchange.xcpt <> io.dmem.xcpt
+    lsu.io.dataExchange.busy := io.dmem.busy
     /*---------------hellacache-------------------*/
         
     //arb register file's read and write port

@@ -4,8 +4,8 @@ import chisel3.util._
 import darecreek.VDecode
 import freechips.rocketchip.rocket._
 import freechips.rocketchip.util._
-import chipsalliance.rocketchip.config
-import chipsalliance.rocketchip.config.{Config, Field, Parameters}
+import org.chipsalliance.cde.config
+import org.chipsalliance.cde.config.{Config, Field, Parameters}
 import darecreek.exu.vfu.VUop
 import xiangshan.MicroOp
 import SmartParam._
@@ -16,10 +16,10 @@ class VLSUOutput extends Bundle {
     val vxsat = Bool()
 }
 
-class LdstIO(implicit tileParams: Parameters, p: Parameters) extends ParameterizedBundle()(p) {
+class LdstIO(implicit p: Parameters) extends ParameterizedBundle()(p) {
     val mUop = Flipped(ValidIO(new UopQueueOutput()(p)))
     val lsuOut = ValidIO(new VLSUOutput)
-    val hellacache = new freechips.rocketchip.rocket.HellaCacheIO()(tileParams)
+    val dataExchange = new RVUMemory()
     val lsuReady = Output(Bool())
 }
 
@@ -45,8 +45,8 @@ class VRegSegmentInfo extends Bundle {
     val data = UInt(8.W)
 }
 
-class SVlsu(implicit tileParams: Parameters, p: Parameters) extends Module {
-    val io = IO(new LdstIO()(tileParams, p))
+class SVlsu(implicit p: Parameters) extends Module {
+    val io = IO(new LdstIO())
 
     val uop_idle :: uop_split :: uop_split_finish :: uop_complete :: Nil = Enum(4)
     val uopState = RegInit(uop_idle)
@@ -119,68 +119,48 @@ class SVlsu(implicit tileParams: Parameters, p: Parameters) extends Module {
     val ld_idle :: ld_issue :: ld_wait :: ld_complete :: ld_replay :: Nil = Enum(5)
     
     //prepare hellacache req
-    val hellacacheState = RegInit(ld_idle)
+    val dataExchangeState = RegInit(ld_idle)
 
-    when(hellacacheState === ld_idle) {
+    when(dataExchangeState === ld_idle) {
         // ldstuop queue has data & hellacache is not busy
-        when(ldstUopQueue(issueLdstPtr).valid && !io.hellacache.ordered) {
-            hellacacheState := ld_issue
+        when(ldstUopQueue(issueLdstPtr).valid && !io.dataExchange.busy) {
+            dataExchangeState := ld_issue
         }.otherwise {
-            hellacacheState := ld_idle
+            dataExchangeState := ld_idle
         }
-    }.elsewhen(hellacacheState === ld_issue) {
-        hellacacheState := ld_wait
-    }.elsewhen(hellacacheState === ld_wait) {
-        when(io.hellacache.resp.valid && io.hellacache.resp.bits.has_data) {
-            hellacacheState := ld_complete
-        } .elsewhen(io.hellacache.resp.valid && io.hellacache.resp.bits.replay) {
-            hellacacheState := ld_replay
+    }.elsewhen(dataExchangeState === ld_issue) {
+        dataExchangeState := ld_wait
+    }.elsewhen(dataExchangeState === ld_wait) {
+        when(io.dataExchange.resp.valid && io.dataExchange.resp.bits.has_data) {
+            dataExchangeState := ld_complete
+        } .elsewhen(io.dataExchange.resp.valid && io.dataExchange.resp.bits.replay) {
+            dataExchangeState := ld_replay
         }.otherwise {
-            hellacacheState := ld_wait
+            dataExchangeState := ld_wait
         }
-    }.elsewhen(hellacacheState === ld_complete) {
-        hellacacheState := ld_idle
-    }.elsewhen(hellacacheState === ld_replay) {
-        hellacacheState := ld_issue
+    }.elsewhen(dataExchangeState === ld_complete) {
+        dataExchangeState := ld_idle
+    }.elsewhen(dataExchangeState === ld_replay) {
+        dataExchangeState := ld_issue
     }.otherwise {
-        hellacacheState := ld_idle
+        dataExchangeState := ld_idle
     }
 
-    when(hellacacheState === ld_issue) {
+    when(dataExchangeState === ld_issue) {
         issueLdstUop := ldstUopQueue(issueLdstPtr)
-        io.hellacache.req.valid := true.B
-        io.hellacache.req.bits.addr := issueLdstUop.addr
-        // io.hellacache.req.bits.idx := 0.U
-        io.hellacache.req.bits.tag := 0.U
-        io.hellacache.req.bits.cmd := M_XRD
-        io.hellacache.req.bits.size := log2Ceil(64).U
-        io.hellacache.req.bits.signed := false.B
-        io.hellacache.req.bits.dprv := PRV.S.U
-        io.hellacache.req.bits.dv := false.B
-        
-        io.hellacache.req.bits.phys := false.B
-        io.hellacache.req.bits.no_xcpt := false.B
-        io.hellacache.req.bits.no_alloc := false.B
-
-        io.hellacache.req.bits.data := 0.U
-        io.hellacache.req.bits.mask := 0.U
-
-
-        io.hellacache.s1_kill := false.B
-        io.hellacache.s1_data.mask := 0.U
-        io.hellacache.s1_data.data := 0.U
-        io.hellacache.s2_kill := false.B
-
-        io.hellacache.keep_clock_enabled := true.B
+        io.dataExchange.req.valid := true.B
+        io.dataExchange.req.bits.addr := issueLdstUop.addr
+        io.dataExchange.req.bits.cmd := M_XRD
+        io.dataExchange.req.bits.size := log2Ceil(64).U
+        io.dataExchange.req.bits.signed := false.B
+        io.dataExchange.req.bits.phys := false.B
+        io.dataExchange.req.bits.idx := issueLdstPtr
+        io.dataExchange.req.bits.data := DontCare
+        io.dataExchange.req.bits.mask := DontCare
 
     }.otherwise {
-        io.hellacache.req.valid := false.B
-        io.hellacache.req.bits := DontCare
-        io.hellacache.s2_kill := false.B
-        io.hellacache.s1_kill := false.B
-        io.hellacache.s1_data.mask := 0.U
-        io.hellacache.s1_data.data := 0.U
-        io.hellacache.keep_clock_enabled := true.B
+        io.dataExchange.req.valid := false.B
+        io.dataExchange.req.bits := DontCare
     }
 
      
@@ -193,8 +173,8 @@ class SVlsu(implicit tileParams: Parameters, p: Parameters) extends Module {
         * 1. write data into dest reg
         * 2. deq lduop
     */
-    when(hellacacheState === ld_wait && io.hellacache.resp.valid && io.hellacache.resp.bits.has_data) {
-        val loadData = io.hellacache.resp.bits.data
+    when(dataExchangeState === ld_wait && io.dataExchange.resp.valid && io.dataExchange.resp.bits.has_data) {
+        val loadData = io.dataExchange.resp.bits.data
         for(i <- 0 until 16) {
             when(vreg_info(i).idx === issueLdstPtr) {
                 for(j <- 0 until 8) {

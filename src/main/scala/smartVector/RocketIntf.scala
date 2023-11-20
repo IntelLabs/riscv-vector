@@ -4,6 +4,7 @@ import chisel3._
 import chisel3.util._
 
 import SmartParam._
+import freechips.rocketchip.rocket.HellaCacheExceptions
 
 
 // RVU (Rocket Vector Interface)
@@ -26,15 +27,32 @@ class RVUissue extends Bundle {
     val vInfo  = new VInfo
 }
 
+class RVUMemoryReq extends Bundle {
+    val addr = UInt(64.W)
+    val size = UInt(log2Ceil(64 + 1).W)
+    val signed = Bool()
+    val cmd = UInt(3.W)
+    val phys = Bool() 
+    val idx = UInt(8.W) // ldst queue index
+
+    // store data
+    val data = UInt(64.W)
+    val mask = UInt(8.W)
+}
+
+class RVUMemoryResp extends Bundle {
+    val data = UInt(64.W)
+    val mask = UInt(8.W)
+    val replay = Bool()
+    val has_data = Bool()
+
+}
+
 class RVUMemory extends Bundle {
-    val lsu_req_valid      = Output(Bool())
-    val lsu_req_ld         = Output(Bool())
-    val lsu_req_addrs      = Output(UInt(64.W))
-    val lsu_req_data_width = Output(UInt(3.W))
-    val st_req_data        = Output(UInt(64.W))
-    val ld_resp_data       = Input(UInt(64.W))
-    val lsu_resp_valid     = Input(Bool())
-    val lsu_resp_excp      = Input(Bool())
+    val req  = Decoupled(new RVUMemoryReq)
+    val resp = Flipped(Valid(new RVUMemoryResp))
+    val xcpt = Input(new HellaCacheExceptions)
+    val busy = Input(Bool())
 }
 
 class RVUCommit extends Bundle {
