@@ -28,7 +28,7 @@ class FPTestEngine extends TestEngine {
     var historyTCs : List[(Int, Int, TestCase)] = List() // robIdx, uopIdx, TestCase
     var historyTCIx = 0
 
-    var results : List[(Boolean, Int)] = List()
+    var results : List[(Boolean, Int, Int)] = List() // correctness, robIdx, uopIdx
 
     def clearFlushedRes(robIdx : Int) = {
         results = results.filter(_._2 > robIdx) // flush compare
@@ -84,7 +84,7 @@ class FPTestEngine extends TestEngine {
                 val resCorrectness = resTestCase.rc.checkRes(dutVd, uopIdx, dutFflags=fflags)
                 val resRobIdx = robIdx
 
-                results :+= (resCorrectness, resRobIdx)
+                results :+= (resCorrectness, resRobIdx, resUopIdx)
             }
         }
     }
@@ -171,6 +171,7 @@ class FPTestEngine extends TestEngine {
                 //  then the engine didn't tick after "sending the input and checking
                 //  the result for the first time".
                 //  then here we should not check for the result second time.
+                // dut.io.in.valid.poke(false.B)
                 checkOutput(dut)
             }
             dut.clock.step(1)
@@ -192,7 +193,9 @@ class FPTestEngine extends TestEngine {
         if (results.length > 0) {
             val resCorrectness = results(0)._1
             val resRobIdx = results(0)._2
+            val resUopIdx = results(0)._3
             results = results.tail
+            println(s"Returning robIdx ${resRobIdx}, uop ${resUopIdx}'s result: ${resCorrectness}.")
             return (resCorrectness, resRobIdx)
         }
         return (false, NO_RESULT_ROBIDX)
