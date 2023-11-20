@@ -33,6 +33,8 @@ class ResultChecker(val n_ops : Int, val expectvd : Array[String],
     var checkedRes = 0
     var uopIdxBitPat = 0
 
+    var acked = 0
+
     def setGoldenVxsat(goldenVxsat : Boolean) = { 
         this.goldenVxsat = goldenVxsat
         this.isFPDIV = false
@@ -45,15 +47,34 @@ class ResultChecker(val n_ops : Int, val expectvd : Array[String],
         this.testVxsatOrFflags = true
     }
 
-    def isCompleted() : Boolean = { this.checkedRes == this.n_ops }
+    def isCompleted() : Boolean = { 
+        this.checkedRes == this.n_ops 
+    }
+
+    def areAllAcked() : Boolean = {
+        this.acked == this.checkedRes
+    }
+
+    def ack() = {
+        assert(this.acked < this.checkedRes, "Acking more than already checked result")
+        this.acked += 1
+    }
+
+    def checkBitPatCompleted() : Boolean = {
+        // println(s"bitpat ${uopIdxBitPat.toBinaryString}")
+        (uopIdxBitPat + 1) == (1 << n_ops)
+    }
 
     def checkRes(dutVd : BigInt, uopIdx : Int, 
             dutVxsat : Boolean = false, dutFflags : Int = 0) : Boolean = {
         
-        var res = this._checkRes(dutVd, uopIdx)
-
-        if ((uopIdxBitPat & (1 << uopIdx)) > 0) println(s"uop ${uopIdx} has been checked twice!")
+        assert(this.checkedRes < this.n_ops, s"received redundant result ${uopIdx}!!")
+        
+        if ((uopIdxBitPat & (1 << uopIdx)) > 0) 
+            assert(false, s"uop ${uopIdx} has been checked twice!")
         else uopIdxBitPat |= (1 << uopIdx)
+
+        var res = this._checkRes(dutVd, uopIdx)
 
         this.resFflags |= dutFflags
         this.resVxsat = this.resVxsat || dutVxsat
@@ -64,11 +85,13 @@ class ResultChecker(val n_ops : Int, val expectvd : Array[String],
                 if (this.isFPDIV) {
                     res = res && (this.goldenFflags == this.resFflags)
                     if (this.goldenFflags != this.resFflags) {
+                        println(".. fflags incorrect")
                         dump(f"(fflags) h${this.resFflags}%016x", f"(fflags) h${this.goldenFflags}%016x")
                     }
                 } else {
                     res = res && (this.goldenVxsat == this.resVxsat)
                     if (this.goldenVxsat != this.resVxsat) {
+                        println(".. vxsat incorrect")
                         dump(f"(vxsat) ${this.resVxsat}", f"(vxsat) ${this.goldenVxsat}")
                     }
                 }

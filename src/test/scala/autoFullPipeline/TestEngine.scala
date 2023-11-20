@@ -125,6 +125,8 @@ abstract class TestEngine extends BundleGenHelper {
                     testBehaviorPool = testBehaviorPool.filterNot(_ == randomTBinPool)
                 } else {
                     curTestCasePool += (this.robIndex -> (randomTBinPool, randomTBinPool.getNextTestCase()))
+                    failedTBs = failedTBs - this.robIndex
+                    
                     println(s"0. Adding ${randomTBinPool.getInstid()}, robIdx ${robIndex} to the pool")
                     advRobIdx()
                 }
@@ -158,6 +160,7 @@ abstract class TestEngine extends BundleGenHelper {
                             if (x._1 <= flushedRobIdx) { // flush compare
                                 val tb : TestBehavior = x._2._1
                                 deletedTBs = deletedTBs + tb
+                                println(s".. deleted robIdx ${x._1}")
                             }
                             x._1 <= flushedRobIdx // flush compare
                         })
@@ -206,12 +209,17 @@ abstract class TestEngine extends BundleGenHelper {
                     if (failedTBs.contains(resRobIdx)) {
                         println(s"Received result ${resRobIdx} for already incorrect ${failedTBs(resRobIdx).getInstid()}..")
                     } else {
+                        /*for ((key, value) <- curTestCasePool) {
+                            // Do something with each key-value pair
+                            println(s".. in curTestCasePool, robIdx: $key, Value: $value")
+                        }*/
                         assert(false, s"ERROR!!! Received result ${resRobIdx} for flushed robIdx ${resRobIdx}!!!")
                     }
                 }
 
                 val (resTestBehavior, resTestCase) : (TestBehavior, TestCase) = curTestCasePool(resRobIdx)
                 // println(s"4. Received results for ${resTestCase.instid}, robIdx ${resRobIdx}")
+                resTestCase.ackRes()
                 if (!resCorrectness) {
                     println(s"${resTestCase.instid}, result incorrect")
 
@@ -224,8 +232,12 @@ abstract class TestEngine extends BundleGenHelper {
                     failedTBs += (resRobIdx -> resTestBehavior)
                 } else {
                     //  TODO 1.3.1. check if all uops' results are checked and remove the TestCase from the pool
-                    if (resTestCase.isCompleted()) {
-                        curTestCasePool = curTestCasePool.filterNot(_._2._2 == resTestCase)
+                    if (resTestCase.isCompleted() && resTestCase.areAllAcked()) {
+                        curTestCasePool = curTestCasePool.filterNot(x => {
+                            if (x._2._2 == resTestCase)
+                                println(s".. Completed, deleting robIdx ${x._1}")
+                            x._2._2 == resTestCase
+                        })
                         exhaustedCount -= 1
 
                         //  TODO 1.3.2. check if TestBehavior are done and record the result, remove it from the pool

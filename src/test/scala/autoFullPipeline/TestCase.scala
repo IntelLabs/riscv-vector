@@ -62,7 +62,18 @@ class TestCase(
     def flush() = { flushed = true }
 
     def isCompleted() : Boolean = {
+        if (this.rc.isCompleted() && !this.rc.checkBitPatCompleted()) {
+            println(s"WARNING: ${instid} test case completed but some uop might not be checked..")
+        }
         return this.rc.isCompleted()
+    }
+
+    def areAllAcked() : Boolean = {
+        return this.rc.areAllAcked()
+    }
+
+    def ackRes() = {
+        this.rc.ack()
     }
 
     def isExhausted() : Boolean = {
