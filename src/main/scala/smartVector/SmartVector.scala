@@ -48,34 +48,36 @@ class SmartVector(implicit tileParams: Parameters) extends Module {
     regFile.io.in.readIn := split.io.out.toRegFileRead
     regFile.io.in.writeIn := split.io.out.toRegFileWrite
 
-    val ldstUopQueue = Module(new LdstUopQueue()(tileParams))
-    ldstUopQueue.io.decodedInst <> decoder.io.out
+    val lsu = Module(new SVlsu()(tileParams, p))
+    lsu.io.mUop <> split.io.out.mUop
 
-    /*******************hellacache******************/
-    ldstUopQueue.io.hellacache.req <> io.hellacache.req
-    io.hellacache.s1_kill := ldstUopQueue.io.hellacache.s1_kill
-    io.hellacache.s1_data := ldstUopQueue.io.hellacache.s1_data
-    io.hellacache.s2_kill := ldstUopQueue.io.hellacache.s2_kill
-    ldstUopQueue.io.hellacache.s2_paddr := io.hellacache.s2_paddr
-    ldstUopQueue.io.hellacache.s2_uncached := io.hellacache.s2_uncached
+    // /*******************hellacache******************/
+    lsu.io.hellacache.req <> io.hellacache.req
+    io.hellacache.s1_kill := lsu.io.hellacache.s1_kill
+    io.hellacache.s1_data := lsu.io.hellacache.s1_data
+    io.hellacache.s2_kill := lsu.io.hellacache.s2_kill
+    lsu.io.hellacache.s2_paddr := io.hellacache.s2_paddr
+    lsu.io.hellacache.s2_uncached := io.hellacache.s2_uncached
 
     // 使用 <> 连接 resp、replay_next、s2_xcpt、s2_gpa、s2_gpa_is_pte、uncached_resp、ordered、perf
-    ldstUopQueue.io.hellacache.resp <> io.hellacache.resp
-    ldstUopQueue.io.hellacache.replay_next := io.hellacache.replay_next
-    ldstUopQueue.io.hellacache.s2_xcpt := io.hellacache.s2_xcpt
-    ldstUopQueue.io.hellacache.s2_gpa := io.hellacache.s2_gpa
-    ldstUopQueue.io.hellacache.s2_gpa_is_pte := io.hellacache.s2_gpa_is_pte
-    // ldstUopQueue.io.hellacache.uncached_resp <> io.hellacache.uncached_resp
-    ldstUopQueue.io.hellacache.uncached_resp.foreach { ucResp =>
+    lsu.io.hellacache.resp <> io.hellacache.resp
+    lsu.io.hellacache.replay_next := io.hellacache.replay_next
+    lsu.io.hellacache.s2_xcpt := io.hellacache.s2_xcpt
+    lsu.io.hellacache.s2_gpa := io.hellacache.s2_gpa
+    lsu.io.hellacache.s2_gpa_is_pte := io.hellacache.s2_gpa_is_pte
+    lsu.io.hellacache.s2_nack := io.hellacache.s2_nack
+    lsu.io.hellacache.s2_nack_cause_raw := io.hellacache.s2_nack_cause_raw
+    // lsu.io.hellacache.uncached_resp <> io.hellacache.uncached_resp
+    lsu.io.hellacache.uncached_resp.foreach { ucResp =>
         ucResp.valid := io.hellacache.uncached_resp.get.valid
         io.hellacache.uncached_resp.get.ready := ucResp.ready
         ucResp.bits := io.hellacache.uncached_resp.get.bits
     }
-    ldstUopQueue.io.hellacache.ordered := io.hellacache.ordered
-    ldstUopQueue.io.hellacache.perf := io.hellacache.perf
+    lsu.io.hellacache.ordered := io.hellacache.ordered
+    lsu.io.hellacache.perf := io.hellacache.perf
 
-    io.hellacache.keep_clock_enabled := ldstUopQueue.io.hellacache.keep_clock_enabled
-    ldstUopQueue.io.hellacache.clock_enabled := io.hellacache.clock_enabled
+    io.hellacache.keep_clock_enabled := lsu.io.hellacache.keep_clock_enabled
+    lsu.io.hellacache.clock_enabled := io.hellacache.clock_enabled
     /*---------------hellacache-------------------*/
         
     //arb register file's read and write port
