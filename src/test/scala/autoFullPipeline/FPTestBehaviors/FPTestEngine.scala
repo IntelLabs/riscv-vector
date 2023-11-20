@@ -136,15 +136,20 @@ class FPTestEngine extends TestEngine {
                 // dut.io.redirect.poke(genFSMRedirect())
             }
 
+            var jumpBeforeStep = false
             // waiting for dut's ready signal, which represents an ack of the uop ========
-            while((dut.io.in.ready.peek().litValue != 1) &&
+            breakable { while((dut.io.in.ready.peek().litValue != 1) &&
                     curReadyWait < MAX_READY_WAIT) {
                 
-                if (curReadyWait != 0) checkOutput(dut)
+                if (curReadyWait != 0) checkOutput(dut) // might affact in.ready
+                if (dut.io.in.ready.peek().litValue == 1) {
+                    jumpBeforeStep = true
+                    break
+                }
                 dut.clock.step(1)
                 dut.io.redirect.poke(genFSMRedirect())
                 curReadyWait += 1
-            }
+            } }
 
             // waits too long.. =====================================
             if (!(curReadyWait < MAX_READY_WAIT)) {
@@ -162,7 +167,7 @@ class FPTestEngine extends TestEngine {
                 historyTCs :+= (sendRobIdx, uopIdx, chosenTestCase)
             }
 
-            if (curReadyWait > 0) {
+            if (curReadyWait > 0 && !jumpBeforeStep) {
                 // Here, the Engine passed through the while loop,
                 //  clock ticked inside it
                 //  then one should check one more time for the result

@@ -61,7 +61,8 @@ class ResultChecker(val n_ops : Int, val expectvd : Array[String],
     }
 
     def checkBitPatCompleted() : Boolean = {
-        ~(uopIdxBitPat & (~(1 << n_ops))) == 0
+        // println(s"bitpat ${uopIdxBitPat.toBinaryString}")
+        (uopIdxBitPat + 1) == (1 << n_ops)
     }
 
     def checkRes(dutVd : BigInt, uopIdx : Int, 
@@ -84,11 +85,13 @@ class ResultChecker(val n_ops : Int, val expectvd : Array[String],
                 if (this.isFPDIV) {
                     res = res && (this.goldenFflags == this.resFflags)
                     if (this.goldenFflags != this.resFflags) {
+                        println(".. fflags incorrect")
                         dump(f"(fflags) h${this.resFflags}%016x", f"(fflags) h${this.goldenFflags}%016x")
                     }
                 } else {
                     res = res && (this.goldenVxsat == this.resVxsat)
                     if (this.goldenVxsat != this.resVxsat) {
+                        println(".. vxsat incorrect")
                         dump(f"(vxsat) ${this.resVxsat}", f"(vxsat) ${this.goldenVxsat}")
                     }
                 }
