@@ -29,16 +29,23 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   io.out.bits.vCtrl         := RegEnable(decode.io.out, io.in.valid)
   io.out.bits.scalar_opnd_1 := RegEnable(io.in.bits.rs1, io.in.valid)
   io.out.bits.scalar_opnd_2 := RegEnable(io.in.bits.rs2, io.in.valid)
-  
-  io.out.valid             := RegNext(io.in.valid)
-  io.out.bits.vInfo.vstart := RegEnable(io.in.bits.vInfo.vstart, io.in.valid)
-  io.out.bits.vInfo.vl     := RegEnable(io.in.bits.vInfo.vl, io.in.valid)
-  io.out.bits.vInfo.vlmul  := RegEnable(io.in.bits.vInfo.vlmul, io.in.valid)
-  io.out.bits.vInfo.vsew   := RegEnable(io.in.bits.vInfo.vsew, io.in.valid)
-  io.out.bits.vInfo.vma    := RegEnable(io.in.bits.vInfo.vma, io.in.valid)  
-  io.out.bits.vInfo.vta    := RegEnable(io.in.bits.vInfo.vta, io.in.valid) 
-  io.out.bits.vInfo.vxrm   := RegEnable(io.in.bits.vInfo.vxrm, io.in.valid)
-  io.out.bits.vInfo.frm    := RegEnable(io.in.bits.vInfo.frm, io.in.valid)
+
+  val validTmp = Reg(Bool())
+  when (RegNext(io.in.valid) & ~io.out.ready){
+    validTmp := true.B
+  }.otherwise{
+    validTmp := false.B 
+  }
+  io.out.valid := Mux(RegNext(io.in.valid) & io.out.ready, true.B, validTmp & io.out.ready)
+
+  io.out.bits.vInfo.vstart  := RegEnable(io.in.bits.vInfo.vstart, io.in.valid)
+  io.out.bits.vInfo.vl      := RegEnable(io.in.bits.vInfo.vl    , io.in.valid)
+  io.out.bits.vInfo.vlmul   := RegEnable(io.in.bits.vInfo.vlmul , io.in.valid)
+  io.out.bits.vInfo.vsew    := RegEnable(io.in.bits.vInfo.vsew  , io.in.valid)
+  io.out.bits.vInfo.vma     := RegEnable(io.in.bits.vInfo.vma   , io.in.valid)  
+  io.out.bits.vInfo.vta     := RegEnable(io.in.bits.vInfo.vta   , io.in.valid) 
+  io.out.bits.vInfo.vxrm    := RegEnable(io.in.bits.vInfo.vxrm  , io.in.valid)
+  io.out.bits.vInfo.frm     := RegEnable(io.in.bits.vInfo.frm   , io.in.valid)
 
   //The following code is only for the mv instruction. It needs to be adjusted according to different instructions later.
 

@@ -41,8 +41,8 @@ class subVRegFile(numRead: Int, numWrite: Int, regLen: Int) extends Module {
   }
 
   //TODO: This is reserved for verification, delete it later
-  for(i <- 1 until NVPhyRegs){
-    rfData(i) := rf(i)
+  for(i <- 0 until NVPhyRegs){
+    io.rfData(i) := rf(i)
   }
 }
 
@@ -63,10 +63,10 @@ class VRFWritePort(regLen: Int) extends Bundle {
 
 class SVRegFile(numRead: Int, numWrite: Int) extends Module {
   val io = IO(new Bundle {
-    val read = Vec(numRead, new VRFReadPort(LaneWidth))
+    val read  = Vec(numRead,  new VRFReadPort(LaneWidth))
     val write = Vec(numWrite, new VRFWritePort(LaneWidth))
     //TODO: This is reserved for verification, delete it later
-    val rfData = Output(Vec(NVPhyRegs, UInt(regLen.W)))
+    val rfData = Output(Vec(NVPhyRegs, UInt(VLEN.W)))
   })
 
   val subRFs = Seq.fill(NLanes)(Module(new subVRegFile(numRead, numWrite, LaneWidth)))
@@ -83,5 +83,8 @@ class SVRegFile(numRead: Int, numWrite: Int) extends Module {
     }
   }
   //TODO: This is reserved for verification, delete it later
-  io.rfData = Vec.tabulate(NVPhyRegs){i=>Cat(subRFs(1).io.rfData, subRFs(0).io.rfData)}
+  for(i <- 0 until NVPhyRegs){
+    io.rfData(i) := Cat(subRFs(1).io.rfData(i), subRFs(0).io.rfData(i))
+  }
+  //io.rfData := Vec.tabulate(NVPhyRegs){i=>Cat(subRFs(1).io.rfData, subRFs(0).io.rfData)}
 }

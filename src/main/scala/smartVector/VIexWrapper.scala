@@ -18,14 +18,9 @@ import xiangshan.backend.rob.RobPtr
 class VIexWrapper(implicit p : Parameters) extends Module {
   
   val io = IO(new Bundle {
-    val in = Input(ValidIO(new UopQueueOutput))
+    val in = Input(ValidIO(new Muop))
     val out = ValidIO(new VAluOutput)
   })
-
-
-  //val p = Parameters.empty.alterPartial({
-  //case SmartParamsKey => SmartParameters(VLEN = 128)})
-
 
   val SValu = Module(new VAluWrapper()(p))
 
@@ -40,16 +35,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
 
   io.out.bits  := SValu.io.out.bits
   io.out.valid := RegNext(io.in.valid)
-  //io.out.bits.toReg.bits.rfReadEn(0) := false.B
-  //io.out.bits.toReg.bits.rfReadEn(1) := false.B
-  //io.out.bits.toReg.bits.rfReadIdx   := DontCare
-  
-  //io.out.bits.toReg.bits.rfWriteEn   := RegEnable(io.in.bits.uopRegInfo.rfWriteEn, io.in.valid)
-  //io.out.bits.toReg.bits.rfWriteIdx  := RegEnable(io.in.bits.uopAttribute.ldest, io.in.valid)
-  //io.out.bits.toReg.bits.rfWriteData := SValu.io.out.bits.vd
-  //io.out.bits.toReg.bits.vxsat       := SValu.io.out.bits.vxsat
 
-  //io.out.bits.toReg.valid := io.out.bits.toReg.bits.rfWriteEn
 }
 
 
