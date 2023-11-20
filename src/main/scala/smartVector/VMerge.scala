@@ -16,12 +16,21 @@ class CommitInfo extends Bundle{
     val data = UInt(64.W)
 }
 
+class LsuOutput extends Bundle{
+    val data = UInt(VLEN.W)
+    val rfWriteEn         = Bool()
+    val rfWriteIdx        = UInt(5.W)
+    val scalarRegWriteEn  = Bool()
+    val scalarRegWriteIdx = UInt(5.W)
+    val muopEnd           = Bool()
+}
 class VMerge (implicit p : Parameters) extends VFuModule {
 
     val io = IO(new Bundle{
         val in = new Bundle{
             val mergeInfo = Input(new MuopMergeAttr)
             val aluIn = Input(ValidIO(new VAluOutput))
+            val lsuIn = Input(ValidIO(new LsuOutput))
         }
         val out = new Bundle{
             //update register file
@@ -81,22 +90,28 @@ class VMerge (implicit p : Parameters) extends VFuModule {
         }.otherwise{
             io.out.toRegFileWrite := 0.U.asTypeOf(new regWriteIn)
         }
+    }.elsewhen(io.in.lsuIn.valid && io.in.lsuIn.bits.rfWriteEn)
+    {
+        io.out.toRegFileWrite.rfWriteEn  := true.B
+        io.out.toRegFileWrite.rfWriteIdx := io.in.lsuIn.bits.rfWriteIdx
+        io.out.toRegFileWrite.rfWriteData := io.in.lsuIn.bits.data
     }.otherwise{
             io.out.toRegFileWrite := 0.U.asTypeOf(new regWriteIn)
     }
     io.scoreBoardCleanIO.clearEn   := io.out.toRegFileWrite.rfWriteEn
     io.scoreBoardCleanIO.clearAddr := io.out.toRegFileWrite.rfWriteIdx
 
-    when(muopEnd){
+    when(io.in.aluIn.valid && muopEnd){
         io.out.commitInfo.valid := true.B
-        when(io.in.aluIn.valid && scalarRegWriteEn){
-            io.out.commitInfo.bits.scalarRegWriteEn := true.B
-            io.out.commitInfo.bits.ldest            := scalarRegWriteIdx
-            io.out.commitInfo.bits.data             := io.in.aluIn.bits.vd
-        }.otherwise{
-            io.out.commitInfo.bits := 0.U.asTypeOf(new CommitInfo)
-        }
-    }.otherwise{
+        io.out.commitInfo.bits.scalarRegWriteEn := scalarRegWriteEn
+        io.out.commitInfo.bits.ldest            := scalarRegWriteIdx
+        io.out.commitInfo.bits.data             := io.in.aluIn.bits.vd
+    }.elsewhen(io.in.lsuIn.valid && io.in.lsuIn.bits.muopEnd){
+        io.out.commitInfo.valid := true.B
+        io.out.commitInfo.bits.scalarRegWriteEn := io.in.lsuIn.bits.scalarRegWriteEn
+        io.out.commitInfo.bits.ldest            := io.in.lsuIn.bits.scalarRegWriteIdx
+        io.out.commitInfo.bits.data             := io.in.lsuIn.bits.data
+    }otherwise{
         io.out.commitInfo.valid := false.B
         io.out.commitInfo.bits := 0.U.asTypeOf(new CommitInfo)
     }

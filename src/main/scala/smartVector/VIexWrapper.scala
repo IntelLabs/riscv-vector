@@ -24,7 +24,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
 
   val SValu = Module(new VAluWrapper()(p))
 
-  SValu.io.in.valid := io.in.valid
+  SValu.io.in.valid := io.in.valid && ~io.in.bits.uop.ctrl.isLdst
   SValu.io.in.bits.vfuInput.uop := io.in.bits.uop
   
   SValu.io.in.bits.vfuInput.vs1   := io.in.bits.uopRegInfo.vs1
