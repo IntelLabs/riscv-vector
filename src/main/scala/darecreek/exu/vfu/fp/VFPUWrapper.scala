@@ -107,7 +107,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   // red_out_ready := true.B
   red_out_ready := red_busy
   val fpu_valid = RegInit(false.B)
-  val red_in_valid = fpu_valid || ((red_state === calc_vs2) && red_out_valid)
+  val red_in_valid = Wire(Bool())
   val red_in_ready = Wire(Bool())
 
   val red_out = Wire(Vec(NLanes / 2, new LaneFUOutput))
@@ -191,7 +191,9 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
     red_busy := false.B
   }.elsewhen(fire && fpu_red) {
     red_busy := true.B
-  }.elsewhen((red_state === calc_vs1) && red_out_valid && red_out_ready) {
+  }.elsewhen(output_en && io.out.valid && io.out.ready) {
+    red_busy := false.B
+  }.elsewhen(!output_en && (red_state === calc_vs1) && red_out_valid && red_out_ready) {
     red_busy := false.B
   }
 
@@ -320,6 +322,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   val red_vs1 = VecInit(Seq.tabulate(NLanes / 2)(i => red_vs1_bits((i + 1) * LaneWidth - 1, i * LaneWidth)))
   val red_vs2 = VecInit(Seq.tabulate(NLanes / 2)(i => red_vs2_bits((i + 1) * LaneWidth - 1, i * LaneWidth)))
   val red_uop = Reg(new VExpdUOp)
+  red_in_valid := (fpu_valid || ((red_state === calc_vs2) && red_out_valid)) & !flush & !red_uop.sysUop.robIdx.needFlush(io.redirect)
 
   when(vfredosum_vs || vfwredosum_vs || vfwredusum_vs) {
     when(vs2_rnd0) {
@@ -465,8 +468,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
     fpu(i).io.in.bits.mask := Mux(red_in_valid, red_in(i).mask, Mux(narrow, Cat(mask16bReorg(11, 8), mask16bReorg(3, 0)), Mux(narrow_to_1, cmp_mask(i), UIntSplit(mask16bReorg, 8)(i))))
     fpu(i).io.in.bits.tail := Mux(red_in_valid, red_in(i).tail, Mux(narrow, Cat(tailReorg(11, 8), tailReorg(3, 0)), Mux(narrow_to_1, cmp_tail(i), UIntSplit(tailReorg, 8)(i))))
     fpu(i).io.out.ready := io.out.ready || red_out_ready
-    fpu(i).io.redirect.valid := io.redirect.valid & !red_busy
-    fpu(i).io.redirect.bits := io.redirect.bits
+    fpu(i).io.redirect := io.redirect
     vd(i) := fpu(i).io.out.bits.vd
     maskKeep(i) := fpu(i).io.maskKeep
     maskOff(i) := fpu(i).io.maskOff

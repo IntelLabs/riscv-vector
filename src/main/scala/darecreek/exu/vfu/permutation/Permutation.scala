@@ -461,7 +461,7 @@ class Permutation(implicit p: Parameters) extends VFuModule {
     rvalid_reg := rvalid
   }
 
-  val vperm_fifo = Module(new perm_RegFifo(UInt(8.W), 4))
+  val vperm_fifo = Module(new perm_RegFifo(UInt(8.W), 8))
   val vslide_fifo_wdata = Wire(UInt(8.W))
   val cmprs_fifo_wdata = Wire(UInt(8.W))
   val vrgather_fifo_wdata = Wire(UInt(8.W))
@@ -724,26 +724,14 @@ class Permutation(implicit p: Parameters) extends VFuModule {
     reg_rd_preg_idx := rd_preg_idx
   }
 
-  io.out.uop.ctrl.funct6 := funct6_reg
-  io.out.uop.ctrl.funct3 := funct3_reg
-  io.out.uop.ctrl.vm := vm_reg
-  io.out.uop.ctrl.vs1_imm := 0.U
-  io.out.uop.ctrl.widen := false.B
-  io.out.uop.ctrl.widen2 := false.B
-  io.out.uop.ctrl.narrow := false.B
-  io.out.uop.ctrl.narrow_to_1 := false.B
-  io.out.uop.info.vsew := vsew_reg
-  io.out.uop.info.ta := ta_reg
-  io.out.uop.info.ma := ma_reg
-  io.out.uop.info.vstart := vstart_reg
-  io.out.uop.info.vl := vl_reg
-  io.out.uop.info.vlmul := vlmul_reg
-  io.out.uop.info.vxrm := 0.U
-  io.out.uop.info.frm := 0.U
-  io.out.uop.uopIdx := 0.U
-  io.out.uop.uopEnd := true.B
-  io.out.uop.sysUop := RegEnable(io.in.uop.sysUop, uop_valid)
 
+  val uop_reg = Reg(new VUop)
+
+  when(uop_valid) {
+    uop_reg := io.in.uop
+  }
+
+  io.out.uop := uop_reg
   io.out.rd_en := reg_rd_en & !flush
   io.out.rd_preg_idx := reg_rd_preg_idx
   io.out.wb_vld := Mux(reg_vcompress, reg2_wb_vld & !flush, reg_wb_vld & !flush)
