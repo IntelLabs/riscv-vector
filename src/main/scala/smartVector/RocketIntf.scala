@@ -51,7 +51,7 @@ class RVUMemoryResp extends Bundle {
 class RVUMemory extends Bundle {
     val req  = Decoupled(new RVUMemoryReq)
     val resp = Flipped(Valid(new RVUMemoryResp))
-    val xcpt = Input(new HellaCacheExceptions)
+    val xcpt = Input(Bool())
     val busy = Input(Bool())
 }
 
