@@ -4,8 +4,7 @@ import chisel3.util._
 import darecreek.VDecode
 import freechips.rocketchip.rocket._
 import freechips.rocketchip.util._
-import org.chipsalliance.cde.config
-import org.chipsalliance.cde.config.{Config, Field, Parameters}
+import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import darecreek.exu.vfu.VUop
 import xiangshan.MicroOp
 import SmartParam._
@@ -63,8 +62,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     var ldUopSize = 16
     val ldUopIdxBits = log2Up(ldUopSize)
     val vRegIdx = Wire(UInt(5.W))
-    // val vreg_info = VecInit(Seq.fill(16)(VRegSegmentInfo()))
-    val vreg_info = Reg(Vec(16, new VRegSegmentInfo))
+    val vregInfo = RegInit(VecInit(Seq.fill(16)(0.U.asTypeOf(new VRegSegmentInfo))))
 
     // SPLIT FSM
     when(uopState === uop_idle) {
@@ -91,7 +89,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     val s1_mUop = RegNext(io.mUop)
 
     val ldstEnqPtr = RegInit(0.U(ldUopIdxBits.W))
-    val ldstUopQueue = Reg(Vec(ldUopSize, new LdstUop))
+    val ldstUopQueue = RegInit(VecInit(Seq.fill(ldUopSize)(0.U.asTypeOf(new LdstUop))))
 
     when(uopState === uop_split) {
         // unit stride
@@ -99,9 +97,9 @@ class SVlsu(implicit p: Parameters) extends Module {
         ldstUopQueue(ldstEnqPtr).addr := s1_mUop.bits.scalar_opnd_1
         // split into lduop queue & write vreginfo
         for(i <- 0 until 16) {
-            vreg_info(i).status := VRegSegmentStatus.notReady
-            vreg_info(i).idx := ldstEnqPtr
-            vreg_info(i).offset := i.U
+            vregInfo(i).status := VRegSegmentStatus.notReady
+            vregInfo(i).idx := ldstEnqPtr
+            vregInfo(i).offset := (15.U - i.U)
         }
         ldstEnqPtr := ldstEnqPtr + 1.U
     }
@@ -176,13 +174,13 @@ class SVlsu(implicit p: Parameters) extends Module {
     when(dataExchangeState === ld_wait && io.dataExchange.resp.valid && io.dataExchange.resp.bits.has_data) {
         val loadData = io.dataExchange.resp.bits.data
         for(i <- 0 until 16) {
-            when(vreg_info(i).idx === issueLdstPtr) {
+            when(vregInfo(i).idx === issueLdstPtr) {
                 for(j <- 0 until 8) {
-                    when(vreg_info(i).offset === j.U) {
-                        vreg_info(i).data := loadData(j * 8 + 7, j * 8)
+                    when(vregInfo(i).offset === j.U) {
+                        vregInfo(i).data := loadData(j * 8 + 7, j * 8)
                     }
                 }
-                vreg_info(i).status := VRegSegmentStatus.ready
+                vregInfo(i).status := VRegSegmentStatus.ready
             }
         }
         issueLdstPtr := issueLdstPtr + 1.U
@@ -198,20 +196,20 @@ class SVlsu(implicit p: Parameters) extends Module {
 
     /************************** Ldest data writeback to uopQueue********************/
     val vreg_wb_ready = Wire(Bool())
-    vreg_wb_ready := vreg_info.map(_.status === VRegSegmentStatus.ready).reduce(_ && _)
+    vreg_wb_ready := vregInfo.forall(info => info.status === VRegSegmentStatus.ready || info.status === VRegSegmentStatus.invalid)
 
     when(vreg_wb_ready) {
         io.lsuOut.valid := true.B
-        io.lsuOut.bits.vd := Cat(vreg_info.map(_.data)) // Concatenate data from all vreg_info elements
+        io.lsuOut.bits.vd := Cat(vregInfo.map(_.data)) // Concatenate data from all vregInfo elements
         io.lsuOut.bits.uopQueueIdx := 0.U // Adjust this value based on your design
         io.lsuOut.bits.vxsat := false.B
 
         // Reset vreg info
         for (i <- 0 until 16) {
-            vreg_info(i).status := VRegSegmentStatus.invalid
-            vreg_info(i).idx := DontCare
-            vreg_info(i).offset := DontCare
-            vreg_info(i).data := DontCare
+            vregInfo(i).status := VRegSegmentStatus.invalid
+            vregInfo(i).idx := DontCare
+            vregInfo(i).offset := DontCare
+            vregInfo(i).data := DontCare
         }
     }.otherwise {
         io.lsuOut.valid := false.B

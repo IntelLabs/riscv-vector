@@ -1,7 +1,7 @@
 package smartVector
 
 import chisel3._
-import org.chipsalliance.cde.config.{Config, Field, Parameters}
+import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import freechips.rocketchip.formal.MonitorDirection._
 import chisel3.util._
 import darecreek.exu.vfu.VFuParamsKey
@@ -70,7 +70,7 @@ class SmartVector extends Module {
     lsu.io.dataExchange.resp.bits.replay := io.dmem.resp.bits.replay
     lsu.io.dataExchange.resp.bits.has_data := io.dmem.resp.bits.has_data
 
-    lsu.io.dataExchange.xcpt <> io.dmem.xcpt
+    lsu.io.dataExchange.xcpt := io.dmem.xcpt
     lsu.io.dataExchange.busy := io.dmem.busy
     /*---------------hellacache-------------------*/
         
