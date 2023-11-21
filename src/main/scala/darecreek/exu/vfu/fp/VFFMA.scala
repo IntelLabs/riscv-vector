@@ -87,7 +87,7 @@ class VFMASrcPreprocessPipe(implicit val p: Parameters) extends VFPUBaseModule {
     }
   }
 
-  io.out.valid := validVec.last
+  io.out.valid := validVec.last && !io.out.bits.uop.sysUop.robIdx.needFlush(io.redirect)
   io.in.ready := rdyVec(0)
 
 
