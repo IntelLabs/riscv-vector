@@ -1,4 +1,4 @@
-/**
+/** Ordered issue queue 
   * Constraint: so far all inputs of io.in share one 'ready'.
   *             Only support 1 output
   */
@@ -12,7 +12,6 @@ import utils._
 class VArithIssueQ(size: Int, nEnq: Int) extends Module with HasCircularQueuePtrHelper {
   val io = IO(new Bundle {
     val in = Vec(nEnq, Flipped(Decoupled(new VExpdUOp)))
-    // from busy table
     val fromBusyTable = Vec(nEnq, Vec(4, Input(Bool()))) // true: busy
     // wakeups from RF write ports
     val vRFWriteback = Vec(nVRFWritePorts, Flipped(ValidIO(UInt(VPRegIdxWidth.W))))
@@ -49,21 +48,6 @@ class VArithIssueQ(size: Int, nEnq: Int) extends Module with HasCircularQueuePtr
     allSrcReady(i) := (srcReady(i).zip(iq(i).psrcVal) map {case (rdy, v) => rdy || !v}).reduce(_ && _) && state(i) === VALID
   }
 
-   /** 
-    * FU ready
-    */
-  // for (i <- 0 until size) {
-  //   val fuIsReady = Mux1H(Seq(
-  //     iq(i).ctrl.alu -> io.out.readys(0),
-  //     iq(i).ctrl.mul -> io.out.readys(1),
-  //     iq(i).ctrl.fp  -> io.out.readys(2),
-  //     iq(i).ctrl.div -> io.out.readys(3),
-  //   ))
-  //   fuReady(i) := state(i) === VALID && fuIsReady
-  // }
-  // val allReady = WireInit(VecInit(allSrcReady zip fuReady map {case (x,y) => x && y}))
-
-
   /** 
     * Enq
     */
@@ -88,10 +72,7 @@ class VArithIssueQ(size: Int, nEnq: Int) extends Module with HasCircularQueuePtr
     * Deq
     */
   val empty = isEmpty(enqPtr(0), deqPtr)
-  // val validNumDeq = Mux(allSrcReady(deqPtr.value) && !empty, 1.U, 0.U)
-  // val numDeqFire = Mux(io.out.ready, validNumDeq, 0.U)
   val numDeqFire = Mux(io.out.ready && io.out.valid && !io.flush, 1.U, 0.U)
-  // val numDeqFire = Mux(io.out.ready && !empty && !io.flush, 1.U, 0.U)
   io.out.valid := state(deqPtr.value) === VALID && allSrcReady(deqPtr.value)
   when (io.out.fire) { state(deqPtr.value) := IDLE }
   deqPtr := Mux(io.flush, 0.U.asTypeOf(new IQPtr), deqPtr + numDeqFire)

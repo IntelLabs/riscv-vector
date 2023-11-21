@@ -1,3 +1,15 @@
+/***************************************************************************************
+*Copyright (c) 2023-2024 Intel Corporation
+*Vector Acceleration IP core for RISC-V* is licensed under Mulan PSL v2.
+*You can use this software according to the terms and conditions of the Mulan PSL v2.
+*You may obtain a copy of Mulan PSL v2 at:
+*        http://license.coscl.org.cn/MulanPSL2
+*THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+*EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+*MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+*See the Mulan PSL v2 for more details.
+***************************************************************************************/
+
 package darecreek.exu.vfu
 
 import chisel3._
@@ -35,6 +47,16 @@ object MaskExtract {
                  Seq.tabulate(8)(idx => Mux1H(sew.oneHot, Seq(16,8,4,2).map(stride => 
                                               vmask128b((idx+1)*stride-1, idx*stride)))))
     extracted
+  }
+  def mask16_to_2x8(maskIn: UInt, sew: SewOH): Seq[UInt] = {
+    require(maskIn.getWidth == 16)
+    val result16 = Mux1H(Seq(
+      sew.is8  -> maskIn,
+      sew.is16 -> Cat(0.U(4.W), maskIn(7, 4), 0.U(4.W), maskIn(3, 0)),
+      sew.is32 -> Cat(0.U(6.W), maskIn(3, 2), 0.U(6.W), maskIn(1, 0)),
+      sew.is64 -> Cat(0.U(7.W), maskIn(1), 0.U(7.W), maskIn(0)),
+    ))
+    Seq(result16(7, 0), result16(15, 8))
   }
 }
 
@@ -162,15 +184,12 @@ class MaskTailData(implicit p: Parameters) extends Module {
       maskTail(i) := 0.U
     }
   }
-  val destEew = SewOH(uop.info.destEew)
-
   //--------------------------------------------------------
   //-------- Mask/Tail for non-compare instructions --------
   //--------------------------------------------------------
   io.maskKeep := Cat(maskTail.map(x => Mux(x(1), 0.U(8.W), ~(0.U(8.W)))).reverse)
   io.maskOff := Cat(maskTail.zipWithIndex.map({case (x, i) => 
                         Mux(!x(1), 0.U(8.W), Mux(x(0), ~0.U(8.W), UIntSplit(oldVd, 8)(i)))}).reverse)
-
   //----------------------------------------------------
   //---- Mask/Tail for compare instruction -------------
   //----------------------------------------------------

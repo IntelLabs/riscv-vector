@@ -1,3 +1,15 @@
+/***************************************************************************************
+*Copyright (c) 2023-2024 Intel Corporation
+*Vector Acceleration IP core for RISC-V* is licensed under Mulan PSL v2.
+*You can use this software according to the terms and conditions of the Mulan PSL v2.
+*You may obtain a copy of Mulan PSL v2 at:
+*        http://license.coscl.org.cn/MulanPSL2
+*THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+*EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+*MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+*See the Mulan PSL v2 for more details.
+***************************************************************************************/
+
 package darecreek
 
 import chisel3._
@@ -110,6 +122,7 @@ class VInfo extends Bundle {
   val ta = Bool() // tail agnostic
   // val lmul = UInt(4.W) // 1, 2, 4, 8
   val destEew = UInt(3.W) // Destination EEW
+  val emulVd = UInt(4.W)
   // val wenRF = Bool() // RF wen. E.g., vstart >= vl or vl=0 
 }
 
@@ -156,7 +169,8 @@ class VExpdUOp extends VMicroOp {
 }
 
 class SewOH extends Bundle {  // 0   1   2   3
-  val oneHot = Vec(4, Bool()) // 8, 16, 32, 64
+  // val oneHot = Vec(4, Bool()) // 8, 16, 32, 64
+  val oneHot = UInt(4.W) // b0-b3: 8, 16, 32, 64
   def is8 = oneHot(0)
   def is16 = oneHot(1)
   def is32 = oneHot(2)
@@ -165,7 +179,8 @@ class SewOH extends Bundle {  // 0   1   2   3
 object SewOH {
   def apply(vsew: UInt): SewOH = {
     val sew = Wire(new SewOH)
-    sew.oneHot := VecInit(Seq.tabulate(4)(i => vsew === i.U))
+    // sew.oneHot := VecInit(Seq.tabulate(4)(i => vsew === i.U))
+    sew.oneHot := VecInit(Seq.tabulate(4)(i => vsew === i.U)).asUInt
     sew
   }
 }
@@ -184,7 +199,6 @@ class VExuOutput extends Bundle {
   val vd = Vec(NLanes, UInt(LaneWidth.W))
   val fflags = UInt(5.W) // Floating-point accrued exception flag
   val vxsat = Bool() // Fixed-point accrued saturation flag
-  val rd = UInt(xLen.W)
 }
 
 // Input of the lane FU

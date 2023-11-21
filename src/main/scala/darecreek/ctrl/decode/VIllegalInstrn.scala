@@ -1,8 +1,27 @@
+/***************************************************************************************
+*Copyright (c) 2023-2024 Intel Corporation
+*Vector Acceleration IP core for RISC-V* is licensed under Mulan PSL v2.
+*You can use this software according to the terms and conditions of the Mulan PSL v2.
+*You may obtain a copy of Mulan PSL v2 at:
+*        http://license.coscl.org.cn/MulanPSL2
+*THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+*EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+*MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+*See the Mulan PSL v2 for more details.
+***************************************************************************************/
+
+//Todo: extract vec-info generation from ill detection
 package darecreek
 
 import chisel3._
 import chisel3.util._
 import darecreek.lsu._
+
+class PartialVInfo extends Bundle {
+  val vRobPtr = new VRobPtr
+  // val destEew = UInt(3.W)
+  val emulVd = UInt(4.W)
+}
 
 class VIllegalInstrn extends Module {
   val io = IO(new Bundle {
@@ -11,6 +30,7 @@ class VIllegalInstrn extends Module {
     val robPtrIn = Input(new VRobPtr)
     val validIn = Input(Bool())
     val ill = ValidIO(new VRobPtr)
+    val partialVInfo = ValidIO(new PartialVInfo)
   })
   val ctrl = io.ctrl
   val info = io.info
@@ -217,4 +237,9 @@ class VIllegalInstrn extends Module {
                ill_reg || ill_regGrpEnd || ill_regOverlap || ill_segOverlap
   io.ill.valid := RegNext(illFinal || io.ctrl.illegal || io.info.vill) && RegNext(io.validIn)
   io.ill.bits := RegNext(io.robPtrIn)
+
+  io.partialVInfo.valid := RegNext(io.validIn)
+  io.partialVInfo.bits.vRobPtr := RegEnable(io.robPtrIn, io.validIn)
+  // io.partialVInfo.bits.destEew := RegEnable(?, io.validIn)
+  io.partialVInfo.bits.emulVd := RegEnable(emulVd, io.validIn)
 }

@@ -6,15 +6,11 @@ import chisel3.util._
 class subVRFReadPort(regLen: Int) extends Bundle {
   val addr = Input(UInt(VPRegIdxWidth.W))
   val data = Output(UInt(regLen.W))
-  // override def cloneType: subVRFReadPort.this.type =
-    // new subVRFReadPort(regLen).asInstanceOf[this.type]
 }
 class subVRFWritePort(regLen: Int) extends Bundle {
   val wen = Input(Bool())
   val addr = Input(UInt(VPRegIdxWidth.W))
   val data = Input(UInt(regLen.W))
-  // override def cloneType: subVRFWritePort.this.type =
-  //   new subVRFWritePort(regLen).asInstanceOf[this.type]
 
 }
 
@@ -39,15 +35,11 @@ class subVRegFile(numRead: Int, numWrite: Int, regLen: Int) extends Module {
 class VRFReadPort(regLen: Int) extends Bundle {
   val addr = Input(UInt(VPRegIdxWidth.W))
   val data = Output(Vec(NLanes, UInt(regLen.W)))
-  // override def cloneType: VRFReadPort.this.type =
-  //   new VRFReadPort(regLen).asInstanceOf[this.type]
 }
 class VRFWritePort(regLen: Int) extends Bundle {
   val wen = Input(Bool())
   val addr = Input(UInt(VPRegIdxWidth.W))
   val data = Input(Vec(NLanes, UInt(regLen.W)))
-  // override def cloneType: VRFWritePort.this.type =
-  //   new VRFWritePort(regLen).asInstanceOf[this.type]
 }
 
 class VRegFile(numRead: Int, numWrite: Int) extends Module {

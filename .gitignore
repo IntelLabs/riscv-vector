@@ -5,3 +5,28 @@ test_run_dir/
 generated/
 build/
 *~
+<<<<<<< HEAD
+=======
+
+.bloop/
+.metals/
+.vscode/
+project/.bloop/
+project/metals.sbt
+
+src/test/scala/auto/IncorrectInputs/*/
+src/test/scala/auto/IncorrectInputs/*.txt
+src/test/scala/auto/IncorrectInputs/*/*.txt
+src/test/scala/auto/IncorrectInputs/*/*.data
+src/test/scala/auto/AutoTestRes/*/
+src/test/scala/auto/AutoTestRes/*/*.txt
+src/test/scala/auto/*.txt
+
+src/test/scala/autoFullPipeline/IncorrectInputs/*/
+src/test/scala/autoFullPipeline/IncorrectInputs/*.txt
+src/test/scala/autoFullPipeline/IncorrectInputs/*/*.txt
+src/test/scala/autoFullPipeline/IncorrectInputs/*/*.data
+src/test/scala/autoFullPipeline/AutoTestRes/*/
+src/test/scala/autoFullPipeline/AutoTestRes/*/*.txt
+src/test/scala/autoFullPipeline/*.txt
+>>>>>>> dev

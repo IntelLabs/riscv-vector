@@ -1,3 +1,15 @@
+/***************************************************************************************
+*Copyright (c) 2023-2024 Intel Corporation
+*Vector Acceleration IP core for RISC-V* is licensed under Mulan PSL v2.
+*You can use this software according to the terms and conditions of the Mulan PSL v2.
+*You may obtain a copy of Mulan PSL v2 at:
+*        http://license.coscl.org.cn/MulanPSL2
+*THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+*EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+*MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+*See the Mulan PSL v2 for more details.
+***************************************************************************************/
+
 package darecreek
 
 import chisel3._
@@ -100,27 +112,24 @@ class VCtrlBlock extends Module {
   // Illegal instrn module
   val vIllegalInstrn = Module(new VIllegalInstrn)
   vIllegalInstrn.io.validIn := decoder.io.out.valid
-  vIllegalInstrn.io.ctrl := decoder.io.out.vCtrl
-  vIllegalInstrn.io.info := decoder.io.out.vInfo
+  vIllegalInstrn.io.ctrl := decoder.io.out.bits.vCtrl
+  vIllegalInstrn.io.info := decoder.io.out.bits.vInfo
   vIllegalInstrn.io.robPtrIn := vq.io.enqPtrOut
   vq.io.illegal := vIllegalInstrn.io.ill
+  vq.io.partialVInfo := vIllegalInstrn.io.partialVInfo
 
   // ROB
-  rob.io.in.valid := io.ovi_issue.valid
-  rob.io.in.sb_id := io.ovi_issue.sb_id
+  rob.io.in.valid := decoder.io.out.valid
+  rob.io.in.sb_id := decoder.io.out.bits.sb_id
+  rob.io.in.ldestVal := decoder.io.out.bits.vCtrl.ldestVal
+  rob.io.in.rdVal := decoder.io.out.bits.vCtrl.rdVal
   rob.io.ovi_dispatch := io.ovi_dispatch
-  io.ovi_completed := rob.io.ovi_completed
-  // rob.io.illegal.valid := decoder.io.out.valid
-  // rob.io.illegal.bits.ctrl := decoder.io.out.vCtrl
-  // rob.io.illegal.bits.info := decoder.io.out.vInfo
-  // rob.io.illegalPtr := vq.io.illegalPtr
   rob.io.illegal := vIllegalInstrn.io.ill
-  rob.io.fromRename zip rename.io.out map { case (rob, rename) =>
-    rob.valid := rename.fire
-    rob.bits := rename.bits
-  }
+  rob.io.partialVInfo := vIllegalInstrn.io.partialVInfo
+  rob.io.fromDispatch <> dispatch.io.toRob
   rob.io.wbArith := io.wbArith
   rob.io.wbLSU := io.wbLSU
+  io.ovi_completed := rob.io.ovi_completed
 
 
   /**

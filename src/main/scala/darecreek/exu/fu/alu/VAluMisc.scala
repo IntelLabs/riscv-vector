@@ -163,12 +163,13 @@ class VAluMisc extends Module {
     * Integer Merge/Move
     */
   // Adjust vmask. E.g., if sew==32: 000000ab -> aaaabbbb   
-  val vmask_adjust = Mux1H(sew.oneHot, Seq(1, 2, 4, 8).map(k => 
-    Cat(Seq.tabulate(8/k)(i => Fill(k, vmask(i))).reverse)
-  ))
+  // val vmask_adjust = Mux1H(sew.oneHot, Seq(1, 2, 4, 8).map(k => 
+  //   Cat(Seq.tabulate(8/k)(i => Fill(k, vmask(i))).reverse)
+  // ))
   val mergeResult = Wire(Vec(8, UInt(8.W)))
   for (i <- 0 until 8) {
-    mergeResult(i) := Mux(vmask_adjust(i), vs1(8*i+7, 8*i), vs2(8*i+7, 8*i))
+    // mergeResult(i) := Mux(vmask_adjust(i), vs1(8*i+7, 8*i), vs2(8*i+7, 8*i))
+    mergeResult(i) := Mux(vmask(i), vs1(8*i+7, 8*i), vs2(8*i+7, 8*i))
   }
   val mergeMove = Mux(uop.ctrl.vm, vs1, Cat(mergeResult.reverse))
 

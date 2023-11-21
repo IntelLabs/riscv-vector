@@ -71,6 +71,15 @@ package object fudian {
     def defaultNaN(expWidth: Int, pc: Int): FloatPoint = {
       fromUInt(defaultNaNUInt(expWidth, pc), expWidth, pc)
     }
+    def infUInt(expWidth: Int, pc: Int, isNeg: Bool): UInt = {
+      Cat(isNeg.asUInt, Fill(expWidth, 1.U(1.W)), 0.U((pc-1).W))
+    }
+    def zeroUInt(expWidth: Int, pc: Int, isNeg: Bool): UInt = {
+      Cat(isNeg.asUInt, 0.U((expWidth+pc-1).W))
+    }
+    def greatestFinite(expWidth: Int, pc: Int, isNeg: Bool): UInt = {
+      Cat(isNeg.asUInt, ~0.U((expWidth-1).W), 0.U(1.W), ~0.U((pc-1).W))
+    }
   }
 
   class RawFloat(val expWidth: Int, val precision: Int) extends Bundle {

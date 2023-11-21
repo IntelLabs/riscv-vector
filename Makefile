@@ -7,6 +7,18 @@ test_mac:
 test_div:
 	sbt "testOnly darecreek.vfutest.alu.VDivSpec"
 
+<<<<<<< HEAD
+=======
+test_load:
+	sbt "testOnly darecreek.lsutest.VLsuSpec_ld"
+
+test_load_idxSeg:
+	sbt "testOnly darecreek.lsutest.VLsuSpec_ld_idxSeg"
+
+test_store:
+	sbt "testOnly darecreek.lsutest.VLsuSpec_st"
+
+>>>>>>> dev
 # test_amd: test_alu, test_mac, test_div
 test_amd: test_alu test_mac test_div
 
@@ -39,4 +51,9 @@ verilog_allFu: verilog_alu verilog_mac verilog_fp verilog_div verilog_vmask veri
 clean:
 	rm -rf ./build;	rm -rf ./generated;	rm -rf ./test_run_dir
 
+<<<<<<< HEAD
 .PHONY: verilog test_alu test_mac test_div test_amd clean
+=======
+.PHONY: verilog test_alu test_mac test_div test_amd test_load test_load_idxSeg test_store \
+        clean
+>>>>>>> dev
