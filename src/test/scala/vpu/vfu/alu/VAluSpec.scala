@@ -44,6 +44,7 @@ class SmartVectorWrapper extends Module {
             val rvuCommit = new RVUCommit
             val rvuExtra  = new RVUExtra
         })
+    val rfData = Output(Vec(32, UInt(128.W)))
   })
   val smartVector = Module(new SmartVector)
 
@@ -51,6 +52,7 @@ class SmartVectorWrapper extends Module {
   //smartVector.io.in.valid := io.in.valid
 
   io.out := smartVector.io.out
+  io.rfData := smartVector.io.rfData
   
   
 }

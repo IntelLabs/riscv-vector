@@ -17,7 +17,7 @@ class SVRegFileWrapper(implicit p : Parameters) extends Module{
         }
         val out = Output(new regOut)
         //TODO: This is reserved for verification, delete it later
-        val rfData = Output(Vec(NVPhyRegs, UInt((VLEN/NLanes).W)))
+        val rfData = Output(Vec(NVPhyRegs, UInt(VLEN.W)))
     })
 
     val nVRFReadPorts = 2
