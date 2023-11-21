@@ -43,11 +43,17 @@ class FPTestEngine extends TestEngine {
         if (!block && dut.io.out.valid.peek().litValue == 1) {
 
             println(".. valid == true, checking results..")
+
+            println("historyTCs:")
+            historyTCs.foreach(x => {
+                println(s".. robIdx ${x._1}, uopIdx ${x._2}")
+            })
             
             var robIdx = dut.io.out.bits.uop.sysUop.robIdx.value.peek().litValue.toInt
             var uopIdx = dut.io.out.bits.uop.uopIdx.peek().litValue.toInt
 
-            while(
+            // ========
+            /*while(
                 historyTCs.length > 0 &&
                 // && (historyTCs(0)._1 != robIdx || historyTCs(0)._2 != uopIdx)
                 historyTCs(0)._3.flushed
@@ -62,13 +68,27 @@ class FPTestEngine extends TestEngine {
             if (historyTCs.length == 0) {
                 println(s"historyTCs is empty!!!!!!!!")
                 assert(false)
-            }
+            }*/
+            // ========
 
-            val resRobIdx = historyTCs(0)._1
-            val resUopIdx = historyTCs(0)._2
-            val resTestCase = historyTCs(0)._3
+            val filteredCandids = historyTCs.filter(x => {x._1 == robIdx && x._2 == uopIdx})
+            historyTCs = historyTCs.filter(x => { x._1 != robIdx || x._2 != uopIdx })
+
+            /*println("historyTCs:")
+            historyTCs.foreach(x => {
+                println(s".. robIdx ${x._1}, uopIdx ${x._2}")
+            })*/
+
+            assert(filteredCandids.length != 0, s"ERROR!!!!!! (flushed?) Not expecting robIdx ${robIdx}, uopIdx ${uopIdx}")
+            assert(filteredCandids.length == 1, s"ERROR!!!!!! Waiting for multiple outputs of robIdx ${robIdx}, uopIdx ${uopIdx}")
+
+            val resRobIdx = filteredCandids(0)._1
+            val resUopIdx = filteredCandids(0)._2
+            val resTestCase = filteredCandids(0)._3
             val testCaseFlushed = resTestCase.flushed
-            historyTCs = historyTCs.tail
+            assert(!testCaseFlushed, s"ERROR!!!!!! Flushed before! robIdx ${resRobIdx}, uopIdx ${resUopIdx}")
+
+            // historyTCs = historyTCs.tail
             
             println(s"2.2. Received result for robIdx ${robIdx}, uopIdx ${uopIdx}, in FPTestEngine:")
             if (testCaseFlushed) {
@@ -125,9 +145,12 @@ class FPTestEngine extends TestEngine {
             if (flush) {
                 for (i <- 0 until historyTCs.length) {
                     if(historyTCs(i)._1 <= flushedRobIdx) { // flush compare
+                        println(s".. flush robIdx ${historyTCs(i)._1}, uopIdx ${historyTCs(i)._2}")
                         historyTCs(i)._3.flush()
                     }
                 }
+
+                historyTCs = historyTCs.filter(!_._3.flushed)
 
                 // clear past results of test case with less robIdx
                 clearFlushedRes(flushedRobIdx)
