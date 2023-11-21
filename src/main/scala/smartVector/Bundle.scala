@@ -7,9 +7,9 @@ import SmartParam._
 
 
 class regReadIn(implicit p: Parameters) extends Bundle {
-  val rfReadEn = Vec(2,Bool())
+  val rfReadEn = Vec(4,Bool()) //0: vs1   1: vs2   2: mask   3: old_vd
   //val rfWriteEn = Bool()
-  val rfReadIdx = Vec(2,UInt(5.W))
+  val rfReadIdx = Vec(4,UInt(5.W))
   //val rfWriteIdx = UInt(5.W)
   //val rfWriteData = UInt(VLEN.W)
   //val vxsat = Bool()
@@ -26,8 +26,8 @@ class regWriteIn(implicit p: Parameters) extends Bundle {
 
 class regOut extends Bundle{
   val writeDone = Bool()
-  val readVld   = Vec(2,Bool())
-  val readData  = Vec(2,UInt(VLEN.W))
+  val readVld   = Vec(4,Bool())
+  val readData  = Vec(4,UInt(VLEN.W))
 }
 
 

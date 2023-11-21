@@ -30,8 +30,8 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   SValu.io.in.bits.vfuInput.vs1   := io.in.bits.uopRegInfo.vs1
   SValu.io.in.bits.vfuInput.vs2   := io.in.bits.uopRegInfo.vs2
   SValu.io.in.bits.vfuInput.rs1   := io.in.bits.scalar_opnd_1
-  SValu.io.in.bits.vfuInput.oldVd := 0.U
-  SValu.io.in.bits.vfuInput.mask  := 0.U
+  SValu.io.in.bits.vfuInput.oldVd := io.in.bits.uopRegInfo.old_vd
+  SValu.io.in.bits.vfuInput.mask  := io.in.bits.uopRegInfo.mask
 
   io.out.bits  := SValu.io.out.bits
   io.out.valid := RegNext(io.in.valid)
