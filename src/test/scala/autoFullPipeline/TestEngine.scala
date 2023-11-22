@@ -207,13 +207,15 @@ abstract class TestEngine extends BundleGenHelper {
                 // TODO When robIdx does not exist in the pool.. failed or flushed..
                 if (!curTestCasePool.contains(resRobIdx)) {
                     if (failedTBs.contains(resRobIdx)) {
-                        println(s"Received result ${resRobIdx} for already incorrect ${failedTBs(resRobIdx).getInstid()}..")
+                        println(s"WARNING: Received result ${resRobIdx} for already incorrect ${failedTBs(resRobIdx).getInstid()}.. Ignoring..")
+                        println("=============================================================================")
+                        break
                     } else {
                         /*for ((key, value) <- curTestCasePool) {
                             // Do something with each key-value pair
                             println(s".. in curTestCasePool, robIdx: $key, Value: $value")
                         }*/
-                        assert(false, s"ERROR!!! Received result ${resRobIdx} for flushed robIdx ${resRobIdx}!!!")
+                        assert(false, s"ERROR!!! Received result for flushed robIdx ${resRobIdx}!!!")
                     }
                 }
 
@@ -224,12 +226,15 @@ abstract class TestEngine extends BundleGenHelper {
                     println(s"${resTestCase.instid}, result incorrect")
 
                     resTestBehavior.recordFail()
+                    curTestCasePool.foreach(x => {
+                        if (x._2._1 == resTestBehavior) {
+                            failedTBs += (x._1 -> resTestBehavior)
+                        }
+                    })
                     curTestCasePool = curTestCasePool.filterNot(_._2._1 == resTestBehavior)
                     testBehaviorPool = testBehaviorPool.filterNot(_ == resTestBehavior)
 
                     exhaustedCount = curTestCasePool.filter(_._2._2.isExhausted()).size
-
-                    failedTBs += (resRobIdx -> resTestBehavior)
                 } else {
                     //  TODO 1.3.1. check if all uops' results are checked and remove the TestCase from the pool
                     if (resTestCase.isCompleted() && resTestCase.areAllAcked()) {
