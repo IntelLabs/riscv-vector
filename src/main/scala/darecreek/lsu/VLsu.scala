@@ -295,9 +295,10 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
     ld_waddr_inc(i) := Mux(needSub2, i.U - 2.U, Mux(needSub1, i.U - 1.U, i.U))
     ldDataBuf.io.waddr(i) := el_id_high + ld_waddr_inc(i)
   }
-  ldDataBuf.io.wen(2) := ldValidWen
-  ldDataBuf.io.wen(1) := ldValidWen && !needSub2
-  ldDataBuf.io.wen(0) := ldValidWen && !needSub1 && !needSub2
+  val seg_ld = ctrl_ld.segment
+  ldDataBuf.io.wen(2) := ldValidWen && !seg_ld
+  ldDataBuf.io.wen(1) := ldValidWen && !needSub2 && !seg_ld
+  ldDataBuf.io.wen(0) := ldValidWen && !needSub1 && !needSub2 && !seg_ld
 
 
   /**
@@ -310,7 +311,7 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   val seg_wdata = Reg(Vec(8, Vec(8, UInt(8.W))))
   val seg_wen = Reg(Vec(8, UInt(8.W)))
   val cntSeg = Reg(UInt((vlenbWidth + 3).W))
-  cntSeg := Mux(stateLd === s_idle, 0.U, Mux(seg_ValidWen, cntSeg +
+  cntSeg := Mux(stateLd === s_idle, 0.U, Mux(ldValid, cntSeg +
                                   Mux1H(destEewOH_ld.oneHot, Seq(1.U, 2.U, 4.U, 8.U)), cntSeg))
   // If emul > 1, each filed will take multiple registers, idxRf -> idxRf/emul
   // Note: for segment instrn, emul <= 4
