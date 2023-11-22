@@ -82,7 +82,7 @@ trait HasPipelineReg {
   io.in.ready := rdyVec(0)
  //  io.out.valid := validVec.takeRight(2).head
  //  io.out.bits.uop := uopVec.takeRight(2).head
-  io.out.valid := validVec.last && uopVec.last.sysUop.robIdx.needFlush(io.redirect)
+  io.out.valid := validVec.last && !uopVec.last.sysUop.robIdx.needFlush(io.redirect)
   io.out.bits.uop := uopVec.last
 
   def regEnable(i: Int): Bool = validVec(i - 1) && rdyVec(i - 1) && !flushVec(i - 1)
