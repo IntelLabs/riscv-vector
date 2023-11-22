@@ -239,7 +239,8 @@ object Datapath {
   // val testdataRoot = "/home/maoting/nanhu/testdata/9_6/unittest/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/10_10/unittest/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/10_13/unittest/"
-  val testdataRoot = "/home/maoting/nanhu/testdata/debug/"
+  val testdataRoot = "/home/maoting/nanhu/testdata/11_22/unittest/"
+  // val testdataRoot = "/home/maoting/nanhu/testdata/debug/"
   //val testdataRoot = "C:\\kou\\XS_Vector_Unit\\src\\test\\scala\\unittest\\"
   // val testdataRoot = "/home/kou/unittest/"
   // val testdataRoot = "/home/maoting/xs-unittest/testdata/"
@@ -260,8 +261,8 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
     // new VfmulvvTestBehavior,
     // new VfmaccvvTestBehavior
 
-    new VfncvtxfwTestBehavior,
-    new VfncvtxufwTestBehavior
+    // new VfncvtxfwTestBehavior,
+    // new VfncvtxufwTestBehavior
 
     // new VnclipwvTestBehavior
     // new VzextVf2TestBehavior,
@@ -378,10 +379,10 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
     // new VfminvvTestBehavior, // vfmin.vv
     // new VfmaxvvTestBehavior, // vfmax.vv
 
-    // new VmfeqvvTestBehavior, // vmfeq.vv
-    // new VmfnevvTestBehavior, // vmfne.vv
-    // new VmfltvvTestBehavior, // vmflt.vv
-    // new VmflevvTestBehavior, // vmfle.vv
+    new VmfeqvvTestBehavior, // vmfeq.vv
+    new VmfnevvTestBehavior, // vmfne.vv
+    new VmfltvvTestBehavior, // vmflt.vv
+    new VmflevvTestBehavior, // vmfle.vv
 
     // new VfsgnjvvTestBehavior, // vfsgnj.vv
     // new VfsgnjnvvTestBehavior, // vfsgnjn.vv
