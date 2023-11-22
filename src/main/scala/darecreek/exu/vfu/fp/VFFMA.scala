@@ -457,23 +457,23 @@ class VFFMA(implicit val p: Parameters) extends VFPUSubModule {
   // (1) It always accept FMA from FADD (if an FMA wants FMUL, it's never blocked).
   // (2) It has lower writeback arbitration priority than FADD (and may be blocked when FMUL.out.valid).
   // mul_pipe.io.out.ready := mulOutIsFMA || (io.out.ready && !add_pipe.io.out.valid)
-  mul_pipe.io.out.ready := (mulOutIsFMA && io.out.ready) || (io.out.ready && !add_pipe.io.out.valid)
+  mul_pipe.io.out.ready := Mux(mulOutIsFMA, add_pipe.io.in.ready, io.out.ready && !add_pipe.io.out.valid)
   add_pipe.io.out.ready := io.out.ready
 
-//    io.out.bits.uop := RegNext(Mux(add_pipe.io.out.valid,
-//      add_pipe.io.out.bits.uop,
-//      mul_pipe.io.out.bits.uop
-//    ))
-//    io.out.bits.vd := Mux(RegNext(add_pipe.io.out.valid),
-//      add_pipe.io.out.bits.vd,
-//      mul_pipe.io.out.bits.vd
-//    )
-//    io.out.bits.fflags := Mux(RegNext(add_pipe.io.out.valid),
-//      add_pipe.io.out.bits.fflags,
-//      mul_pipe.io.out.bits.fflags
-//    )
-//    // delay 1 cycle to match timing of arithmetic result
-//    io.out.valid := RegNext(add_pipe.io.out.valid || (mul_pipe.io.out.valid && !mulOutIsFMA))
+  //    io.out.bits.uop := RegNext(Mux(add_pipe.io.out.valid,
+  //      add_pipe.io.out.bits.uop,
+  //      mul_pipe.io.out.bits.uop
+  //    ))
+  //    io.out.bits.vd := Mux(RegNext(add_pipe.io.out.valid),
+  //      add_pipe.io.out.bits.vd,
+  //      mul_pipe.io.out.bits.vd
+  //    )
+  //    io.out.bits.fflags := Mux(RegNext(add_pipe.io.out.valid),
+  //      add_pipe.io.out.bits.fflags,
+  //      mul_pipe.io.out.bits.fflags
+  //    )
+  //    // delay 1 cycle to match timing of arithmetic result
+  //    io.out.valid := RegNext(add_pipe.io.out.valid || (mul_pipe.io.out.valid && !mulOutIsFMA))
 
 
   io.out.bits.uop := Mux(add_pipe.io.out.valid,
