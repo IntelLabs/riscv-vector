@@ -148,7 +148,7 @@ abstract class TestEngine extends BundleGenHelper {
                 if (!flush) {
                     flush = randomFlush()
                     if (flush) {
-                        flushedRobIdx = sendRobIdx + 1
+                        flushedRobIdx = sendRobIdx // + 1
                         println(s"1.1. Flush (all <= ${flushedRobIdx})")
 
                         val prevSize = curTestCasePool.size
