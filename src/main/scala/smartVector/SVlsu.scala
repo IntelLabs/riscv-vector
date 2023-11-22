@@ -17,6 +17,7 @@ class VLSUOutput extends Bundle {
 
 class LdstIO(implicit p: Parameters) extends ParameterizedBundle()(p) {
     val mUop = Flipped(ValidIO(new UopQueueOutput()(p)))
+    val oldVd = Input(UInt(VLEN.W))
     val lsuOut = ValidIO(new VLSUOutput)
     val dataExchange = new RVUMemory()
     val lsuReady = Output(Bool())
@@ -27,15 +28,16 @@ class LdstUop extends Bundle {
     val addr = Output(UInt(64.W))
     val effecSize = Output(UInt(3.W))
     val offset = Output(UInt(6.W))
+    val isLast = Output(Bool())
 }
 
 object VRegSegmentStatus {
-  val invalid :: notReady :: ready :: Nil = Enum(3)
+  val invalid :: needData :: notReady :: ready :: Nil = Enum(4)
 }
 
 class VRegSegmentInfo extends Bundle {
     // 0: not ready, 1: ready
-    val status = UInt(log2Ceil(3).W)
+    val status = UInt(2.W)
     // corresponding ldstuop idx of current vreg segement
     val idx = UInt(8.W)
     // offset of writeback valid data for current vreg segement
@@ -64,6 +66,11 @@ class SVlsu(implicit p: Parameters) extends Module {
     val vRegIdx = Wire(UInt(5.W))
     val vregInfo = RegInit(VecInit(Seq.fill(16)(0.U.asTypeOf(new VRegSegmentInfo))))
 
+    /**********************SPLIT STAGE**************************/
+    // stage 0 IDLE --> stage 1 SPLIT (start to split) --> stage 2 SPLIT_FINISH (split finish) --> stage 3 COMPLETE (writeback to uopQueue)
+    
+    val splitCount = RegInit(0.U(5.W))
+    val curSplitIdx = RegInit(0.U(5.W))
     // SPLIT FSM
     when(uopState === uop_idle) {
         when(io.mUop.valid) {
@@ -72,36 +79,83 @@ class SVlsu(implicit p: Parameters) extends Module {
             uopState := uop_idle
         }
     }.elsewhen(uopState === uop_split) {
-        uopState := uop_split_finish
+        when(splitCount === 0.U) {
+            uopState := uop_split_finish
+        }.otherwise {
+            uopState := uop_split
+        }
     }.elsewhen(uopState === uop_split_finish) {
         when(completeLd) {
             uopState := uop_complete
         }.otherwise {
             uopState := uop_split_finish
         }   
+    }.elsewhen(uopState === uop_complete) {
+        completeLd := false.B
+        uopState := uop_idle
     }.otherwise {
         uopState := uop_idle
     }
 
-    /**********************SPLIT STAGE**************************/
-    // stage 0 IDLE --> stage 1 SPLIT (start to split) --> stage 2 SPLIT_FINISH (split finish) --> stage 3 COMPLETE (writeback to uopQueue)
     vRegIdx := io.mUop.bits.uopAttribute.ldest
     val s1_mUop = RegNext(io.mUop)
 
     val ldstEnqPtr = RegInit(0.U(ldUopIdxBits.W))
+    val ldstDeqPtr = RegInit(0.U(ldUopIdxBits.W))
+
     val ldstUopQueue = RegInit(VecInit(Seq.fill(ldUopSize)(0.U.asTypeOf(new LdstUop))))
 
-    when(uopState === uop_split) {
-        // unit stride
-        ldstUopQueue(ldstEnqPtr).valid := true.B
-        ldstUopQueue(ldstEnqPtr).addr := s1_mUop.bits.scalar_opnd_1
-        // split into lduop queue & write vreginfo
-        for(i <- 0 until 16) {
-            vregInfo(i).status := VRegSegmentStatus.notReady
-            vregInfo(i).idx := ldstEnqPtr
-            vregInfo(i).offset := (15.U - i.U)
+    def findEntryWithAddr(ldstUopQueue: Vec[LdstUop], alignedAddr: UInt): (Bool, UInt) = {
+        val matches = ldstUopQueue.zipWithIndex.map { case (entry, i) =>
+            entry.valid && entry.addr === alignedAddr
         }
-        ldstEnqPtr := ldstEnqPtr + 1.U
+
+        val validMatch = matches.reduce(_ || _)
+        val indexMatch = Mux1H(matches, (0 until ldstUopQueue.length).map(_.U))
+
+        (validMatch, indexMatch)
+    }
+
+    val vl = 8.U
+    val eew = 8.U
+
+    when(uopState === uop_idle) {
+        when(io.mUop.valid) {
+            // Set split info
+            curSplitIdx := 0.U
+            splitCount := vl
+            ldstEnqPtr := 0.U
+
+            (0 until 16).foreach { i =>
+                when(i.U < vl) {
+                    vregInfo(i).status := VRegSegmentStatus.needData
+                    vregInfo(i).data := Reverse(io.oldVd(i * 8 + 7, i * 8))
+                }
+            }
+        }
+    }.elsewhen(uopState === uop_split) {
+        // unit stride
+        when(splitCount > 0.U) {
+            val addr = s1_mUop.bits.scalar_opnd_1 + curSplitIdx * (eew >> 3.U)
+            val alignedAddr = (addr >> 3.U) << 3.U
+            val offset = (addr - alignedAddr)
+
+            ldstUopQueue(ldstEnqPtr).valid := true.B
+            ldstUopQueue(ldstEnqPtr).addr := alignedAddr
+            ldstUopQueue(ldstEnqPtr).isLast := (splitCount === 1.U)
+
+            val regSegment = eew >> 3.U
+            for(i <- 0 until 16) {
+                when(i.U < regSegment) {
+                    vregInfo(curSplitIdx * regSegment + i.U).status := VRegSegmentStatus.notReady
+                    vregInfo(curSplitIdx * regSegment + i.U).idx := ldstEnqPtr
+                    vregInfo(curSplitIdx * regSegment + i.U).offset := offset + i.U
+                }
+            }
+            curSplitIdx := curSplitIdx + 1.U
+            splitCount := splitCount - 1.U
+            ldstEnqPtr := ldstEnqPtr + 1.U
+        }
     }
     
     /*-----------------SPLIT STAGE END-----------------------*/
@@ -174,17 +228,18 @@ class SVlsu(implicit p: Parameters) extends Module {
     when(dataExchangeState === ld_wait && io.dataExchange.resp.valid && io.dataExchange.resp.bits.has_data) {
         val loadData = io.dataExchange.resp.bits.data
         for(i <- 0 until 16) {
-            when(vregInfo(i).idx === issueLdstPtr) {
+            when(vregInfo(i).status === VRegSegmentStatus.notReady && vregInfo(i).idx === issueLdstPtr) {
                 for(j <- 0 until 8) {
                     when(vregInfo(i).offset === j.U) {
-                        vregInfo(i).data := loadData(j * 8 + 7, j * 8)
+                        vregInfo(i).data := Reverse(loadData(j * 8 + 7, j * 8))
                     }
                 }
                 vregInfo(i).status := VRegSegmentStatus.ready
             }
         }
-        issueLdstPtr := issueLdstPtr + 1.U
-        completeLd := true.B
+        ldstUopQueue(issueLdstPtr).valid := false.B
+        issueLdstPtr := Mux(ldstUopQueue(issueLdstPtr).isLast, 0.U, issueLdstPtr + 1.U)
+        completeLd := Mux(ldstUopQueue(issueLdstPtr).isLast, true.B, false.B)
     }
     
     /**************************exception handling**********************************/
@@ -196,11 +251,13 @@ class SVlsu(implicit p: Parameters) extends Module {
 
     /************************** Ldest data writeback to uopQueue********************/
     val vreg_wb_ready = Wire(Bool())
-    vreg_wb_ready := vregInfo.forall(info => info.status === VRegSegmentStatus.ready || info.status === VRegSegmentStatus.invalid)
+    vreg_wb_ready := vregInfo.forall(
+        info => info.status === VRegSegmentStatus.ready || info.status === VRegSegmentStatus.invalid
+    ) && !vregInfo.forall(info => info.status === VRegSegmentStatus.invalid)
 
     when(vreg_wb_ready) {
         io.lsuOut.valid := true.B
-        io.lsuOut.bits.vd := Cat(vregInfo.map(_.data)) // Concatenate data from all vregInfo elements
+        io.lsuOut.bits.vd := Cat(vregInfo.reverseMap(entry => Reverse(entry.data))) // Concatenate data from all vregInfo elements)
         io.lsuOut.bits.uopQueueIdx := 0.U // Adjust this value based on your design
         io.lsuOut.bits.vxsat := false.B
 
