@@ -366,23 +366,23 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
     // new VfaddvvTestBehavior, // vfadd.vv
     // new VfsubvvTestBehavior, // vfsub.vv
 
-    // new VfmulvvTestBehavior, // vfmul.vv
-    // new VfmaccvvTestBehavior, // vfmacc.vv
-    // new VfnmaccvvTestBehavior, // vfnmacc.vv
-    // new VfmsacvvTestBehavior, // vfmsac.vv
-    // new VfnmsacvvTestBehavior, // vfnmsac.vv
-    // new VfmaddvvTestBehavior, // vfmadd.vv
-    // new VfnmaddvvTestBehavior, // vfnmadd.vv
-    // new VfmsubvvTestBehavior, // vfmsub.vv
-    // new VfnmsubvvTestBehavior, // vfnmsub.vv
+    new VfmulvvTestBehavior, // vfmul.vv
+    new VfmaccvvTestBehavior, // vfmacc.vv
+    new VfnmaccvvTestBehavior, // vfnmacc.vv
+    new VfmsacvvTestBehavior, // vfmsac.vv
+    new VfnmsacvvTestBehavior, // vfnmsac.vv
+    new VfmaddvvTestBehavior, // vfmadd.vv
+    new VfnmaddvvTestBehavior, // vfnmadd.vv
+    new VfmsubvvTestBehavior, // vfmsub.vv
+    new VfnmsubvvTestBehavior, // vfnmsub.vv
 
     // new VfminvvTestBehavior, // vfmin.vv
     // new VfmaxvvTestBehavior, // vfmax.vv
 
-    new VmfeqvvTestBehavior, // vmfeq.vv
-    new VmfnevvTestBehavior, // vmfne.vv
-    new VmfltvvTestBehavior, // vmflt.vv
-    new VmflevvTestBehavior, // vmfle.vv
+    // new VmfeqvvTestBehavior, // vmfeq.vv
+    // new VmfnevvTestBehavior, // vmfne.vv
+    // new VmfltvvTestBehavior, // vmflt.vv
+    // new VmflevvTestBehavior, // vmfle.vv
 
     // new VfsgnjvvTestBehavior, // vfsgnj.vv
     // new VfsgnjnvvTestBehavior, // vfsgnjn.vv

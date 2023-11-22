@@ -209,9 +209,30 @@ class FPTestEngine extends TestEngine {
 
             // dut.io.dontCare.poke(true.B)
             dut.io.in.bits.poke(getEmptyVFuInput()) // don't care..
-            dut.io.redirect.poke(genFSMRedirect())
+            if (flush) {
+                dut.io.redirect.poke(genFSMRedirect(flush, flush, flushedRobIdx))
+            } else {
+                dut.io.redirect.poke(genFSMRedirect())
+            }
 
             checkOutput(dut)
+
+            if (flush) {
+                for (i <- 0 until historyTCs.length) {
+                    if(historyTCs(i)._1 <= flushedRobIdx) { // flush compare
+                        println(s".. flush robIdx ${historyTCs(i)._1}, uopIdx ${historyTCs(i)._2}")
+                        historyTCs(i)._3.flush()
+                    }
+                }
+
+                historyTCs = historyTCs.filter(!_._3.flushed)
+
+                // clear past results of test case with less robIdx
+                clearFlushedRes(flushedRobIdx)
+                println(s"2. Flushed (all <= ${flushedRobIdx}), from FPTestEngine")
+            }
+            // dut.io.redirect.poke(genFSMRedirect())
+
             dut.clock.step(1)
         }
 
