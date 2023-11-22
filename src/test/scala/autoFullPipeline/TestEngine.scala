@@ -197,7 +197,7 @@ abstract class TestEngine extends BundleGenHelper {
             } else {
                 if (curTestCasePool.size == 0) break
                 // Rest test cases are all waiting for results, no more uop to give
-                stepRes = iterate(dut, curTestCasePool.toList.head._2._2, -1, true)
+                stepRes = iterate(dut, curTestCasePool.toList.head._2._2, -1, true, flush=flush, flushedRobIdx=flushedRobIdx)
             }
             val resCorrectness = stepRes._1
             val resRobIdx = stepRes._2
