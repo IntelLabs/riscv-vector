@@ -25,7 +25,8 @@ class FPResultChecker(
     n_res : Int, 
     expectvd : Array[String],
     val simi : Map[String, String],
-    val fpRes : FPResult) extends ResultChecker(n_res, expectvd, (a, b) => {}) {
+    val fpRes : FPResult,
+    dump : (String, String) => Unit) extends ResultChecker(n_res, expectvd, dump) {
     
     override def _checkRes(dutVd : BigInt, uopIdx : Int) : Boolean = {
         return fpRes.checkAndCompare(dutVd, uopIdx, simi, expectvd)
