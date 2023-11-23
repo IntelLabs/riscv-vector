@@ -82,11 +82,8 @@ class VnTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String, 
                     mask=mask(0))
             if (vx) srcBundle.rs1=vs1data(0)
             if (vv) srcBundle.vs1=vs1data(sewIndex)
-            dut.io.out.ready.poke(true.B)
-            dut.io.in.valid.poke(true.B)
-            dut.io.in.bits.poke(genVFuInput(
-                srcBundle, 
-                ctrl.copy(
+
+            val ctrlBundle = ctrl.copy(
                     vsew=vsew,
                     vs1_imm=getImm(simi),
                     narrow=true,
@@ -99,7 +96,14 @@ class VnTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String, 
                     vxrm = vxrm,
                     vstart = getVstart(simi)
                 )
+
+            dut.io.out.ready.poke(true.B)
+            dut.io.in.valid.poke(true.B)
+            dut.io.in.bits.poke(genVFuInput(
+                srcBundle, 
+                ctrlBundle
             ))
+            println(s"uopIdx ${j}, ctrlBundle: \n .. ${ctrlBundle}")
             dut.clock.step(1)
             finalVxsat = finalVxsat || dut.io.out.bits.vxsat.peek().litValue == 1
             vd = dut.io.out.bits.vd.peek().litValue
