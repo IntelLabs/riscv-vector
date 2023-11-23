@@ -258,6 +258,8 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
 
     // new VredsumvsTestBehavior,
 
+    new VnclipwvTestBehavior,
+
     // new VfmulvvTestBehavior,
     // new VfmaccvvTestBehavior
 
@@ -356,7 +358,7 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
     // new VfncvtxufwTestBehavior, // vfncvt.xu.f.w
     // new VfncvtxfwTestBehavior, // vfncvt.x.f.w
     // new VfncvtrtzxufwTestBehavior, // vfncvt.rtz.xu.f.w
-    new VfncvtrtzxfwTestBehavior, // vfncvt.rtz.x.f.w
+    // new VfncvtrtzxfwTestBehavior, // vfncvt.rtz.x.f.w
     // new VfncvtfxuwTestBehavior, // vfncvt.f.xu.w
     // new VfncvtfxwTestBehavior, // vfncvt.f.x.w
 

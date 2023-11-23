@@ -261,40 +261,6 @@ object Dump {
   }
 }
 
-/*object TestResults {
-
-  case class InstTestRes(
-    inst : String,
-    failed : Boolean = false,
-    fault_dut_out : String = "",
-    fault_golden_out : String = "",
-    fault_fsm_wb_idx : String = "",
-  )
-
-  var results: ConCurMap[String, InstTestRes] = new ConcurrentHashMap().asScala
-
-  def initResults(insts : Array[String]) : Unit = {
-    for(inst <- insts) {
-      results(inst) = InstTestRes(inst)
-    }
-  }
-
-  def addResult(testRes : InstTestRes) : Unit = {
-    results(testRes.inst) = testRes
-  }
-
-  def checkResult(inst : String) : Boolean = {
-    return results(inst).failed
-  }
-
-  def print() : Unit = {
-    println("TestResults: ")
-    results.foreach {
-        case (key, value) => println(s"$key=${value.failed}, ${value.fault_dut_out}")
-    }
-  }
-}*/
-
 object Datapath {
   // val testdataRoot = "/home/maoting/nanhu/testdata/8_23/unittest/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/8_29/unittest/"
