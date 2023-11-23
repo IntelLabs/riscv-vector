@@ -100,26 +100,7 @@ class VnTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String, 
 
             srcBundles :+= srcBundle
             ctrlBundles :+= ctrlBundle
-
-            /*dut.clock.step(1)
-            finalVxsat = finalVxsat || dut.io.out.bits.vxsat.peek().litValue == 1
-            vd = dut.io.out.bits.vd.peek().litValue
-            vdres = f"h$vd%032x".equals(expectvd(sewIndex))
-            if (j % 2 == 1 || (n_ops == 1)) {
-                // compare when it's odd uopidx or it has only one uop
-                Logger.printvds(f"h$vd%032x", expectvd(sewIndex))
-                if (!vdres) dump(simi, f"h$vd%032x", expectvd(sewIndex))
-                assert(vdres)
-            }*/
-
-            /*if (j % 2 == 0)
-                prevVd = f"h$vd%032x"*/
-
         }
-        /*if(useVxsat) {
-            if (finalVxsat != vxsat) dump(simi, s"(vxsat) ${finalVxsat}", s"(vxsat) ${vxsat}")
-            assert(finalVxsat == vxsat)
-        }*/
 
         return TestCase.newNormalCase(
             this.instid,

@@ -267,7 +267,7 @@ object TBMap {
         ("vfwcvt_f_f_v" -> (() => new VfwcvtffvTestBehavior)),
         ("vfwcvt_rtz_xu_f_v" -> (() => new VfwcvtrtzxufvTestBehavior)),
         ("vfwcvt_rtz_x_f_v" -> (() => new VfwcvtrtzxfvTestBehavior)),
-        /*("vmacc_vv" -> (() => new VmaccvvTestBehavior)),
+        ("vmacc_vv" -> (() => new VmaccvvTestBehavior)),
         ("vnmsac_vv" -> (() => new VnmsacvvTestBehavior)),
         ("vmadd_vv" -> (() => new VmaddvvTestBehavior)),
         ("vnmsub_vv" -> (() => new VnmsubvvTestBehavior)),
@@ -297,7 +297,7 @@ object TBMap {
         ("vwmacc_vx" -> (() => new VwmaccvxTestBehavior)),
         ("vwmaccu_vx" -> (() => new VwmaccuvxTestBehavior)),
         ("vwmaccsu_vx" -> (() => new VwmaccsuvxTestBehavior)),
-        ("vwmaccus_vx" -> (() => new VwmaccusvxTestBehavior)),*/
+        ("vwmaccus_vx" -> (() => new VwmaccusvxTestBehavior)),
         ("vcpop_m" -> (() => new VcpopmTestBehavior)),
         ("vid_v" -> (() => new VidvTestBehavior)),
         ("viota_m" -> (() => new ViotamTestBehavior)),
