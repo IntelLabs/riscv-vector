@@ -168,7 +168,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     val issueLdstUop = WireInit(0.U.asTypeOf(new LdstUop))
     val issueLdstPtr = RegInit(0.U(ldUopIdxBits.W))
 
-    val ld_idle :: ld_issue :: ld_wait :: ld_complete :: ld_replay :: Nil = Enum(5)
+    val ld_idle :: ld_issue :: ld_wait :: ld_complete :: Nil = Enum(4)
     
     //prepare hellacache req
     val dataExchangeState = RegInit(ld_idle)
@@ -186,14 +186,12 @@ class SVlsu(implicit p: Parameters) extends Module {
         when(io.dataExchange.resp.valid && io.dataExchange.resp.bits.has_data) {
             dataExchangeState := ld_complete
         } .elsewhen(io.dataExchange.resp.valid && io.dataExchange.resp.bits.replay) {
-            dataExchangeState := ld_replay
+            dataExchangeState := ld_issue
         }.otherwise {
             dataExchangeState := ld_wait
         }
     }.elsewhen(dataExchangeState === ld_complete) {
         dataExchangeState := ld_idle
-    }.elsewhen(dataExchangeState === ld_replay) {
-        dataExchangeState := ld_issue
     }.otherwise {
         dataExchangeState := ld_idle
     }
@@ -244,8 +242,6 @@ class SVlsu(implicit p: Parameters) extends Module {
     
     /**************************exception handling**********************************/
 
-
-    /**************************cache miss replay***********************************/
 
 
 

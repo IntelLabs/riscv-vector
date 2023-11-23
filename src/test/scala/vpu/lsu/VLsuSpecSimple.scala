@@ -108,6 +108,14 @@ class SVlsuTest extends AnyFlatSpec with ChiselScalatestTester {
       // Set up Hellacache response data
       dut.io.dataExchange.resp.valid.poke(true.B)
       dut.io.dataExchange.resp.bits.has_data.poke(true.B)
+      dut.io.dataExchange.resp.bits.replay.poke(true.B)
+      // Set the data to be returned by Hellacache
+      dut.io.dataExchange.resp.bits.data.poke("hffffffffffffffff".U)
+
+      dut.clock.step(4)
+      dut.io.dataExchange.resp.valid.poke(true.B)
+      dut.io.dataExchange.resp.bits.replay.poke(false.B)
+      dut.io.dataExchange.resp.bits.has_data.poke(true.B)
       // Set the data to be returned by Hellacache
       dut.io.dataExchange.resp.bits.data.poke("hffffffffffffffff".U)
 
