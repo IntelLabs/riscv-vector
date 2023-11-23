@@ -75,7 +75,7 @@ class VnTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String, 
             /* if(j % 2 == 0) 
             oldvd = oldvddata(sewIndex) */
             
-            println(s"vs2data(sew2Index) ${vs2data(sew2Index)}, sew2Index ${sew2Index}")
+            // println(s"vs2data(sew2Index) ${vs2data(sew2Index)}, sew2Index ${sew2Index}")
             var srcBundle = SrcBundle(
                     vs2=vs2data(sew2Index), 
                     old_vd=oldvd,
