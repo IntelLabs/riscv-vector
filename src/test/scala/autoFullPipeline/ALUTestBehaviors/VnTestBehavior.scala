@@ -66,7 +66,7 @@ class VnTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String, 
         var vdres = false
 
         val resultChecker = ALUResultChecker.newVnChecker(
-            n_ops, n_inputs, expectvd, useVxsat, vxsat, 
+            n_ops, n_inputs, expectvd, vflmul, useVxsat, vxsat, 
             (a, b) => this.dump(simi, a, b))
 
         var srcBundles : Seq[SrcBundle] = Seq()

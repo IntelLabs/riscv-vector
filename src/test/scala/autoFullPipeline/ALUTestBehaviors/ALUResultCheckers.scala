@@ -55,12 +55,13 @@ object ALUResultChecker {
         n_ops : Int, 
         n_inputs : Int,
         expectvd : Array[String],
+        vflmul : String,
         useVxsat : Boolean = false,
         goldenVxsat : Boolean = false,
         dump : (String, String) => Unit = (a, b) => {}
     ) : ALUVnResultChecker = {
         var rc = new ALUVnResultChecker(
-            n_ops, n_inputs, expectvd, dump
+            n_ops, n_inputs, expectvd, vflmul, dump
         )
 
         if (useVxsat) {
@@ -155,13 +156,41 @@ class ALUVnResultChecker(
     n_ops : Int, 
     n_inputs : Int,
     expectvd : Array[String],
+    val vflmul : String,
     dump : (String, String) => Unit = (a, b) => {}) extends ResultChecker(n_ops, expectvd, dump) {
     
     override def _checkRes(dutVd : BigInt, uopIdx : Int) : Boolean = {
+
         var correctness : Boolean = true
-        var vdRes : String = ""
-        var goldenVd : String = ""
-        val sewIndex = n_inputs - 1 - (uopIdx / 2)
+        // var vdRes : String = ""
+        // var goldenVd : String = ""
+        
+        val expectvdIdx = uopIdx / 2
+        val lower = uopIdx % 2 == 0
+        var goldenvd = ""
+        // var vd = dut.io.out.bits.vd.peek().litValue
+        var dutvd = f"h$dutVd%032x"
+        
+        if (vflmul != "0.250000" && 
+            vflmul != "0.500000" && 
+            vflmul != "0.125000") {
+            
+            goldenvd = expectvd((n_ops / 2) - 1 - expectvdIdx)
+            if (lower) {
+                goldenvd = s"h${goldenvd.slice(17, 33)}"
+                dutvd = s"h${dutvd.slice(17, 33)}"
+            } else {
+                goldenvd = s"h${goldenvd.slice(1, 17)}"
+                dutvd = s"h${dutvd.slice(1, 17)}"
+            }
+        }else {
+            goldenvd = expectvd(0)
+        }
+        correctness = dutvd.equals(goldenvd)
+        Logger.printvds(dutvd, goldenvd)
+
+        
+        /*val sewIndex = n_inputs - 1 - (uopIdx / 2)
         if (uopIdx % 2 == 1 || (n_ops == 1)) {
             // compare when it's odd uopidx or it has only one uop
             vdRes = f"h$dutVd%032x"
@@ -169,8 +198,8 @@ class ALUVnResultChecker(
             Logger.printvds(vdRes, goldenVd)
         }
 
-        correctness = vdRes.equals(goldenVd)
-        if (!correctness) dump(vdRes, goldenVd)
+        correctness = vdRes.equals(goldenVd)*/
+        if (!correctness) dump(dutvd, goldenvd)
 
         return correctness
     }
