@@ -230,7 +230,7 @@ class VfTestBehavior(fn : String, cb : CtrlBundle,
         fpRes.setup(n_res, (a, b, c) => this.dump(a, b, c, "")) // * fpRes
 
         var fpResultChecker = new FPResultChecker(
-            n_res, expectvd, simi, fpRes
+            n_res, expectvd, simi, fpRes, (a, b) => this.dump(simi, a, b)
         )
         fpResultChecker.setGoldenFflags(expectfflags)
 

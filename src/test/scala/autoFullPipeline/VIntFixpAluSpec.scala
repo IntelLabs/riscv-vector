@@ -198,7 +198,7 @@ object Dump {
       writer.write("---------------------------------------------------\n")
     }
     writer.close()
-
+    // println("record incorrest inst")
     recordIncorrectInst(instid)
   }
 
@@ -356,7 +356,7 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
     // new VfncvtxufwTestBehavior, // vfncvt.xu.f.w
     // new VfncvtxfwTestBehavior, // vfncvt.x.f.w
     // new VfncvtrtzxufwTestBehavior, // vfncvt.rtz.xu.f.w
-    // new VfncvtrtzxfwTestBehavior, // vfncvt.rtz.x.f.w
+    new VfncvtrtzxfwTestBehavior, // vfncvt.rtz.x.f.w
     // new VfncvtfxuwTestBehavior, // vfncvt.f.xu.w
     // new VfncvtfxwTestBehavior, // vfncvt.f.x.w
 
@@ -366,15 +366,15 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
     // new VfaddvvTestBehavior, // vfadd.vv
     // new VfsubvvTestBehavior, // vfsub.vv
 
-    new VfmulvvTestBehavior, // vfmul.vv
-    new VfmaccvvTestBehavior, // vfmacc.vv
-    new VfnmaccvvTestBehavior, // vfnmacc.vv
-    new VfmsacvvTestBehavior, // vfmsac.vv
-    new VfnmsacvvTestBehavior, // vfnmsac.vv
-    new VfmaddvvTestBehavior, // vfmadd.vv
-    new VfnmaddvvTestBehavior, // vfnmadd.vv
-    new VfmsubvvTestBehavior, // vfmsub.vv
-    new VfnmsubvvTestBehavior, // vfnmsub.vv
+    // new VfmulvvTestBehavior, // vfmul.vv
+    // new VfmaccvvTestBehavior, // vfmacc.vv
+    // new VfnmaccvvTestBehavior, // vfnmacc.vv
+    // new VfmsacvvTestBehavior, // vfmsac.vv
+    // new VfnmsacvvTestBehavior, // vfnmsac.vv
+    // new VfmaddvvTestBehavior, // vfmadd.vv
+    // new VfnmaddvvTestBehavior, // vfnmadd.vv
+    // new VfmsubvvTestBehavior, // vfmsub.vv
+    // new VfnmsubvvTestBehavior, // vfnmsub.vv
 
     // new VfminvvTestBehavior, // vfmin.vv
     // new VfmaxvvTestBehavior, // vfmax.vv
@@ -546,13 +546,18 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
   }
 
   val printRes : (() => Unit) = () => { 
+    var overallRes : Boolean = true
     println("============================== TEST RESULT ==================================")
     for(tb <- tbs) {
-      var result = "\u001b[32mSUCCESS\u001b[0m"
-      if (!tb.testResult) result = "\u001b[31mFAILED\u001b[0m"
+      var result = "SUCCESS"
+      if (!tb.testResult) {
+        overallRes = false
+        result = "!!!!!!! FAILED !!!!!!!!!"
+      }
       println(s"${tb.getInstid()} \t ${result}")
     }
     println("============================== TEST RESULT ==================================")
+    assert(overallRes, "Some instructions output incorrect result")
   }
 
   val currentDateTime: String = 
