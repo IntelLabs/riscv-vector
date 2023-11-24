@@ -50,6 +50,13 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   // val vfwredusum_vs = (funct6 === "b110001".U) && (funct3 === "b001".U)
   val vfwredusum_vs = false.B
 
+  val reg_vfredosum_vs = RegEnable(vfredosum_vs, false.B, fire)
+  val reg_vfredusum_vs = RegEnable(vfredusum_vs, false.B, fire)
+  val reg_vfredmax_vs = RegEnable(vfredmax_vs, false.B, fire)
+  val reg_vfredmin_vs = RegEnable(vfredmin_vs, false.B, fire)
+  val reg_vfwredosum_vs = RegEnable(vfwredosum_vs, false.B, fire)
+  val reg_vfwredusum_vs = RegEnable(vfwredusum_vs, false.B, fire)
+
   val fpu_red = vfredosum_vs ||
     vfredusum_vs ||
     vfredmax_vs ||
@@ -324,7 +331,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   val red_uop = Reg(new VExpdUOp)
   red_in_valid := (fpu_valid || ((red_state === calc_vs2) && red_out_valid)) & !flush & !red_uop.sysUop.robIdx.needFlush(io.redirect)
 
-  when(vfredosum_vs || vfwredosum_vs || vfwredusum_vs) {
+  when(reg_vfredosum_vs || reg_vfwredosum_vs || reg_vfwredusum_vs) {
     when(vs2_rnd0) {
       red_vs2_bits := red_vs1_zero
     }.otherwise {
