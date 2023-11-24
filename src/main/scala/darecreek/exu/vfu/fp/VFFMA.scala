@@ -40,10 +40,6 @@ class VFMASrcPreprocessPipe(implicit val p: Parameters) extends VFPUBaseModule {
     Mux(typeTag === VFPU.S, Cat(invert(x(63, 32), 32), invert(x(31, 0), 32)), invert(x, 64))
   }
 
-//  object WidenState extends ChiselEnum {
-//    val sEmpty, sWiden1, sWiden2 = Value
-//  }
-
   val io = IO(new Bundle() {
     val in = Flipped(Decoupled(new LaneFloatFUIn))
     val redirect = Input(ValidIO(new Redirect))
@@ -139,70 +135,7 @@ class VFMASrcPreprocessPipe(implicit val p: Parameters) extends VFPUBaseModule {
     Mux(uop.ctrl.widen || uop.ctrl.widen2, VFPU.D, uop.typeTag),
     transfer
   )
-//  io.out.bits.uop.fWidenEnd := RegEnable(
-//    widenState.isOneOf(WidenState.sWiden1, WidenState.sWiden2),
-//    transfer
-//  )
-
-  // FSM & ready/valid interface
-  // always accept new input, no matter if it is a widening
-  // io.in.ready := io.out.ready || !io.out.valid
-  // io.out.valid := validReg
-
-
-//  when(transfer) {
-//    // validReg := io.in.valid
-//    switch(widenState) {
-//      is(WidenState.sEmpty) {
-//        when(uop.ctrl.widen) {
-//          widenState := WidenState.sWiden1
-//        }.elsewhen(uop.ctrl.widen2) { // NOTE!!! It is assumed only .wv insts has widen2 == true
-//          widenState := WidenState.sWiden2
-//        }
-//      }
-//      is(WidenState.sWiden1) {
-//        when(uop.ctrl.widen) {
-//          widenState := WidenState.sEmpty
-//        }
-//      }
-//      is(WidenState.sWiden2) {
-//        when(uop.ctrl.widen2) {
-//          widenState := WidenState.sEmpty
-//        }
-//      }
-//    }
-//    //  } .elsewhen(io.out.ready) {
-//    //    validReg := false.B
-//  }
-
-
-
-  // switch(widenState) {
-  //   is(WidenState.sEmpty) {
-  //     when(transfer) {
-  //       validReg := true.B
-  //       when(uop.ctrl.widen) {
-  //         widenState := WidenState.sWiden1
-  //       }.elsewhen(uop.ctrl.widen2) {  // NOTE!!! It is assumed only .wv insts has widen2 == true
-  //         widenState := WidenState.sWiden2
-  //       }
-  //     }.elsewhen(io.out.ready) {
-  //       validReg := false.B
-  //     }
-  //   }
-  //   is(WidenState.sWiden1) {
-  //     when(io.out.ready) {
-  //       widenState := WidenState.sEmpty
-  //     }
-  //   }
-  //   is(WidenState.sWiden2) {
-  //     when(io.out.ready) {
-  //       widenState := WidenState.sEmpty
-  //     }
-  //   }
-  // }
 }
-
 
 class MulToAddIO(val ftypes: Seq[VFPU.FType])(implicit val p: Parameters) extends Bundle {
   val mulOut = MixedVec(ftypes.map(t => new FMULToFADD(t.expWidth, t.precision)))
@@ -222,38 +155,7 @@ class MulToAddIOVec(val ftypes: Seq[VFPU.FType])(implicit val p: Parameters) ext
   val mask = UInt(8.W)
   val tail = UInt(8.W)
   val uop = new VFPUOp
-
-  //  def getFloat0 = mul_out_0.head
-  //  def getDouble0 = mul_out_0.last
 }
-
-//
-//class FMAMidResult extends FMULToFADD(FPU.ftypes.last.expWidth, FPU.ftypes.last.precision) {
-//
-//  def toFloat: FMULToFADD = {
-//    val floatMidResult = Wire(new FMULToFADD(FPU.ftypes.head.expWidth, FPU.ftypes.head.precision))
-//    floatMidResult.fp_prod.sign := fp_prod.sign
-//    floatMidResult.fp_prod.exp := fp_prod.exp
-//    floatMidResult.fp_prod.sig := fp_prod.sig
-//    floatMidResult.inter_flags := inter_flags
-//    floatMidResult
-//  }
-//
-//  def fromFloat(float: FMULToFADD): FMULToFADD = {
-//    fp_prod.sign := float.fp_prod.sign
-//    fp_prod.exp := float.fp_prod.exp
-//    fp_prod.sig := float.fp_prod.sig
-//    inter_flags := float.inter_flags
-//    this
-//  }
-//}
-//
-//class FMAMidResultIO extends Bundle {
-//  val in = Flipped(ValidIO(new FMAMidResult))
-//  val out = ValidIO(new FMAMidResult)
-//  val waitForAdd = Input(Bool())
-//}
-
 
 class VFMUL_pipe(val mulLat: Int = 2)(implicit val p: Parameters)
   extends VFPUPipelineModule {
@@ -459,22 +361,6 @@ class VFFMA(implicit val p: Parameters) extends VFPUSubModule {
   mul_pipe.io.out.ready := Mux(mulOutIsFMA, add_pipe.io.in.ready, io.out.ready && !add_pipe.io.out.valid)
   add_pipe.io.out.ready := io.out.ready
 
-  //    io.out.bits.uop := RegNext(Mux(add_pipe.io.out.valid,
-  //      add_pipe.io.out.bits.uop,
-  //      mul_pipe.io.out.bits.uop
-  //    ))
-  //    io.out.bits.vd := Mux(RegNext(add_pipe.io.out.valid),
-  //      add_pipe.io.out.bits.vd,
-  //      mul_pipe.io.out.bits.vd
-  //    )
-  //    io.out.bits.fflags := Mux(RegNext(add_pipe.io.out.valid),
-  //      add_pipe.io.out.bits.fflags,
-  //      mul_pipe.io.out.bits.fflags
-  //    )
-  //    // delay 1 cycle to match timing of arithmetic result
-  //    io.out.valid := RegNext(add_pipe.io.out.valid || (mul_pipe.io.out.valid && !mulOutIsFMA))
-
-
   io.out.bits.uop := Mux(add_pipe.io.out.valid,
     add_pipe.io.out.bits.uop,
     mul_pipe.io.out.bits.uop
@@ -487,8 +373,7 @@ class VFFMA(implicit val p: Parameters) extends VFPUSubModule {
     add_pipe.io.out.bits.fflags,
     mul_pipe.io.out.bits.fflags
   )
-  // delay 1 cycle to match timing of arithmetic result
-  io.out.valid := add_pipe.io.out.valid || (mul_pipe.io.out.valid && !mulOutIsFMA)
 
+  io.out.valid := add_pipe.io.out.valid || (mul_pipe.io.out.valid && !mulOutIsFMA)
 
 }

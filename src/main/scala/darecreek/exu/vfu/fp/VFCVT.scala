@@ -60,26 +60,6 @@ class VFCVTDataModule(implicit val p: Parameters) extends VFPUPipelineModule {
   val isRtz = ctrl.cvtRm(1)
   val eleActives = S1Reg(VecInit(Seq(0, 4).map(isActive)))
 
-  //  object State extends ChiselEnum {
-  //    val sEmpty, sWiden, sNarrow = Value
-  //  }
-
-  //  val state = RegInit(State.sEmpty)
-  //  // widen/narrow fsm
-  //  when(regEnable(2)) {
-  //    when(uop.expdEnd) {
-  //      state := State.sEmpty
-  //    }.elsewhen(state === State.sEmpty) {
-  //      when(uop.ctrl.widen) {
-  //        state := State.sWiden
-  //      }.elsewhen(uop.ctrl.narrow) {
-  //        state := State.sNarrow
-  //      }
-  //    }.otherwise {
-  //      state := State.sEmpty
-  //    }
-  //  }
-
   // widening FP2FP
   // only need one, since widening insts has 2 output cycles
   val s2d = Module(new fudian.FPToFP(
@@ -213,8 +193,6 @@ class VFCVTDataModule(implicit val p: Parameters) extends VFPUPipelineModule {
   val uopReg = uopVec(2)
   io.out.bits.vd := Mux(uopReg.ctrl.narrow, narrowOutReg, nonNarrowOutReg)
   io.out.bits.fflags := Mux(uopReg.ctrl.narrow, narrowFlagOutReg, nonNarrowFlagOutReg)
-  // delay 1 cycle to match the timing of the arithmetic result
-  // io.out.valid := validVec.last && state =/= State.sNarrow  // block narrow cycle 1
   io.out.valid := validVec.last
   io.out.bits.uop := uopVec.last
 }
