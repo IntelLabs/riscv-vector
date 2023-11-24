@@ -25,7 +25,7 @@ class SVlsuTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.mUop.valid.poke(true.B)
       dut.io.mUop.bits.uopAttribute.ldest.poke(1.U)
       dut.io.mUop.bits.scalar_opnd_1.poke(0x1001.U)
-      dut.io.oldVd.poke(0.U)
+      dut.io.oldVd.poke("h7777777777777777".U)
       dut.io.mUop.bits.uopAttribute.scalarRegWriteEn.poke(false.B)
 
       dut.clock.step(1)
@@ -35,6 +35,7 @@ class SVlsuTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.clock.step(30)
 
       // Set up Hellacache response data
+      dut.io.dataExchange.req.ready.poke(true.B)
       dut.io.dataExchange.resp.valid.poke(true.B)
       dut.io.dataExchange.resp.bits.has_data.poke(true.B)
       // Set the data to be returned by Hellacache
