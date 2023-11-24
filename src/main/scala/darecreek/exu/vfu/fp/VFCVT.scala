@@ -60,25 +60,25 @@ class VFCVTDataModule(implicit val p: Parameters) extends VFPUPipelineModule {
   val isRtz = ctrl.cvtRm(1)
   val eleActives = S1Reg(VecInit(Seq(0, 4).map(isActive)))
 
-  object State extends ChiselEnum {
-    val sEmpty, sWiden, sNarrow = Value
-  }
+  //  object State extends ChiselEnum {
+  //    val sEmpty, sWiden, sNarrow = Value
+  //  }
 
-  val state = RegInit(State.sEmpty)
-  // widen/narrow fsm
-  when(regEnable(2)) {
-    when(uop.expdEnd) {
-      state := State.sEmpty
-    }.elsewhen(state === State.sEmpty) {
-      when(uop.ctrl.widen) {
-        state := State.sWiden
-      }.elsewhen(uop.ctrl.narrow) {
-        state := State.sNarrow
-      }
-    }.otherwise {
-      state := State.sEmpty
-    }
-  }
+  //  val state = RegInit(State.sEmpty)
+  //  // widen/narrow fsm
+  //  when(regEnable(2)) {
+  //    when(uop.expdEnd) {
+  //      state := State.sEmpty
+  //    }.elsewhen(state === State.sEmpty) {
+  //      when(uop.ctrl.widen) {
+  //        state := State.sWiden
+  //      }.elsewhen(uop.ctrl.narrow) {
+  //        state := State.sNarrow
+  //      }
+  //    }.otherwise {
+  //      state := State.sEmpty
+  //    }
+  //  }
 
   // widening FP2FP
   // only need one, since widening insts has 2 output cycles
@@ -154,7 +154,7 @@ class VFCVTDataModule(implicit val p: Parameters) extends VFPUPipelineModule {
     i2f.io.rm := rm1
   }
   i2d.io.int := Mux(
-    uop.ctrl.widen && uop.expdIdx(0),  // widening cycle1 included
+    uop.ctrl.widen && uop.expdIdx(0), // widening cycle1 included
     zeroExt(src.head(32), 64),
     Mux(uop.ctrl.widen && !uop.expdIdx(0), zeroExt(src.tail(32), 64),
       src)
@@ -189,20 +189,11 @@ class VFCVTDataModule(implicit val p: Parameters) extends VFPUPipelineModule {
     narrowFlag := i2sNarrowFlag
   }
   when(regEnable(2) && uop.ctrl.narrow) {
-    when(state === State.sEmpty) {
-      narrowFlagBuf := narrowFlag
-      when(uop.expdIdx(0)) {
-        narrowBuf(1) := narrow32b
-      }.otherwise {
-        narrowBuf(0) := narrow32b
-      }
-    }.elsewhen(state === State.sNarrow) {
-      narrowFlagBuf := narrowFlagBuf | narrowFlag
-      when(uop.expdIdx(0)) {
-        narrowBuf(1) := narrow32b
-      }.otherwise {
-        narrowBuf(0) := narrow32b
-      }
+    narrowFlagBuf := narrowFlag
+    when(uop.expdIdx(0)) {
+      narrowBuf(1) := narrow32b
+    }.otherwise {
+      narrowBuf(0) := narrow32b
     }
   }
   val narrowOutReg = Cat(narrowBuf(1), narrowBuf(0))
