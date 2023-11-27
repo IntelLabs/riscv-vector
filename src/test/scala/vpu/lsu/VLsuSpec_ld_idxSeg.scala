@@ -19,6 +19,9 @@ trait VLsuBehavior_ld_idxSeg {
   val vluxei32 = CtrlBundle(VLUXEI32_V)
   val vluxei64 = CtrlBundle(VLUXEI64_V)
   val vlseg2e8 = CtrlBundle(BitPat("b001") ## VLE8_V(28, 0))
+  val vlseg3e8 = CtrlBundle(BitPat("b010") ## VLE8_V(28, 0))
+  val vlseg3e16 = CtrlBundle(BitPat("b010") ## VLE16_V(28, 0), destEew=1)
+  val vlseg2e64 = CtrlBundle(BitPat("b001") ## VLE64_V(28, 0), destEew=3)
   
   def vLsuTest0(): Unit = {
     it should "pass: indexed load" in {
@@ -382,7 +385,7 @@ trait VLsuBehavior_ld_idxSeg {
   }
 
   def vLsuTest4(): Unit = {
-    it should "pass: segment load" in {
+    it should "pass: segment load vlseg2e8" in {
       test(new VLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
         test_init(dut)
         dut.clock.step(1)
@@ -444,6 +447,156 @@ trait VLsuBehavior_ld_idxSeg {
     }
   }
 
+  def vLsuTest5(): Unit = {
+    it should "pass: segment load vlseg3e16" in {
+      test(new VLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+        test_init(dut)
+        dut.clock.step(1)
+        val vSew = 1
+        val ldReqs = Seq(
+          (vlseg3e16.copy(vl=3, uopIdx=0), ldReqSrc_default),
+          (vlseg3e16.copy(vl=3, uopIdx=1, uopEnd=false), ldReqSrc_default),
+          (vlseg3e16.copy(vl=3, uopIdx=2, uopEnd=true), ldReqSrc_default),
+        )
+        val ldResps = Seq(
+          ("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d" + 
+            "0123456701234567_89abcdef89abcdef_0123456701234567_89abcdef89abcdef",
+           SeqId(el_count=3, el_off=0, el_id=0), ("h0", false)),
+           ("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d" + 
+            "0123456701234567_89abcdef89abcdef_0123456701234567_89abcdef89abcdef",
+           SeqId(el_count=3, el_off=0, el_id=1), ("h0", false)),
+           ("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d" + 
+            "0123456701234567_89abcdef89abcdef_0123456701234567_89abcdef89abcdef",
+           SeqId(el_count=3, el_off=0, el_id=2), ("h0", false)),
+        )
+        next_is_load_and_step(dut)
+        fork {
+          for ((c, s) <- ldReqs) {
+            while (!dut.io.fromIQ.ld.ready.peekBoolean()) {
+              dut.clock.step(1)
+            }
+            dut.io.fromIQ.ld.valid.poke(true.B)
+            dut.io.fromIQ.ld.bits.poke(genLdInput(c, s))
+            dut.clock.step(1)
+          }
+          dut.io.fromIQ.ld.valid.poke(false.B)
+          dut.clock.step(4)
+        }.join()
+
+        fork {
+          for ((ldData, seqId, mask)  <- ldResps) {
+            one_512b_load_resp(dut, ldData, seqId.asUInt, mask)
+            dut.clock.step(1)
+          }
+          dut.io.ovi_load.valid.poke(false.B)
+          dut.io.ovi_memop.sync_end.poke(true.B)
+          dut.clock.step(1)
+          dut.io.ovi_memop.sync_end.poke(false.B)
+        }.fork {
+          var wb_cnt = 0
+          for (i <- 0 until 10) {
+            if (dut.io.wb.ld.valid.peekBoolean()) {
+              if (wb_cnt == 0) {
+                dut.io.wb.ld.bits.vd.expect("hffffffffffff_ffffffffffffffff_ffffffffffffffff_ffffffff_cdefcdefcdef".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(0.U)
+              } else if (wb_cnt == 1) {
+                dut.io.wb.ld.bits.vd.expect("hffffffffffff_ffffffffffffffff_ffffffffffffffff_ffffffff_89ab89ab89ab".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(1.U)
+              } else {
+                dut.io.wb.ld.bits.vd.expect("hffffffffffff_ffffffffffffffff_ffffffffffffffff_ffffffff_cdefcdefcdef".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(2.U)
+              }
+              wb_cnt += 1
+            }
+            dut.clock.step(1)
+          }
+        }.join()
+
+        dut.clock.step(4)
+      }
+    }
+  }
+
+  def vLsuTest6(): Unit = {
+    it should "pass: segment load" in {
+      test(new VLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+        test_init(dut)
+        dut.clock.step(1)
+        val vSew = 1
+        val ldReqs = Seq(
+          (vlseg2e64.copy(vl=5, emulVd=2, uopIdx=0), ldReqSrc_default),
+          (vlseg2e64.copy(vl=5, emulVd=2, uopIdx=1), ldReqSrc_default),
+          (vlseg2e64.copy(vl=5, emulVd=2, uopIdx=2), ldReqSrc_default),
+          (vlseg2e64.copy(vl=5, emulVd=2, uopIdx=3, uopEnd=true), ldReqSrc_default),
+        )
+        val ldResps = Seq(
+          ("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d" + 
+            "0123456701234567_89abcdef89abcdef_0123456701234567_89abcdef89abcdef",
+           SeqId(el_count=2, el_off=0, el_id=0), ("h0", false)),
+           ("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d" + 
+            "0123456701234567_89abcdef89abcdef_0123456701234567_89abcdef89abcdef",
+           SeqId(el_count=2, el_off=0, el_id=1), ("h0", false)),
+           ("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d" + 
+            "0123456701234567_89abcdef89abcdef_0123456701234567_89abcdef89abcdef",
+           SeqId(el_count=2, el_off=0, el_id=2), ("h0", false)),
+           ("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d" + 
+            "0123456701234567_89abcdef89abcdef_0123456701234567_89abcdef89abcdef",
+           SeqId(el_count=2, el_off=0, el_id=3), ("h0", false)),
+           ("h0004000300020001_0008000700060005_000c000b000a0009_0001000f000e000d" + 
+            "0123456701234567_89abcdef89abcdef_0123456701234567_89abcdef89abcdef",
+           SeqId(el_count=2, el_off=0, el_id=4), ("h0", false)),
+        )
+        next_is_load_and_step(dut)
+        fork {
+          for ((c, s) <- ldReqs) {
+            while (!dut.io.fromIQ.ld.ready.peekBoolean()) {
+              dut.clock.step(1)
+            }
+            dut.io.fromIQ.ld.valid.poke(true.B)
+            dut.io.fromIQ.ld.bits.poke(genLdInput(c, s))
+            dut.clock.step(1)
+          }
+          dut.io.fromIQ.ld.valid.poke(false.B)
+          dut.clock.step(4)
+        }.join()
+
+        fork {
+          for ((ldData, seqId, mask)  <- ldResps) {
+            one_512b_load_resp(dut, ldData, seqId.asUInt, mask)
+            dut.clock.step(1)
+          }
+          dut.io.ovi_load.valid.poke(false.B)
+          dut.io.ovi_memop.sync_end.poke(true.B)
+          dut.clock.step(1)
+          dut.io.ovi_memop.sync_end.poke(false.B)
+        }.fork {
+          var wb_cnt = 0
+          for (i <- 0 until 10) {
+            if (dut.io.wb.ld.valid.peekBoolean()) {
+              if (wb_cnt == 0) {
+                dut.io.wb.ld.bits.vd.expect("h89abcdef89abcdef_89abcdef89abcdef_89abcdef89abcdef_89abcdef89abcdef".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(0.U)
+              } else if (wb_cnt == 1) {
+                dut.io.wb.ld.bits.vd.expect("hffffffffffffffff_ffffffffffffffff_ffffffffffffffff_89abcdef89abcdef".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(1.U)
+              } else if (wb_cnt == 2) {
+                dut.io.wb.ld.bits.vd.expect("h0123456701234567_0123456701234567_0123456701234567_0123456701234567".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(2.U)
+              } else if (wb_cnt == 3) {
+                dut.io.wb.ld.bits.vd.expect("hffffffffffffffff_ffffffffffffffff_ffffffffffffffff_0123456701234567".U)
+                dut.io.wb.ld.bits.uop.expdIdx.expect(3.U)
+              }
+              wb_cnt += 1
+            }
+            dut.clock.step(1)
+          }
+        }.join()
+
+        dut.clock.step(4)
+      }
+    }
+  }
+
 
 }
 
@@ -454,4 +607,6 @@ class VLsuSpec_ld_idxSeg extends AnyFlatSpec with ChiselScalatestTester with Bun
   it should behave like vLsuTest2()
   it should behave like vLsuTest3()
   it should behave like vLsuTest4()
+  it should behave like vLsuTest5()
+  it should behave like vLsuTest6()
 }

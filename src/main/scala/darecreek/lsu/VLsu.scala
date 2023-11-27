@@ -56,7 +56,7 @@ class VLoadDataBuf extends Module {
   //---- Segment write. Only for VLEN = 256 ----
   for (idxRf <- 0 until 8) {
     when (io.wen_seg) {
-      for (offset <- 0 until 3) {
+      for (offset <- 0 until 4) {
         when (io.woffset_seg === offset.U) {
           for (i <- 0 until 8) {
             when (io.wmask_seg(idxRf)(i)) {rf(idxRf)(offset*8 + i) := io.wdata_seg(idxRf)(i)}
@@ -163,7 +163,6 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   val eew_ld = Reg(UInt(3.W))
   val eew_ld_wire = Cat(false.B, ld.bits.uop.ctrl.funct3(1, 0))
   val destEew_ld = Reg(UInt(3.W))
-  // val destEew_ld_wire = Mux(ctrl_ld_wire.indexed, ld.bits.uop.info.vsew, eew_ld_wire)
   val destEew_ld_wire = ld.bits.uop.info.destEew
   val destEewOH_ld = Reg(new SewOH)
   val destEewOH_ld_wire = SewOH(destEew_ld_wire)
@@ -183,6 +182,7 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
     rs2_ld := ld.bits.rs2
     nf_ld := ld.bits.uop.ctrl.funct6(5, 3)
   }
+  val emulVd = RegEnable(ld.bits.uop.info.emulVd, firstLdFire)
 
   // Ld Data Buffer
   val ldDataBuf = Module(new VLoadDataBuf)
@@ -304,8 +304,7 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   /**
     *  Write Load Data Buffer for Segment instrn
     */
-  val veew_minus_vsew = destEew_ld - sew_ld
-  val vemul = vlmul_ld + veew_minus_vsew
+  // TODO: emulVd: check if this works for indexed segement
   val seg_wmask = io.ovi_load.mask(0)
   val seg_ValidWen = RegNext(ldValid)
   val seg_wdata = Reg(Vec(8, Vec(8, UInt(8.W))))
@@ -315,33 +314,33 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
                                   Mux1H(destEewOH_ld.oneHot, Seq(1.U, 2.U, 4.U, 8.U)), cntSeg))
   // If emul > 1, each filed will take multiple registers, idxRf -> idxRf/emul
   // Note: for segment instrn, emul <= 4
-  def segDataSelect(vemul: UInt, data: Seq[UInt], idxRf: Int, eewByte: Int, j: Int) = {
+  def segDataSelect(emul: UInt, data: Seq[UInt], idxRf: Int, eewByte: Int, j: Int) = {
     Mux1H(Seq(
-      (vemul === 0.U || vemul(2)) -> data(idxRf * eewByte + j),
-      (vemul === 1.U) -> data((idxRf/2) * eewByte + j),
-      (vemul === 2.U) -> data((idxRf/4) * eewByte + j),
-      (vemul === 3.U) -> data((idxRf/8) * eewByte + j)
+      (emul === 1.U) -> data(idxRf * eewByte + j),
+      (emul === 2.U) -> data((idxRf/2) * eewByte + j),
+      (emul === 4.U) -> data((idxRf/4) * eewByte + j),
+      // (emul === 8.U) -> data((idxRf/8) * eewByte + j)
     ))
   }
   for (idxRf <- 0 until 8) {
     when (ldValid) {
       when (destEewOH_ld.is8) {
         seg_wen(idxRf) := "b0000_0001".U << cntSeg(2, 0) 
-        seg_wdata(idxRf)(cntSeg(2, 0)) := segDataSelect(vemul, UIntSplit(io.ovi_load.data, 8), idxRf, 1, 0)
+        seg_wdata(idxRf)(cntSeg(2, 0)) := segDataSelect(emulVd, UIntSplit(io.ovi_load.data, 8), idxRf, 1, 0)
       }.elsewhen (destEewOH_ld.is16) {
         seg_wen(idxRf) := "b0000_0011".U << Cat(cntSeg(2, 1), 0.U(1.W))
         for (j <- 0 until 2) {
-          seg_wdata(idxRf)(Cat(cntSeg(2, 1), j.U(1.W))) := segDataSelect(vemul, UIntSplit(io.ovi_load.data, 8), idxRf, 2, j)
+          seg_wdata(idxRf)(Cat(cntSeg(2, 1), j.U(1.W))) := segDataSelect(emulVd, UIntSplit(io.ovi_load.data, 8), idxRf, 2, j)
         }
       }.elsewhen (destEewOH_ld.is32) {
         seg_wen(idxRf) := "b0000_1111".U << Cat(cntSeg(2), 0.U(2.W))
         for (j <- 0 until 4) {
-          seg_wdata(idxRf)(Cat(cntSeg(2), j.U(2.W))) := segDataSelect(vemul, UIntSplit(io.ovi_load.data, 8), idxRf, 4, j)
+          seg_wdata(idxRf)(Cat(cntSeg(2), j.U(2.W))) := segDataSelect(emulVd, UIntSplit(io.ovi_load.data, 8), idxRf, 4, j)
         }
       }.otherwise {
         seg_wen(idxRf) := "b1111_1111".U
         for (j <- 0 until 8) {
-          seg_wdata(idxRf)(j) := segDataSelect(vemul, UIntSplit(io.ovi_load.data, 8), idxRf, 8, j)
+          seg_wdata(idxRf)(j) := segDataSelect(emulVd, UIntSplit(io.ovi_load.data, 8), idxRf, 8, j)
         }
       }
     }.otherwise {
@@ -349,24 +348,25 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
     }
   }
 
-  val vemulReg = RegNext(vemul)
+  val emulVdReg = RegNext(emulVd)
   val emulKeep_seg = Wire(UInt(8.W))
   // Note: for segment instrn, emul <= 4
   // Only work for VLEN = 256
-  when (vemulReg === 0.U || vemulReg(2)) {
+  val cntSeg_r = RegNext(cntSeg)
+  when (emulVdReg === 1.U) {
     emulKeep_seg := "b1111_1111".U
-  }.elsewhen (vemulReg === 1.U) {
-    emulKeep_seg := Mux(cntSeg(vlenbWidth+2, 5) === 0.U, "b0101_0101".U, "b1010_1010".U)
+  }.elsewhen (emulVdReg === 2.U) {
+    emulKeep_seg := Mux(cntSeg_r(vlenbWidth+2, 5) === 0.U, "b0101_0101".U, "b1010_1010".U)
   }.otherwise {
-    emulKeep_seg := Mux(cntSeg(vlenbWidth+2, 5) === 0.U, "b0001_0001".U,
-                    Mux(cntSeg(vlenbWidth+2, 5) === 1.U, "b0010_0010".U,
-                    Mux(cntSeg(vlenbWidth+2, 5) === 2.U, "b0100_0100".U, "b1000_1000".U)))
+    emulKeep_seg := Mux(cntSeg_r(vlenbWidth+2, 5) === 0.U, "b0001_0001".U,
+                    Mux(cntSeg_r(vlenbWidth+2, 5) === 1.U, "b0010_0010".U,
+                    Mux(cntSeg_r(vlenbWidth+2, 5) === 2.U, "b0100_0100".U, "b1000_1000".U)))
   }
   val nfKeep_seg = Wire(UInt(8.W))
   val nf_oneHot = Seq.tabulate(8)(nf => nf_ld === nf.U)
-  when (vemulReg === 0.U || vemulReg(2)) {
+  when (emulVdReg === 1.U) {
     nfKeep_seg := Mux1H(nf_oneHot, Seq.tabulate(8)(i => ("b" + "0"*(7-i) + "1"*(i+1)).U))
-  }.elsewhen (vemulReg === 1.U) {
+  }.elsewhen (emulVdReg === 2.U) {
     nfKeep_seg := Mux1H(nf_oneHot.take(4), Seq.tabulate(4)(i => ("b" + "00"*(3-i) + "11"*(i+1)).U))
   }.otherwise {
     nfKeep_seg := Mux1H(nf_oneHot.take(2), Seq.tabulate(2)(i => ("b" + "0000"*(1-i) + "1111"*(i+1)).U))
@@ -376,7 +376,7 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
     ldDataBuf.io.wmask_seg(idxRf) := (Fill(8, (emulKeep_seg & nfKeep_seg)(idxRf)) & seg_wen(idxRf)).asBools
   }
   ldDataBuf.io.wen_seg := seg_ValidWen && ctrl_ld.segment
-  ldDataBuf.io.woffset_seg := cntSeg(vlenbWidth-1, 3)
+  ldDataBuf.io.woffset_seg := Cat(0.U(1.W), cntSeg_r(vlenbWidth-2, 3))
   ldDataBuf.io.wdata_seg := seg_wdata
 
 

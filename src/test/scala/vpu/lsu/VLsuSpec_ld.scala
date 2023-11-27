@@ -25,6 +25,7 @@ class VExpdUOpTest extends Bundle {
   val info_vl = UInt(bVL.W)
   val info_vstart = UInt(bVstart.W)
   val info_destEew = UInt(3.W)
+  val info_emulVd = UInt(4.W)
   val expdIdx = UInt(3.W)
   val expdEnd = Bool()
 }
@@ -114,6 +115,7 @@ class VLsuTestWrapper extends Module {
       lsu_uop.info.vl := io_uop.info_vl
       lsu_uop.info.vstart := io_uop.info_vstart
       lsu_uop.info.destEew := io_uop.info_destEew
+      lsu_uop.info.emulVd := io_uop.info_emulVd
       lsu_uop.expdIdx := io_uop.expdIdx
       lsu_uop.expdEnd := io_uop.expdEnd
     }
