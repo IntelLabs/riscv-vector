@@ -182,6 +182,12 @@ abstract class TestEngine extends BundleGenHelper {
                     }
                 }
 
+                if (flush && (sendRobIdx <= flushedRobIdx)) { // flush compare
+                    // in case of robIdx wrapped around, send=0 flush=255
+                    println("0.0.1. flushedRobIdx wrapped around! Ignoring..")
+                    flush = false
+                }
+
                 println(s"0.1. Before sending to the dut, flush=${flush}, flushedRobIdx=${flushedRobIdx}")
                 stepRes = iterate(dut, chosenTestCase, sendRobIdx, flush=flush, flushedRobIdx=flushedRobIdx)
                 if (chosenTestCase.isExhausted()) 
