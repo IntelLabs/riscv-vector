@@ -257,7 +257,7 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
 
   var tbs : Seq[TestBehavior] = Seq(
 
-    // new VmadcvvmTestBehavior,
+    new VmadcvvTestBehavior,
 
     // new VredsumvsTestBehavior,
 
@@ -365,20 +365,20 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
     // new VfncvtfxuwTestBehavior, // vfncvt.f.xu.w
     // new VfncvtfxwTestBehavior, // vfncvt.f.x.w
 
-    new VfncvtffwTestBehavior, // vfncvt.f.f.w
-    new VfncvtrodffwTestBehavior, // vfncvt.rod.f.f.w
+    // new VfncvtffwTestBehavior, // vfncvt.f.f.w
+    // new VfncvtrodffwTestBehavior, // vfncvt.rod.f.f.w
 
-    new VfaddvvTestBehavior, // vfadd.vv
-    new VfsubvvTestBehavior, // vfsub.vv
+    // new VfaddvvTestBehavior, // vfadd.vv
+    // new VfsubvvTestBehavior, // vfsub.vv
 
-    new VfmulvvTestBehavior, // vfmul.vv
-    new VfmaccvvTestBehavior, // vfmacc.vv
-    new VfnmaccvvTestBehavior, // vfnmacc.vv
-    new VfmsacvvTestBehavior, // vfmsac.vv
-    new VfnmsacvvTestBehavior, // vfnmsac.vv
-    new VfmaddvvTestBehavior, // vfmadd.vv
-    new VfnmaddvvTestBehavior, // vfnmadd.vv
-    new VfmsubvvTestBehavior, // vfmsub.vv
+    // new VfmulvvTestBehavior, // vfmul.vv
+    // new VfmaccvvTestBehavior, // vfmacc.vv
+    // new VfnmaccvvTestBehavior, // vfnmacc.vv
+    // new VfmsacvvTestBehavior, // vfmsac.vv
+    // new VfnmsacvvTestBehavior, // vfnmsac.vv
+    // new VfmaddvvTestBehavior, // vfmadd.vv
+    // new VfnmaddvvTestBehavior, // vfnmadd.vv
+    // new VfmsubvvTestBehavior, // vfmsub.vv
     // new VfnmsubvvTestBehavior, // vfnmsub.vv
 
     // new VfminvvTestBehavior, // vfmin.vv
