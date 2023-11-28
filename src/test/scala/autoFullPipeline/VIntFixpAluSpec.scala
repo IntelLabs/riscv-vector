@@ -240,6 +240,7 @@ object Datapath {
   // val testdataRoot = "/home/maoting/nanhu/testdata/10_10/unittest/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/10_13/unittest/"
   val testdataRoot = "/home/maoting/nanhu/testdata/11_22/unittest/"
+  // val testdataRoot = "/home/maoting/nanhu/testdata/11_27/2023_11_27_14_36_data/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/debug/"
   //val testdataRoot = "C:\\kou\\XS_Vector_Unit\\src\\test\\scala\\unittest\\"
   // val testdataRoot = "/home/kou/unittest/"
@@ -255,6 +256,8 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
   if(Dump.DUMP) println(s"DUMP is turned on. Incorrect inputs will be saved to ${Dump.fileName}")
 
   var tbs : Seq[TestBehavior] = Seq(
+
+    // new VmadcvvmTestBehavior,
 
     // new VredsumvsTestBehavior,
 
@@ -347,9 +350,9 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
     // new VmadcvxmTestBehavior,
 
     // FP ===============================
-    new VfredosumvsTestBehavior, // vfredosum.vs
-    new VfredusumvsTestBehavior, // vfredusum.vs
-    new VfredmaxvsTestBehavior, // vfredmax.vs
+    // new VfredosumvsTestBehavior, // vfredosum.vs
+    // new VfredusumvsTestBehavior, // vfredusum.vs
+    // new VfredmaxvsTestBehavior, // vfredmax.vs
     // new VfredminvsTestBehavior, // vfredmin.vs
 
     // new VfwredosumvsTestBehavior, // vfwredosum.vs
@@ -362,20 +365,20 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
     // new VfncvtfxuwTestBehavior, // vfncvt.f.xu.w
     // new VfncvtfxwTestBehavior, // vfncvt.f.x.w
 
-    // new VfncvtffwTestBehavior, // vfncvt.f.f.w
-    // new VfncvtrodffwTestBehavior, // vfncvt.rod.f.f.w
+    new VfncvtffwTestBehavior, // vfncvt.f.f.w
+    new VfncvtrodffwTestBehavior, // vfncvt.rod.f.f.w
 
-    // new VfaddvvTestBehavior, // vfadd.vv
-    // new VfsubvvTestBehavior, // vfsub.vv
+    new VfaddvvTestBehavior, // vfadd.vv
+    new VfsubvvTestBehavior, // vfsub.vv
 
-    // new VfmulvvTestBehavior, // vfmul.vv
-    // new VfmaccvvTestBehavior, // vfmacc.vv
-    // new VfnmaccvvTestBehavior, // vfnmacc.vv
-    // new VfmsacvvTestBehavior, // vfmsac.vv
-    // new VfnmsacvvTestBehavior, // vfnmsac.vv
-    // new VfmaddvvTestBehavior, // vfmadd.vv
-    // new VfnmaddvvTestBehavior, // vfnmadd.vv
-    // new VfmsubvvTestBehavior, // vfmsub.vv
+    new VfmulvvTestBehavior, // vfmul.vv
+    new VfmaccvvTestBehavior, // vfmacc.vv
+    new VfnmaccvvTestBehavior, // vfnmacc.vv
+    new VfmsacvvTestBehavior, // vfmsac.vv
+    new VfnmsacvvTestBehavior, // vfnmsac.vv
+    new VfmaddvvTestBehavior, // vfmadd.vv
+    new VfnmaddvvTestBehavior, // vfnmadd.vv
+    new VfmsubvvTestBehavior, // vfmsub.vv
     // new VfnmsubvvTestBehavior, // vfnmsub.vv
 
     // new VfminvvTestBehavior, // vfmin.vv
