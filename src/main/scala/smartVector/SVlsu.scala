@@ -150,7 +150,12 @@ class SVlsu(implicit p: Parameters) extends Module {
             // setup info
             // mw + width[2:0] 
             val mwCatWidth = Cat(funct6(2), funct3)
-            val eewb = mwCatWidth + 1.U
+            val eewb = MuxCase(1.U, Array(
+                (mwCatWidth === "b0001".U) -> 1.U,
+                (mwCatWidth === "b0101".U) -> 2.U,
+                (mwCatWidth === "b0110".U) -> 4.U,
+                (mwCatWidth === "b0111".U) -> 8.U,
+            ))
             eewbReg := eewb
 
             // ldst type
@@ -184,7 +189,7 @@ class SVlsu(implicit p: Parameters) extends Module {
                 when(i.U < uopVl) {
                     for(j <- 0 until segNum) {
                         when(j.U < eewb) {
-                            vregInfo(i.U * eewb + j.U).status := VRegSegmentStatus.needData
+                            vregInfo((splitOffset + i.U) * eewb + j.U).status := VRegSegmentStatus.needData
                         }
                     }
                 }
@@ -206,8 +211,8 @@ class SVlsu(implicit p: Parameters) extends Module {
             for(i <- 0 until segNum) {
                 when(i.U < eewbReg) {
                     vregInfo((splitOffset + curSplitIdx) * eewbReg + i.U).status := VRegSegmentStatus.notReady
-                    vregInfo((splitOffset + curSplitIdx) + i.U).idx := ldstEnqPtr
-                    vregInfo((splitOffset + curSplitIdx) + i.U).offset := offset + i.U
+                    vregInfo((splitOffset + curSplitIdx) * eewbReg + i.U).idx := ldstEnqPtr
+                    vregInfo((splitOffset + curSplitIdx) * eewbReg + i.U).offset := offset + i.U
                 }
             }
             curSplitIdx := curSplitIdx + 1.U
