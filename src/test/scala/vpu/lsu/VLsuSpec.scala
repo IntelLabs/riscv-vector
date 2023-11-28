@@ -18,22 +18,22 @@ import darecreek.lsu._
 class VUopTest extends Bundle {
     val ctrl_funct6 = UInt(6.W)
     val ctrl_funct3 = UInt(3.W)
-    val ctrl_load = Bool()
-    val ctrl_store = Bool()
-    val ctrl_vm = Bool()
-    val info_ma = Bool()
-    val info_ta = Bool()
-    val info_vsew = UInt(3.W)
-    val info_vlmul = UInt(3.W)
-    val info_vl = UInt(bVL.W)
+    val ctrl_load   = Bool()
+    val ctrl_store  = Bool()
+    val ctrl_vm     = Bool()
+    val info_ma     = Bool() // vector mask agnostic, data unknown or undisturbed
+    val info_ta     = Bool() // vector tail agnostic, data unknown or undisturbed
+    val info_vsew   = UInt(3.W)
+    val info_vlmul  = UInt(3.W)
+    val info_vl     = UInt(bVL.W)
     val info_vstart = UInt(bVstart.W)
     val splitUopIdx = UInt(3.W)
     val splitUopEnd = Bool()
 }
 
 class MuopTest extends Bundle {
-    val uop = new VUopTest
-    val oldVd = Input(UInt(VLEN.W))
+    val uop           = new VUopTest
+    val oldVd         = Input(UInt(VLEN.W))
     val scalar_opnd_1 = UInt(64.W)
     val scalar_opnd_2 = UInt(64.W)
     val vs1           = UInt(128.W)
@@ -49,16 +49,19 @@ class FakeDCache(ldResps: Seq[(UInt, UInt)]) extends Module {
 
     val ldResp = RegInit(0.U(64.W))
     val ldRespSeqId = RegInit(0.U(log2Ceil(ldResps.length).W))
+    val queueIdx = RegNext(RegNext(io.req.bits.idx))
     
-    io.xcpt := DontCare
-    io.busy := false.B
-    io.req.ready := true.B
-    io.resp.valid := false.B
-    io.resp.bits.replay := false.B
-    io.resp.bits.has_data := false.B
-    io.resp.bits.data := 0.U
-    io.resp.bits.mask := 0.U
+    io.xcpt                 := DontCare
+    io.req.ready            := true.B
 
+    io.resp.valid           := false.B
+    io.resp.bits.nack       := false.B
+    io.resp.bits.has_data   := false.B
+    io.resp.bits.data       := 0.U
+    io.resp.bits.mask       := 0.U
+    io.resp.bits.idx        := 0.U
+
+    // fsm transition logic
     when(state === s0) {
         when(io.req.valid) {
             nextState := s1
@@ -70,21 +73,15 @@ class FakeDCache(ldResps: Seq[(UInt, UInt)]) extends Module {
     }.otherwise {
         nextState := s0
     }
-
     state := nextState
 
-
-    when(state === s1) {
-        io.resp.valid := false.B
-        io.resp.bits.replay := false.B
-        io.resp.bits.has_data := false.B
-        io.resp.bits.mask := 0.U
-        io.req.ready := false.B
-    }.elsewhen(state === s2) {
-        io.resp.valid := true.B
-        io.resp.bits.replay := false.B
-        io.resp.bits.has_data := true.B
-        io.resp.bits.mask := 0.U
+    // fsm output logic
+    when(state === s2) {
+        io.resp.valid           := true.B
+        io.resp.bits.nack       := false.B
+        io.resp.bits.has_data   := true.B
+        io.resp.bits.mask       := 0.U
+        io.resp.bits.idx        := queueIdx
 
         for(i <- 0 until ldResps.length) {
             when(i.U === ldRespSeqId) {
@@ -93,7 +90,6 @@ class FakeDCache(ldResps: Seq[(UInt, UInt)]) extends Module {
         }
 
         ldRespSeqId := ldRespSeqId + 1.U
-        
     }
 }
 
@@ -101,7 +97,7 @@ class SmartVectorLsuTestWrapper(ldResps: Seq[(UInt, UInt)]) extends Module {
     val io = IO(new Bundle {
         val mUop = Flipped(ValidIO(new MuopTest))
         val lsuOut = ValidIO(new VLSUOutput)
-        val xcpt = Output(new VLSUXcpt)
+        val xcpt = Output(new HellaCacheExceptions)
         val lsuReady = Output(Bool())
     })
 
@@ -113,52 +109,48 @@ class SmartVectorLsuTestWrapper(ldResps: Seq[(UInt, UInt)]) extends Module {
 
     val vLsu = Module(new SVlsu()(p))
   
-    io.lsuReady := vLsu.io.lsuReady
+    io.lsuReady                             := vLsu.io.lsuReady
+    vLsu.io.oldVd                           := io.mUop.bits.oldVd
+    vLsu.io.mUop.valid                      := io.mUop.valid
 
-    vLsu.io.mUop.valid := io.mUop.valid
+    vLsu.io.mUop.bits.scalar_opnd_1         := io.mUop.bits.scalar_opnd_1
+    vLsu.io.mUop.bits.scalar_opnd_2         := io.mUop.bits.scalar_opnd_2
+    vLsu.io.mUop.bits.uopRegInfo.vs1        := io.mUop.bits.vs1
+    vLsu.io.mUop.bits.uopRegInfo.vs2        := io.mUop.bits.vs2
+    vLsu.io.mUop.bits.uopRegInfo.vxsat      := false.B
     
-    vLsu.io.oldVd := io.mUop.bits.oldVd
+    vLsu.io.mUop.bits.uop.sysUop            := DontCare
+    vLsu.io.mUop.bits.uop.uopIdx            := io.mUop.bits.uop.splitUopIdx
+    vLsu.io.mUop.bits.uop.uopEnd            := io.mUop.bits.uop.splitUopEnd
 
-    vLsu.io.mUop.bits.scalar_opnd_1 := io.mUop.bits.scalar_opnd_1
-    vLsu.io.mUop.bits.scalar_opnd_2 := io.mUop.bits.scalar_opnd_2
-    vLsu.io.mUop.bits.uopRegInfo.vs1 := io.mUop.bits.vs1
-    vLsu.io.mUop.bits.uopRegInfo.vs2 := io.mUop.bits.vs2
-    vLsu.io.mUop.bits.uopRegInfo.vxsat := false.B
-    vLsu.io.mUop.bits.uop.sysUop := DontCare
+    vLsu.io.mUop.bits.uop.ctrl.funct6       := io.mUop.bits.uop.ctrl_funct6
+    vLsu.io.mUop.bits.uop.ctrl.funct3       := io.mUop.bits.uop.ctrl_funct3
+    vLsu.io.mUop.bits.uop.ctrl.load         := io.mUop.bits.uop.ctrl_load
+    vLsu.io.mUop.bits.uop.ctrl.store        := io.mUop.bits.uop.ctrl_store
+    vLsu.io.mUop.bits.uop.ctrl.vm           := io.mUop.bits.uop.ctrl_vm
+    vLsu.io.mUop.bits.uop.ctrl.vs1_imm      := DontCare
+    vLsu.io.mUop.bits.uop.ctrl.narrow       := DontCare
+    vLsu.io.mUop.bits.uop.ctrl.narrow_to_1  := DontCare
+    vLsu.io.mUop.bits.uop.ctrl.widen        := DontCare
+    vLsu.io.mUop.bits.uop.ctrl.widen2       := DontCare
 
+    vLsu.io.mUop.bits.uop.info.ma           := io.mUop.bits.uop.info_ma
+    vLsu.io.mUop.bits.uop.info.ta           := io.mUop.bits.uop.info_ta
+    vLsu.io.mUop.bits.uop.info.vsew         := io.mUop.bits.uop.info_vsew
+    vLsu.io.mUop.bits.uop.info.vlmul        := io.mUop.bits.uop.info_vlmul
+    vLsu.io.mUop.bits.uop.info.vl           := io.mUop.bits.uop.info_vl
+    vLsu.io.mUop.bits.uop.info.vstart       := io.mUop.bits.uop.info_vstart
+    vLsu.io.mUop.bits.uop.info.vxrm         := DontCare
+    vLsu.io.mUop.bits.uop.info.frm          := DontCare
 
-    vLsu.io.mUop.bits.uop.ctrl.funct6 := io.mUop.bits.uop.ctrl_funct6
-    vLsu.io.mUop.bits.uop.ctrl.funct3 := io.mUop.bits.uop.ctrl_funct3
-    vLsu.io.mUop.bits.uop.ctrl.load := io.mUop.bits.uop.ctrl_load
-    vLsu.io.mUop.bits.uop.ctrl.store := io.mUop.bits.uop.ctrl_store
-    vLsu.io.mUop.bits.uop.ctrl.vm := io.mUop.bits.uop.ctrl_vm
-    vLsu.io.mUop.bits.uop.ctrl.vs1_imm := DontCare
-    vLsu.io.mUop.bits.uop.ctrl.narrow := DontCare
-    vLsu.io.mUop.bits.uop.ctrl.narrow_to_1 := DontCare
-    vLsu.io.mUop.bits.uop.ctrl.widen := DontCare
-    vLsu.io.mUop.bits.uop.ctrl.widen2 := DontCare
-
-    vLsu.io.mUop.bits.uop.info.ma := io.mUop.bits.uop.info_ma
-    vLsu.io.mUop.bits.uop.info.ta := io.mUop.bits.uop.info_ta
-    vLsu.io.mUop.bits.uop.info.vsew := io.mUop.bits.uop.info_vsew
-    vLsu.io.mUop.bits.uop.info.vlmul := io.mUop.bits.uop.info_vlmul
-    vLsu.io.mUop.bits.uop.info.vl := io.mUop.bits.uop.info_vl
-    vLsu.io.mUop.bits.uop.info.vstart := io.mUop.bits.uop.info_vstart
-    vLsu.io.mUop.bits.uop.info.vxrm := DontCare
-    vLsu.io.mUop.bits.uop.info.frm := DontCare
-    vLsu.io.mUop.bits.uop.uopIdx := io.mUop.bits.uop.splitUopIdx
-    vLsu.io.mUop.bits.uop.uopEnd := io.mUop.bits.uop.splitUopEnd
-
-    io.lsuOut.valid := vLsu.io.lsuOut.valid
-    io.lsuOut.bits.vd := vLsu.io.lsuOut.bits.vd
-    io.lsuOut.bits.uopQueueIdx := 0.U
+    io.lsuOut.valid                         := vLsu.io.lsuOut.valid
+    io.lsuOut.bits.vd                       := vLsu.io.lsuOut.bits.vd
+    io.lsuOut.bits.uopQueueIdx              := 0.U
 
     val dcache = Module(new FakeDCache(ldResps))
     vLsu.io.dataExchange <> dcache.io
 
-
-    io.xcpt := DontCare
-
+    io.xcpt := vLsu.io.xcpt
 }
 
 
@@ -166,16 +158,16 @@ trait VLsuBehavior_ld {
   this: AnyFlatSpec with ChiselScalatestTester with BundleGenHelper =>
 
     val ldReqSrc_default = SrcBundleLd()
-    val vle8 = CtrlBundle(VLE8_V)
-    val vle16 = CtrlBundle(VLE16_V)
-    val vle32 = CtrlBundle(VLE32_V)
-    val vle64 = CtrlBundle(VLE64_V)
-    val vlm = CtrlBundle(VLM_V)
-    val vlse8 = CtrlBundle(VLSE8_V)
-    val vlse16 = CtrlBundle(VLSE16_V)
-    val vlse32 = CtrlBundle(VLSE32_V)
-    val vlse64 = CtrlBundle(VLSE64_V)
-    val vse8 = CtrlBundle(VSE8_V)
+    val vle8    = CtrlBundle(VLE8_V)
+    val vle16   = CtrlBundle(VLE16_V)
+    val vle32   = CtrlBundle(VLE32_V)
+    val vle64   = CtrlBundle(VLE64_V)
+    val vlm     = CtrlBundle(VLM_V)
+    val vlse8   = CtrlBundle(VLSE8_V)
+    val vlse16  = CtrlBundle(VLSE16_V)
+    val vlse32  = CtrlBundle(VLSE32_V)
+    val vlse64  = CtrlBundle(VLSE64_V)
+    val vse8    = CtrlBundle(VSE8_V)
   
     val ldRespsTest0 = Seq(
         (0x00040003.U, 0.U),
@@ -248,8 +240,8 @@ trait VLsuBehavior_ld {
             test_init(dut)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vle8.copy(vl=19, uopIdx=0, ta=false), ldReqSrc_default, "hffffffffffffffff0123456789abcdef".U), 
-                (vle8.copy(vl=19, uopIdx=1, uopEnd=true, ta=false), ldReqSrc_default, "h201f1e1d1c1b1a1918171615140f0f0f".U),
+                (vle8.copy(vl=19, uopIdx=0), ldReqSrc_default, "hffffffffffffffff0123456789abcdef".U),
+                (vle8.copy(vl=19, uopIdx=1, uopEnd=true), ldReqSrc_default, "h201f1e1d1c1b1a1918171615140f0f0f".U),
             )
 
             next_is_load_and_step(dut)
