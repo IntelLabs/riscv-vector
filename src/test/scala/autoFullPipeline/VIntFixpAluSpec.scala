@@ -239,7 +239,8 @@ object Datapath {
   // val testdataRoot = "/home/maoting/nanhu/testdata/9_6/unittest/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/10_10/unittest/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/10_13/unittest/"
-  val testdataRoot = "/home/maoting/nanhu/testdata/11_22/unittest/"
+  // val testdataRoot = "/home/maoting/nanhu/testdata/11_22/unittest/"
+  val testdataRoot = "/home/maoting/nanhu/testdata/11_28/unittest/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/11_27/2023_11_27_14_36_data/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/debug/"
   //val testdataRoot = "C:\\kou\\XS_Vector_Unit\\src\\test\\scala\\unittest\\"
@@ -257,7 +258,8 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
 
   var tbs : Seq[TestBehavior] = Seq(
 
-    new VmadcvvTestBehavior,
+    // new VmadcvvTestBehavior,
+    new VfmvfsTestBehavior,
 
     // new VredsumvsTestBehavior,
 
