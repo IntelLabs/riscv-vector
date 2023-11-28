@@ -168,6 +168,13 @@ class VTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String,
         var vdres = false
 
         val n_ops = n_inputs // if (hasVd) n_inputs; else 1
+
+        if (hasFd) {
+            expectvd = expectvd.map(x => {
+                "h" + x.slice(17, 33)
+            })
+        }
+
         val resultChecker = ALUResultChecker.newVChecker(n_ops, expectvd, hasVd, vxsat, 
             (a, b) => this.dump(simi, a, b))
 
