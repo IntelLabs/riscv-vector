@@ -104,7 +104,7 @@ class VmadcsbcTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : St
             var srcBundle = SrcBundle(
                 vs2=vs2data(reversej),
                 // old_vd=prevVd
-                old_vd=oldvddata(reversej)
+                old_vd=oldvddata(n_ops - 1)
             )
             if (vx) srcBundle.rs1 = vs1data(0)
             if (vv) srcBundle.vs1 = vs1data(reversej)
