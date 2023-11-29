@@ -72,7 +72,9 @@ class SVlsu(implicit p: Parameters) extends Module {
 
     // uop & control related
     val mUopReg         = RegInit(0.U.asTypeOf(new Muop()(p)))
-    val eewbReg         = RegInit(8.U)
+    val memElemBytesReg = RegInit(8.U)
+    val eewbReg         = RegInit(64.U)
+    val sewbReg         = RegInit(64.U) // for indexed load
     val uopVlReg        = RegInit(0.U(bVL.W))
     val elenReg         = RegInit(0.U(log2Ceil(VLEN / 8 + 1).W))
     val ldstTypeReg     = RegInit(0.U(2.W))
@@ -164,15 +166,24 @@ class SVlsu(implicit p: Parameters) extends Module {
             eewbReg := eewb
 
             // ldst type
-            ldstTypeReg := MuxCase(0.U, Array(
+            val ldstType = MuxCase(0.U, Array(
                 (funct6(1, 0) === "b00".U) -> Mop.unit_stride,
                 (funct6(1, 0) === "b01".U) -> Mop.index_unodered,
                 (funct6(1, 0) === "b10".U) -> Mop.constant_stride,
                 (funct6(1, 0) === "b11".U) -> Mop.index_ordered,
             ))
-            
+            ldstTypeReg := ldstType
+
+            val memElemBytes = Mux(
+                ldstType === Mop.index_ordered || ldstType === Mop.index_unodered,
+                io.mUop.bits.uop.info.vsew,
+                eewb
+            )
+            memElemBytesReg := memElemBytes
+            sewbReg := io.mUop.bits.uop.info.vsew
+
             // decide micro vl
-            val elen = (VLEN.U >> 3.U) / eewb
+            val elen = (VLEN.U >> 3.U) / memElemBytes
             val uopVl = Mux(
                 uopIdx === 0.U && uopEnd, vl - vstart, 
                 Mux(
@@ -205,14 +216,14 @@ class SVlsu(implicit p: Parameters) extends Module {
     }.elsewhen(uopState === uop_split) {
         // unit stride
         when(curSplitIdx < splitCount) {
-            // align addr to eew
-            val align2eewbAddr = (mUopReg.scalar_opnd_1 >> eewbReg) << eewbReg
-            // val baseAddr = align2eewbAddr + mUopReg.uop.uopIdx * (VLEN / 8).U + splitOffset * eewbReg
+            // align addr to memElemBytes
+            val align2eewbAddr = (mUopReg.scalar_opnd_1 >> memElemBytes) << memElemBytes
+            // val baseAddr = align2eewbAddr + mUopReg.uop.uopIdx * (VLEN / 8).U + splitOffset * memElemBytes
             val addr = WireInit(0.U.asTypeOf(align2eewbAddr))
 
             when(ldstTypeReg === Mop.unit_stride) {
-                val baseAddr = align2eewbAddr + (mUopReg.uop.uopIdx * elenReg + splitOffset) * eewbReg
-                addr := baseAddr  + curSplitIdx * eewbReg
+                val baseAddr = align2eewbAddr + (mUopReg.uop.uopIdx * elenReg + splitOffset) * memElemBytes
+                addr := baseAddr  + curSplitIdx * memElemBytes
 
             }.elsewhen(ldstTypeReg === Mop.constant_stride) {
                 when(mUopReg.scalar_opnd_2 === 0.U) {
@@ -220,8 +231,8 @@ class SVlsu(implicit p: Parameters) extends Module {
                 }.otherwise {
                     var XLEN = 64
                     val strideNeg = mUopReg.scalar_opnd_2(XLEN - 1)
-                    val strideAbs = Mux(strideNeg, -mUopReg.scalar_opnd_2, mUopReg.scalar_opnd_2) * eewbReg
-                    val elen = (VLEN.U >> 3.U) / eewbReg
+                    val strideAbs = Mux(strideNeg, -mUopReg.scalar_opnd_2, mUopReg.scalar_opnd_2) * memElemBytes
+                    val elen = (VLEN.U >> 3.U) / memElemBytes
                     val baseAddr = Mux(
                         strideNeg,
                         align2eewbAddr - (mUopReg.uop.uopIdx * elenReg + splitOffset) * strideAbs,
@@ -247,8 +258,8 @@ class SVlsu(implicit p: Parameters) extends Module {
             ldstUopQueue(ldstEnqPtr).isLast := (curSplitIdx === splitCount - 1.U)
 
             for(i <- 0 until segNum) {
-                when(i.U < eewbReg) {
-                    val segIdx = (splitOffset + curSplitIdx) * eewbReg + i.U
+                when(i.U < memElemBytes) {
+                    val segIdx = (splitOffset + curSplitIdx) * memElemBytes + i.U
                     vregInfo(segIdx).status := VRegSegmentStatus.notReady
                     vregInfo(segIdx).idx    := ldstEnqPtr
                     vregInfo(segIdx).offset := offset + i.U
