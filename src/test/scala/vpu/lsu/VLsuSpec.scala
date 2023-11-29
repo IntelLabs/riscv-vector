@@ -40,7 +40,7 @@ class MuopTest extends Bundle {
     val vs2           = UInt(128.W)
 }
 
-class FakeDCache(ldResps: Seq[(UInt, UInt)]) extends Module {
+class FakeDCache extends Module {
     val io = IO(Flipped(new RVUMemory))
 
     val s0 :: s1 :: s2 :: Nil = Enum(3)
@@ -48,8 +48,30 @@ class FakeDCache(ldResps: Seq[(UInt, UInt)]) extends Module {
     val nextState = WireInit(s0)
 
     val ldResp = RegInit(0.U(64.W))
-    val ldRespSeqId = RegInit(0.U(log2Ceil(ldResps.length).W))
     val queueIdx = RegNext(RegNext(io.req.bits.idx))
+    val addr = RegNext(RegNext(io.req.bits.addr))
+
+    val dataTable = Seq(
+        (0x0fd0.U, BigInt("4040404040404404", 16).U),
+        (0x0fd8.U, BigInt("3030303030303030", 16).U),
+        (0x0fe0.U, BigInt("2020202020202020", 16).U),
+        (0x0fe8.U, BigInt("1010101010101010", 16).U),
+        (0x0ff0.U, BigInt("5678901234503489", 16).U),
+        (0x0ff8.U, BigInt("eeeeeeeeeeeeeeee", 16).U),
+        (0x1000.U, BigInt("0123456789abcdef", 16).U),
+        (0x1008.U, BigInt("ffffffffffffffff", 16).U),
+        (0x1010.U, BigInt("0f0f0f0f0f0f0f0f", 16).U),
+        (0x1018.U, BigInt("fedcba9876543210", 16).U),
+        (0x1020.U, BigInt("1234567890123456", 16).U),
+        (0x1028.U, BigInt("0101010101010101", 16).U),
+        (0x1030.U, BigInt("2345678901234567", 16).U),
+        (0x1038.U, BigInt("1111111111111111", 16).U),
+        (0x1040.U, BigInt("2222222222222222", 16).U),
+        (0x1048.U, BigInt("3333333333333333", 16).U),
+        (0x1050.U, BigInt("4444444444444444", 16).U),
+        (0x1058.U, BigInt("5555555555555555", 16).U),
+        (0x1060.U, BigInt("6666666666666666", 16).U),
+    )
     
     io.xcpt                 := DontCare
     io.req.ready            := true.B
@@ -83,17 +105,15 @@ class FakeDCache(ldResps: Seq[(UInt, UInt)]) extends Module {
         io.resp.bits.mask       := 0.U
         io.resp.bits.idx        := queueIdx
 
-        for(i <- 0 until ldResps.length) {
-            when(i.U === ldRespSeqId) {
-                io.resp.bits.data := ldResps(i)._1
+        for(i <- 0 until dataTable.length) {
+            when(dataTable(i)._1 === addr) {
+                io.resp.bits.data := dataTable(i)._2
             }
         }
-
-        ldRespSeqId := ldRespSeqId + 1.U
     }
 }
 
-class SmartVectorLsuTestWrapper(ldResps: Seq[(UInt, UInt)]) extends Module {
+class SmartVectorLsuTestWrapper extends Module {
     val io = IO(new Bundle {
         val mUop = Flipped(ValidIO(new MuopTest))
         val lsuOut = ValidIO(new VLSUOutput)
@@ -147,7 +167,7 @@ class SmartVectorLsuTestWrapper(ldResps: Seq[(UInt, UInt)]) extends Module {
     io.lsuOut.bits.vd                       := vLsu.io.lsuOut.bits.vd
     io.lsuOut.bits.uopQueueIdx              := 0.U
 
-    val dcache = Module(new FakeDCache(ldResps))
+    val dcache = Module(new FakeDCache)
     vLsu.io.dataExchange <> dcache.io
 
     io.xcpt := vLsu.io.xcpt
@@ -169,95 +189,13 @@ trait VLsuBehavior_ld {
     val vlse64  = CtrlBundle(VLSE64_V)
     val vse8    = CtrlBundle(VSE8_V)
   
-    val ldRespsTest0 = Seq(
-        (0x00040003.U, 0.U),
-        (0x00040003.U, 1.U),
-        (0x00040003.U, 2.U),
-        (0x00040003.U, 3.U),
-        (0x00040003.U, 4.U),
-        (0x00040003.U, 5.U),
-        (0x00040003.U, 6.U),
-        (0x00040003.U, 7.U),
-    )
-
-    val ldRespsTest1 = Seq(
-        (BigInt("0123456789abcdef", 16).U, 0.U),
-        (BigInt("0123456789abcdef", 16).U, 1.U),
-        (BigInt("0123456789abcdef", 16).U, 2.U),
-        (BigInt("0123456789abcdef", 16).U, 3.U),
-        (BigInt("0123456789abcdef", 16).U, 4.U),
-        (BigInt("0123456789abcdef", 16).U, 5.U),
-        (BigInt("0123456789abcdef", 16).U, 6.U),
-        (BigInt("0123456789abcdef", 16).U, 7.U),
-        (BigInt("ffffffffffffffff", 16).U, 8.U),
-        (BigInt("ffffffffffffffff", 16).U, 9.U),
-        (BigInt("ffffffffffffffff", 16).U, 10.U),
-        (BigInt("ffffffffffffffff", 16).U, 11.U),
-        (BigInt("ffffffffffffffff", 16).U, 12.U),
-        (BigInt("ffffffffffffffff", 16).U, 13.U),
-        (BigInt("ffffffffffffffff", 16).U, 14.U),
-        (BigInt("ffffffffffffffff", 16).U, 15.U),
-        (BigInt("0f0f0f0f0f0f0f0f", 16).U, 0.U),
-        (BigInt("0f0f0f0f0f0f0f0f", 16).U, 1.U),
-        (BigInt("0f0f0f0f0f0f0f0f", 16).U, 2.U), 
-    )
-
-    val ldRespsTest2 = Seq(
-        (BigInt("0123456789abcdef", 16).U, 0.U),
-        (BigInt("0123456789abcdef", 16).U, 1.U),
-        (BigInt("0123456789abcdef", 16).U, 2.U),
-        (BigInt("0123456789abcdef", 16).U, 3.U),
-        (BigInt("0123456789abcdef", 16).U, 4.U),
-        (BigInt("0123456789abcdef", 16).U, 5.U),
-        (BigInt("0123456789abcdef", 16).U, 6.U),
-        (BigInt("0123456789abcdef", 16).U, 7.U),
-        (BigInt("ffffffffffffffff", 16).U, 0.U),
-        (BigInt("ffffffffffffffff", 16).U, 1.U),
-        (BigInt("ffffffffffffffff", 16).U, 2.U),
-        (BigInt("ffffffffffffffff", 16).U, 3.U),
-        (BigInt("ffffffffffffffff", 16).U, 4.U),
-        (BigInt("ffffffffffffffff", 16).U, 5.U),
-        (BigInt("ffffffffffffffff", 16).U, 6.U),
-        (BigInt("ffffffffffffffff", 16).U, 7.U),
-        (BigInt("9876543211234567", 16).U, 0.U),
-        (BigInt("9876543211234567", 16).U, 1.U),
-        (BigInt("9876543211234567", 16).U, 2.U),
-        (BigInt("9876543211234567", 16).U, 3.U),
-        (BigInt("9876543211234567", 16).U, 4.U),
-        (BigInt("9876543211234567", 16).U, 5.U),
-        (BigInt("9876543211234567", 16).U, 6.U),
-        (BigInt("9876543211234567", 16).U, 7.U),
-        (BigInt("0f0f0f0f0f0f0f0f", 16).U, 0.U),
-        (BigInt("0f0f0f0f0f0f0f0f", 16).U, 1.U),
-        (BigInt("0f0f0f0f0f0f0f0f", 16).U, 2.U), 
-    )
-
-    val ldRespsTest3 = Seq(
-        (BigInt("0123456789abcdef", 16).U, 0.U),
-        (BigInt("0123456789abcdef", 16).U, 1.U),
-        (BigInt("0123456789abcdef", 16).U, 2.U),
-        (BigInt("0123456789abcdef", 16).U, 3.U),
-        (BigInt("ffffffffffffffff", 16).U, 0.U),
-        (BigInt("ffffffffffffffff", 16).U, 1.U),
-        (BigInt("ffffffffffffffff", 16).U, 2.U),
-        (BigInt("ffffffffffffffff", 16).U, 3.U),
-        (BigInt("9876543211234567", 16).U, 0.U),
-        (BigInt("9876543211234567", 16).U, 1.U),
-    )
-
-    val ldRespsTest4 = Seq(
-        (BigInt("0123456789abcdef", 16).U, 0.U),
-        (BigInt("0123456789abcdef", 16).U, 1.U),
-        (BigInt("9876543211234567", 16).U, 2.U),
-    )
-
     def vLsuTest0(): Unit = {
         it should "pass: unit-stride load (uops=1, eew=8, vl=8, vstart=0)" in {
-        test(new SmartVectorLsuTestWrapper(ldRespsTest0)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+        test(new SmartVectorLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             test_init(dut)
             dut.clock.step(1)
             val ldReqs = Seq(
-            (vle8.copy(vl=8, uopIdx=0, uopEnd=true), ldReqSrc_default, "h201f1e1d1c1b1a190000000000040003".U),
+                (vle8.copy(vl=8, uopIdx=0, uopEnd=true), ldReqSrc_default, "h201f1e1d1c1b1a190123456789abcdef".U),
             )
 
             next_is_load_and_step(dut)
@@ -284,12 +222,12 @@ trait VLsuBehavior_ld {
 
     def vLsuTest1(): Unit = {
         it should "pass: unit-stride load (uops=2, eew=8, vl=19, vstart=0)" in {
-        test(new SmartVectorLsuTestWrapper(ldRespsTest1)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+        test(new SmartVectorLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             test_init(dut)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vle8.copy(vl=19, uopIdx=0), ldReqSrc_default, "hffffffffffffffff0123456789abcdef".U),
-                (vle8.copy(vl=19, uopIdx=1, uopEnd=true), ldReqSrc_default, "h201f1e1d1c1b1a1918171615140f0f0f".U),
+                (vle8.copy(vl=19, uopIdx=0, uopEnd=false), ldReqSrc_default, "hffffffffffffffff0123456789abcdef".U),
+                (vle8.copy(vl=19, uopIdx=1, uopEnd=true),  ldReqSrc_default, "h201f1e1d1c1b1a1918171615140f0f0f".U),
             )
 
             next_is_load_and_step(dut)
@@ -316,14 +254,14 @@ trait VLsuBehavior_ld {
 
     def vLsuTest2(): Unit = {
         it should "pass: unit-stride load (uops=4, eew=16, vl=27, vstart=0)" in {
-        test(new SmartVectorLsuTestWrapper(ldRespsTest2)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+        test(new SmartVectorLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             test_init(dut)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vle16.copy(vl=27, uopIdx=0, uopEnd=false), ldReqSrc_default, "h0123456789abcdef0123456789abcdef".U),
-                (vle16.copy(vl=27, uopIdx=1, uopEnd=false), ldReqSrc_default, "hffffffffffffffffffffffffffffffff".U),
-                (vle16.copy(vl=27, uopIdx=2, uopEnd=false), ldReqSrc_default, "h98765432112345679876543211234567".U),
-                (vle16.copy(vl=27, uopIdx=3, uopEnd=true),  ldReqSrc_default, "h201f1e1d1c1b1a1918170f0f0f0f0f0f".U),
+                (vle16.copy(vl=27, uopIdx=0, uopEnd=false), ldReqSrc_default, "hffffffffffffffff0123456789abcdef".U),
+                (vle16.copy(vl=27, uopIdx=1, uopEnd=false), ldReqSrc_default, "hfedcba98765432100f0f0f0f0f0f0f0f".U),
+                (vle16.copy(vl=27, uopIdx=2, uopEnd=false), ldReqSrc_default, "h01010101010101011234567890123456".U),
+                (vle16.copy(vl=27, uopIdx=3, uopEnd=true),  ldReqSrc_default, "h201f1e1d1c1b1a191817678901234567".U),
             )
 
             next_is_load_and_step(dut)
@@ -349,13 +287,13 @@ trait VLsuBehavior_ld {
 
     def vLsuTest3(): Unit = {
         it should "pass: unit-stride load (uops=3, eew=32, vl=10, vstart=0)" in {
-        test(new SmartVectorLsuTestWrapper(ldRespsTest3)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+        test(new SmartVectorLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             test_init(dut)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vle32.copy(vl=10, uopIdx=0, uopEnd=false), ldReqSrc_default, "h0123456789abcdef0123456789abcdef".U),
-                (vle32.copy(vl=10, uopIdx=1, uopEnd=false), ldReqSrc_default, "hffffffffffffffffffffffffffffffff".U),
-                (vle32.copy(vl=10, uopIdx=2, uopEnd=true),  ldReqSrc_default, "h201f1e1d1c1b1a199876543211234567".U),
+                (vle32.copy(vl=10, uopIdx=0, uopEnd=false), ldReqSrc_default, "hffffffffffffffff0123456789abcdef".U),
+                (vle32.copy(vl=10, uopIdx=1, uopEnd=false), ldReqSrc_default, "hfedcba98765432100f0f0f0f0f0f0f0f".U),
+                (vle32.copy(vl=10, uopIdx=2, uopEnd=true),  ldReqSrc_default, "h201f1e1d1c1b1a191234567890123456".U),
             )
 
             next_is_load_and_step(dut)
@@ -381,12 +319,12 @@ trait VLsuBehavior_ld {
 
     def vLsuTest4(): Unit = {
         it should "pass: unit-stride load (uops=2, eew=64, vl=3, vstart=0)" in {
-        test(new SmartVectorLsuTestWrapper(ldRespsTest4)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+        test(new SmartVectorLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             test_init(dut)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vle64.copy(vl=3, uopIdx=0, uopEnd=false), ldReqSrc_default, "h0123456789abcdef0123456789abcdef".U),
-                (vle64.copy(vl=3, uopIdx=1, uopEnd=true),  ldReqSrc_default, "h201f1e1d1c1b1a199876543211234567".U),
+                (vle64.copy(vl=3, uopIdx=0, uopEnd=false), ldReqSrc_default, "hffffffffffffffff0123456789abcdef".U),
+                (vle64.copy(vl=3, uopIdx=1, uopEnd=true),  ldReqSrc_default, "h201f1e1d1c1b1a190f0f0f0f0f0f0f0f".U),
             )
 
             next_is_load_and_step(dut)
@@ -412,12 +350,109 @@ trait VLsuBehavior_ld {
 
     def vLsuTest5(): Unit = {
         it should "pass: unit-stride load (uops=2, eew=64, vl=3, vstart=1)" in {
-        test(new SmartVectorLsuTestWrapper(ldRespsTest4)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+        test(new SmartVectorLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             test_init(dut)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vle64.copy(vl=3, uopIdx=0, uopEnd=false), ldReqSrc_default, "h0123456789abcdef0123456789abcdef".U),
-                (vle64.copy(vl=3, uopIdx=1, uopEnd=true),  ldReqSrc_default, "h201f1e1d1c1b1a199876543211234567".U),
+                (vle64.copy(vl=3, vstart=1, uopIdx=0, uopEnd=false), ldReqSrc_default, "hffffffffffffffff1817161514131211".U),
+                (vle64.copy(vl=3, vstart=1, uopIdx=1, uopEnd=true),  ldReqSrc_default, "hfedcba98765432100f0f0f0f0f0f0f0f".U),
+            )
+
+            next_is_load_and_step(dut)
+            for ((c, s, r) <- ldReqs) {
+                while (!dut.io.lsuReady.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.mUop.valid.poke(true.B)
+                dut.io.mUop.bits.poke(genLdInput(c, s))
+                dut.clock.step(1)
+                dut.io.mUop.valid.poke(false.B)
+
+                while (!dut.io.lsuOut.valid.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.lsuOut.valid.expect(true.B)
+                // dut.clock.step(200)
+                dut.io.lsuOut.bits.vd.expect(r)
+                dut.clock.step(4)
+            }
+        }
+        }
+    }
+
+    def vLsuTest6(): Unit = {
+        it should "pass: strided load (uops=1, eew=8, vl=6, vstart=0, stride=-5)" in {
+        test(new SmartVectorLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            test_init(dut)
+            dut.clock.step(1)
+            val ldReqs = Seq(
+                // 1000~1001(cdef), 1008~1009(ffff), 1010~1011(0f0f), 1018~1019(3210)
+                // 1020~1021(3456), 1028~1029(0101), 1030~1031(4567), 1038~1039(1111)
+                (vlse8.copy(vl=6, uopIdx=0, uopEnd=true), SrcBundleLd(scalar_opnd_2="hffffffff_fffffffb"), "h201f1e1d1c1b1a19181720103478eeef".U),
+                // (vlse8.copy(vl=10, uopIdx=1, uopEnd=true),  SrcBundleLd(scalar_opnd_2="h4"), "h201f1e1d1c1b1a191817161533332222".U),
+            )
+
+            next_is_load_and_step(dut)
+            for ((c, s, r) <- ldReqs) {
+                while (!dut.io.lsuReady.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.mUop.valid.poke(true.B)
+                dut.io.mUop.bits.poke(genLdInput(c, s))
+                dut.clock.step(1)
+                dut.io.mUop.valid.poke(false.B)
+
+                while (!dut.io.lsuOut.valid.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.lsuOut.valid.expect(true.B)
+                dut.io.lsuOut.bits.vd.expect(r)
+                dut.clock.step(4)
+            }
+        }
+        }
+    }
+
+    def vLsuTest7(): Unit = {
+        it should "pass: strided load (uops=2, eew=64, vl=3, vstart=0, stride=-1)" in {
+        test(new SmartVectorLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            test_init(dut)
+            dut.clock.step(1)
+            val ldReqs = Seq(
+                (vlse32.copy(vl=3, uopIdx=0, uopEnd=true), SrcBundleLd(scalar_opnd_2="hffffffff_ffffffff"), "h201f1e1deeeeeeeeeeeeeeee89abcdef".U),
+            )
+
+            next_is_load_and_step(dut)
+            for ((c, s, r) <- ldReqs) {
+                while (!dut.io.lsuReady.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.mUop.valid.poke(true.B)
+                dut.io.mUop.bits.poke(genLdInput(c, s))
+                dut.clock.step(1)
+                dut.io.mUop.valid.poke(false.B)
+
+                while (!dut.io.lsuOut.valid.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.lsuOut.valid.expect(true.B)
+                dut.io.lsuOut.bits.vd.expect(r)
+                dut.clock.step(4)
+            }
+        }
+        }
+    }
+
+    def vLsuTest8(): Unit = {
+        it should "pass: strided load (uops=2, eew=16, vl=10, vstart=0, stride=4)" in {
+        test(new SmartVectorLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            test_init(dut)
+            dut.clock.step(1)
+            val ldReqs = Seq(
+                // 1000~1001(cdef), 1008~1009(ffff), 1010~1011(0f0f), 1018~1019(3210)
+                // 1020~1021(3456), 1028~1029(0101), 1030~1031(4567), 1038~1039(1111)
+                (vlse16.copy(vl=10, uopIdx=0, uopEnd=false), SrcBundleLd(scalar_opnd_2="h4"), "h111145670101345632100f0fffffcdef".U),
+                (vlse16.copy(vl=10, uopIdx=1, uopEnd=true),  SrcBundleLd(scalar_opnd_2="h4"), "h201f1e1d1c1b1a191817161533332222".U),
             )
 
             next_is_load_and_step(dut)
@@ -450,4 +485,7 @@ class VLsuSpec_ld extends AnyFlatSpec with ChiselScalatestTester with BundleGenH
     it should behave like vLsuTest3()  // unit-stride load
     it should behave like vLsuTest4()  // unit-stride load
     it should behave like vLsuTest5()  // unit-stride load
+    it should behave like vLsuTest6()  // strided load
+    it should behave like vLsuTest7()  // strided load
+    it should behave like vLsuTest8()  // strided load
 }

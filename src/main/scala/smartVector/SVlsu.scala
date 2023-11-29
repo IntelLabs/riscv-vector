@@ -8,6 +8,10 @@ import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import xiangshan.MicroOp
 import SmartParam._
 
+/*
+    what I need:
+        * XLEN --> to obtain the highest bit in scalar_operand
+*/
 class VLSUOutput extends Bundle {
     val vd = UInt(VLEN.W)
     val uopQueueIdx = UInt(4.W) // magic number
@@ -70,6 +74,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     val mUopReg         = RegInit(0.U.asTypeOf(new Muop()(p)))
     val eewbReg         = RegInit(8.U)
     val uopVlReg        = RegInit(0.U(bVL.W))
+    val elenReg         = RegInit(0.U(log2Ceil(VLEN / 8 + 1).W))
     val ldstTypeReg     = RegInit(0.U(2.W))
 
     // ldQueue
@@ -175,13 +180,15 @@ class SVlsu(implicit p: Parameters) extends Module {
                     Mux(uopEnd, vl - (elen - vstart) - elen * (uopIdx - 1.U), elen)
                 )
             )
+            elenReg  := elen
             uopVlReg := uopVl
 
             // Set split info
+            val splitOffsetWire = Mux(uopIdx === 0.U, vstart, 0.U)
             ldstEnqPtr  := 0.U
             curSplitIdx := 0.U
             splitCount  := uopVl
-            splitOffset := Mux(uopIdx === 0.U, vstart, 0.U)
+            splitOffset := splitOffsetWire
 
             for(i <- 0 until segNum) {
                 vregInfo(i).data := Reverse(io.oldVd(8 * i + 7, 8 * i))
@@ -189,7 +196,7 @@ class SVlsu(implicit p: Parameters) extends Module {
                 when(i.U < uopVl) {
                     for(j <- 0 until segNum) {
                         when(j.U < eewb) {
-                            vregInfo((splitOffset + i.U) * eewb + j.U).status := VRegSegmentStatus.needData
+                            vregInfo((splitOffsetWire + i.U) * eewb + j.U).status := VRegSegmentStatus.needData
                         }
                     }
                 }
@@ -199,7 +206,38 @@ class SVlsu(implicit p: Parameters) extends Module {
         // unit stride
         when(curSplitIdx < splitCount) {
             // align addr to eew
-            val addr = ((mUopReg.scalar_opnd_1 >> eewbReg) << eewbReg)  + curSplitIdx * eewbReg
+            val align2eewbAddr = (mUopReg.scalar_opnd_1 >> eewbReg) << eewbReg
+            // val baseAddr = align2eewbAddr + mUopReg.uop.uopIdx * (VLEN / 8).U + splitOffset * eewbReg
+            val addr = WireInit(0.U.asTypeOf(align2eewbAddr))
+
+            when(ldstTypeReg === Mop.unit_stride) {
+                val baseAddr = align2eewbAddr + (mUopReg.uop.uopIdx * elenReg + splitOffset) * eewbReg
+                addr := baseAddr  + curSplitIdx * eewbReg
+
+            }.elsewhen(ldstTypeReg === Mop.constant_stride) {
+                when(mUopReg.scalar_opnd_2 === 0.U) {
+                    // do someting
+                }.otherwise {
+                    var XLEN = 64
+                    val strideNeg = mUopReg.scalar_opnd_2(XLEN - 1)
+                    val strideAbs = Mux(strideNeg, -mUopReg.scalar_opnd_2, mUopReg.scalar_opnd_2) * eewbReg
+                    val elen = (VLEN.U >> 3.U) / eewbReg
+                    val baseAddr = Mux(
+                        strideNeg,
+                        align2eewbAddr - (mUopReg.uop.uopIdx * elenReg + splitOffset) * strideAbs,
+                        align2eewbAddr + (mUopReg.uop.uopIdx * elenReg + splitOffset) * strideAbs
+                    )
+                    
+                    addr := Mux(strideNeg,
+                            baseAddr - curSplitIdx * strideAbs, 
+                            baseAddr + curSplitIdx * strideAbs)
+                }
+            }.elsewhen(ldstTypeReg === Mop.index_ordered || ldstTypeReg === Mop.index_unodered) {
+                // indexed addr
+            }.otherwise {
+                // do something 
+            }
+
             // align addr to 64 bits
             val alignedAddr = (addr >> 3.U) << 3.U
             val offset = addr - alignedAddr
@@ -210,9 +248,10 @@ class SVlsu(implicit p: Parameters) extends Module {
 
             for(i <- 0 until segNum) {
                 when(i.U < eewbReg) {
-                    vregInfo((splitOffset + curSplitIdx) * eewbReg + i.U).status := VRegSegmentStatus.notReady
-                    vregInfo((splitOffset + curSplitIdx) * eewbReg + i.U).idx := ldstEnqPtr
-                    vregInfo((splitOffset + curSplitIdx) * eewbReg + i.U).offset := offset + i.U
+                    val segIdx = (splitOffset + curSplitIdx) * eewbReg + i.U
+                    vregInfo(segIdx).status := VRegSegmentStatus.notReady
+                    vregInfo(segIdx).idx    := ldstEnqPtr
+                    vregInfo(segIdx).offset := offset + i.U
                 }
             }
             curSplitIdx := curSplitIdx + 1.U
