@@ -64,8 +64,6 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
     vfwredosum_vs ||
     vfwredusum_vs
 
-  val fpu_red_osum = vfredosum_vs || vfwredosum_vs
-
   val widen2 = Mux(vfwredosum_vs || vfwredusum_vs, true.B, io.in.bits.uop.ctrl.widen2)
 
   val vd = Wire(Vec(2, UInt(64.W)))
@@ -291,7 +289,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
 
   when(flush) {
     vs1_zero_bypass := false.B
-  }.elsewhen(fpu_red_osum && fire && !vm && !(vmask_vl.orR)) {
+  }.elsewhen(fpu_red && fire && !vm && !(vmask_vl.orR)) {
     vs1_zero_bypass := true.B
   }.elsewhen(output_valid) {
     vs1_zero_bypass := false.B
