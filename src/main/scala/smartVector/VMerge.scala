@@ -27,7 +27,7 @@ class VMerge (implicit p : Parameters) extends VFuModule {
 
     val io = IO(new Bundle{
         val in = new Bundle{
-            val mergeInfo = Input(new MuopMergeAttr)
+            val mergeInfo = Input(ValidIO(new MuopMergeAttr))
             val aluIn = Input(ValidIO(new VAluOutput))
             val lsuIn = Input(ValidIO(new LsuOutput))
         }
@@ -49,27 +49,15 @@ class VMerge (implicit p : Parameters) extends VFuModule {
     val scalarRegWriteEn  = Reg(Bool())
     val scalarRegWriteIdx = Reg(UInt(5.W))
     val muopEnd           = Reg(Bool())
-
-    when(io.in.mergeInfo.alu){
-        rfWriteEn         := io.in.mergeInfo.rfWriteEn
-        rfWriteIdx        := io.in.mergeInfo.ldest
-        regBackWidth      := io.in.mergeInfo.regBackWidth
-        regWriteMuopIdx   := io.in.mergeInfo.regWriteMuopIdx
-        scalarRegWriteEn  := io.in.mergeInfo.scalarRegWriteEn
-        scalarRegWriteIdx := io.in.mergeInfo.ldest
-        muopEnd           := io.in.mergeInfo.muopEnd
-    }.otherwise{
-        //TODO: ALU has no output valid, other iex has valid, when valid is high, let the signal pass
-        rfWriteEn         := io.in.mergeInfo.rfWriteEn
-        rfWriteIdx        := io.in.mergeInfo.ldest
-        regBackWidth      := io.in.mergeInfo.regBackWidth
-        regWriteMuopIdx   := io.in.mergeInfo.regWriteMuopIdx
-        scalarRegWriteEn  := io.in.mergeInfo.scalarRegWriteEn
-        scalarRegWriteIdx := io.in.mergeInfo.ldest
-        muopEnd           := io.in.mergeInfo.muopEnd
-    }
-    
-       
+  
+    rfWriteEn         := RegEnable(io.in.mergeInfo.bits.rfWriteEn, io.in.mergeInfo.valid)
+    rfWriteIdx        := RegEnable(io.in.mergeInfo.bits.ldest, io.in.mergeInfo.valid)
+    regBackWidth      := RegEnable(io.in.mergeInfo.bits.regBackWidth, io.in.mergeInfo.valid)
+    regWriteMuopIdx   := RegEnable(io.in.mergeInfo.bits.regWriteMuopIdx, io.in.mergeInfo.valid)
+    scalarRegWriteEn  := RegEnable(io.in.mergeInfo.bits.scalarRegWriteEn, io.in.mergeInfo.valid)
+    scalarRegWriteIdx := RegEnable(io.in.mergeInfo.bits.ldest, io.in.mergeInfo.valid)
+    muopEnd           := RegEnable(io.in.mergeInfo.bits.muopEnd, io.in.mergeInfo.valid)
+         
     when(io.in.aluIn.valid && rfWriteEn){
         when(regBackWidth === "b111".U){
             io.out.toRegFileWrite.rfWriteEn  := true.B

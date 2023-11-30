@@ -71,13 +71,17 @@ class SmartVector extends Module {
     commit.io.in.commitInfo <> merge.io.out.commitInfo
 
     //ChenLu change
-    split.io.stallSplit     := false.B
+    split.io.lsuStallSplit     := false.B
     merge.io.in.lsuIn.valid := false.B
     merge.io.in.lsuIn.bits  := 0.U.asTypeOf(new LsuOutput)
     
     merge.io.in.mergeInfo <> split.io.out.mUopMergeAttr  
     regFile.io.in.readIn  <> split.io.out.toRegFileRead
     regFile.io.in.writeIn <> merge.io.out.toRegFileWrite
+
+    //stall pipeline
+    split.io.iexNeedStall := iex.io.iexNeedStall
+    decoder.io.iexNeedStall := iex.io.iexNeedStall
 
     //TODO: This is reserved for verification, delete it later
     io.rfData := regFile.io.rfData

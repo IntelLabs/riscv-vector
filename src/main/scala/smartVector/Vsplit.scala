@@ -16,6 +16,13 @@ class MuopMergeAttr extends Bundle {
     val ldest = UInt(5.W)
     val muopEnd = Bool()
     val alu = Bool()
+    val mul = Bool()
+    val fp = Bool()
+    val div = Bool()
+    val fixP = Bool()
+    val redu = Bool()
+    val mask = Bool()
+    val perm = Bool()
     
     //000:8bit
     //001:16bit
@@ -37,6 +44,14 @@ class VUopCtrlW extends Bundle {
   val narrow_to_1 = Bool()
   val load = Bool()
   val store = Bool()
+  val alu = Bool() // All low-latency operations
+  val mul = Bool()
+  val fp = Bool()
+  val div = Bool()
+  val fixP = Bool()
+  val redu = Bool()
+  val mask = Bool()
+  val perm = Bool()
   def vv = !funct3(2) && !(funct3(1) && funct3(0))
   def vx = funct3(2)
   def vi = !funct3(2) && funct3(1) && funct3(0)
@@ -76,14 +91,15 @@ class Vsplit(implicit p : Parameters) extends Module {
         val out = new Bundle{
             val mUop          = ValidIO(new Muop)
             val toRegFileRead = Output(new regReadIn)
-            val mUopMergeAttr = Output(new MuopMergeAttr)
+            val mUopMergeAttr = ValidIO(new MuopMergeAttr)
         }
         val scoreBoardSetIO = Flipped(new ScoreboardSetIO)
         val scoreBoardReadIO = Flipped(new ScoreboardReadIO)
-        val stallSplit = Input(Bool()) 
+        val lsuStallSplit = Input(Bool()) 
+        val iexNeedStall  = Input(Bool())
     })
     
-    val vCtrl         = Reg(Vec(1, new darecreek.VCtrl))
+    val vCtrl         = RegInit(VecInit(Seq.fill(1)(0.U.asTypeOf(new darecreek.VCtrl))))
     val vInfo         = Reg(Vec(1, new VInfo))
     val scalar_opnd_1 = Reg(Vec(1, UInt(64.W)))
     val scalar_opnd_2 = Reg(Vec(1, UInt(64.W)))
@@ -112,10 +128,12 @@ class Vsplit(implicit p : Parameters) extends Module {
         uopRegInfo(0).vxsat      := false.B
     } 
 
-    val ctrl = Mux(instFirstIn,io.in.decodeIn.bits.vCtrl,vCtrl(0))
-    val info = Mux(instFirstIn,io.in.decodeIn.bits.vInfo,vInfo(0))
-    val vs1  = Mux(instFirstIn,io.in.regFileIn.readData(0), uopRegInfo(0).vs1)
-    val vs2  = Mux(instFirstIn,io.in.regFileIn.readData(1), uopRegInfo(0).vs2)
+    val ctrl    = Mux(instFirstIn,io.in.decodeIn.bits.vCtrl,vCtrl(0))
+    val info    = Mux(instFirstIn,io.in.decodeIn.bits.vInfo,vInfo(0))
+    val vs1     = Mux(instFirstIn,io.in.regFileIn.readData(0), uopRegInfo(0).vs1)
+    val vs2     = Mux(instFirstIn,io.in.regFileIn.readData(1), uopRegInfo(0).vs2)
+    val old_vd  = Mux(instFirstIn,io.in.regFileIn.readData(2), uopRegInfo(0).old_vd)
+    val mask    = Mux(instFirstIn,io.in.regFileIn.readData(3), uopRegInfo(0).mask)
     val scalar_opnd_1_ = Mux(instFirstIn,io.in.decodeIn.bits.scalar_opnd_1,scalar_opnd_1(0))
     val scalar_opnd_2_ = Mux(instFirstIn,io.in.decodeIn.bits.scalar_opnd_2,scalar_opnd_2(0))
     val v_ext_out = ctrl.alu && ctrl.funct3 === "b010".U && ctrl.funct6 === "b010010".U 
@@ -152,20 +170,29 @@ class Vsplit(implicit p : Parameters) extends Module {
     //ToDo: redu, widen2,narrow_to_1 need to be add
     val regBackWidth = UInt(3.W)
     when(ctrl.widen) {
-        io.out.mUopMergeAttr.regBackWidth := "b111".U
-        io.out.mUopMergeAttr.regWriteMuopIdx  := 0.U
+        io.out.mUopMergeAttr.bits.regBackWidth := "b111".U
+        io.out.mUopMergeAttr.bits.regWriteMuopIdx  := 0.U
     }.elsewhen(ctrl.narrow) {
-        io.out.mUopMergeAttr.regBackWidth := "b11".U
-        io.out.mUopMergeAttr.regWriteMuopIdx  := idx(0)
+        io.out.mUopMergeAttr.bits.regBackWidth := "b11".U
+        io.out.mUopMergeAttr.bits.regWriteMuopIdx  := idx(0)
     }.otherwise{
-        io.out.mUopMergeAttr.regBackWidth := "b111".U
-        io.out.mUopMergeAttr.regWriteMuopIdx  := 0.U       
+        io.out.mUopMergeAttr.bits.regBackWidth := "b111".U
+        io.out.mUopMergeAttr.bits.regWriteMuopIdx  := 0.U       
     }
-    io.out.mUopMergeAttr.scalarRegWriteEn := ctrl.rdVal
-    io.out.mUopMergeAttr.ldest            := ctrl.ldest + ldest_inc
-    io.out.mUopMergeAttr.rfWriteEn        := ctrl.ldestVal
-    io.out.mUopMergeAttr.muopEnd          := io.out.mUop.bits.uop.uopEnd
-    io.out.mUopMergeAttr.alu              := ctrl.alu
+    
+    io.out.mUopMergeAttr.valid                 := io.out.mUop.valid
+    io.out.mUopMergeAttr.bits.scalarRegWriteEn := ctrl.rdVal
+    io.out.mUopMergeAttr.bits.ldest            := ctrl.ldest + ldest_inc
+    io.out.mUopMergeAttr.bits.rfWriteEn        := ctrl.ldestVal
+    io.out.mUopMergeAttr.bits.muopEnd          := io.out.mUop.bits.uop.uopEnd
+    io.out.mUopMergeAttr.bits.alu              := ctrl.alu
+    io.out.mUopMergeAttr.bits.mul              := ctrl.mul 
+    io.out.mUopMergeAttr.bits.fp               := ctrl.fp  
+    io.out.mUopMergeAttr.bits.div              := ctrl.div 
+    io.out.mUopMergeAttr.bits.fixP             := ctrl.fixP
+    io.out.mUopMergeAttr.bits.redu             := ctrl.redu
+    io.out.mUopMergeAttr.bits.mask             := ctrl.mask
+    io.out.mUopMergeAttr.bits.perm             := ctrl.perm
 
     val vs1ReadEn = ctrl.lsrcVal(0)
     val vs2ReadEn = ctrl.lsrcVal(1)
@@ -192,7 +219,7 @@ class Vsplit(implicit p : Parameters) extends Module {
         hasRegConf(1) := true.B
     }
 
-    needStall := hasRegConf(0) || hasRegConf(1) || io.stallSplit
+    needStall := hasRegConf(0) || hasRegConf(1) || io.lsuStallSplit || io.iexNeedStall
          
     io.out.mUop.bits.uop.uopIdx := idx
     io.out.mUop.bits.uop.uopEnd := (idx + 1.U === vInfo(0).vlmul)
@@ -207,7 +234,15 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.out.mUop.bits.uop.ctrl.narrow_to_1 := ctrl.narrow_to_1
     io.out.mUop.bits.uop.ctrl.load        := ctrl.load
     io.out.mUop.bits.uop.ctrl.store       := ctrl.store
-    
+    io.out.mUop.bits.uop.ctrl.alu         := ctrl.alu  
+    io.out.mUop.bits.uop.ctrl.mul         := ctrl.mul 
+    io.out.mUop.bits.uop.ctrl.fp          := ctrl.fp  
+    io.out.mUop.bits.uop.ctrl.div         := ctrl.div 
+    io.out.mUop.bits.uop.ctrl.fixP        := ctrl.fixP
+    io.out.mUop.bits.uop.ctrl.redu        := ctrl.redu
+    io.out.mUop.bits.uop.ctrl.mask        := ctrl.mask
+    io.out.mUop.bits.uop.ctrl.perm        := ctrl.perm
+
     io.out.mUop.bits.uop.info.ma          := info.vma
     io.out.mUop.bits.uop.info.ta          := info.vta
     io.out.mUop.bits.uop.info.vl          := info.vl
@@ -224,6 +259,8 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.out.mUop.bits.uopRegInfo.vxsat     := false.B          
     io.out.mUop.bits.uopRegInfo.vs1       := vs1
     io.out.mUop.bits.uopRegInfo.vs2       := vs2
+    io.out.mUop.bits.uopRegInfo.old_vd    := old_vd
+    io.out.mUop.bits.uopRegInfo.mask      := mask
 
     io.out.toRegFileRead.rfReadEn(0)          := ctrl.lsrcVal(0)
     io.out.toRegFileRead.rfReadEn(1)          := ctrl.lsrcVal(1)
@@ -235,7 +272,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.out.toRegFileRead.rfReadIdx(3)         := ctrl.ldest
 
     io.scoreBoardSetIO.setEn     := true.B
-    io.scoreBoardSetIO.setAddr   := io.out.mUopMergeAttr.ldest
+    io.scoreBoardSetIO.setAddr   := io.out.mUopMergeAttr.bits.ldest
 
     when ((instFirstIn || currentState === ongoing) & ~needStall){
         io.out.mUop.valid := true.B

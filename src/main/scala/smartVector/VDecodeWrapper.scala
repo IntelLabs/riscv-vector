@@ -21,6 +21,7 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
     val in  = Flipped(Decoupled(new RVUissue))
     val out = Decoupled(new VDecodeOutput)
     //val decode_ready = Output(Bool())
+    val iexNeedStall = Input(Bool())
   })
 
   val decode = Module(new VDecode)
@@ -51,6 +52,6 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
 
 
   //Only receive one instruction, and then set ready to false
-  io.in.ready := io.out.ready
+  io.in.ready := io.out.ready && ~io.iexNeedStall
 }
 
