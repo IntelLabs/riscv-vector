@@ -125,6 +125,7 @@ class VCsr extends Bundle {
 class VInfo extends VCsr {
   val destEew = UInt(3.W) // Destination EEW
   val emulVd = UInt(4.W) // EMUL of vd
+  val emulVs2 = UInt(4.W)
 }
 
 class VCtrlInfo extends Bundle {

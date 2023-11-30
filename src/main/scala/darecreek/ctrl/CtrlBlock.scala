@@ -20,6 +20,7 @@ class PartialVInfo extends Bundle {
   val vRobPtr = new VRobPtr
   val destEew = UInt(3.W)
   val emulVd = UInt(4.W)
+  val emulVs2 = UInt(4.W)
 }
 
 class VCtrlBlock extends Module {
@@ -75,6 +76,7 @@ class VCtrlBlock extends Module {
   when (decoder.io.out.valid) {
     partialVInfo_reg.bits.destEew := infoCalc.io.infoAll.veewVd
     partialVInfo_reg.bits.emulVd := infoCalc.io.infoAll.emulVd
+    partialVInfo_reg.bits.emulVs2 := infoCalc.io.infoAll.emulVs2
     partialVInfo_reg.bits.vRobPtr := vq.io.enqPtrOut
   }
   partialVInfo_reg.valid := decoder.io.out.valid
