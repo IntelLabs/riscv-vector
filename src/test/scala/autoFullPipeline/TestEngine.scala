@@ -67,6 +67,10 @@ abstract class TestEngine extends BundleGenHelper {
         robIndex = (robIndex + 1) % 256
     }
 
+    def calAdvRobIdx(step : Int) : Int = {
+        return (robIndex + step) % 256
+    }
+
     def randomFlush() : Boolean = {
         return RandomGen.rand.nextInt(100) > 90
     }
@@ -147,44 +151,56 @@ abstract class TestEngine extends BundleGenHelper {
                 // TODO randomly flush
                 if (!flush) {
                     flush = randomFlush()
-                    if (flush && (robIndex <= flushedRobIdx)) { // flush compare
+                    /*if (flush && 
+                        curTestCasePool.filter(x._1 <= flushedRobIdx)
+                        (robIndex <= flushedRobIdx)) 
+                    { // flush compare
                         // in case of robIdx wrapped around, send=0 flush=255
                         println("1.1. flushedRobIdx wrapped around! Ignoring..")
                         flush = false
-                    }
+                    }*/
 
                     if (flush) {
                         flushedRobIdx = sendRobIdx // + 1
-                        println(s"1.1. Flush (all <= ${flushedRobIdx})")
+                        val needToFill = curTestCasePool.filter(_._1 <= flushedRobIdx).size // flush compare
 
-                        val prevSize = curTestCasePool.size
-                        var deletedTBs : Set[TestBehavior] = Set()
+                        if (
+                            calAdvRobIdx(needToFill) <= flushedRobIdx // flush compare
+                        ) {
+                            println("1.1. flushedRobIdx wrapped around! Ignoring..")
+                            flush = false
+                        } else {
+                            println(s"1.1. Flush (all <= ${flushedRobIdx})")
 
-                        // delete flushed test cases, so TestEngine will not
-                        // give new uops of them to the next level detailed TestEngine
-                        curTestCasePool = curTestCasePool.filterNot(x => {
-                            if (x._1 <= flushedRobIdx) { // flush compare
-                                val tb : TestBehavior = x._2._1
-                                deletedTBs = deletedTBs + tb
-                                println(s".. deleted robIdx ${x._1}")
+                            val prevSize = curTestCasePool.size
+                            var deletedTBs : Set[TestBehavior] = Set()
+
+                            // delete flushed test cases, so TestEngine will not
+                            // give new uops of them to the next level detailed TestEngine
+                            curTestCasePool = curTestCasePool.filterNot(x => {
+                                if (x._1 <= flushedRobIdx) { // flush compare
+                                    val tb : TestBehavior = x._2._1
+                                    deletedTBs = deletedTBs + tb
+                                    println(s".. deleted robIdx ${x._1}")
+                                }
+                                x._1 <= flushedRobIdx // flush compare
+                            })
+
+                            // if any TB has no test case left, record success
+                            for (tb <- deletedTBs) {
+                                if (!curTestCasePool.values.exists(_._1 == tb) &&
+                                    tb.isFinished()
+                                ) {
+                                    tbSuccess(tb)
+                                }
                             }
-                            x._1 <= flushedRobIdx // flush compare
-                        })
 
-                        // if any TB has no test case left, record success
-                        for (tb <- deletedTBs) {
-                            if (!curTestCasePool.values.exists(_._1 == tb) &&
-                                tb.isFinished()
-                            ) {
-                                tbSuccess(tb)
-                            }
+                            println(s"1.2. curTestCasePool shrinked from ${prevSize} to ${curTestCasePool.size}")
+                            exhaustedCount = curTestCasePool.filter(_._2._2.isExhausted()).size
+                            
+                            // give uop and flush info in the next iteration
+                            break // continue
                         }
-
-                        println(s"1.2. curTestCasePool shrinked from ${prevSize} to ${curTestCasePool.size}")
-                        exhaustedCount = curTestCasePool.filter(_._2._2.isExhausted()).size
-                        
-                        // give uop and flush info in the next iteration
-                        break // continue
                     }
                 }
 
