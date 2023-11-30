@@ -16,6 +16,12 @@ import chisel3._
 import chisel3.util._
 import utils._
 
+class PartialVInfo extends Bundle {
+  val vRobPtr = new VRobPtr
+  // val destEew = UInt(3.W)
+  val emulVd = UInt(4.W)
+}
+
 class VCtrlBlock extends Module {
   val io = IO(new Bundle {
     // OVI issue
@@ -46,6 +52,7 @@ class VCtrlBlock extends Module {
   })
 
   val decoder = Module(new VDecodeUnit)
+  val infoCalc = Module(new VInfoCalc)
   val vq = Module(new VecQueue)
   val expander = Module(new ParallelExpander)
   val rat = Module(new VRenameTableWrapper)
@@ -61,6 +68,16 @@ class VCtrlBlock extends Module {
   decoder.io.in <> io.ovi_issue
   decoder.io.issueCredit := rob.io.ovi_issueCredit
 
+  // infoCalc
+  infoCalc.io.ctrl := decoder.io.out.bits.ctrl
+  infoCalc.io.csr := decoder.io.out.bits.csr
+  val partialVInfo_reg = Reg(ValidIO(new PartialVInfo))
+  when (decoder.io.out.valid) {
+    partialVInfo_reg.bits.emulVd := infoCalc.io.infoAll.emulVd
+    partialVInfo_reg.bits.vRobPtr := vq.io.enqPtrOut
+  }
+  partialVInfo_reg.valid := decoder.io.out.valid
+  
   // vq
   vq.io.in := decoder.io.out
   vq.io.flush := rob.io.flush
@@ -112,20 +129,21 @@ class VCtrlBlock extends Module {
   // Illegal instrn module
   val vIllegalInstrn = Module(new VIllegalInstrn)
   vIllegalInstrn.io.validIn := decoder.io.out.valid
-  vIllegalInstrn.io.ctrl := decoder.io.out.bits.vCtrl
-  vIllegalInstrn.io.info := decoder.io.out.bits.vInfo
+  vIllegalInstrn.io.ctrl := decoder.io.out.bits.ctrl
+  vIllegalInstrn.io.csr := decoder.io.out.bits.csr
+  vIllegalInstrn.io.infoAll := infoCalc.io.infoAll
   vIllegalInstrn.io.robPtrIn := vq.io.enqPtrOut
   vq.io.illegal := vIllegalInstrn.io.ill
-  vq.io.partialVInfo := vIllegalInstrn.io.partialVInfo
+  vq.io.partialVInfo := partialVInfo_reg
 
   // ROB
   rob.io.in.valid := decoder.io.out.valid
   rob.io.in.sb_id := decoder.io.out.bits.sb_id
-  rob.io.in.ldestVal := decoder.io.out.bits.vCtrl.ldestVal
-  rob.io.in.rdVal := decoder.io.out.bits.vCtrl.rdVal
+  rob.io.in.ldestVal := decoder.io.out.bits.ctrl.ldestVal
+  rob.io.in.rdVal := decoder.io.out.bits.ctrl.rdVal
   rob.io.ovi_dispatch := io.ovi_dispatch
   rob.io.illegal := vIllegalInstrn.io.ill
-  rob.io.partialVInfo := vIllegalInstrn.io.partialVInfo
+  rob.io.partialVInfo := partialVInfo_reg
   rob.io.fromDispatch <> dispatch.io.toRob
   rob.io.wbArith := io.wbArith
   rob.io.wbLSU := io.wbLSU
