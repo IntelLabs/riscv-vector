@@ -74,6 +74,7 @@ class VecQueue extends Module with HasCircularQueuePtrHelper {
 
   // Partial VInfo
   when (io.partialVInfo.valid) {
+    vq(io.partialVInfo.bits.vRobPtr.value).info.destEew := io.partialVInfo.bits.destEew
     vq(io.partialVInfo.bits.vRobPtr.value).info.emulVd := io.partialVInfo.bits.emulVd
   }
 
@@ -92,6 +93,7 @@ class VecQueue extends Module with HasCircularQueuePtrHelper {
 
   when (io.out.fire) {
     when (io.partialVInfo.valid && io.partialVInfo.bits.vRobPtr === deqPtr) {
+      io.out.bits.info.destEew := io.partialVInfo.bits.destEew
       io.out.bits.info.emulVd := io.partialVInfo.bits.emulVd
     }
   }

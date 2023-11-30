@@ -57,7 +57,7 @@ class VRob extends Module with HasCircularQueuePtrHelper {
     val ovi_dispatch = new OVIdispatch
     // from VIllegalInstrn.io.ill
     val illegal = Flipped(ValidIO(new VRobPtr))
-    // from VIllegalInstrn.io.partialVInfo
+    // extract from VInfoCalc.io.infoAll
     val partialVInfo = Flipped(ValidIO(new PartialVInfo))
     // from Rename block
     val fromDispatch = Vec(VRenameWidth, Flipped(Decoupled(new VExpdUOp)))
