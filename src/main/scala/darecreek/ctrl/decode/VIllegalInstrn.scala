@@ -23,6 +23,16 @@ class VIllegalInstrn extends Module {
     val infoAll = Input(new VInfoAll)
     val robPtrIn = Input(new VRobPtr)
     val validIn = Input(Bool())
+    val extraInfo_for_VIllegal = Input(new Bundle {
+      val ldst = Bool()
+      val ldstCtrl = new LdstCtrl
+      val vemul_ldst = SInt(4.W)
+      val ext2 = Bool() // Integer extension instructions
+      val ext4 = Bool()
+      val ext8 = Bool()
+      val wholeRegMv = Bool() // Whole register move
+      val nreg = UInt(4.W)  // Whole register move
+    })
     val ill = ValidIO(new VRobPtr)
   })
   val ctrl = io.ctrl
@@ -48,14 +58,10 @@ class VIllegalInstrn extends Module {
   /**
    * Load/Store
    */
-  val ldst = ctrl.load || ctrl.store
-  val ldstCtrl = LdstDecoder(ctrl.funct6, lsrc(1))
+  val ldst = io.extraInfo_for_VIllegal.ldst
+  val ldstCtrl = io.extraInfo_for_VIllegal.ldstCtrl
   val nfield = ctrl.funct6(5, 3) +& 1.U  // for segment load/store
-  // Load/store: illegal when emul (= eew*lmul/sew) > 8 or < 1/8 except mask and whole-register ones
-  val veew_ldst = Cat(false.B, ctrl.funct3(1,0))
-  val veew_minus_vsew = veew_ldst -& vsew
-  val vemul_ldst = Wire(SInt(4.W))
-  vemul_ldst := vlmul.asSInt + veew_minus_vsew.asSInt
+  val vemul_ldst = io.extraInfo_for_VIllegal.vemul_ldst
   val ill_ldstEmul = ldst && (vemul_ldst > 3.S || vemul_ldst < -3.S) &&
                      !ldstCtrl.mask && !ldstCtrl.wholeReg
   // Segment: illegal when emul (lmul for indexed) * nfield > 8
@@ -70,20 +76,15 @@ class VIllegalInstrn extends Module {
   // Whole regsiter load/store
   val ill_nfield = ldst && ldstCtrl.wholeReg && !(nfield === 1.U || nfield === 2.U || nfield === 4.U || nfield === 8.U)
 
-
   /** Arithmetic Integer */
   // Integer extension instructions
-  val ext = ctrl.funct6 === "b010010".U && ctrl.funct3 === "b010".U
-  val ext2 = ext && ctrl.lsrc(0)(2,1) === 3.U
-  val ext4 = ext && ctrl.lsrc(0)(2,1) === 2.U
-  val ext8 = ext && ctrl.lsrc(0)(2,1) === 1.U
-  val ill_ext2 = ext2 && (vlmul === 5.U || vsew === 0.U)
-  val ill_ext4 = ext4 && (vlmul === 5.U || vlmul === 6.U || vsew(2, 1) === 0.U)
-  val ill_ext8 = ext8 && (vlmul(2) || vsew =/= 3.U)
+  val ill_ext2 = io.extraInfo_for_VIllegal.ext2 && (vlmul === 5.U || vsew === 0.U)
+  val ill_ext4 = io.extraInfo_for_VIllegal.ext4 && (vlmul === 5.U || vlmul === 6.U || vsew(2, 1) === 0.U)
+  val ill_ext8 = io.extraInfo_for_VIllegal.ext8 && (vlmul(2) || vsew =/= 3.U)
   val ill_ext = ill_ext2 || ill_ext4 || ill_ext8
   // Whole register move
-  val wholeRegMv = ctrl.funct6 === "b100111".U && ctrl.funct3 === "b011".U //Whole register move
-  val nreg = ctrl.lsrc(0)(2, 0) +& 1.U  //for whole register move
+  val wholeRegMv = io.extraInfo_for_VIllegal.wholeRegMv
+  val nreg = io.extraInfo_for_VIllegal.nreg
   val ill_nreg = wholeRegMv && !(nreg === 1.U || nreg === 2.U || nreg === 4.U || nreg === 8.U)
   
   /** Arithmetic Floating-point */
@@ -92,18 +93,6 @@ class VIllegalInstrn extends Module {
   // invalid SEW of FP
   val ill_sewFP = !vsew(1) && ctrl.fp
 
-  /**
-   * Register Number
-   */
-  val vnfield = Wire(UInt(3.W))
-  vnfield := Mux(nfield === 8.U, 3.U, nfield >> 1)
-  val vnreg = Wire(UInt(3.W))
-  vnreg := Mux(nreg === 8.U, 3.U, nreg >> 1)
-  // EMUL of Vd
-                                         // 15.1     or      //15.4/5/6: vmsb(o/i)f
-  val mask_onlyOneReg = ctrl.mask && (ctrl.funct6(3) || ctrl.funct6(2) && !ctrl.lsrc(0)(4))
-  
-  
   // Illegal start number of register group
   def regGroup_start_illegal(vemul: UInt, startReg: UInt) = {
     vemul === 1.U && startReg(0) =/= 0.U ||

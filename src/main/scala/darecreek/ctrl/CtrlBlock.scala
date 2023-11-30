@@ -18,7 +18,7 @@ import utils._
 
 class PartialVInfo extends Bundle {
   val vRobPtr = new VRobPtr
-  // val destEew = UInt(3.W)
+  val destEew = UInt(3.W)
   val emulVd = UInt(4.W)
 }
 
@@ -73,6 +73,7 @@ class VCtrlBlock extends Module {
   infoCalc.io.csr := decoder.io.out.bits.csr
   val partialVInfo_reg = Reg(ValidIO(new PartialVInfo))
   when (decoder.io.out.valid) {
+    partialVInfo_reg.bits.destEew := infoCalc.io.infoAll.veewVd
     partialVInfo_reg.bits.emulVd := infoCalc.io.infoAll.emulVd
     partialVInfo_reg.bits.vRobPtr := vq.io.enqPtrOut
   }
@@ -132,6 +133,7 @@ class VCtrlBlock extends Module {
   vIllegalInstrn.io.ctrl := decoder.io.out.bits.ctrl
   vIllegalInstrn.io.csr := decoder.io.out.bits.csr
   vIllegalInstrn.io.infoAll := infoCalc.io.infoAll
+  vIllegalInstrn.io.extraInfo_for_VIllegal := infoCalc.io.extraInfo_for_VIllegal
   vIllegalInstrn.io.robPtrIn := vq.io.enqPtrOut
   vq.io.illegal := vIllegalInstrn.io.ill
   vq.io.partialVInfo := partialVInfo_reg

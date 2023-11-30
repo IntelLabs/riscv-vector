@@ -22,9 +22,7 @@ import darecreek.lsu._
   *
   * Requirement: inputs valid must be consecutive
   * Others: all inputs of io.in share one 'ready'. 'Ready' of all outputs are from one source.
-  * 
   */
-
 class ParallelExpander extends Module {
   val io = IO(new Bundle {
     val in = Vec(VRenameWidth, Flipped(Decoupled(new VMicroOp)))
@@ -51,7 +49,7 @@ class ParallelExpander extends Module {
     * Calculate expanded length
     */
   val expdLen = Wire(Vec(VRenameWidth, UInt(4.W)))
-  val destEew = Wire(Vec(VRenameWidth, UInt(3.W)))
+  val destEew = io.in.map(_.bits.info.destEew)
   val lmul = Wire(Vec(VRenameWidth, UInt(4.W)))
   val veew = Wire(Vec(VRenameWidth, UInt(3.W)))
   val veew_minus_vsew = Wire(Vec(VRenameWidth, UInt(3.W)))
@@ -94,14 +92,6 @@ class ParallelExpander extends Module {
       expdLen(i) := ctrl(i).lsrc(0)(2, 0) +& 1.U
     }.otherwise {
       expdLen(i) := lmul(i)
-    }
-    //---- destEew ----
-    when (ctrl(i).widen || ctrl(i).widen2) {
-      destEew(i) := info(i).vsew + 1.U
-    }.elsewhen (ctrl(i).isLdst && !ldstCtrl(i).indexed) {
-      destEew(i) := veew(i)
-    }.otherwise {
-      destEew(i) := info(i).vsew
     }
   }
 
@@ -235,7 +225,6 @@ class ParallelExpander extends Module {
 
     io.out(i).bits.lsrcValExpd(2) := ctrl.lsrcVal(2) || needOldVd
 
-
     // Reg addr increment of SEW part reg
     val sewSide_inc = Mux(veew_minus_vsew_out(i) === 3.U, 0.U,
                    Mux(veew_minus_vsew_out(i) === 2.U, expdIdx(i) >> 2,
@@ -292,6 +281,4 @@ class ParallelExpander extends Module {
   // when (io.out(0).fire) {
   //   debugCnt := debugCnt + 1.U
   // }
-
-
 }

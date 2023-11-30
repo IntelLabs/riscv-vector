@@ -36,12 +36,22 @@ class VInfoCalc extends Module {
     val ctrl = Input(new VCtrl)
     val csr = Input(new VCsr)
     val infoAll = Output(new VInfoAll)
+    // extra info for module VIllegalInstrn
+    val extraInfo_for_VIllegal = Output(new Bundle {
+      val ldst = Bool()
+      val ldstCtrl = new LdstCtrl
+      val vemul_ldst = SInt(4.W)
+      val ext2 = Bool() // Integer extension instructions
+      val ext4 = Bool()
+      val ext8 = Bool()
+      val wholeRegMv = Bool() // Whole register move
+      val nreg = UInt(4.W)  // Whole register move
+    })
   })
   val ctrl = io.ctrl
   val vsew = io.csr.vsew
   val vlmul = io.csr.vlmul
   val lsrc = ctrl.lsrc
-  val ldest = ctrl.ldest
 
   /**
    * Load/Store
@@ -54,12 +64,6 @@ class VInfoCalc extends Module {
   val veew_minus_vsew = veew_ldst -& vsew
   val vemul_ldst = Wire(SInt(4.W))
   vemul_ldst := vlmul.asSInt + veew_minus_vsew.asSInt
-  // Segment: illegal when emul (lmul for indexed) * nfield > 8
-  val lmul = Vlmul_to_lmul(vlmul)
-  val emul_ldst = Vlmul_to_lmul(vemul_ldst(2, 0))
-  val emul_lmul = Mux(ldstCtrl.indexed, lmul, emul_ldst)
-  val emul_x_nfield = emul_lmul * nfield
-
 
   /** Arithmetic Integer */
   // Integer extension instructions
@@ -117,17 +121,8 @@ class VInfoCalc extends Module {
   }.otherwise {
     vemulVs2 := vlmul
   }
-  // Illegal start number of register group
-  def regGroup_start_illegal(vemul: UInt, startReg: UInt) = {
-    vemul === 1.U && startReg(0) =/= 0.U ||
-    vemul === 2.U && startReg(1, 0) =/= 0.U ||
-    vemul === 3.U && startReg(2, 0) =/= 0.U
-  }
-  val ill_reg = regGroup_start_illegal(vemulVd, ldest) && (ctrl.ldestVal || ctrl.lsrcVal(2)) ||
-                regGroup_start_illegal(vemulVs1, lsrc(0)) && ctrl.lsrcVal(0) ||
-                regGroup_start_illegal(vemulVs2, lsrc(1)) && ctrl.lsrcVal(1)
  
-  /** Register Group Overlap
+  /**
    *  @note We use veew = b111 to represent EEW = 1
    */
   // EEW of Vd
@@ -178,4 +173,13 @@ class VInfoCalc extends Module {
   io.infoAll.emulVd := Vlmul_to_lmul(vemulVd)
   io.infoAll.emulVs1 := Vlmul_to_lmul(vemulVs1)
   io.infoAll.emulVs2 := Vlmul_to_lmul(vemulVs2)
+
+  io.extraInfo_for_VIllegal.ldst := ldst
+  io.extraInfo_for_VIllegal.ldstCtrl := ldstCtrl
+  io.extraInfo_for_VIllegal.vemul_ldst := vemul_ldst
+  io.extraInfo_for_VIllegal.ext2 := ext2
+  io.extraInfo_for_VIllegal.ext4 := ext4
+  io.extraInfo_for_VIllegal.ext8 := ext8
+  io.extraInfo_for_VIllegal.wholeRegMv := wholeRegMv
+  io.extraInfo_for_VIllegal.nreg := nreg
 }
