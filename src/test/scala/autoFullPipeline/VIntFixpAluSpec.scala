@@ -259,7 +259,7 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
   var tbs : Seq[TestBehavior] = Seq(
 
     // new VmadcvvTestBehavior,
-    new VfmvfsTestBehavior,
+    // new VfmvfsTestBehavior,
 
     // new VredsumvsTestBehavior,
 
@@ -425,46 +425,46 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
     // new VmfgevfTestBehavior, // vmfge.vf
     // new VfclassvTestBehavior, // vfclass.v
     // new VfmergevfmTestBehavior, // vfmerge.vfm
-    // new VfmvTestBehavior, // vfmv.v.f
-    // new Vfrsqrt7vTestBehavior, // vfrsqrt7.v
-    // new Vfrec7vTestBehavior, // vfrec7.v
+    new VfmvTestBehavior, // vfmv.v.f
+    new Vfrsqrt7vTestBehavior, // vfrsqrt7.v
+    new Vfrec7vTestBehavior, // vfrec7.v
 
 
-    // new VfcvtxufvTestBehavior, // vfcvt.xu.f.v
-    // new VfcvtxfvTestBehavior, // vfcvt.x.f.v
-    // new VfcvtrtzxufvTestBehavior, // vfcvt.rtz.xu.f.v
-    // new VfcvtrtzxfvTestBehavior, // vfcvt.rtz.x.f.v
-    // new VfcvtfxuvTestBehavior, // vfcvt.f.xu.v
-    // new VfcvtfxvTestBehavior, // vfcvt.f.x.v
+    new VfcvtxufvTestBehavior, // vfcvt.xu.f.v
+    new VfcvtxfvTestBehavior, // vfcvt.x.f.v
+    new VfcvtrtzxufvTestBehavior, // vfcvt.rtz.xu.f.v
+    new VfcvtrtzxfvTestBehavior, // vfcvt.rtz.x.f.v
+    new VfcvtfxuvTestBehavior, // vfcvt.f.xu.v
+    new VfcvtfxvTestBehavior, // vfcvt.f.x.v
 
-    // new VfwaddwvTestBehavior, // vfwadd.wv
-    // new VfwsubwvTestBehavior, // vfwsub.wv
-    // new VfwaddwfTestBehavior, // vfwadd.wf
-    // new VfwsubwfTestBehavior, // vfwsub.wf
+    new VfwaddwvTestBehavior, // vfwadd.wv
+    new VfwsubwvTestBehavior, // vfwsub.wv
+    new VfwaddwfTestBehavior, // vfwadd.wf
+    new VfwsubwfTestBehavior, // vfwsub.wf
 
-    // new VfwaddvvTestBehavior, // vfwadd.vv
-    // new VfwsubvvTestBehavior, // vfwsub.vv
-    // new VfwmaccvvTestBehavior, // vfwmacc.vv
-    // new VfwnmaccvvTestBehavior, // vfwnmacc.vv
-    // new VfwmsacvvTestBehavior, // vfwmsac.vv
-    // new VfwnmsacvvTestBehavior, // vfwnmsac.vv
-    // new VfwmulvvTestBehavior, // vfwmul.vv
+    new VfwaddvvTestBehavior, // vfwadd.vv
+    new VfwsubvvTestBehavior, // vfwsub.vv
+    new VfwmaccvvTestBehavior, // vfwmacc.vv
+    new VfwnmaccvvTestBehavior, // vfwnmacc.vv
+    new VfwmsacvvTestBehavior, // vfwmsac.vv
+    new VfwnmsacvvTestBehavior, // vfwnmsac.vv
+    new VfwmulvvTestBehavior, // vfwmul.vv
 
-    // new VfwaddvfTestBehavior, // vfwadd.vf
-    // new VfwsubvfTestBehavior, // vfwsub.vf
-    // new VfwmaccvfTestBehavior, // vfwmacc.vf
-    // new VfwnmaccvfTestBehavior, // vfwnmacc.vf
-    // new VfwmsacvfTestBehavior, // vfwmsac.vf
-    // new VfwnmsacvfTestBehavior, // vfwnmsac.vf
-    // new VfwmulvfTestBehavior, // vfwmul.vf
+    new VfwaddvfTestBehavior, // vfwadd.vf
+    new VfwsubvfTestBehavior, // vfwsub.vf
+    new VfwmaccvfTestBehavior, // vfwmacc.vf
+    new VfwnmaccvfTestBehavior, // vfwnmacc.vf
+    new VfwmsacvfTestBehavior, // vfwmsac.vf
+    new VfwnmsacvfTestBehavior, // vfwnmsac.vf
+    new VfwmulvfTestBehavior, // vfwmul.vf
 
-    // new VfwcvtffvTestBehavior, // vfwcvt.f.f.v
-    // new VfwcvtxufvTestBehavior, // vfwcvt.xu.f.v
-    // new VfwcvtxfvTestBehavior, // vfwcvt.x.f.v
-    // new VfwcvtrtzxufvTestBehavior, // vfwcvt.rtz.xu.f.v
-    // new VfwcvtrtzxfvTestBehavior, // vfwcvt.rtz.x.f.v
-    // new VfwcvtfxuvTestBehavior, // vfwcvt.f.xu.v
-    // new VfwcvtfxvTestBehavior, // vfwcvt.f.x.v
+    new VfwcvtffvTestBehavior, // vfwcvt.f.f.v
+    new VfwcvtxufvTestBehavior, // vfwcvt.xu.f.v
+    new VfwcvtxfvTestBehavior, // vfwcvt.x.f.v
+    new VfwcvtrtzxufvTestBehavior, // vfwcvt.rtz.xu.f.v
+    new VfwcvtrtzxfvTestBehavior, // vfwcvt.rtz.x.f.v
+    new VfwcvtfxuvTestBehavior, // vfwcvt.f.xu.v
+    new VfwcvtfxvTestBehavior, // vfwcvt.f.x.v
 
     // Div ========================================
     // new VdivvvTestBehavior,
