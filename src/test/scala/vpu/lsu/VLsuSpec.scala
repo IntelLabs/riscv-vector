@@ -52,25 +52,26 @@ class FakeDCache extends Module {
     val addr = RegNext(RegNext(io.req.bits.addr))
 
     val dataTable = Seq(
-        (0x0fd0.U, BigInt("4040404040404404", 16).U),
-        (0x0fd8.U, BigInt("3030303030303030", 16).U),
-        (0x0fe0.U, BigInt("2020202020202020", 16).U),
-        (0x0fe8.U, BigInt("1010101010101010", 16).U),
-        (0x0ff0.U, BigInt("5678901234503489", 16).U),
-        (0x0ff8.U, BigInt("eeeeeeeeeeeeeeee", 16).U),
-        (0x1000.U, BigInt("0123456789abcdef", 16).U),
-        (0x1008.U, BigInt("ffffffffffffffff", 16).U),
-        (0x1010.U, BigInt("0f0f0f0f0f0f0f0f", 16).U),
-        (0x1018.U, BigInt("fedcba9876543210", 16).U),
-        (0x1020.U, BigInt("1234567890123456", 16).U),
-        (0x1028.U, BigInt("0101010101010101", 16).U),
-        (0x1030.U, BigInt("2345678901234567", 16).U),
-        (0x1038.U, BigInt("1111111111111111", 16).U),
-        (0x1040.U, BigInt("2222222222222222", 16).U),
-        (0x1048.U, BigInt("3333333333333333", 16).U),
-        (0x1050.U, BigInt("4444444444444444", 16).U),
-        (0x1058.U, BigInt("5555555555555555", 16).U),
-        (0x1060.U, BigInt("6666666666666666", 16).U),
+        // addr, data, exception
+        (0x0fd0.U, BigInt("4040404040404404", 16).U, false.B),
+        (0x0fd8.U, BigInt("3030303030303030", 16).U, false.B),
+        (0x0fe0.U, BigInt("2020202020202020", 16).U, false.B),
+        (0x0fe8.U, BigInt("1010101010101010", 16).U, false.B),
+        (0x0ff0.U, BigInt("5678901234503489", 16).U, false.B),
+        (0x0ff8.U, BigInt("eeeeeeeeeeeeeeee", 16).U, false.B),
+        (0x1000.U, BigInt("0123456789abcdef", 16).U, false.B),
+        (0x1008.U, BigInt("ffffffffffffffff", 16).U, false.B),
+        (0x1010.U, BigInt("0f0f0f0f0f0f0f0f", 16).U, false.B),
+        (0x1018.U, BigInt("fedcba9876543210", 16).U, false.B),
+        (0x1020.U, BigInt("1234567890123456", 16).U, false.B),
+        (0x1028.U, BigInt("0101010101010101", 16).U, false.B),
+        (0x1030.U, BigInt("2345678901234567", 16).U, false.B),
+        (0x1038.U, BigInt("1111111111111111", 16).U, false.B),
+        (0x1040.U, BigInt("2222222222222222", 16).U, false.B),
+        (0x1048.U, BigInt("3333333333333333", 16).U, false.B),
+        (0x1050.U, BigInt("4444444444444444", 16).U, false.B),
+        (0x1058.U, BigInt("5555555555555555", 16).U, false.B),
+        (0x1060.U, BigInt("6666666666666666", 16).U, true.B),
     )
     
     io.xcpt                 := DontCare
@@ -108,6 +109,12 @@ class FakeDCache extends Module {
         for(i <- 0 until dataTable.length) {
             when(dataTable(i)._1 === addr) {
                 io.resp.bits.data := dataTable(i)._2
+
+                when(dataTable(i)._3) {
+                    io.xcpt.ma.ld := true.B
+                }.otherwise {
+                    io.xcpt.ma.ld := false.B
+                }
             }
         }
     }
@@ -117,7 +124,7 @@ class SmartVectorLsuTestWrapper extends Module {
     val io = IO(new Bundle {
         val mUop = Flipped(ValidIO(new MuopTest))
         val lsuOut = ValidIO(new VLSUOutput)
-        val xcpt = Output(new HellaCacheExceptions)
+        val xcpt = Output(new VLSUXcpt)
         val lsuReady = Output(Bool())
     })
 
@@ -167,10 +174,11 @@ class SmartVectorLsuTestWrapper extends Module {
     io.lsuOut.bits.vd                       := vLsu.io.lsuOut.bits.vd
     io.lsuOut.bits.uopQueueIdx              := 0.U
 
+    io.xcpt <> vLsu.io.xcpt
+
     val dcache = Module(new FakeDCache)
     vLsu.io.dataExchange <> dcache.io
 
-    io.xcpt := vLsu.io.xcpt
 }
 
 
@@ -355,7 +363,7 @@ trait VLsuBehavior_ld {
             dut.clock.step(1)
             val ldReqs = Seq(
                 (vle64.copy(vl=3, vstart=1, uopIdx=0, uopEnd=false), ldReqSrc_default, "hffffffffffffffff1817161514131211".U),
-                (vle64.copy(vl=3, vstart=1, uopIdx=1, uopEnd=true),  ldReqSrc_default, "hfedcba98765432100f0f0f0f0f0f0f0f".U),
+                (vle64.copy(vl=3, vstart=1, uopIdx=1, uopEnd=true),  ldReqSrc_default, "h201f1e1d1c1b1a190f0f0f0f0f0f0f0f".U),
             )
 
             next_is_load_and_step(dut)
@@ -372,7 +380,6 @@ trait VLsuBehavior_ld {
                     dut.clock.step(1)
                 }
                 dut.io.lsuOut.valid.expect(true.B)
-                // dut.clock.step(200)
                 dut.io.lsuOut.bits.vd.expect(r)
                 dut.clock.step(4)
             }
@@ -475,6 +482,41 @@ trait VLsuBehavior_ld {
         }
         }
     }
+
+    def vLsuTest9(): Unit = {
+        it should "pass: unit-strde exception" in {
+        test(new SmartVectorLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            test_init(dut)
+            dut.clock.step(1)
+            val ldReqs = Seq(
+                (vle8.copy(vl=19, uopIdx=0, uopEnd=false, vstart=1), SrcBundleLd(scalar_opnd_1="h1058"), "h201f1e1d1c1b1a195555555555555511".U),
+                (vle8.copy(vl=8, uopIdx=0, uopEnd=true), ldReqSrc_default, "h201f1e1d1c1b1a190123456789abcdef".U),
+            )
+
+            next_is_load_and_step(dut)
+            for ((c, s, r) <- ldReqs) {
+                while (!dut.io.lsuReady.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.mUop.valid.poke(true.B)
+                dut.io.mUop.bits.poke(genLdInput(c, s))
+                dut.clock.step(1)
+                dut.io.mUop.valid.poke(false.B)
+
+                while (!dut.io.lsuOut.valid.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.lsuOut.valid.expect(true.B)
+                if(dut.io.xcpt.update_vl.peekBoolean()) {
+                    dut.io.xcpt.update_vl.expect(true.B)
+                } 
+                dut.io.xcpt.update_data.expect(8.U)
+                dut.io.lsuOut.bits.vd.expect(r)
+                dut.clock.step(4)
+            }
+        }
+        }
+    }
 }
 
 class VLsuSpec_ld extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VLsuBehavior_ld {
@@ -488,4 +530,5 @@ class VLsuSpec_ld extends AnyFlatSpec with ChiselScalatestTester with BundleGenH
     it should behave like vLsuTest6()  // strided load
     it should behave like vLsuTest7()  // strided load
     it should behave like vLsuTest8()  // strided load
+    it should behave like vLsuTest9()  // strided load
 }

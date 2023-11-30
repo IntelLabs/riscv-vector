@@ -31,7 +31,6 @@ class RVUMemoryReq extends Bundle {
     val idx     = UInt(4.W)
     // memop
     val addr    = UInt(64.W)
-    val signed  = Bool()
     // 0 for load; 1 for store
     val cmd     = Bool()
     // store info
