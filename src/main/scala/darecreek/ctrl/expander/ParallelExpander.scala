@@ -19,6 +19,20 @@ import darecreek.lsu._
 /** Parallel ordered expanding method for renaming
   * parallel input --> calc expanded length --> expd len accumulator --> expander --> RF addrs update --> parallel output
   * First version: insert pipeline regs between accumulator and expander
+  * 
+  * Example of one vadd (lmul=4) and one vsub (lmul=4) instruction (assume VRenameWidth = 2):
+  *          clock1   clock2      clock3      clock4      clock5
+  * Input0   vadd
+  * Input1   vsub
+  * Output0          vadd_expd0  vadd_expd2  vsub_expd0  vsub_expd2
+  * Output1          vadd_expd1  vadd_expd3  vsub_expd1  vsub_expd3
+  * 
+  * Example of one vadd (lmul=1) and one vsub (lmul=2) instruction (assume VRenameWidth = 2):
+  *          clock1   clock2      clock3    
+  * Input0   vadd
+  * Input1   vsub
+  * Output0          vadd_expd0  vsub_expd1
+  * Output1          vsub_expd0  n/a
   *
   * Requirement: inputs valid must be consecutive
   * Others: all inputs of io.in share one 'ready'. 'Ready' of all outputs are from one source.
