@@ -33,24 +33,24 @@ class VIexWrapper(implicit p : Parameters) extends Module {
 
   val outValid = SValu.io.out.valid || SVMac.io.out.valid || SVMask.io.out.valid
 
-    switch(currentState){
-      is(empty){
-          when(io.in.valid){
-              currentStateNext := ongoing
-          }.otherwise{
-              currentStateNext := empty
-          }
+  switch(currentState){
+    is(empty){
+      when(io.in.valid && ~io.in.bits.uop.ctrl.alu && ~io.in.bits.uop.ctrl.mask){
+        currentStateNext := ongoing
+      }.otherwise{
+        currentStateNext := empty
       }
-      is(ongoing){
-          when(outValid){
-              currentStateNext := empty
-          }.otherwise{
-              currentStateNext := ongoing
-          }
+    }
+    is(ongoing){
+      when(outValid){
+          currentStateNext := empty
+      }.otherwise{
+          currentStateNext := ongoing
       }
-    } 
+    }
+  } 
 
-  io.iexNeedStall := currentState === ongoing
+  io.iexNeedStall := (currentState === ongoing)
   assert(!(currentState === ongoing && io.in.valid), "when current state is ongoing, should not has new inst in")
   
 
@@ -80,7 +80,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   SVMask.io.in.bits.vfuInput.mask  := io.in.bits.uopRegInfo.mask
 
   io.out.bits  := SValu.io.out.bits
-  io.out.valid := RegNext(io.in.valid)
+  io.out.valid := outValid
 
 }
 
