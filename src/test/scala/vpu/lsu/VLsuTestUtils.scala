@@ -38,7 +38,7 @@ case class CtrlBundle(instrn: BitPat,
 case class SrcBundleLd(scalar_opnd_1: String = "h1000",
                        scalar_opnd_2: String = "h0",
                        vs1: String = "hc0bfbebdbcbbbab9_b8b7b6b5b4b3b2b1",
-                       vs2: String = "hc0bfbebdbcbbbab9_b8b7b6b5b4b3b2b1",
+                       vs2: String = "h0000000000000000_0000000000000000",
                        oldVd: String = "h201f1e1d1c1b1a19_1817161514131211",
                     //    mask: String = "hffff_ffff_ffff_ffff",
 )

@@ -530,5 +530,5 @@ class VLsuSpec_ld extends AnyFlatSpec with ChiselScalatestTester with BundleGenH
     it should behave like vLsuTest6()  // strided load
     it should behave like vLsuTest7()  // strided load
     it should behave like vLsuTest8()  // strided load
-    it should behave like vLsuTest9()  // strided load
+    it should behave like vLsuTest9()  // unit-stride exception
 }
