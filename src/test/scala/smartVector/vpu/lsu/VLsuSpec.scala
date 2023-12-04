@@ -44,14 +44,6 @@ class MuopTest extends Bundle {
 class FakeDCache extends Module {
     val io = IO(Flipped(new RVUMemory))
 
-    val s0 :: s1 :: s2 :: Nil = Enum(3)
-    val state = RegInit(s0)
-    val nextState = WireInit(s0)
-
-    val ldResp = RegInit(0.U(64.W))
-    val queueIdx = RegNext(RegNext(io.req.bits.idx))
-    val addr = RegNext(RegNext(io.req.bits.addr))
-
     val dataTable = Seq(
         // addr, data, exception
         (0x0fd0.U, BigInt("4040404040404404", 16).U, false.B),
@@ -75,46 +67,53 @@ class FakeDCache extends Module {
         (0x1060.U, BigInt("6666666666666666", 16).U, true.B),
     )
     
-    io.xcpt                 := DontCare
     io.req.ready            := true.B
-
-    io.resp.valid           := false.B
-    io.resp.bits.nack       := false.B
-    io.resp.bits.has_data   := false.B
     io.resp.bits.data       := 0.U
-    io.resp.bits.mask       := 0.U
-    io.resp.bits.idx        := 0.U
+    io.resp.bits.nack       := false.B
+    io.xcpt                 := 0.U.asTypeOf(new HellaCacheExceptions())
 
-    // fsm transition logic
-    when(state === s0) {
-        when(io.req.valid) {
-            nextState := s1
-        }.otherwise {
-            nextState := s0
-        }
-    }.elsewhen(state === s1) {
-        nextState := s2
-    }.otherwise {
-        nextState := s0
+    val hasXcpt = WireInit(false.B)
+    val hasMiss = WireInit(false.B)
+
+    val s1_valid = RegNext(io.req.valid)
+    val s1_req   = RegNext(io.req.bits)
+    val s2_valid = RegNext(s1_valid)
+    val s2_req   = RegNext(s1_req)
+
+    when(hasXcpt || hasMiss) {
+        s1_valid := false.B
+        s2_valid := false.B
     }
-    state := nextState
 
-    // fsm output logic
-    when(state === s2) {
-        io.resp.valid           := true.B
-        io.resp.bits.nack       := false.B
-        io.resp.bits.has_data   := true.B
-        io.resp.bits.mask       := 0.U
-        io.resp.bits.idx        := queueIdx
+    io.resp.valid           := s2_valid
+    io.resp.bits.has_data   := true.B
+    io.resp.bits.mask       := 0.U
+    io.resp.bits.idx        := s2_req.idx
 
+    val noise = RegInit("b011000001".U(32.W))
+    noise := noise >> 1.U
+    val random = noise(0)
+
+    when(s2_valid) {
+        when(random) {
+            io.resp.bits.nack := true.B
+            hasMiss := true.B
+            io.resp.bits.has_data := false.B
+        }.otherwise {
+            io.resp.bits.nack := false.B
+            hasMiss := false.B
+            io.resp.bits.has_data := true.B
+        }
         for(i <- 0 until dataTable.length) {
-            when(dataTable(i)._1 === addr) {
+            when(dataTable(i)._1 === s2_req.addr) {
                 io.resp.bits.data := dataTable(i)._2
 
                 when(dataTable(i)._3) {
                     io.xcpt.ma.ld := true.B
+                    hasXcpt := true.B
                 }.otherwise {
                     io.xcpt.ma.ld := false.B
+                    hasXcpt := false.B
                 }
             }
         }
@@ -223,6 +222,7 @@ trait VLsuBehavior_ld {
                         dut.clock.step(1)
                     }
                     dut.io.lsuOut.valid.expect(true.B)
+                    // dut.clock.step(100)
                     dut.io.lsuOut.bits.vd.expect(r)
                     dut.clock.step(4)
             }
@@ -254,6 +254,7 @@ trait VLsuBehavior_ld {
                     dut.clock.step(1)
                 }
                 dut.io.lsuOut.valid.expect(true.B)
+                // dut.clock.step(50)
                 dut.io.lsuOut.bits.vd.expect(r)
                 dut.clock.step(4)
             }
@@ -288,6 +289,7 @@ trait VLsuBehavior_ld {
                     dut.clock.step(1)
                 }
                 dut.io.lsuOut.valid.expect(true.B)
+                // dut.clock.step(100)
                 dut.io.lsuOut.bits.vd.expect(r)
                 dut.clock.step(4)
             }
@@ -509,6 +511,7 @@ trait VLsuBehavior_ld {
                     dut.clock.step(1)
                 }
                 dut.io.lsuOut.valid.expect(true.B)
+                // dut.clock.step(100)
                 if(dut.io.xcpt.update_vl.peekBoolean()) {
                     dut.io.xcpt.update_vl.expect(true.B)
                 } 
