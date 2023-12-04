@@ -10,7 +10,8 @@ case object SmartParamsKey extends Field[SmartParameters]
 // Todo: some parameters should come from scalar parameters
 
 case class  SmartParameters (
-  val VLEN: Int = 128
+  val VLEN: Int = 128,
+  val XLEN: Int = 64
 ){
   val bVL: Int = log2Up(VLEN) + 1
   val bVstart: Int = bVL - 1
@@ -19,6 +20,7 @@ case class  SmartParameters (
 
 trait smartParas {
   val VLEN = 128
+  val XLEN = 64
   val bVL: Int = log2Up(VLEN) + 1
   val bVstart: Int = bVL - 1
   val bVSTART = bVL 

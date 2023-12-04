@@ -8,10 +8,6 @@ import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import xiangshan.MicroOp
 import SmartParam._
 
-/*
-    what I need:
-        * XLEN --> to obtain the highest bit in scalar_operand
-*/
 class VLSUOutput extends Bundle {
     val vd              = UInt(VLEN.W)
     val uopQueueIdx     = UInt(4.W) // magic number
@@ -26,7 +22,6 @@ class VLSUXcpt extends Bundle {
 
 class LdstIO(implicit p: Parameters) extends ParameterizedBundle()(p) {
     val mUop            = Flipped(ValidIO(new Muop()(p)))
-    val oldVd           = Input(UInt(VLEN.W))
     val lsuOut          = ValidIO(new VLSUOutput)
     val dataExchange    = new RVUMemory()
     val xcpt            = Output(new VLSUXcpt)
@@ -245,7 +240,7 @@ class SVlsu(implicit p: Parameters) extends Module {
                 )
 
                 for(i <- 0 until segNum) {
-                    vregInfo(i).data := Reverse(io.oldVd(8 * i + 7, 8 * i))
+                    vregInfo(i).data := Reverse(io.mUop.bits.uopRegInfo.old_vd(8 * i + 7, 8 * i))
 
                     when(i.U < memVl && i.U >= memVstart) {
                         for(j <- 0 until segNum) {
@@ -272,7 +267,6 @@ class SVlsu(implicit p: Parameters) extends Module {
                 when(mUopReg.scalar_opnd_2 === 0.U) {
                     addr := align2membAddr
                 }.otherwise {
-                    val XLEN = 64
                     val strideNeg = mUopReg.scalar_opnd_2(XLEN - 1)
                     val strideAbs = Mux(strideNeg, -mUopReg.scalar_opnd_2, mUopReg.scalar_opnd_2) * membReg
 

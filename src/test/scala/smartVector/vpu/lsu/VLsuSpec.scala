@@ -33,11 +33,12 @@ class VUopTest extends Bundle {
 
 class MuopTest extends Bundle {
     val uop           = new VUopTest
-    val oldVd         = Input(UInt(VLEN.W))
-    val scalar_opnd_1 = UInt(64.W)
-    val scalar_opnd_2 = UInt(64.W)
-    val vs1           = UInt(128.W)
-    val vs2           = UInt(128.W)
+    val oldVd         = UInt(VLEN.W)
+    val scalar_opnd_1 = UInt(XLEN.W)
+    val scalar_opnd_2 = UInt(XLEN.W)
+    val vs1           = UInt(VLEN.W)
+    val vs2           = UInt(VLEN.W)
+    val mask          = UInt(VLEN.W)
 }
 
 class FakeDCache extends Module {
@@ -137,13 +138,14 @@ class SmartVectorLsuTestWrapper extends Module {
     val vLsu = Module(new SVlsu()(p))
   
     io.lsuReady                             := vLsu.io.lsuReady
-    vLsu.io.oldVd                           := io.mUop.bits.oldVd
     vLsu.io.mUop.valid                      := io.mUop.valid
 
     vLsu.io.mUop.bits.scalar_opnd_1         := io.mUop.bits.scalar_opnd_1
     vLsu.io.mUop.bits.scalar_opnd_2         := io.mUop.bits.scalar_opnd_2
     vLsu.io.mUop.bits.uopRegInfo.vs1        := io.mUop.bits.vs1
     vLsu.io.mUop.bits.uopRegInfo.vs2        := io.mUop.bits.vs2
+    vLsu.io.mUop.bits.uopRegInfo.old_vd     := io.mUop.bits.oldVd
+    vLsu.io.mUop.bits.uopRegInfo.mask       := io.mUop.bits.mask
     vLsu.io.mUop.bits.uopRegInfo.vxsat      := false.B
     
     vLsu.io.mUop.bits.uop.sysUop            := DontCare
