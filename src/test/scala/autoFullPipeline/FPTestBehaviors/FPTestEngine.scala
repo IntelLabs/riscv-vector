@@ -34,8 +34,9 @@ class FPTestEngine extends TestEngine {
         results = results.filter(_._2 > robIdx) // flush compare
     }
 
-    def checkOutput(dut : VFPUWrapper) = {
-        val block = randomBlock()
+    def checkOutput(dut : VFPUWrapper, enableRandomBlock : Boolean = true) = {
+        var block = randomBlock()
+        if (!enableRandomBlock) block = false
         dut.io.out.ready.poke((!block).B) // TODO randomly block
 
         println(s".. checkOutput block = ${block}, ready = ${!block}")
@@ -200,7 +201,7 @@ class FPTestEngine extends TestEngine {
                 //  the result for the first time".
                 //  then here we should not check for the result second time.
                 // dut.io.in.valid.poke(false.B)
-                checkOutput(dut)
+                checkOutput(dut, false)
             }
             dut.clock.step(1)
         } else {
