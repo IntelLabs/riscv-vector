@@ -30,7 +30,7 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   val vstart = io.in.uop.info.vstart
   val vl = io.in.uop.info.vl
   val vlmul = io.in.uop.info.vlmul
-  val uop_valid = io.in.uop_valid
+  val uop_valid = io.in.uop_valid && !io.out.perm_busy
   val rdata = io.in.rdata
   val rvalid = io.in.rvalid
   val rs1_imm = Mux(ctrl.vi, Cat(0.U(59.W), vs1_imm), rs1)
