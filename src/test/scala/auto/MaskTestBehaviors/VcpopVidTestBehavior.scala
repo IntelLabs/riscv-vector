@@ -94,38 +94,25 @@ class VcpTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String,
 
             var robIdx = (false, 0)
             robIdxValid = randomFlush()
-            if (robIdxValid) {
+            /*if (robIdxValid) {
                 robIdx = (true, 1)
             }
-            ctrlBundle.robIdx = robIdx
-            dut.io.in.bits.poke(genVFuInput(
-                SrcBundle(
-                    old_vd=oldvd,
-                    vs2=vs2, 
-                    vs1="h0",
-                    mask=mask(0)), 
-                ctrlBundle
-            ))
-            // dut.io.redirect.poke(genFSMRedirect((robIdxValid, robIdxValid, 0)))
-            dut.clock.step(1)
+            ctrlBundle.robIdx = robIdx*/
 
-            if (robIdxValid) {
-                // flushed
-                println("flushed")
-
-                /*dut.io.in.valid.poke(false.B)
-
-                var srcBundle = SrcBundle()
-                ctrlBundle = ctrl.copy()
-
-                // turning off redirect bits
+            if (!robIdxValid) {
                 dut.io.in.bits.poke(genVFuInput(
-                    srcBundle,
+                    SrcBundle(
+                        old_vd=oldvd,
+                        vs2=vs2, 
+                        vs1="h0",
+                        mask=mask(0)), 
                     ctrlBundle
                 ))
-                // dut.io.redirect.poke(genFSMRedirect())
-                
-                dut.clock.step(1)*/
+                // dut.io.redirect.poke(genFSMRedirect((robIdxValid, robIdxValid, 0)))
+                dut.clock.step(1)
+            } else {
+                // flushed
+                println("flushed")
                 return
             }
 
