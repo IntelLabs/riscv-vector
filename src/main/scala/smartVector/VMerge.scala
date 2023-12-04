@@ -8,7 +8,6 @@ import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import darecreek.exu.vfu.alu.VAlu
 import firrtl.Utils
 import SmartParam._
-import freechips.rocketchip.diplomaticobjectmodel.model.R
 
 class CommitInfo extends Bundle{
     val scalarRegWriteEn = Bool() 

@@ -1,3 +1,15 @@
+/***************************************************************************************
+*Copyright (c) 2023-2024 Intel Corporation
+*Vector Acceleration IP core for RISC-V* is licensed under Mulan PSL v2.
+*You can use this software according to the terms and conditions of the Mulan PSL v2.
+*You may obtain a copy of Mulan PSL v2 at:
+*        http://license.coscl.org.cn/MulanPSL2
+*THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+*EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+*MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+*See the Mulan PSL v2 for more details.
+***************************************************************************************/
+
 /**
   * Integer and fixed-point (except mult and div)
   *   
@@ -217,9 +229,9 @@ class VAlu(implicit p: Parameters) extends VFuModule {
   val mask16b = MaskExtract(io.in.bits.mask, maskIdx, eewVm)
   for (i <- 0 until 2) {
     vIntFixpAlu64bs(i).io.vmask := 
-      mask16_to_2x8(mask16b, eewVm)(i)
+      MaskExtract.mask16_to_2x8(mask16b, eewVm)(i)
     vIntFixpAlu64bs(i).io.oldVd := // only for compare instrution
-      mask16_to_2x8(MaskExtract(oldVd, uopIdx, sew), sew)(i)
+      MaskExtract.mask16_to_2x8(MaskExtract(oldVd, uopIdx, sew), sew)(i)
   }
 
   /**
@@ -263,10 +275,7 @@ class VAlu(implicit p: Parameters) extends VFuModule {
    */
   val old_cmpOutResult = Reg(UInt(128.W))
   val cmpOutResult = old_cmpOutResult & cmpOutOff | cmpOutKeep // Compare and carry-out instrns
-  val uopEndS1 = RegEnable(uopEnd, valid)
-  when (RegNext(valid)) {
-    old_cmpOutResult := Mux(uopEndS1, 0.U, cmpOutResult)
-  }
+  when (RegNext(valid)) { old_cmpOutResult := cmpOutResult }
   io.out.valid := RegNext(Mux(narrow_to_1, uopEnd && valid, valid), init = false.B)
 
   /**
@@ -346,19 +355,6 @@ class VAlu(implicit p: Parameters) extends VFuModule {
                      Mux(uopIdxS1(0), Cat(updateType.drop(VLENB/2).map(_(1) === false.B).reverse),
                                       Cat(updateType.take(VLENB/2).map(_(1) === false.B).reverse))
                      ).orR
-  }
-
-
-  //---- Some methods ----
-  def mask16_to_2x8(maskIn: UInt, sew: SewOH): Seq[UInt] = {
-    require(maskIn.getWidth == 16)
-    val result16 = Mux1H(Seq(
-      sew.is8  -> maskIn,
-      sew.is16 -> Cat(0.U(4.W), maskIn(7, 4), 0.U(4.W), maskIn(3, 0)),
-      sew.is32 -> Cat(0.U(6.W), maskIn(3, 2), 0.U(6.W), maskIn(1, 0)),
-      sew.is64 -> Cat(0.U(7.W), maskIn(1), 0.U(7.W), maskIn(0)),
-    ))
-    Seq(result16(7, 0), result16(15, 8))
   }
 }
 

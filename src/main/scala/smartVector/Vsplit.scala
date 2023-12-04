@@ -55,6 +55,8 @@ class VUop(implicit p: Parameters) extends Bundle {
 class UopRegInfo(implicit p : Parameters) extends Bundle {
     val vs1           = UInt(128.W)
     val vs2           = UInt(128.W)
+    val mask          = UInt(128.W)
+    val old_vd        = UInt(128.W)
     val vxsat         = Bool()
 }
 
@@ -104,6 +106,8 @@ class Vsplit(implicit p : Parameters) extends Module {
         //ALU will judge whether use the data, do not worry to send the wrong data 
         uopRegInfo(0).vs1        := Mux(io.in.regFileIn.readVld(0), io.in.regFileIn.readData(0), uopRegInfo(0).vs1)
         uopRegInfo(0).vs2        := Mux(io.in.regFileIn.readVld(1), io.in.regFileIn.readData(1), uopRegInfo(0).vs2)
+        uopRegInfo(0).mask       := Mux(io.in.regFileIn.readVld(2), io.in.regFileIn.readData(2), uopRegInfo(0).mask)
+        uopRegInfo(0).old_vd     := Mux(io.in.regFileIn.readVld(3), io.in.regFileIn.readData(3), uopRegInfo(0).old_vd)
 
         uopRegInfo(0).vxsat      := false.B
     } 
@@ -223,8 +227,12 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     io.out.toRegFileRead.rfReadEn(0)          := ctrl.lsrcVal(0)
     io.out.toRegFileRead.rfReadEn(1)          := ctrl.lsrcVal(1)
+    io.out.toRegFileRead.rfReadEn(2)          := ~ctrl.vm
+    io.out.toRegFileRead.rfReadEn(3)          := ctrl.lsrcVal(2)
     io.out.toRegFileRead.rfReadIdx(0)         := ctrl.lsrc(0) + lsrc0_inc
     io.out.toRegFileRead.rfReadIdx(1)         := ctrl.lsrc(1) + lsrc1_inc
+    io.out.toRegFileRead.rfReadIdx(2)         := 0.U
+    io.out.toRegFileRead.rfReadIdx(3)         := ctrl.ldest
 
     io.scoreBoardSetIO.setEn     := true.B
     io.scoreBoardSetIO.setAddr   := io.out.mUopMergeAttr.ldest

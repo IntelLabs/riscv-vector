@@ -24,10 +24,10 @@ class subVRFWritePort(regLen: Int) extends Bundle {
 // A portion of vector RF (only 64-bit)
 class subVRegFile(numRead: Int, numWrite: Int, regLen: Int) extends Module {
   val io = IO(new Bundle {
-    val read = Vec(numRead, new subVRFReadPort(regLen))
-    val write = Vec(numWrite, new subVRFWritePort(regLen))
+    val read   = Vec(numRead, new subVRFReadPort(regLen))
+    val write  = Vec(numWrite, new subVRFWritePort(regLen))
     //TODO: This is reserved for verification, delete it later
-    val rfData = Output(Vec(NVPhyRegs, UInt(regLen.W)))
+    val rfData = Output(Vec(NVPhyRegs, UInt((VLEN/NLanes).W)))
   })
 
   val rf = Reg(Vec(NVPhyRegs, UInt(regLen.W)))
@@ -72,16 +72,17 @@ class SVRegFile(numRead: Int, numWrite: Int) extends Module {
   val subRFs = Seq.fill(NLanes)(Module(new subVRegFile(numRead, numWrite, LaneWidth)))
   for (laneIdx <- 0 until NLanes) {
     for (i <- 0 until numRead) {
-      subRFs(laneIdx).io.read(i).ren := io.read(i).ren
+      subRFs(laneIdx).io.read(i).ren  := io.read(i).ren
       subRFs(laneIdx).io.read(i).addr := io.read(i).addr
-      io.read(i).data(laneIdx) := subRFs(laneIdx).io.read(i).data
+      io.read(i).data(laneIdx)        := subRFs(laneIdx).io.read(i).data
     }
     for (i <- 0 until numWrite) {
-      subRFs(laneIdx).io.write(i).wen := io.write(i).wen
+      subRFs(laneIdx).io.write(i).wen  := io.write(i).wen
       subRFs(laneIdx).io.write(i).addr := io.write(i).addr
       subRFs(laneIdx).io.write(i).data := io.write(i).data(laneIdx)
     }
   }
+
   //TODO: This is reserved for verification, delete it later
   for(i <- 0 until NVPhyRegs){
     io.rfData(i) := Cat(subRFs(1).io.rfData(i), subRFs(0).io.rfData(i))

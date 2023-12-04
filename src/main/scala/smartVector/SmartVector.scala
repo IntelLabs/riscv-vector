@@ -43,6 +43,7 @@ class SmartVector extends Module {
             val rvuExtra  = new RVUExtra
         })
         //TODO: This is reserved for verification, delete it later
+        //val rfData = Output(Vec(NVPhyRegs, UInt(VLEN.W)))
         val rfData = Output(Vec(NVPhyRegs, UInt(VLEN.W)))
     })
 

@@ -62,42 +62,15 @@ class MaskTailData extends Module {
   //--------------------------------------------------------
   //-------- Mask/Tail for non-compare instructions --------
   //--------------------------------------------------------
-  io.maskKeep := Mux1H(Seq(
-    destEew.is8  -> Cat(maskTail.map(x => Mux(x(1), 0.U(8.W), ~(0.U(8.W)))).reverse),
-    destEew.is16 -> Cat(maskTail.take(4).map(x => Mux(x(1), 0.U(16.W), ~(0.U(16.W)))).reverse),
-    destEew.is32 -> Cat(maskTail.take(2).map(x => Mux(x(1), 0.U(32.W), ~(0.U(32.W)))).reverse),
-    destEew.is64 -> Cat(maskTail.take(1).map(x => Mux(x(1), 0.U(64.W), ~(0.U(64.W))))),
-  ))
-  io.maskOff := Mux1H(Seq(
-    destEew.is8  -> Cat(maskTail.zipWithIndex.map({case (x, i) => 
-                        Mux(!x(1), 0.U(8.W), Mux(x(0), ~0.U(8.W), UIntSplit(oldVd, 8)(i)))}).reverse),
-    destEew.is16 -> Cat(maskTail.take(4).zipWithIndex.map({case (x, i) => 
-                        Mux(!x(1), 0.U(16.W), Mux(x(0), ~0.U(16.W), UIntSplit(oldVd, 16)(i)))}).reverse),
-    destEew.is32 -> Cat(maskTail.take(2).zipWithIndex.map({case (x, i) => 
-                        Mux(!x(1), 0.U(32.W), Mux(x(0), ~0.U(32.W), UIntSplit(oldVd, 32)(i)))}).reverse),
-    destEew.is64 -> Cat(maskTail.take(1).zipWithIndex.map({case (x, i) => 
-                        Mux(!x(1), 0.U(64.W), Mux(x(0), ~0.U(64.W), UIntSplit(oldVd, 64)(i)))}).reverse),
-  ))
-
+  io.maskKeep := Cat(maskTail.map(x => Mux(x(1), 0.U(8.W), ~(0.U(8.W)))).reverse)
+  io.maskOff := Cat(maskTail.zipWithIndex.map({case (x, i) => 
+                        Mux(!x(1), 0.U(8.W), Mux(x(0), ~0.U(8.W), UIntSplit(oldVd, 8)(i)))}).reverse)
   //----------------------------------------------------
   //---- Mask/Tail for compare instruction -------------
   //----------------------------------------------------
-  io.maskKeep_cmp := Mux1H(Seq(
-    destEew.is8  -> Cat(maskTail.map(x => !x(1)).reverse),
-    destEew.is16 -> Cat(0.U(4.W), Cat(maskTail.take(4).map(x => !x(1)).reverse)),
-    destEew.is32 -> Cat(0.U(6.W), Cat(maskTail.take(2).map(x => !x(1)).reverse)),
-    destEew.is64 -> Cat(0.U(7.W), Cat(maskTail.take(1).map(x => !x(1)).reverse)),
-  ))
-  io.maskOff_cmp := Mux1H(Seq(
-    destEew.is8  -> Cat(maskTail.zipWithIndex.map({case (x, i) => 
-                         Mux(!x(1), false.B, Mux(x(0), true.B, oldVd(i)))}).reverse),
-    destEew.is16 -> Cat(~(0.U(4.W)), Cat(maskTail.take(4).zipWithIndex.map({case (x, i) => 
-                         Mux(!x(1), false.B, Mux(x(0), true.B, oldVd(i)))}).reverse)),
-    destEew.is32 -> Cat(~(0.U(6.W)), Cat(maskTail.take(2).zipWithIndex.map({case (x, i) => 
-                         Mux(!x(1), false.B, Mux(x(0), true.B, oldVd(i)))}).reverse)),
-    destEew.is64 -> Cat(~(0.U(7.W)), Cat(maskTail.take(1).zipWithIndex.map({case (x, i) => 
-                        Mux(!x(1), false.B, Mux(x(0), true.B, oldVd(i)))}).reverse)),
-  ))
+  io.maskKeep_cmp := Cat(maskTail.map(x => !x(1)).reverse)
+  io.maskOff_cmp := Cat(maskTail.zipWithIndex.map({case (x, i) => 
+                         Mux(!x(1), false.B, Mux(x(0), true.B, oldVd(i)))}).reverse)
 }
 
 
@@ -278,24 +251,11 @@ class VAlu extends Module {
   readyS2FixP := arb.io.in(0).ready
   readyS1Int := arb.io.in(1).ready
 
-  val uopS1_adjust = Wire(new VExpdUOp) // Adjust expdIdx & expdLen when narrow (to reduce ROB complexity)
-  uopS1_adjust := uopS1
-  when (uopS1.ctrl.narrow) {
-    uopS1_adjust.expdLen := Mux(uopS1.expdLen === 1.U, 1.U, uopS1.expdLen >> 1)
-    uopS1_adjust.expdIdx := uopS1.expdIdx >> 1
-  }
-  val uopS2_adjust = Wire(new VExpdUOp) // Adjust expdIdx & expdLen when narrow
-  uopS2_adjust := uopS2
-  when (uopS2.ctrl.narrow) {
-    uopS2_adjust.expdLen := Mux(uopS2.expdLen === 1.U, 1.U, uopS2.expdLen >> 1)
-    uopS2_adjust.expdIdx := uopS2.expdIdx >> 1
-  }
-
-  arb.io.in(0).bits.uop := uopS2_adjust
+  arb.io.in(0).bits.uop := uopS2
   arb.io.in(0).bits.vd := vdS2FixPFinal
   arb.io.in(0).bits.fflags := 0.U
   arb.io.in(0).bits.vxsat := vxsatS2
-  arb.io.in(1).bits.uop := uopS1_adjust
+  arb.io.in(1).bits.uop := uopS1
   arb.io.in(1).bits.vd := vdS1IntFinal
   arb.io.in(1).bits.fflags := 0.U
   arb.io.in(1).bits.vxsat := false.B
