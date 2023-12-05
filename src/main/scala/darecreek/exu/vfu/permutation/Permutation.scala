@@ -223,7 +223,7 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   vslide_cnt_max := Cat(0.U(1.W), vslide_lo_valid) + Cat(0.U(1.W), vslide_hi_valid)
   when(flush) {
     vslide_rd_cnt := 0.U
-  }.elsewhen(rd_vs_en) {
+  }.elsewhen(rd_vs_en && reg_vslide) {
     when(vslide_rd_cnt === vslide_cnt_max) {
       vslide_rd_cnt := 0.U
     }.otherwise {
@@ -338,7 +338,7 @@ class Permutation(implicit p: Parameters) extends VFuModule {
 
   when(flush) {
     vrgather_rd_cnt := 0.U
-  }.elsewhen(rd_vs_en) {
+  }.elsewhen(rd_vs_en && reg_vrgather) {
     when(vrgather_rd_cnt === vrgather_cnt_max) {
       vrgather_rd_cnt := 0.U
     }.otherwise {
