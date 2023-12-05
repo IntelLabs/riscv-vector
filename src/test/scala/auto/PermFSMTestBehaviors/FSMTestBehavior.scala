@@ -169,7 +169,7 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
             // Stage 2.4: see if any wb value is there to be written =============
             val fsm_wb_vld = dut.io.out.wb_vld.peek().litValue.toInt
             if (fsm_wb_vld == 1) {
-                // wb_idxs :+= ClkIdx(clock_counter + WB_DELAY, 0)
+                wb_idxs :+= ClkIdx(clock_counter + WB_DELAY, 0)
 
                 // 12.5: wb_data comes at the same cycle with wb_vld
                 vd = dut.io.out.wb_data.peek().litValue
