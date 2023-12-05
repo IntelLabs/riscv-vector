@@ -25,6 +25,8 @@ class FPTestEngine extends TestEngine {
     override def getName() = "FPTestEngine"
     override def getDut() = new VFPUWrapper
 
+    var noRes = 0
+
     var historyTCs : List[(Int, Int, TestCase)] = List() // robIdx, uopIdx, TestCase
     var historyTCIx = 0
 
@@ -42,7 +44,7 @@ class FPTestEngine extends TestEngine {
         println(s".. checkOutput block = ${block}, ready = ${!block}")
 
         if (!block && dut.io.out.valid.peek().litValue == 1) {
-
+            noRes = 0
             println(".. valid == true, checking results..")
 
             println("historyTCs:")
@@ -107,6 +109,8 @@ class FPTestEngine extends TestEngine {
 
                 results :+= (resCorrectness, resRobIdx, resUopIdx)
             }
+        } else if (!block) {
+            noRes += 1
         }
     }
 
@@ -204,6 +208,7 @@ class FPTestEngine extends TestEngine {
                 checkOutput(dut, false)
             }
             dut.clock.step(1)
+            noRes = 0
         } else {
             dut.io.in.valid.poke(false.B)
             dut.io.in.bits.uop.uopEnd.poke(false.B)
@@ -212,11 +217,13 @@ class FPTestEngine extends TestEngine {
             dut.io.in.bits.poke(getEmptyVFuInput()) // don't care..
             if (flush) {
                 dut.io.redirect.poke(genFSMRedirect(flush, flush, flushedRobIdx))
+                noRes = 0
             } else {
                 dut.io.redirect.poke(genFSMRedirect())
             }
 
             checkOutput(dut)
+            assert(noRes < MAX_NO_RES_ITER)
 
             if (flush) {
                 for (i <- 0 until historyTCs.length) {
