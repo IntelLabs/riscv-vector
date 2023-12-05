@@ -17,7 +17,7 @@ class VLSUXcpt extends Bundle {
     val exception_vld   = Bool()
     val update_vl       = Bool()
     val update_data     = UInt(bVL.W)
-    val xcpt_cause       = new HellaCacheExceptions()
+    val xcpt_cause      = new HellaCacheExceptions()
 }
 
 class LdstIO(implicit p: Parameters) extends ParameterizedBundle()(p) {
@@ -47,7 +47,6 @@ object VMemCmd {
 class LdstUop extends Bundle {
     val valid       = Bool()
     val addr        = Output(UInt(64.W))
-    val queueIdx    = Output(UInt(ldUopQueueWidth.W))
     val firstvl     = Output(UInt(bVL.W))
     val isLast      = Output(Bool())
 }
@@ -58,7 +57,7 @@ class VRegSegmentInfo extends Bundle {
     // corresponding ldstuop idx of current vreg segement
     val idx     = UInt(ldUopQueueWidth.W)
     // offset of writeback valid data for current vreg segement
-    val offset = UInt(log2Ceil(8).W)
+    val offset  = UInt(log2Ceil(8).W)
     // data of current vreg segement
     val data    = UInt(8.W)
 }
@@ -105,22 +104,18 @@ class SVlsu(implicit p: Parameters) extends Module {
     
     /****************************SPLIT STAGE*********************************/
     /*
-                                                                splitIdx + 1
-            +------------+                                       +-------------+
-            |            |                                       |             |
-            |      +-----+-----+                          +------+------+      |
-            |      |           |       mUop.Valid         |             |      |
-            +----> | uop_idle  +-------------------------->  uop_split  | <----+
-                |           |                          |             |
-                +-----+-----+                          +------+------+
-                        ^                                       |
-                        |                                       |
-            completeLd |                                       | splitIdx = splitCount
-                        |        +--------------------+         |
-                        |        |                    |         |
-                        +--------+  uop_split_finish  +<--------+
-                                |                    |
-                                +--------------------+
+                                                     splitId+1
+                    +--------+                       +--------+
+                    |        |                       |        |
+                    |   +----+---+  mUop.Valid  +----+----+   |
+                    |-> |uop_idle|--------------|uop_split| <-|
+                        +---+----+              +----+----+
+                            |                        |
+                  completeLd|                        |splitIdx = splitCount-1
+                            |   +----------------+   |        || xcpt
+                            |-> |uop_split_finish| <-|
+                                +----------------+
+
     */        
 
     // SPLIT FSM -- decide next state
@@ -312,10 +307,6 @@ class SVlsu(implicit p: Parameters) extends Module {
             curSplitIdx := curSplitIdx + 1.U
             ldstEnqPtr  := ldstEnqPtr  + 1.U
         }
-    }.elsewhen(uopState === uop_split && mem_xcpt) {
-        ldstUopQueue.foreach(
-            uop => uop.valid := false.B
-        )
     }
     /*-----------------SPLIT STAGE END-----------------------*/
 
@@ -339,6 +330,9 @@ class SVlsu(implicit p: Parameters) extends Module {
     
     // issueLdPtr
     when(mem_xcpt) {
+        ldstUopQueue.foreach(
+            uop => uop.valid := false.B
+        )
         issueLdstPtr := 0.U
     }.elsewhen(io.dataExchange.resp.valid && io.dataExchange.resp.bits.nack && !mem_xcpt) {
         issueLdstPtr := io.dataExchange.resp.bits.idx
