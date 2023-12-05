@@ -648,13 +648,16 @@ class Permutation(implicit p: Parameters) extends VFuModule {
 
   val rdata_update_vs_idx_reg = RegInit(false.B)
   val rdata_wb_vld_reg = RegInit(false.B)
+  val rdata_wb_vld_reg2 = RegInit(false.B)
 
   when(flush) {
     rdata_update_vs_idx_reg := false.B
     rdata_wb_vld_reg := false.B
+    rdata_wb_vld_reg2 := false.B
   }.otherwise {
     rdata_update_vs_idx_reg := rdata_update_vs_idx
     rdata_wb_vld_reg := rdata_wb_vld
+    rdata_wb_vld_reg2 := rdata_wb_vld_reg
   }
 
   when(flush) {
@@ -704,18 +707,12 @@ class Permutation(implicit p: Parameters) extends VFuModule {
 
   val rd_en = rd_mask_en || rd_vs_en || cmprs_rd_old_vd
   val reg_rd_en = RegInit(false.B)
-  val reg_wb_vld = RegInit(false.B)
-  val reg2_wb_vld = RegInit(false.B)
   val reg_rd_preg_idx = RegInit(0.U(8.W))
 
   when(flush) {
     reg_rd_en := false.B
-    reg_wb_vld := false.B
-    reg2_wb_vld := false.B
   }.otherwise {
     reg_rd_en := rd_en
-    reg_wb_vld := wb_vld
-    reg2_wb_vld := reg_wb_vld
   }
 
   when(flush) {
@@ -734,7 +731,7 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   io.out.uop := uop_reg
   io.out.rd_en := reg_rd_en & !flush
   io.out.rd_preg_idx := reg_rd_preg_idx
-  io.out.wb_vld := Mux(reg_vcompress, reg2_wb_vld & !flush, reg_wb_vld & !flush)
+  io.out.wb_vld := Mux(reg_vcompress, rdata_wb_vld_reg2 & !flush, rdata_wb_vld_reg & !flush)
   io.out.wb_data := perm_vd
   io.out.perm_busy := perm_busy | flush
 }
