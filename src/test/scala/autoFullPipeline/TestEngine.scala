@@ -52,6 +52,9 @@ object TestEngine {
 abstract class TestEngine extends BundleGenHelper {
     val NO_RESULT_ROBIDX = -1
 
+    val MAX_NO_RES_ITER = 20
+    var noResIter = 0
+
     var normalModeTBs : Seq[TestBehavior] = Seq()
     var orderedTBs : Seq[TestBehavior] = Seq()
 
@@ -225,6 +228,7 @@ abstract class TestEngine extends BundleGenHelper {
             val resRobIdx = stepRes._2
 
             if (resRobIdx != NO_RESULT_ROBIDX) {
+                noResIter = 0
                 //  TODO 1.3.0. if the result is incorrect, record the incorrect result and remove the TestCase and TestBehavior
                 // TODO When robIdx does not exist in the pool.. failed or flushed..
                 if (!curTestCasePool.contains(resRobIdx)) {
@@ -284,7 +288,9 @@ abstract class TestEngine extends BundleGenHelper {
                     testBehaviorPool = testBehaviorPool.filterNot(_ == resTestBehavior)
                 }
             } else {
+                // assert(noResIter < MAX_NO_RES_ITER)
                 println("Waiting for TestCase result..")
+                // noResIter += 1
             }
             println("=============================================================================")
         } }
