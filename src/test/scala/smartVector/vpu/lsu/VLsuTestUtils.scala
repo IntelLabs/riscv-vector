@@ -41,7 +41,7 @@ case class SrcBundleLd(scalar_opnd_1: String = "h1000",
                        vs2: String = "h0000000000000000_0000000000000000",
                        oldVd: String = "h201f1e1d1c1b1a19_1817161514131211",
                        mask: String = "h0",
-                    //    mask: String = "hffff_ffff_ffff_ffff",
+                      //  mask: String = "hffff_ffff_ffff_ffff",
 )
 
 case class SeqId(v_reg: Int = 0,

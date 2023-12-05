@@ -79,6 +79,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     val elenReg         = RegInit(0.U(vlenbWidth.W))
     val mlenReg         = RegInit(0.U(vlenbWidth.W))
     val ldstTypeReg     = RegInit(0.U(2.W))
+    val vmReg           = RegInit(true.B)
 
     // vreg seg info
     val vregInfo        = RegInit(VecInit(Seq.fill(vlenb)(0.U.asTypeOf(new VRegSegmentInfo))))
@@ -159,7 +160,9 @@ class SVlsu(implicit p: Parameters) extends Module {
             val (vstart, vl)     = (io.mUop.bits.uop.info.vstart, io.mUop.bits.uop.info.vl)
             val (uopIdx, uopEnd) = (io.mUop.bits.uop.uopIdx, io.mUop.bits.uop.uopEnd)
             val vsew             = io.mUop.bits.uop.info.vsew
+            val vm               = io.mUop.bits.uop.ctrl.vm
             
+            vmReg := vm
             // eew in bytes 
             val mwCatWidth = Cat(funct6(2), funct3)
             val eewb = MuxCase(1.U, Array(
@@ -244,68 +247,77 @@ class SVlsu(implicit p: Parameters) extends Module {
         }
     }.elsewhen(uopState === uop_split && !mem_xcpt) {
         when(curSplitIdx < splitCount) {
-            val curVl = mUopReg.uop.uopIdx * Mux(elenReg < mlenReg, elenReg, mlenReg) + splitStart + curSplitIdx
-            val addr  = WireInit(0.U(64.W))
-            /*-----------------------------------------calc addr start-------------------------------------------------*/
-            /*                                                                                                         */
-            // align addr to memb
-            val align2membAddr = (mUopReg.scalar_opnd_1 >> membAlignIdxReg) << membAlignIdxReg
+            val curVl       = mUopReg.uop.uopIdx * Mux(elenReg < mlenReg, elenReg, mlenReg) + splitStart + curSplitIdx
+            val addr        = WireInit(0.U(64.W))
+            val offset      = WireInit(0.U(log2Ceil(8).W))
+            val baseSegIdx  = (curVl % mlenReg) * membReg
 
-            when(ldstTypeReg === Mop.unit_stride) {
-                addr := align2membAddr + curVl * membReg
-            }.elsewhen(ldstTypeReg === Mop.constant_stride) {
-                when(mUopReg.scalar_opnd_2 === 0.U) {
-                    addr := align2membAddr
+            val maskVal = mUopReg.uopRegInfo.mask(curVl)
+
+            when(vmReg || maskVal) {
+                /*-----------------------------------------calc addr start-------------------------------------------------*/
+                /*                                                                                                         */
+                // align addr to memb
+                val align2membAddr = (mUopReg.scalar_opnd_1 >> membAlignIdxReg) << membAlignIdxReg
+                when(ldstTypeReg === Mop.unit_stride) {
+                    addr := align2membAddr + curVl * membReg
+                }.elsewhen(ldstTypeReg === Mop.constant_stride) {
+                    when(mUopReg.scalar_opnd_2 === 0.U) {
+                        addr := align2membAddr
+                    }.otherwise {
+                        val strideNeg = mUopReg.scalar_opnd_2(XLEN - 1)
+                        val strideAbs = Mux(strideNeg, -mUopReg.scalar_opnd_2, mUopReg.scalar_opnd_2) * membReg
+
+                        addr := Mux(strideNeg, align2membAddr - curVl * strideAbs, align2membAddr + curVl * strideAbs)
+                    }
+                }.elsewhen(ldstTypeReg === Mop.index_ordered || ldstTypeReg === Mop.index_unodered) {
+                    // indexed addr
+                    val idxVal = WireInit(0.U(VLEN.W))
+                    val remain = WireInit(0.U(VLEN.W))
+                    val rShiftVal = WireInit(0.U(VLEN.W))
+                    val eew = eewbReg << 3.U
+
+                    val beginIdx = (curVl % elenReg) * (eew)
+
+                    rShiftVal := (mUopReg.uopRegInfo.vs2 >> beginIdx)
+                    remain := ((1.U << eew) - 1.U)
+                    idxVal := (mUopReg.uopRegInfo.vs2 >> beginIdx) & remain
+                    val idxNeg = idxVal(eew - 1.U)
+                    val idxAlignVal = (idxVal >> membAlignIdxReg) << membAlignIdxReg
+                    val idxAbs = Mux(idxNeg, ((~idxAlignVal) & remain) + 1.U, idxAlignVal)
+                    
+                    addr := Mux(idxNeg, align2membAddr - idxAbs, align2membAddr + idxAbs)
                 }.otherwise {
-                    val strideNeg = mUopReg.scalar_opnd_2(XLEN - 1)
-                    val strideAbs = Mux(strideNeg, -mUopReg.scalar_opnd_2, mUopReg.scalar_opnd_2) * membReg
-
-                    addr := Mux(strideNeg, align2membAddr - curVl * strideAbs, align2membAddr + curVl * strideAbs)
+                    // do something
                 }
-            }.elsewhen(ldstTypeReg === Mop.index_ordered || ldstTypeReg === Mop.index_unodered) {
-                // indexed addr
-                val idxVal = WireInit(0.U(VLEN.W))
-                val remain = WireInit(0.U(VLEN.W))
-                val rShiftVal = WireInit(0.U(VLEN.W))
-                val eew = eewbReg << 3.U
 
-                val beginIdx = (curVl % elenReg) * (eew)
+                // align addr to 64 bits
+                val alignedAddr = (addr >> 3.U) << 3.U
+                offset := addr - alignedAddr
+                /*                                                                                                         */
+                /*-----------------------------------------calc addr end---------------------------------------------------*/
 
-                rShiftVal := (mUopReg.uopRegInfo.vs2 >> beginIdx)
-                remain := ((1.U << eew) - 1.U)
-                idxVal := (mUopReg.uopRegInfo.vs2 >> beginIdx) & remain
-                val idxNeg = idxVal(eew - 1.U)
-                val idxAlignVal = (idxVal >> membAlignIdxReg) << membAlignIdxReg
-                val idxAbs = Mux(idxNeg, ((~idxAlignVal) & remain) + 1.U, idxAlignVal)
-                
-                addr := Mux(idxNeg, align2membAddr - idxAbs, align2membAddr + idxAbs)
-            }.otherwise {
-                // do something
+                ldstUopQueue(ldstEnqPtr).valid   := true.B
+                ldstUopQueue(ldstEnqPtr).addr    := alignedAddr
+                ldstUopQueue(ldstEnqPtr).isLast  := (curSplitIdx === splitCount - 1.U)
+                ldstUopQueue(ldstEnqPtr).firstvl := curVl
+
+                ldstEnqPtr  := ldstEnqPtr  + 1.U
             }
 
-            // align addr to 64 bits
-            val alignedAddr = (addr >> 3.U) << 3.U
-            val offset = addr - alignedAddr
-            /*                                                                                                         */
-            /*-----------------------------------------calc addr end---------------------------------------------------*/
-
-            ldstUopQueue(ldstEnqPtr).valid   := true.B
-            ldstUopQueue(ldstEnqPtr).addr    := alignedAddr
-            ldstUopQueue(ldstEnqPtr).isLast  := (curSplitIdx === splitCount - 1.U)
-            ldstUopQueue(ldstEnqPtr).firstvl := curVl
-
-            val baseSegIdx = (curVl % mlenReg) * membReg;
             for(i <- 0 until vlenb) {
                 when(i.U < membReg) {
                     val segIdx = baseSegIdx + i.U
-
-                    vregInfo(segIdx).status := VRegSegmentStatus.notReady
-                    vregInfo(segIdx).idx    := ldstEnqPtr
-                    vregInfo(segIdx).offset := offset + i.U
+                    when(vmReg || maskVal) {
+                        vregInfo(segIdx).status := VRegSegmentStatus.notReady
+                        vregInfo(segIdx).idx    := ldstEnqPtr
+                        vregInfo(segIdx).offset := offset + i.U
+                    }.otherwise {
+                        vregInfo(segIdx).status := VRegSegmentStatus.ready
+                    }
                 }
             }
             curSplitIdx := curSplitIdx + 1.U
-            ldstEnqPtr  := ldstEnqPtr  + 1.U
         }
     }
     /*-----------------SPLIT STAGE END-----------------------*/
