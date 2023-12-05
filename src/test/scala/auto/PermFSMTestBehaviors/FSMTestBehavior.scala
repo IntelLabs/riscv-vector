@@ -152,7 +152,7 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
 
             // ================================================
             // 10.27 add random flush
-            var robIdx = (false, 0)
+            var robIdx = (false, 1)
             robIdxValid = randomFlush()
             if (robIdxValid) {
                 robIdx = (true, 1)
@@ -317,6 +317,7 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
             vxrm = vxrm,
             vstart = vstart,
             // robIdx = robIdx
+            robIdx = (false, 1)
         )
 
 
@@ -430,7 +431,8 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
             uopIdx=0,
             uopEnd=true,
             vxrm = vxrm,
-            vstart = vstart
+            vstart = vstart,
+            robIdx = (false, 1)
         )
         
         dut.io.in.poke(genFSMInput(
