@@ -1,6 +1,6 @@
 #!/bin/bash
 
-N_PROCESSES=6
+N_PROCESSES=8
 
 if [ -z "$1" ]; then
     echo "Usage: $0 <file of instruction names>"
@@ -67,7 +67,7 @@ for i in $(seq 0 "$N_PROCESSES"); do
     if [ -f "$inst_file" ]; then
         pushd . > /dev/null
         cd ../../../../../..
-        sbt -J-XX:+UseG1GC -J-Xms2g -J-Xmx8g -Dinsfile="$inst_file_path" \
+        sbt -J-XX:+UseG1GC -J-Xms2g -J-Xmx4g -Dinsfile="$inst_file_path" \
             -DincorrInsts="$incorrect_inst_file_path" \
             -DdoneInsts="$done_inst_file_path" \
             -DincorrDataDire="./src/test/scala/autoFullPipeline/AutoTestRes/$foldername/incorrectData/" \
