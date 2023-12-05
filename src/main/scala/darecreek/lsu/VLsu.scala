@@ -147,6 +147,7 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
     val valid = Bool()
     val uop = new VExpdUOp
   }))
+  when (reset.asBool) { ldUopTable.foreach(_.valid := false.B) }
   val ldBufPtrEnq = RegInit(0.U(3.W))
   ldBufPtrEnq := Mux(completeLd, 0.U, Mux(ld.fire, ldBufPtrEnq + 1.U, ldBufPtrEnq))
   when (ld.fire) {
