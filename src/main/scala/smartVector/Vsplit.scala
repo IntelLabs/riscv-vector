@@ -117,23 +117,22 @@ class Vsplit(implicit p : Parameters) extends Module {
         vInfo(0)                 := io.in.decodeIn.bits.vInfo
         scalar_opnd_1(0)         := io.in.decodeIn.bits.scalar_opnd_1
         scalar_opnd_2(0)         := io.in.decodeIn.bits.scalar_opnd_2
-
-        //To save power, when do not need to update the vs1, keep it unchanged. 
-        //ALU will judge whether use the data, do not worry to send the wrong data 
-        uopRegInfo(0).vs1        := Mux(io.in.regFileIn.readVld(0), io.in.regFileIn.readData(0), uopRegInfo(0).vs1)
-        uopRegInfo(0).vs2        := Mux(io.in.regFileIn.readVld(1), io.in.regFileIn.readData(1), uopRegInfo(0).vs2)
-        uopRegInfo(0).mask       := Mux(io.in.regFileIn.readVld(2), io.in.regFileIn.readData(2), uopRegInfo(0).mask)
-        uopRegInfo(0).old_vd     := Mux(io.in.regFileIn.readVld(3), io.in.regFileIn.readData(3), uopRegInfo(0).old_vd)
-
         uopRegInfo(0).vxsat      := false.B
-    } 
+    }
+
+    //To save power, when do not need to update the vs1, keep it unchanged. 
+    //ALU will judge whether use the data, do not worry to send the wrong data 
+    uopRegInfo(0).vs1        := Mux(io.in.regFileIn.readVld(0), io.in.regFileIn.readData(0), uopRegInfo(0).vs1)
+    uopRegInfo(0).vs2        := Mux(io.in.regFileIn.readVld(1), io.in.regFileIn.readData(1), uopRegInfo(0).vs2)
+    uopRegInfo(0).mask       := Mux(io.in.regFileIn.readVld(2), io.in.regFileIn.readData(2), uopRegInfo(0).mask)
+    uopRegInfo(0).old_vd     := Mux(io.in.regFileIn.readVld(3), io.in.regFileIn.readData(3), uopRegInfo(0).old_vd)
 
     val ctrl    = Mux(instFirstIn,io.in.decodeIn.bits.vCtrl,vCtrl(0))
     val info    = Mux(instFirstIn,io.in.decodeIn.bits.vInfo,vInfo(0))
-    val vs1     = Mux(instFirstIn,io.in.regFileIn.readData(0), uopRegInfo(0).vs1)
-    val vs2     = Mux(instFirstIn,io.in.regFileIn.readData(1), uopRegInfo(0).vs2)
-    val old_vd  = Mux(instFirstIn,io.in.regFileIn.readData(2), uopRegInfo(0).old_vd)
-    val mask    = Mux(instFirstIn,io.in.regFileIn.readData(3), uopRegInfo(0).mask)
+    val vs1     = Mux(io.in.regFileIn.readVld(0), io.in.regFileIn.readData(0), uopRegInfo(0).vs1)
+    val vs2     = Mux(io.in.regFileIn.readVld(1), io.in.regFileIn.readData(1), uopRegInfo(0).vs2)
+    val old_vd  = Mux(io.in.regFileIn.readVld(2), io.in.regFileIn.readData(2), uopRegInfo(0).old_vd)
+    val mask    = Mux(io.in.regFileIn.readVld(3), io.in.regFileIn.readData(3), uopRegInfo(0).mask)
     val scalar_opnd_1_ = Mux(instFirstIn,io.in.decodeIn.bits.scalar_opnd_1,scalar_opnd_1(0))
     val scalar_opnd_2_ = Mux(instFirstIn,io.in.decodeIn.bits.scalar_opnd_2,scalar_opnd_2(0))
     val v_ext_out = ctrl.alu && ctrl.funct3 === "b010".U && ctrl.funct6 === "b010010".U 
@@ -262,10 +261,10 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.out.mUop.bits.uopRegInfo.old_vd    := old_vd
     io.out.mUop.bits.uopRegInfo.mask      := mask
 
-    io.out.toRegFileRead.rfReadEn(0)          := ctrl.lsrcVal(0)
-    io.out.toRegFileRead.rfReadEn(1)          := ctrl.lsrcVal(1)
-    io.out.toRegFileRead.rfReadEn(2)          := ~ctrl.vm
-    io.out.toRegFileRead.rfReadEn(3)          := ctrl.lsrcVal(2)
+    io.out.toRegFileRead.rfReadEn(0)          := io.out.mUop.valid && ctrl.lsrcVal(0)
+    io.out.toRegFileRead.rfReadEn(1)          := io.out.mUop.valid && ctrl.lsrcVal(1)
+    io.out.toRegFileRead.rfReadEn(2)          := io.out.mUop.valid && ~ctrl.vm
+    io.out.toRegFileRead.rfReadEn(3)          := io.out.mUop.valid && ctrl.lsrcVal(2)
     io.out.toRegFileRead.rfReadIdx(0)         := ctrl.lsrc(0) + lsrc0_inc
     io.out.toRegFileRead.rfReadIdx(1)         := ctrl.lsrc(1) + lsrc1_inc
     io.out.toRegFileRead.rfReadIdx(2)         := 0.U
@@ -283,7 +282,7 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     switch(currentState){
         is(empty){
-            when(needStall){
+            when(instFirstIn && needStall){
                 currentStateNext := ongoing
             }.elsewhen(io.in.decodeIn.valid && io.in.decodeIn.bits.vInfo.vlmul === 1.U){
                 currentStateNext := empty

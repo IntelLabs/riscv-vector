@@ -32,7 +32,7 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   io.out.bits.scalar_opnd_2 := RegEnable(io.in.bits.rs2, io.in.valid)
 
   val validTmp = Reg(Bool())
-  when (RegNext(io.in.valid) & ~io.out.ready){
+  when (RegNext(io.in.valid) & (~io.out.ready || io.iexNeedStall)){
     validTmp := true.B
   }.otherwise{
     validTmp := false.B 

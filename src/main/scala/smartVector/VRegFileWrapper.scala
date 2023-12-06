@@ -48,16 +48,18 @@ class SVRegFileWrapper(implicit p : Parameters) extends Module{
     regWriteDone := regFile.io.write(0).wen
 
     io.out.writeDone := regWriteDone
-    io.out.readVld(0) := RegNext(io.in.readIn.rfReadEn(0))
-    io.out.readVld(1) := RegNext(io.in.readIn.rfReadEn(1))
-    io.out.readVld(2) := RegNext(io.in.readIn.rfReadEn(2))
-    io.out.readVld(3) := RegNext(io.in.readIn.rfReadEn(3))
+    io.out.readVld(0) := io.in.readIn.rfReadEn(0)
+    io.out.readVld(1) := io.in.readIn.rfReadEn(1)
+    io.out.readVld(2) := io.in.readIn.rfReadEn(2)
+    io.out.readVld(3) := io.in.readIn.rfReadEn(3)
 
     val readDataOUt = Wire(Vec(4, UInt(VLEN.W)))
     readDataOUt(0) := Cat(regFile.io.read(0).data(1), regFile.io.read(0).data(0))
     readDataOUt(1) := Cat(regFile.io.read(1).data(1), regFile.io.read(1).data(0))
     readDataOUt(2) := Cat(regFile.io.read(2).data(1), regFile.io.read(2).data(0))
     readDataOUt(3) := Cat(regFile.io.read(3).data(1), regFile.io.read(3).data(0))
+
+    //bypass
     io.out.readData(0) := Mux(io.in.readIn.rfReadIdx(0) === io.in.writeIn.rfWriteIdx, io.in.writeIn.rfWriteData, readDataOUt(0))
     io.out.readData(1) := Mux(io.in.readIn.rfReadIdx(1) === io.in.writeIn.rfWriteIdx, io.in.writeIn.rfWriteData, readDataOUt(1))
     io.out.readData(2) := Mux(io.in.readIn.rfReadIdx(2) === io.in.writeIn.rfWriteIdx, io.in.writeIn.rfWriteData, readDataOUt(2))

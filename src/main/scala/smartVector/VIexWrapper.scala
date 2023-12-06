@@ -50,7 +50,8 @@ class VIexWrapper(implicit p : Parameters) extends Module {
     }
   } 
 
-  io.iexNeedStall := (currentState === ongoing)
+  currentState := currentStateNext
+  io.iexNeedStall := (currentStateNext === ongoing)
   assert(!(currentState === ongoing && io.in.valid), "when current state is ongoing, should not has new inst in")
   
 
@@ -79,7 +80,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   SVMask.io.in.bits.vfuInput.oldVd := io.in.bits.uopRegInfo.old_vd
   SVMask.io.in.bits.vfuInput.mask  := io.in.bits.uopRegInfo.mask
 
-  io.out.bits  := SValu.io.out.bits
+  io.out.bits  := Mux(SVMask.io.out.valid,SVMask.io.out.bits,Mux(SVMac.io.out.valid,SVMac.io.out.bits,SValu.io.out.bits))
   io.out.valid := outValid
 
 }

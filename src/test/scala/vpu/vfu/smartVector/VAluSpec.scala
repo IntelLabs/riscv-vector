@@ -1035,13 +1035,19 @@ trait SmartBehavior {
           //vmv.vv
           //genRVUissue("b01011110000000110100000011010111".U, Smartvmvxs),
 
-          //genRVUissue("b01011110000000010011001111010111".U, Smartvmvxs),
-          //genRVUissue("b01011110000000001011010111010111".U, Smartvmvxs),
-          //genRVUissue("b01011110000000010011011101010111".U, Smartvmvxs),
-          //vadd.v.v
+          
+          //vadd.v.v has no dependency with vmv.v.v
+          genRVUissue("b00000010101001111000011101010111".U, Smartvmvxs),
+
+          //vadd.v.v has dependency with vmv.v.v
           //genRVUissue("b00000010001000110000011101010111".U, Smartvmvxs),
+
           //vsub.v.v
           //genRVUissue("b00001010001000110000011101010111".U, Smartvmvxs),
+
+          //vmul.v.v
+          genRVUissue("b10010110001000110010011111010111".U, Smartvmvxs),
+          
           
         )
 
