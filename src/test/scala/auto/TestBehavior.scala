@@ -33,6 +33,10 @@ abstract class TestBehavior(filename : String, ctrlBundle : TestCtrlBundleBase, 
         return dut
     }
 
+    def randomFlush() : Boolean = {
+        return RandomGen.rand.nextInt(100) > 95
+    }
+
     def getHexfield(simi : Map[String,String], keyname : String) : Int = {
         if(simi.get(keyname) != None) {
             val fflags = simi.get(keyname).get
@@ -67,13 +71,13 @@ abstract class TestBehavior(filename : String, ctrlBundle : TestCtrlBundleBase, 
 
     def dump(simi : Map[String,String], dut_out : String, golden_vd : String, fault_wb : String = "") = {
         //println("fault_wb in TestBehavior", fault_wb)
-        TestResults.addResult(TestResults.InstTestRes(
+        /*TestResults.addResult(TestResults.InstTestRes(
             this.getInstid(),
             true,
             dut_out,
             golden_vd,
             fault_wb
-        ))
+        ))*/
         Dump.dump(simi, instid, dut_out, golden_vd, fault_wb=fault_wb)
     }
 

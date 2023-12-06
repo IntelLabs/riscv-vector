@@ -71,9 +71,9 @@ class VnTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String, 
         for(j <- 0 until n_ops){
             val sewIndex = n_inputs - 1 - (j / 2)
             val sew2Index = n_ops - 1 - j
-            var oldvd = prevVd
-            if(j % 2 == 0)
-                oldvd = oldvddata(sewIndex)
+            var oldvd = oldvddata(sewIndex)
+            /* if(j % 2 == 0) 
+            oldvd = oldvddata(sewIndex) */
             
             println(s"vs2data(sew2Index) ${vs2data(sew2Index)}, sew2Index ${sew2Index}")
             var srcBundle = SrcBundle(
@@ -111,8 +111,8 @@ class VnTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String, 
                 assert(vdres)
             }
 
-            if (j % 2 == 0)
-                prevVd = f"h$vd%032x"
+            /*if (j % 2 == 0)
+                prevVd = f"h$vd%032x"*/
 
         }
         if(useVxsat) {

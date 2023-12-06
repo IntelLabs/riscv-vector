@@ -1,3 +1,15 @@
+/***************************************************************************************
+*Copyright (c) 2023-2024 Intel Corporation
+*Vector Acceleration IP core for RISC-V* is licensed under Mulan PSL v2.
+*You can use this software according to the terms and conditions of the Mulan PSL v2.
+*You may obtain a copy of Mulan PSL v2 at:
+*        http://license.coscl.org.cn/MulanPSL2
+*THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+*EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+*MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+*See the Mulan PSL v2 for more details.
+***************************************************************************************/
+
 package darecreek.exu.vfu.mac
 
 import chisel3._
@@ -7,10 +19,14 @@ import darecreek.exu.vfu._
 /** 64-bit vector multiply and accumlation unit
  *  
  *  Support these instructions: 11.10, 11.12, 11.13, 11.14, 12.3
+ *  io.fireIn, io.fireS1 are fire signals of valid/ready mechanisam.
+ *  fireIn is input fire of MAC, fireS1 is the next stage fire.
+ *  If ready is not needed, set fireIn = valid, fireS1 = RegNext(valid)
  */
 class VMac64b extends Module {
   val io = IO(new Bundle {
-    val valid = Input(Bool())
+    val fireIn = Input(Bool())
+    val fireS1 = Input(Bool())
     val sew = Input(new SewOH)
     val uopIdx = Input(UInt(3.W))
     val vxrm = Input(UInt(2.W))
@@ -36,8 +52,8 @@ class VMac64b extends Module {
   val vs1_is_signed = io.vs1_is_signed
   val sew = io.sew
   val uopIdx = io.uopIdx
-  val valid = io.valid
-  val validS1 = RegNext(valid)
+  val fireIn = io.fireIn
+  val fireS1 = io.fireS1
 
   /**
    *  First pipeline stage:
@@ -165,19 +181,19 @@ class VMac64b extends Module {
   val wallaceOut_mid = wallaceStage(nAddendsSeq.size - 1 - 3)  // Seq(6)(UInt(128.W))
   
   //------ To alleviate timing, move last 3 steps of wallace into the second pipeline stage
-  val wallaceOut_mid_reg = RegEnable(VecInit(wallaceOut_mid), valid)
+  val wallaceOut_mid_reg = RegEnable(VecInit(wallaceOut_mid), fireIn)
   //-------------------------------------------------------------------------------------
 
   /**
    *  Second pipeline stage: 128 + 128
    */
-  val sewS1 = RegEnable(sew, valid)
-  val highHalfS1 = RegEnable(io.highHalf, valid)
-  val widenS1 = RegEnable(io.widen, valid)
-  val uopIdxS1 = RegEnable(uopIdx, valid)
-  val vxrmS1 = RegEnable(io.vxrm, valid)
-  val isSubS1 = RegEnable(io.isSub, valid)
-  val isFixPS1 = RegEnable(io.isFixP, valid)
+  val sewS1 = RegEnable(sew, fireIn)
+  val highHalfS1 = RegEnable(io.highHalf, fireIn)
+  val widenS1 = RegEnable(io.widen, fireIn)
+  val uopIdxS1 = RegEnable(uopIdx, fireIn)
+  val vxrmS1 = RegEnable(io.vxrm, fireIn)
+  val isSubS1 = RegEnable(io.isSub, fireIn)
+  val isFixPS1 = RegEnable(io.isFixP, fireIn)
   // val wallaceOutReg = wallaceOut map {x => RegNext(x)}
   val wallaceOutReg = reduce3to2(reduce3to2(reduce3to2(wallaceOut_mid_reg, sewS1), sewS1), sewS1) // Seq(2)(UInt(128.W))
 
@@ -210,14 +226,14 @@ class VMac64b extends Module {
    *    (1) get vd  (2) vsmul  (3) vs1*vs2-vd --> -vs1*vs2+vd (vnmsac/vnmsub)
    */
   val walOut = Wire(UInt(128.W))
-  walOut := RegEnable(sum_wo.asUInt, validS1)
-  val sewS2 = RegEnable(sewS1, validS1)
-  val highHalfS2 = RegEnable(highHalfS1, validS1)
-  val widenS2 = RegEnable(widenS1, validS1)
-  val uopIdxS2 = RegEnable(uopIdxS1, validS1)
-  val vxrmS2 = RegEnable(vxrmS1, validS1)
-  val isSubS2 = RegEnable(isSubS1, validS1)
-  val isFixPS2 = RegEnable(isFixPS1, validS1)
+  walOut := RegEnable(sum_wo.asUInt, fireS1)
+  val sewS2 = RegEnable(sewS1, fireS1)
+  val highHalfS2 = RegEnable(highHalfS1, fireS1)
+  val widenS2 = RegEnable(widenS1, fireS1)
+  val uopIdxS2 = RegEnable(uopIdxS1, fireS1)
+  val vxrmS2 = RegEnable(vxrmS1, fireS1)
+  val isSubS2 = RegEnable(isSubS1, fireS1)
+  val isFixPS2 = RegEnable(isFixPS1, fireS1)
   val vdS2 = PriorityMux(Seq(
            (sewS2.is64 || widenS2) -> Mux(sewS2.is64 && highHalfS2 || widenS2 && uopIdxS2(0), 
                                           walOut(127, 64), walOut(63, 0)),

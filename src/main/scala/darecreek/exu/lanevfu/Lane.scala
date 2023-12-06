@@ -1,15 +1,27 @@
-/**
-  * Vector Lane: 64-bit data-path of FUs
-  */
+/***************************************************************************************
+*Copyright (c) 2023-2024 Intel Corporation
+*Vector Acceleration IP core for RISC-V* is licensed under Mulan PSL v2.
+*You can use this software according to the terms and conditions of the Mulan PSL v2.
+*You may obtain a copy of Mulan PSL v2 at:
+*        http://license.coscl.org.cn/MulanPSL2
+*THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+*EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+*MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+*See the Mulan PSL v2 for more details.
+***************************************************************************************/
 
+/** Vector Lane: 64-bit data-path of FUs
+  */
 package darecreek
 
 import chisel3._
 import chisel3.util._
 import darecreek.exu.fp._
-import darecreek.exu.fu.alu._
-import darecreek.exu.fu.mac._
+import darecreek.exu.lanevfu.alu._
+import darecreek.exu.lanevfu.mac._
 import darecreek.exu.fu.div._
+import chipsalliance.rocketchip.config._
+import darecreek.exu.vfu.{VFuParamsKey, VFuParameters}
 
 class DummyLaneFU extends Module {
   val io = IO(new Bundle {
@@ -36,18 +48,20 @@ class VLane extends Module{
     val out = Decoupled(new LaneFUOutput)
   })
 
+  val p = Parameters.empty.alterPartial({
+                     case VFuParamsKey => VFuParameters(VLEN = 256)})
   // ALU
-  val valu = Module(new VAlu)
+  val valu = Module(new LaneVAlu()(p))
   // val valu = Module(new DummyLaneFU)
   // MUL
-  val vmac = Module(new VIMac)
+  val vmac = Module(new LaneVMac)
   // val vmac = Module(new DummyLaneFU)
   // FP
-  val vfp = Module(new VFPUTop)
-  // val vfp = Module(new DummyLaneFU)
+  // val vfp = Module(new VFPUTop)
+  val vfp = Module(new DummyLaneFU)
   // fake div
-  val vdiv = Module(new DivTop)
-  // val vdiv = Module(new DummyLaneFU)
+  // val vdiv = Module(new DivTop)
+  val vdiv = Module(new DummyLaneFU)
 
   // Input of ALU
   valu.io.in.bits := io.in.data

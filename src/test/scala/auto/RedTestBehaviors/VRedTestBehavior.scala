@@ -53,6 +53,8 @@ class Vred(fn : String, cb : CtrlBundle, s : String, instid : String, widen : Bo
         var vd : BigInt = 0
         var vdres = false
         // var prevVds : Seq[String] = Seq()
+
+        var robIdxValid = false
             
         // println("1111")
         var vs1 = vs1data(n_inputs - 1)
@@ -61,30 +63,70 @@ class Vred(fn : String, cb : CtrlBundle, s : String, instid : String, widen : Bo
         for(j <- 0 until n_inputs){
             vs2 = vs2data(n_inputs - 1 - j)
 
-            // dut.io.out.ready.poke(true.B)
+            var ctrlBundle = ctrl.copy(
+                vsew=vsew,
+                // widen2=widen,
+                vl=simi.get("vl").get.toInt,
+                vlmul = UtilFuncs.lmulconvert(vflmul).toInt, 
+                ma = (simi.get("ma").get.toInt == 1),
+                ta = (simi.get("ta").get.toInt == 1),
+                vm = (simi.get("vm").get.toInt == 1),
+                uopIdx=j,
+                uopEnd = (j == n_inputs - 1),
+                vxrm = vxrm,
+                vstart = getVstart(simi)
+            )
+
+            var robIdx = (false, 0)
+            robIdxValid = randomFlush()
+            if (robIdxValid) {
+                robIdx = (true, 1)
+            }
+            ctrlBundle.robIdx = robIdx
+
             dut.io.in.valid.poke(true.B)
             dut.io.in.bits.poke(genVFuInput(
                 SrcBundle(
                     vs2=vs2, vs1=vs1,
                     old_vd=oldvd,mask=mask(0)), 
-                ctrl.copy(
-                    vsew=vsew,
-                    // widen2=widen,
-                    vl=simi.get("vl").get.toInt,
-                    vlmul = UtilFuncs.lmulconvert(vflmul).toInt, 
-                    ma = (simi.get("ma").get.toInt == 1),
-                    ta = (simi.get("ta").get.toInt == 1),
-                    vm = (simi.get("vm").get.toInt == 1),
-                    uopIdx=j,
-                    uopEnd = (j == n_inputs - 1),
-                    vxrm = vxrm,
-                    vstart = getVstart(simi)
-                )
+                ctrlBundle
             ))
+            // dut.io.redirect.poke(genFSMRedirect((robIdxValid, robIdxValid, 0)))
+
             dut.clock.step(1)
-            vd = dut.io.out.bits.vd.peek().litValue
+
+            if (robIdxValid) {
+                // flushed
+                println("flushed")
+
+                /*dut.io.in.valid.poke(false.B)
+
+
+                var srcBundle = SrcBundle()
+                ctrlBundle = ctrl.copy()
+
+                // turning off redirect bits
+                dut.io.in.bits.poke(genVFuInput(
+                    srcBundle,
+                    ctrlBundle
+                ))
+                // dut.io.redirect.poke(genFSMRedirect())
+                
+                dut.clock.step(1)*/
+                return
+            }
+
             // sprevVds = prevVds :+ f"h$vd%032x"
         }
+
+        dut.io.in.valid.poke(false.B)
+
+        while (dut.io.out.valid.peek().litValue != 1) {
+            dut.clock.step(1) // 10.19
+        }
+
+        vd = dut.io.out.bits.vd.peek().litValue
+        
         var vdidx = n_inputs - 1
         if (widen && (
             vflmul != "0.125000" && 

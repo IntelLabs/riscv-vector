@@ -77,15 +77,16 @@ class VAluAdder extends Module {
   // val destEew_oneHot = Seq.tabulate(4)(i => uop.info.destEew === i.U)
   val carryIn = Wire(Vec(8, Bool()))
   // Adjust vmask. sew==32: 00000011 -> 00010001   sew==16: 00001111 -> 01010101
-  val vmask_adjust = MuxCase(vmask, Seq(
-    sew.is16 -> Cat(false.B, vmask(3), false.B, vmask(2), false.B, vmask(1), false.B, vmask(0)),
-    sew.is32 -> Cat(0.U(3.W), vmask(1), 0.U(3.W), vmask(0))
-  ))
+  // val vmask_adjust = MuxCase(vmask, Seq(
+  //   sew.is16 -> Cat(false.B, vmask(3), false.B, vmask(2), false.B, vmask(1), false.B, vmask(0)),
+  //   sew.is32 -> Cat(0.U(3.W), vmask(1), 0.U(3.W), vmask(0))
+  // ))
 
   for (i <- 0 until 8) {
     val adder_8b = new Adder_8b(vs1_adjust(8*i+7, 8*i), vs2_adjust(8*i+7, 8*i), cin(i))
     // Generate carry-in from sub and vmask(11.4 Add-with-Carry/Sub-with_Borrow)
-    carryIn(i) := Mux(addWithCarry, Mux(vm, sub, vmask_adjust(i) ^ sub), sub)
+    // carryIn(i) := Mux(addWithCarry, Mux(vm, sub, vmask_adjust(i) ^ sub), sub)
+    carryIn(i) := Mux(addWithCarry, Mux(vm, sub, vmask(i) ^ sub), sub)
     // Generate final carry-in: cin
     val eewCin = SewOH(uop.info.destEew)
     if (i == 0) {

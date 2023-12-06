@@ -86,10 +86,10 @@ class VFCVTDataModule(implicit val p: Parameters) extends VFPUPipelineModule {
     VFPU.f32.expWidth, VFPU.f32.precision,
     VFPU.f64.expWidth, VFPU.f64.precision
   )) // !! output is 64b
-  s2d.io.in := Mux(state === State.sEmpty, src.tail(32), src.head(32)) // first tail, then head
+  s2d.io.in := Mux(uop.expdIdx(0), src.head(32), src.tail(32)) // first tail, then head
   s2d.io.rm := rm1
   val s2dOut = s2d.io.result // 64b
-  val s2dFlagOut = s2d.io.fflags & Mux(state === State.sEmpty, Fill(5, eleActives(0)), Fill(5, eleActives(1)))
+  val s2dFlagOut = s2d.io.fflags & Mux(uop.expdIdx(0), Fill(5, eleActives(1)), Fill(5, eleActives(0)))
 
   // narrowing FP2FP
   val d2s = Module(new fudian.FPToFP(
@@ -100,7 +100,7 @@ class VFCVTDataModule(implicit val p: Parameters) extends VFPUPipelineModule {
   // mandatory rod rounding
   d2s.io.rm := Mux(isRod, "b101".asUInt, rm1) // rounding towards odd
   val d2sNarrow32b = d2s.io.result // 32b
-  val d2sNarrowFlag = Mux(Mux(state === State.sNarrow, eleActives(1), eleActives(0)), d2s.io.fflags, empty_fflags)
+  val d2sNarrowFlag = Mux(Mux(uop.expdIdx(0), eleActives(1), eleActives(0)), d2s.io.fflags, empty_fflags)
 
   // FP2Int
   // s2i deals with fp32->int32, fp32->int64(widen)
@@ -125,16 +125,16 @@ class VFCVTDataModule(implicit val p: Parameters) extends VFPUPipelineModule {
   )
   val s2iResult = Mux(
     uop.ctrl.widen,
-    Mux(state === State.sEmpty, s2iX1.io.result, s2iX2.io.result),
+    Mux(uop.expdIdx(0), s2iX2.io.result, s2iX1.io.result),
     Cat(s2iX2.io.result.tail(32), s2iX1.io.result.tail(32))
   )
   val f2iOut = Mux(isTypeSingle, s2iResult, d2i.io.result)
   val d2iNarrow32b = d2i.io.result.tail(32)
   val s2ifflags = Seq(s2iX1, s2iX2).zipWithIndex.map(x => x._1.io.fflags & Fill(5, eleActives(x._2)))
-  val d2ifflags = d2i.io.fflags & Mux(state === State.sNarrow, Fill(5, eleActives(1)), Fill(5, eleActives(0)))
+  val d2ifflags = d2i.io.fflags & Mux(uop.expdIdx(0), Fill(5, eleActives(1)), Fill(5, eleActives(0)))
   val s2iFlagResult = Mux(
     uop.ctrl.widen,
-    Mux(state === State.sEmpty, s2ifflags(0), s2ifflags(1)),
+    Mux(uop.expdIdx(0), s2ifflags(1), s2ifflags(0)),
     s2ifflags.reduce(_ | _)
   )
   val f2iFlagOut = Mux(isTypeSingle, s2iFlagResult, d2ifflags)
@@ -154,9 +154,10 @@ class VFCVTDataModule(implicit val p: Parameters) extends VFPUPipelineModule {
     i2f.io.rm := rm1
   }
   i2d.io.int := Mux(
-    uop.ctrl.widen && state === State.sWiden, // widening cycle1 included
+    uop.ctrl.widen && uop.expdIdx(0),  // widening cycle1 included
     zeroExt(src.head(32), 64),
-    src
+    Mux(uop.ctrl.widen && !uop.expdIdx(0), zeroExt(src.tail(32), 64),
+      src)
   )
   i2d.io.sign := ctrl.cvtSigned
   i2d.io.rm := rm1
@@ -165,8 +166,8 @@ class VFCVTDataModule(implicit val p: Parameters) extends VFPUPipelineModule {
   val i2sNarrow32b = i2sX1.io.result
   val i2fOut = Mux(isTypeSingle && !uop.ctrl.widen, i2sResult, i2d.io.result)
   val i2sfflags = Seq(i2sX1, i2sX2).zipWithIndex.map(x => x._1.io.fflags & Fill(5, eleActives(x._2))) // X1tail, X2head
-  val i2dfflags = i2d.io.fflags & Fill(5, eleActives(0))
-  val i2sNarrowFlag = i2sfflags(0)
+  val i2dfflags = i2d.io.fflags & Mux(uop.expdIdx(0), Fill(5, eleActives(1)), Fill(5, eleActives(0)))
+  val i2sNarrowFlag = i2sX1.io.fflags & Mux(uop.expdIdx(0), Fill(5, eleActives(1)), Fill(5, eleActives(0)))
   val i2fFlagOut = Mux(isTypeSingle && !uop.ctrl.widen, i2sfflags.reduce(_ | _), i2dfflags)
 
   // narrowing output handling
@@ -189,11 +190,19 @@ class VFCVTDataModule(implicit val p: Parameters) extends VFPUPipelineModule {
   }
   when(regEnable(2) && uop.ctrl.narrow) {
     when(state === State.sEmpty) {
-      narrowBuf(0) := narrow32b
       narrowFlagBuf := narrowFlag
+      when(uop.expdIdx(0)) {
+        narrowBuf(1) := narrow32b
+      }.otherwise {
+        narrowBuf(0) := narrow32b
+      }
     }.elsewhen(state === State.sNarrow) {
-      narrowBuf(1) := narrow32b
       narrowFlagBuf := narrowFlagBuf | narrowFlag
+      when(uop.expdIdx(0)) {
+        narrowBuf(1) := narrow32b
+      }.otherwise {
+        narrowBuf(0) := narrow32b
+      }
     }
   }
   val narrowOutReg = Cat(narrowBuf(1), narrowBuf(0))

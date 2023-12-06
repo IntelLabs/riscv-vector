@@ -1,0 +1,2 @@
+vfsqrt_v
+vfdiv_vv

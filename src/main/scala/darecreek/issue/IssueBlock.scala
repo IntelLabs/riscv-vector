@@ -1,8 +1,18 @@
+/***************************************************************************************
+*Copyright (c) 2023-2024 Intel Corporation
+*Vector Acceleration IP core for RISC-V* is licensed under Mulan PSL v2.
+*You can use this software according to the terms and conditions of the Mulan PSL v2.
+*You may obtain a copy of Mulan PSL v2 at:
+*        http://license.coscl.org.cn/MulanPSL2
+*THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+*EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+*MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+*See the Mulan PSL v2 for more details.
+***************************************************************************************/
+
 /**
   * IssueBlock: issue queues + physical register file
-  *   Constrain: So far only one arith IQ is supported
-  * 
-  * TODO: flush handling
+  *   So far only one arith IQ is supported
   */
 
 package darecreek
@@ -77,8 +87,7 @@ class VIssueBlock extends Module {
   wbRFAddrs(1).valid := io.fromLSU.ld.valid && io.fromLSU.ld.bits.uop.pdestVal
   wbRFAddrs(1).bits := io.fromLSU.ld.bits.uop.pdest
 
-  /**
-    * ---- Arithmetic ----
+  /** ---- Arithmetic ----
     *  IQ --> Read RF --> EXU
     */
   val validPipe_arith = RegInit(false.B)
@@ -104,7 +113,9 @@ class VIssueBlock extends Module {
   io.get_rs1.exu.addr := arithIQ.io.out.bits.vRobIdx
   io.toExu.bits.rs1 := RegEnable(io.get_rs1.exu.data, fireArithIQout)
   // Pipeline of valid
-  when (fireArithIQout) {
+  when (io.flush) {
+    validPipe_arith := false.B
+  }.elsewhen (fireArithIQout) {
     validPipe_arith := true.B
   }.elsewhen (toExuReady) {
     validPipe_arith := false.B
@@ -128,7 +139,7 @@ class VIssueBlock extends Module {
   io.wbArith.bits.uop := io.fromExu.bits.uop
   io.wbArith.bits.fflags := io.fromExu.bits.fflags
   io.wbArith.bits.vxsat := io.fromExu.bits.vxsat
-  io.wbArith.bits.rd := io.fromExu.bits.rd
+  io.wbArith.bits.rd := io.fromExu.bits.vd(0)(xLen-1, 0)
 
   /**
     * ---- Load/Store ----
@@ -161,11 +172,12 @@ class VIssueBlock extends Module {
   io.toLSU.ld.bits.rs2 := RegEnable(io.get_rs1.ld.data, fireLdIQout)
   // Pipeline of valid
   val validPipe_ld = RegInit(false.B)
-  when (io.toLSU.ld.ready) {
+  when (io.flush) {
     validPipe_ld := false.B
-  }
-  when (fireLdIQout) {
+  }.elsewhen (fireLdIQout) {
     validPipe_ld := true.B
+  }.elsewhen (io.toLSU.ld.ready) {
+    validPipe_ld := false.B
   }
   io.toLSU.ld.valid := validPipe_ld
   // Ready
@@ -200,11 +212,12 @@ class VIssueBlock extends Module {
   io.toLSU.st.bits.rs2 := RegEnable(io.get_rs1.st.data, fireStIQout)
   // Pipeline of valid
   val validPipe_st = RegInit(false.B)
-  when (io.toLSU.st.ready) {
+  when (io.flush) {
     validPipe_st := false.B
-  }
-  when (fireStIQout) {
+  }.elsewhen (fireStIQout) {
     validPipe_st := true.B
+  }.elsewhen (io.toLSU.st.ready) {
+    validPipe_st := false.B
   }
   io.toLSU.st.valid := validPipe_st
   // Ready

@@ -1,3 +1,15 @@
+/***************************************************************************************
+*Copyright (c) 2023-2024 Intel Corporation
+*Vector Acceleration IP core for RISC-V* is licensed under Mulan PSL v2.
+*You can use this software according to the terms and conditions of the Mulan PSL v2.
+*You may obtain a copy of Mulan PSL v2 at:
+*        http://license.coscl.org.cn/MulanPSL2
+*THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+*EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+*MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+*See the Mulan PSL v2 for more details.
+***************************************************************************************/
+
 package darecreek
 
 import chisel3._
@@ -7,6 +19,7 @@ import chisel3.util._
 trait DarecreekParameters {
   //---- Come from scalar parameters ----
   val xLen = 64
+  val XLEN = xLen
   val NPhyRegs: Int = 192 // Scalar PRF
   val RobSize = 192
   val CommitWidth = 6
@@ -38,7 +51,7 @@ trait DarecreekParameters {
   val NLaneExuFUs = 4
   val NArithFUs = NLaneExuFUs + 3 // Number of FUs in EXU
 
-  val NVPhyRegs: Int = 96  // Vector PRF
+  val NVPhyRegs: Int = 80  // Vector PRF
   val SPRegIdxWidth = log2Up(NPhyRegs) // Scalar
   val VPRegIdxWidth = log2Up(NVPhyRegs) // Vector
 
@@ -50,7 +63,7 @@ trait DarecreekParameters {
   val NByteLane = LaneWidth / 8
 
   val vlenb = VLEN / 8  //CSR
-  val vlenbWidth = log2Up(vlenb)
+  val vlenbWidth = log2Up(vlenb) + 1
 
   //---- Just for debug ----
   val debug = true
