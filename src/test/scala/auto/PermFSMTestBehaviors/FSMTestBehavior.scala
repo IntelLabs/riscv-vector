@@ -185,6 +185,7 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
                 // flushed
                 println("flushed")
 
+                fsmSrcBundle.uop_valid = false
                 fsmSrcBundle.rdata="h0"
                 fsmSrcBundle.rvalid=false
                 fsmCtrl = ctrlBundle.copy()
