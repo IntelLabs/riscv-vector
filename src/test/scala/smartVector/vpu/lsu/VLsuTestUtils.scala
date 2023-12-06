@@ -32,7 +32,8 @@ case class CtrlBundle(instrn: BitPat,
                       vl: Int = 32,
                       vstart: Int = 0,
                       uopIdx: Int = 0,
-                      uopEnd: Boolean = false
+                      uopEnd: Boolean = false,
+                      lsrc: List[Int] = List(0, 0)
 )
 
 case class SrcBundleLd(scalar_opnd_1: String = "h1000",
@@ -74,6 +75,20 @@ trait BundleGenHelper {
       _.info_vstart -> c.vstart.U,
       _.splitUopIdx -> c.uopIdx.U,
       _.splitUopEnd -> c.uopEnd.B,
+      _.ctrl_lsrc(0) -> {
+        if(c.instrn(19, 15).equals(BitPat("b?????"))) {
+          0.U
+        } else {
+          BitPat.bitPatToUInt(c.instrn(19, 15))
+        }
+      },
+      _.ctrl_lsrc(1) -> {
+        if(c.instrn(24, 20).equals(BitPat("b?????"))) {
+          0.U
+        } else {
+          BitPat.bitPatToUInt(c.instrn(24, 20))
+        }
+      }
     )
   }
 

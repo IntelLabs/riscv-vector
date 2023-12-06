@@ -27,6 +27,7 @@ class MuopMergeAttr extends Bundle {
 }
 
 class VUopCtrlW extends Bundle {
+  val lsrc = Vec(2, UInt(5.W))
   val funct6 = UInt(6.W)
   val funct3 = UInt(3.W)
   val vm = Bool()

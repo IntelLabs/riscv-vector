@@ -16,6 +16,7 @@ import darecreek._
 import darecreek.lsu._
 
 class VUopTest extends Bundle {
+    val ctrl_lsrc   = Vec(2, UInt(5.W))
     val ctrl_funct6 = UInt(6.W)
     val ctrl_funct3 = UInt(3.W)
     val ctrl_load   = Bool()
@@ -151,6 +152,7 @@ class SmartVectorLsuTestWrapper extends Module {
     vLsu.io.mUop.bits.uop.uopIdx            := io.mUop.bits.uop.splitUopIdx
     vLsu.io.mUop.bits.uop.uopEnd            := io.mUop.bits.uop.splitUopEnd
 
+    vLsu.io.mUop.bits.uop.ctrl.lsrc         := io.mUop.bits.uop.ctrl_lsrc
     vLsu.io.mUop.bits.uop.ctrl.funct6       := io.mUop.bits.uop.ctrl_funct6
     vLsu.io.mUop.bits.uop.ctrl.funct3       := io.mUop.bits.uop.ctrl_funct3
     vLsu.io.mUop.bits.uop.ctrl.load         := io.mUop.bits.uop.ctrl_load
@@ -192,6 +194,12 @@ trait VLsuBehavior_ld {
     val vle32   = CtrlBundle(VLE32_V)
     val vle64   = CtrlBundle(VLE64_V)
     val vlm     = CtrlBundle(VLM_V)
+    val vle8ff  = CtrlBundle(VLE8FF_V)
+    val vle16ff = CtrlBundle(VLE16FF_V)
+    val vle32ff = CtrlBundle(VLE32FF_V)
+    val vle64ff = CtrlBundle(VLE64FF_V)
+    val vl1re8  = CtrlBundle(VL1RE8_V)
+
     val vlse8   = CtrlBundle(VLSE8_V)
     val vlse16  = CtrlBundle(VLSE16_V)
     val vlse32  = CtrlBundle(VLSE32_V)
@@ -392,6 +400,186 @@ trait VLsuBehavior_ld {
     }
 
     def vLsuTest6(): Unit = {
+        it should "pass: unit-stride mask load (uops=1, eew=8, vl=8, vstart=0)" in {
+        test(new SmartVectorLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            test_init(dut)
+            dut.clock.step(1)
+            val ldReqs = Seq(
+                (vlm.copy(vl=27, uopIdx=0, uopEnd=true), ldReqSrc_default, "h201f1e1d1c1b1a191817161589abcdef".U),
+            )
+
+            next_is_load_and_step(dut)
+
+            for ((c, s, r) <- ldReqs) {
+                    while (!dut.io.lsuReady.peekBoolean()) {
+                        dut.clock.step(1)
+                    }
+                    dut.io.mUop.valid.poke(true.B)
+                    dut.io.mUop.bits.poke(genLdInput(c, s))
+                    dut.clock.step(1)
+                    dut.io.mUop.valid.poke(false.B)
+
+                    while (!dut.io.lsuOut.valid.peekBoolean()) {
+                        dut.clock.step(1)
+                    }
+                    dut.io.lsuOut.valid.expect(true.B)
+                    // dut.clock.step(100)
+                    dut.io.lsuOut.bits.vd.expect(r)
+                    dut.clock.step(4)
+            }
+        }
+        }
+    }
+
+    def vLsuTest7(): Unit = {
+        it should "pass: unit-strde fault-first-only (uops=1, eew=8, vl=19, vstart=1)" in {
+        test(new SmartVectorLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            test_init(dut)
+            dut.clock.step(1)
+            val ldReqs = Seq(
+                (vle8ff.copy(vl=19, uopIdx=0, uopEnd=false, vstart=1), SrcBundleLd(scalar_opnd_1="h1058"), "h201f1e1d1c1b1a195555555555555511".U),
+            )
+
+            next_is_load_and_step(dut)
+            for ((c, s, r) <- ldReqs) {
+                while (!dut.io.lsuReady.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.mUop.valid.poke(true.B)
+                dut.io.mUop.bits.poke(genLdInput(c, s))
+                dut.clock.step(1)
+                dut.io.mUop.valid.poke(false.B)
+
+                while (!dut.io.lsuOut.valid.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.lsuOut.valid.expect(true.B)
+                dut.io.xcpt.exception_vld.expect(false.B)
+                dut.io.xcpt.update_vl.expect(true.B)
+                dut.io.xcpt.xcpt_cause.ma.ld.expect(false.B)
+                dut.io.xcpt.update_data.expect(8.U)
+                dut.io.lsuOut.bits.vd.expect(r)
+                dut.clock.step(4)
+            }
+        }
+        }
+    }
+
+    def vLsuTest8(): Unit = {
+        it should "pass: unit-strde fault-first-only (uops=1, eew=16, vl=4, vstart=0)" in {
+        test(new SmartVectorLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            test_init(dut)
+            dut.clock.step(1)
+            val ldReqs = Seq(
+                (vle16ff.copy(vl=4, uopIdx=0, uopEnd=true, vstart=0), SrcBundleLd(scalar_opnd_1="h1060"), "h201f1e1d1c1b1a191817161514131211".U),
+            )
+
+            next_is_load_and_step(dut)
+            for ((c, s, r) <- ldReqs) {
+                while (!dut.io.lsuReady.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.mUop.valid.poke(true.B)
+                dut.io.mUop.bits.poke(genLdInput(c, s))
+                dut.clock.step(1)
+                dut.io.mUop.valid.poke(false.B)
+
+                while (!dut.io.lsuOut.valid.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.lsuOut.valid.expect(true.B)
+                dut.io.xcpt.exception_vld.expect(true.B)
+                dut.io.xcpt.update_vl.expect(true.B)
+                dut.io.xcpt.xcpt_cause.ma.ld.expect(true.B)
+                dut.io.xcpt.update_data.expect(0.U)
+                dut.io.lsuOut.bits.vd.expect(r)
+                dut.clock.step(4)
+            }
+        }
+        }
+    }
+
+    def vLsuTest9(): Unit = {
+        it should "pass: unit-strde fault-first-only (uops=1, eew=32, vl=7, vstart=0)" in {
+        test(new SmartVectorLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            test_init(dut)
+            dut.clock.step(1)
+            val ldReqs = Seq(
+                (vle32ff.copy(vl=7, uopIdx=0, uopEnd=false, vstart=0), SrcBundleLd(scalar_opnd_1="h105c"), "h201f1e1d1c1b1a191817161555555555".U),
+            )
+
+            next_is_load_and_step(dut)
+            for ((c, s, r) <- ldReqs) {
+                while (!dut.io.lsuReady.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.mUop.valid.poke(true.B)
+                dut.io.mUop.bits.poke(genLdInput(c, s))
+                dut.clock.step(1)
+                dut.io.mUop.valid.poke(false.B)
+
+                while (!dut.io.lsuOut.valid.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                 dut.io.lsuOut.valid.expect(true.B)
+                dut.io.xcpt.exception_vld.expect(false.B)
+                dut.io.xcpt.update_vl.expect(true.B)
+                dut.io.xcpt.xcpt_cause.ma.ld.expect(false.B)
+                dut.io.xcpt.update_data.expect(1.U)
+                dut.io.lsuOut.bits.vd.expect(r)
+                dut.clock.step(4)
+            }
+        }
+        }
+    }
+
+    def vLsuTest10(): Unit = {
+        it should "pass: unit-strde fault-first-only (uops=1, eew=64, vl=3, vstart=0)" in {
+        test(new SmartVectorLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            test_init(dut)
+            dut.clock.step(1)
+            val ldReqs = Seq(
+                (vle64ff.copy(vl=3, uopIdx=0, uopEnd=false, vstart=0), SrcBundleLd(scalar_opnd_1="h1050"), "h55555555555555554444444444444444".U),
+                (vle64ff.copy(vl=3, uopIdx=1, uopEnd=true,  vstart=0), SrcBundleLd(scalar_opnd_1="h1050"), "h201f1e1d1c1b1a191817161514131211".U),
+            )
+
+            next_is_load_and_step(dut)
+
+            // req0
+            while (!dut.io.lsuReady.peekBoolean()) {
+                dut.clock.step(1)
+            }
+            dut.io.mUop.valid.poke(true.B)
+            dut.io.mUop.bits.poke(genLdInput(ldReqs(0)._1, ldReqs(0)._2))
+            dut.clock.step(1)
+            dut.io.mUop.valid.poke(false.B)
+            while (!dut.io.lsuOut.valid.peekBoolean()) {
+                dut.clock.step(1)
+            }
+            dut.io.lsuOut.bits.vd.expect(ldReqs(0)._3)
+
+            // req1
+            while (!dut.io.lsuReady.peekBoolean()) {
+                dut.clock.step(1)
+            }
+            dut.io.mUop.valid.poke(true.B)
+            dut.io.mUop.bits.poke(genLdInput(ldReqs(1)._1, ldReqs(1)._2))
+            dut.clock.step(1)
+            dut.io.mUop.valid.poke(false.B)
+            while (!dut.io.lsuOut.valid.peekBoolean()) {
+                dut.clock.step(1)
+            }
+            dut.io.lsuOut.valid.expect(true.B)
+            dut.io.xcpt.exception_vld.expect(false.B)
+            dut.io.xcpt.update_vl.expect(true.B)
+            dut.io.xcpt.xcpt_cause.ma.ld.expect(false.B)
+            dut.io.xcpt.update_data.expect(2.U)
+            dut.io.lsuOut.bits.vd.expect(ldReqs(1)._3)
+        }
+        }
+    }
+
+    def vLsuTest11(): Unit = {
         it should "pass: strided load (uops=1, eew=8, vl=6, vstart=0, stride=-5)" in {
         test(new SmartVectorLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             test_init(dut)
@@ -424,7 +612,7 @@ trait VLsuBehavior_ld {
         }
     }
 
-    def vLsuTest7(): Unit = {
+    def vLsuTest12(): Unit = {
         it should "pass: strided load (uops=2, eew=64, vl=3, vstart=0, stride=-1)" in {
         test(new SmartVectorLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             test_init(dut)
@@ -454,7 +642,7 @@ trait VLsuBehavior_ld {
         }
     }
 
-    def vLsuTest8(): Unit = {
+    def vLsuTest13(): Unit = {
         it should "pass: strided load (uops=2, eew=16, vl=10, vstart=0, stride=4)" in {
         test(new SmartVectorLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             test_init(dut)
@@ -487,7 +675,40 @@ trait VLsuBehavior_ld {
         }
     }
 
-    def vLsuTest9(): Unit = {
+    def vLsuTest14(): Unit = {
+        it should "pass: strided load (uops=2, eew=16, vl=10, vstart=0, stride=4) with mask" in {
+        test(new SmartVectorLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            test_init(dut)
+            dut.clock.step(1)
+            val ldReqs = Seq(
+                // 1000~1001(cdef), 1008~1009(ffff), 1010~1011(0f0f), 1018~1019(3210)
+                // 1020~1021(3456), 1028~1029(0101), 1030~1031(4567), 1038~1039(1111)
+                (vlse16.copy(vm=false, vl=10, uopIdx=0, uopEnd=false), SrcBundleLd(scalar_opnd_2="h8", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fefe"), "h111145670101345632100f0fffff1211".U),
+                (vlse16.copy(vm=false, vl=10, uopIdx=1, uopEnd=true),  SrcBundleLd(scalar_opnd_2="h8", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fdfe"), "h201f1e1d1c1b1a191817161514132222".U),
+            )
+
+            next_is_load_and_step(dut)
+            for ((c, s, r) <- ldReqs) {
+                while (!dut.io.lsuReady.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.mUop.valid.poke(true.B)
+                dut.io.mUop.bits.poke(genLdInput(c, s))
+                dut.clock.step(1)
+                dut.io.mUop.valid.poke(false.B)
+
+                while (!dut.io.lsuOut.valid.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.lsuOut.valid.expect(true.B)
+                dut.io.lsuOut.bits.vd.expect(r)
+                dut.clock.step(4)
+            }
+        }
+        }
+    }
+
+    def vLsuTest15(): Unit = {
         it should "pass: unit-strde exception" in {
         test(new SmartVectorLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             test_init(dut)
@@ -522,52 +743,24 @@ trait VLsuBehavior_ld {
         }
         }
     }
-
-    def vLsuTest10(): Unit = {
-        it should "pass: strided load (uops=2, eew=16, vl=10, vstart=0, stride=4) with mask" in {
-        test(new SmartVectorLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            test_init(dut)
-            dut.clock.step(1)
-            val ldReqs = Seq(
-                // 1000~1001(cdef), 1008~1009(ffff), 1010~1011(0f0f), 1018~1019(3210)
-                // 1020~1021(3456), 1028~1029(0101), 1030~1031(4567), 1038~1039(1111)
-                (vlse16.copy(vm=false, vl=10, uopIdx=0, uopEnd=false), SrcBundleLd(scalar_opnd_2="h8", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fefe"), "h111145670101345632100f0fffff1211".U),
-                (vlse16.copy(vm=false, vl=10, uopIdx=1, uopEnd=true),  SrcBundleLd(scalar_opnd_2="h8", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fdfe"), "h201f1e1d1c1b1a191817161514132222".U),
-            )
-
-            next_is_load_and_step(dut)
-            for ((c, s, r) <- ldReqs) {
-                while (!dut.io.lsuReady.peekBoolean()) {
-                    dut.clock.step(1)
-                }
-                dut.io.mUop.valid.poke(true.B)
-                dut.io.mUop.bits.poke(genLdInput(c, s))
-                dut.clock.step(1)
-                dut.io.mUop.valid.poke(false.B)
-
-                while (!dut.io.lsuOut.valid.peekBoolean()) {
-                    dut.clock.step(1)
-                }
-                dut.io.lsuOut.valid.expect(true.B)
-                dut.io.lsuOut.bits.vd.expect(r)
-                dut.clock.step(4)
-            }
-        }
-        }
-    }
 }
 
 class VLsuSpec_ld extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VLsuBehavior_ld {
   behavior of "LSU test"
-    it should behave like vLsuTest0()  // unit-stride load
-    it should behave like vLsuTest1()  // unit-stride load
-    it should behave like vLsuTest2()  // unit-stride load
-    it should behave like vLsuTest3()  // unit-stride load
-    it should behave like vLsuTest4()  // unit-stride load
-    it should behave like vLsuTest5()  // unit-stride load
-    it should behave like vLsuTest6()  // strided load
-    it should behave like vLsuTest7()  // strided load
-    it should behave like vLsuTest8()  // strided load
-    it should behave like vLsuTest9()  // unit-stride exception
-    it should behave like vLsuTest10()  // strided load
+    it should behave like vLsuTest0()   // unit-stride load
+    it should behave like vLsuTest1()   // unit-stride load
+    it should behave like vLsuTest2()   // unit-stride load
+    it should behave like vLsuTest3()   // unit-stride load
+    it should behave like vLsuTest4()   // unit-stride load
+    it should behave like vLsuTest5()   // unit-stride load
+    it should behave like vLsuTest6()   // unit-stride mask load
+    it should behave like vLsuTest7()   // unit-strde fault-first-only
+    it should behave like vLsuTest8()   // unit-strde fault-first-only
+    it should behave like vLsuTest9()   // unit-strde fault-first-only
+    it should behave like vLsuTest10()  // unit-strde fault-first-only
+    it should behave like vLsuTest11()  // strided load
+    it should behave like vLsuTest12()  // strided load
+    it should behave like vLsuTest13()  // strided load
+    it should behave like vLsuTest14()  // strided load with mask enabled
+    it should behave like vLsuTest15()  // unit-stride exception
 }
