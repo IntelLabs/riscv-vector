@@ -1037,7 +1037,7 @@ trait SmartBehavior {
 
           
           //vadd.v.v has no dependency with vmv.v.v
-          genRVUissue("b00000010101001111000011101010111".U, Smartvmvxs),
+          //genRVUissue("b00000010101001111000011101010111".U, Smartvmvxs),
 
           //vadd.v.v has dependency with vmv.v.v
           //genRVUissue("b00000010001000110000011101010111".U, Smartvmvxs),

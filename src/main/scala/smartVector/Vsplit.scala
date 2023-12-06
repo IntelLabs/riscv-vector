@@ -107,7 +107,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     val idx           = RegInit(UInt(5.W), 0.U)
 
     vCtrl(0).illegal     := RegInit(false.B)
-    vCtrl(0).lsrcVal     := RegInit(Vec(3, false.B))
+    vCtrl(0).lsrcVal     := RegInit(VecInit(Seq.fill(3)(false.B)))
     vCtrl(0).ldestVal    := RegInit(false.B)
     vCtrl(0).rdVal       := RegInit(false.B)
     vCtrl(0).load        := RegInit(false.B)
@@ -150,12 +150,14 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     val ctrl = Mux(instFirstIn,io.in.decodeIn.bits.vCtrl,vCtrl(0))
     val info = Mux(instFirstIn,io.in.decodeIn.bits.vInfo,vInfo(0))
-    val vs1  = Mux(instFirstIn,io.in.regFileIn.readData(0), uopRegInfo(0).vs1)
-    val vs2  = Mux(instFirstIn,io.in.regFileIn.readData(1), uopRegInfo(0).vs2)
-    val old_vd  = Mux(io.in.regFileIn.readVld(2), io.in.regFileIn.readData(2), uopRegInfo(0).old_vd)
-    val mask    = Mux(io.in.regFileIn.readVld(3), io.in.regFileIn.readData(3), uopRegInfo(0).mask)
     val scalarOpnd1 = Mux(instFirstIn,io.in.decodeIn.bits.scalar_opnd_1,scalar_opnd_1(0))
     val scalarOpnd2 = Mux(instFirstIn,io.in.decodeIn.bits.scalar_opnd_2,scalar_opnd_2(0))
+
+    //Because the register file do not always read the register file when instFirstIn
+    val vs1     = Mux(io.in.regFileIn.readVld(0), io.in.regFileIn.readData(0), uopRegInfo(0).vs1)
+    val vs2     = Mux(io.in.regFileIn.readVld(1), io.in.regFileIn.readData(1), uopRegInfo(0).vs2)
+    val old_vd  = Mux(io.in.regFileIn.readVld(2), io.in.regFileIn.readData(2), uopRegInfo(0).old_vd)
+    val mask    = Mux(io.in.regFileIn.readVld(3), io.in.regFileIn.readData(3), uopRegInfo(0).mask)
     val v_ext_out = ctrl.alu && ctrl.funct3 === "b010".U && ctrl.funct6 === "b010010".U 
     
     val lsrc1_inc = Wire(UInt(3.W))
