@@ -119,6 +119,7 @@ class SVlsu(implicit p: Parameters) extends Module {
 
     */        
 
+    io.lsuReady := Mux(uopState === uop_idle, true.B, false.B)
     // SPLIT FSM -- decide next state
     when(uopState === uop_idle) {
         when(io.mUop.valid) {
@@ -145,12 +146,6 @@ class SVlsu(implicit p: Parameters) extends Module {
     }
     // SPLIT FSM -- transition
     uopState := nextUopState
-
-    when(nextUopState === uop_idle) {
-        io.lsuReady := true.B // LSU free --> accept new uop request
-    }.otherwise {
-        io.lsuReady := false.B
-    }
     
     when(uopState === uop_idle) {
         when(io.mUop.valid) {
@@ -257,23 +252,23 @@ class SVlsu(implicit p: Parameters) extends Module {
             when(vmReg || maskVal) {
                 /*-----------------------------------------calc addr start-------------------------------------------------*/
                 /*                                                                                                         */
-                // align addr to memb
-                val align2membAddr = (mUopReg.scalar_opnd_1 >> membAlignIdxReg) << membAlignIdxReg
+                val baseAddr = mUopReg.scalar_opnd_1
                 when(ldstTypeReg === Mop.unit_stride) {
-                    addr := align2membAddr + curVl * membReg
+                    // align addr to memb
+                    addr := ((baseAddr + curVl * membReg) >> membAlignIdxReg) << membAlignIdxReg
                 }.elsewhen(ldstTypeReg === Mop.constant_stride) {
                     when(mUopReg.scalar_opnd_2 === 0.U) {
-                        addr := align2membAddr
+                        addr := (baseAddr >> membAlignIdxReg) << membAlignIdxReg
                     }.otherwise {
                         val strideNeg = mUopReg.scalar_opnd_2(XLEN - 1)
-                        val strideAbs = Mux(strideNeg, -mUopReg.scalar_opnd_2, mUopReg.scalar_opnd_2) * membReg
+                        val strideAbs = Mux(strideNeg, -mUopReg.scalar_opnd_2, mUopReg.scalar_opnd_2)
 
-                        addr := Mux(strideNeg, align2membAddr - curVl * strideAbs, align2membAddr + curVl * strideAbs)
+                        addr := (Mux(strideNeg, baseAddr - curVl * strideAbs, baseAddr + curVl * strideAbs) >> membAlignIdxReg) << membAlignIdxReg
                     }
                 }.elsewhen(ldstTypeReg === Mop.index_ordered || ldstTypeReg === Mop.index_unodered) {
                     // indexed addr
-                    val idxVal = WireInit(0.U(VLEN.W))
-                    val remain = WireInit(0.U(VLEN.W))
+                    val idxVal = WireInit(0.U(XLEN.W))
+                    val remain = WireInit(0.U(XLEN.W))
                     val rShiftVal = WireInit(0.U(VLEN.W))
                     val eew = eewbReg << 3.U
 
@@ -282,11 +277,10 @@ class SVlsu(implicit p: Parameters) extends Module {
                     rShiftVal := (mUopReg.uopRegInfo.vs2 >> beginIdx)
                     remain := ((1.U << eew) - 1.U)
                     idxVal := (mUopReg.uopRegInfo.vs2 >> beginIdx) & remain
-                    val idxNeg = idxVal(eew - 1.U)
-                    val idxAlignVal = (idxVal >> membAlignIdxReg) << membAlignIdxReg
-                    val idxAbs = Mux(idxNeg, ((~idxAlignVal) & remain) + 1.U, idxAlignVal)
+                    val idxNeg = idxVal(XLEN - 1)
+                    val idxAbs = Mux(idxNeg, -idxVal, idxVal)
                     
-                    addr := Mux(idxNeg, align2membAddr - idxAbs, align2membAddr + idxAbs)
+                    addr := (Mux(idxNeg, baseAddr - idxAbs, baseAddr + idxAbs) >> membAlignIdxReg) << membAlignIdxReg
                 }.otherwise {
                     // do something
                 }
