@@ -174,8 +174,8 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   val output_en = RegInit(false.B)
   when(flush) {
     output_en := false.B
-  }.elsewhen(fire && fpu_red) {
-    when(uopEnd) {
+  }.elsewhen(fire) {
+    when(fpu_red && uopEnd) {
       output_en := true.B
     }.otherwise {
       output_en := false.B
