@@ -172,7 +172,9 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
 
   val expdIdxZero = RegInit(false.B)
   val output_en = RegInit(false.B)
-  when(fire && fpu_red) {
+  when(flush) {
+    output_en := false.B
+  }.elsewhen(fire && fpu_red) {
     when(uopEnd) {
       output_en := true.B
     }.otherwise {
@@ -548,7 +550,6 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   val old_cmpOutResult = RegInit(0.U(128.W))
   val cmpOutResult = Mux(io.out.bits.uop.uopIdx === 0.U, cmpOutKeep, old_cmpOutResult & cmpOutOff | cmpOutKeep) // Compare
   when(fpu(0).io.out.valid) {
-    // old_cmpOutResult := Mux(io.out.bits.uop.uopEnd, 0.U, cmpOutResult)
     old_cmpOutResult := cmpOutResult
   }
 
