@@ -19,6 +19,7 @@ case class  SmartParameters (
 
 trait smartParas {
   val VLEN = 128
+  val XLEN = 64
   val bVL: Int = log2Up(VLEN) + 1
   val bVstart: Int = bVL - 1
   val bVSTART = bVL 
@@ -26,6 +27,14 @@ trait smartParas {
   val NVPhyRegs = 32
   val NLanes = 2
   val LaneWidth = 64
+
+  val vlenb = VLEN / 8
+  val vlenbWidth = log2Up(vlenb) + 1
+
+  // LSU
+  val ldUopQueueSize = 17
+  val stUopQueueSize = 17
+  val ldUopQueueWidth = log2Up(ldUopQueueSize)
 }
 
 object SmartParam extends smartParas

@@ -9,7 +9,6 @@ import chipsalliance.rocketchip.config
 import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import xiangshan.MicroOp
 import SmartParam._
-import freechips.rocketchip.rocket.HellaCacheExceptions
 
 class MuopMergeAttr extends Bundle {
     val scalarRegWriteEn = Bool()
@@ -82,13 +81,6 @@ class Muop(implicit p : Parameters) extends Bundle {
     val scalar_opnd_1 = UInt(64.W)
     val scalar_opnd_2 = UInt(64.W)
     val uopRegInfo    = new UopRegInfo
-}
-
-class VLSUXcpt extends Bundle {
-    val exception_vld   = Bool()
-    val update_vl       = Bool()
-    val update_data     = UInt(bVL.W)
-    val xcpt_cause      = new HellaCacheExceptions()
 }
 
 class ExcpInfo extends Bundle {

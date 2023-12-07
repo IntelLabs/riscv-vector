@@ -49,10 +49,12 @@ class SmartVector extends Module {
             val rvuCommit = new RVUCommit
             val rvuExtra  = new RVUExtra
         })
+        val rvuMemory = new RVUMemory
         //TODO: This is reserved for verification, delete it later
         //val rfData = Output(Vec(NVPhyRegs, UInt(VLEN.W)))
         val rfData = Output(Vec(NVPhyRegs, UInt(VLEN.W)))
     })
+
 
     val p = Parameters.empty.alterPartial({
         case SmartParamsKey => SmartParameters(VLEN = 128)
@@ -66,6 +68,8 @@ class SmartVector extends Module {
     val commit  = Module(new VCommit())
     val iex     = Module(new VIexWrapper()(p))
     val regFile = Module(new SVRegFileWrapper()(p))
+    val svlsu   = Module(new SVlsu()(p))
+
 
     decoder.io.in.bits  := io.in.bits
     decoder.io.in.valid := io.in.valid
@@ -77,10 +81,13 @@ class SmartVector extends Module {
     commit.io.in.excpInfo <> split.io.excpInfo
     io.out.rvuCommit <> commit.io.out.commitInfo
 
+    svlsu.io.mUop <> split.io.out.mUop
+    svlsu.io.mUopMergeAttr <> split.io.out.mUopMergeAttr
+    split.io.vLSUXcpt <> svlsu.io.xcpt
+
     //ChenLu change
-    split.io.lsuStallSplit     := false.B
-    merge.io.in.lsuIn.valid := false.B
-    merge.io.in.lsuIn.bits  := 0.U.asTypeOf(new LsuOutput)
+    split.io.lsuStallSplit := svlsu.io.lsuReady
+    merge.io.in.lsuIn <> svlsu.io.lsuOut
     
     merge.io.in.mergeInfo <> split.io.out.mUopMergeAttr  
     regFile.io.in.readIn  <> split.io.out.toRegFileRead
@@ -93,7 +100,31 @@ class SmartVector extends Module {
     //TODO: This is reserved for verification, delete it later
     io.rfData := regFile.io.rfData
 
-    
+
+    io.rvuMemory.req.valid      := svlsu.io.dataExchange.req.valid
+    io.rvuMemory.req.bits.idx   := svlsu.io.dataExchange.req.bits.idx
+    io.rvuMemory.req.bits.addr  := svlsu.io.dataExchange.req.bits.addr
+    io.rvuMemory.req.bits.cmd   := svlsu.io.dataExchange.req.bits.cmd
+    io.rvuMemory.req.bits.data  := svlsu.io.dataExchange.req.bits.data
+    io.rvuMemory.req.bits.mask  := svlsu.io.dataExchange.req.bits.mask
+
+    // io.rvuMemory.resp.ready := svlsu.io.dataExchange.resp.ready
+    svlsu.io.dataExchange.req.ready             := io.rvuMemory.req.ready
+    svlsu.io.dataExchange.resp.valid            := io.rvuMemory.resp.valid
+    svlsu.io.dataExchange.resp.bits.idx         := io.rvuMemory.resp.bits.idx
+    svlsu.io.dataExchange.resp.bits.data        := io.rvuMemory.resp.bits.data
+    svlsu.io.dataExchange.resp.bits.has_data    := io.rvuMemory.resp.bits.has_data
+    svlsu.io.dataExchange.resp.bits.mask        := io.rvuMemory.resp.bits.mask
+    svlsu.io.dataExchange.resp.bits.nack        := io.rvuMemory.resp.bits.nack
+
+    svlsu.io.dataExchange.xcpt.ma.ld := io.rvuMemory.xcpt.ma.ld
+    svlsu.io.dataExchange.xcpt.ma.st := io.rvuMemory.xcpt.ma.st
+    svlsu.io.dataExchange.xcpt.pf.ld := io.rvuMemory.xcpt.pf.ld
+    svlsu.io.dataExchange.xcpt.pf.st := io.rvuMemory.xcpt.pf.st
+    svlsu.io.dataExchange.xcpt.gf.ld := io.rvuMemory.xcpt.gf.ld
+    svlsu.io.dataExchange.xcpt.gf.st := io.rvuMemory.xcpt.gf.st
+    svlsu.io.dataExchange.xcpt.ae.ld := io.rvuMemory.xcpt.ae.ld
+    svlsu.io.dataExchange.xcpt.ae.st := io.rvuMemory.xcpt.ae.st
     
     val sboard  = new Scoreboard(NVPhyRegs, false)
     sboard.clear(merge.io.scoreBoardCleanIO.clearEn, merge.io.scoreBoardCleanIO.clearAddr)

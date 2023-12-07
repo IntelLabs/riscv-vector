@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 
 import SmartParam._
-
+import freechips.rocketchip.rocket._
 
 // RVU (Rocket Vector Interface)
 
@@ -26,15 +26,45 @@ class RVUissue extends Bundle {
     val vInfo  = new VInfo
 }
 
+class RVUMemoryReq extends Bundle {
+    // ldst queue index
+    val idx     = UInt(4.W)
+    // memop
+    val addr    = UInt(64.W)
+    // 0 for load; 1 for store
+    val cmd     = Bool()
+    // store info
+    val data    = UInt(64.W)
+    val mask    = UInt(8.W)
+}
+
+class RVUMemoryResp extends Bundle {
+    // ldst queue index
+    val idx      = UInt(4.W)
+    // load result
+    val data     = UInt(64.W)
+    val mask     = UInt(8.W)
+    // cache miss
+    val nack     = Bool()
+
+    val has_data = Bool()
+}
+class AlignmentExceptions extends Bundle {
+    val ld = Bool()
+    val st = Bool()
+}
+
+class HellaCacheExceptions extends Bundle {
+    val ma = new AlignmentExceptions
+    val pf = new AlignmentExceptions
+    val gf = new AlignmentExceptions
+    val ae = new AlignmentExceptions
+}
+
 class RVUMemory extends Bundle {
-    val lsu_req_valid      = Output(Bool())
-    val lsu_req_ld         = Output(Bool())
-    val lsu_req_addrs      = Output(UInt(64.W))
-    val lsu_req_data_width = Output(UInt(3.W))
-    val st_req_data        = Output(UInt(64.W))
-    val ld_resp_data       = Input(UInt(64.W))
-    val lsu_resp_valid     = Input(Bool())
-    val lsu_resp_excp      = Input(Bool())
+    val req  = Decoupled(new RVUMemoryReq)
+    val resp = Flipped(Valid(new RVUMemoryResp))
+    val xcpt = Input(new HellaCacheExceptions)
 }
 
 class RVUCommit extends Bundle {
@@ -46,6 +76,7 @@ class RVUCommit extends Bundle {
     val illegal_inst    = Output(Bool())
     val update_vl       = Output(Bool())
     val update_vl_data  = Output(UInt(5.W))
+    val xcpt_cause      = Output(new HellaCacheExceptions)
 }
 
 class RVUExtra extends Bundle {
