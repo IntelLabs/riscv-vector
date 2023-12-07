@@ -81,9 +81,9 @@ class SVlsu(implicit p: Parameters) extends Module {
     // uop & control related
     val mUopReg         = RegInit(0.U.asTypeOf(new Muop()(p)))
     val unitSMopReg     = RegInit(0.U(5.W))
-    val membReg         = RegInit(8.U)
+    val memwbReg        = RegInit(8.U)
     val eewbReg         = RegInit(8.U)
-    val membAlignIdxReg = RegInit(8.U)
+    val memwAlignReg    = RegInit(8.U)
     val elenReg         = RegInit(0.U(vlenbWidth.W))
     val mlenReg         = RegInit(0.U(vlenbWidth.W))
     val ldstTypeReg     = RegInit(0.U(2.W))
@@ -190,25 +190,25 @@ class SVlsu(implicit p: Parameters) extends Module {
                 (funct6(1, 0) === "b11".U) -> Mop.index_ordered,
             ))
 
-            // unit-stride & strided use eew as memb
+            // unit-stride & strided use eew as memwb
             // indexed use sew
-            val memb = Mux(ldstType === Mop.index_ordered || ldstType === Mop.index_unodered, sewb, eewb)
+            val memwb = Mux(ldstType === Mop.index_ordered || ldstType === Mop.index_unodered, sewb, eewb)
 
-            membAlignIdxReg := MuxCase(1.U, Array(
-                (memb === 1.U) -> 0.U,
-                (memb === 2.U) -> 1.U,
-                (memb === 4.U) -> 2.U,
-                (memb === 8.U) -> 3.U,
+            memwAlignReg := MuxCase(1.U, Array(
+                (memwb === 1.U) -> 0.U,
+                (memwb === 2.U) -> 1.U,
+                (memwb === 4.U) -> 2.U,
+                (memwb === 8.U) -> 3.U,
             ))
 
-            val mlen = (VLEN.U >> 3.U) / memb
+            val mlen = (VLEN.U >> 3.U) / memwb
             val elen = (VLEN.U >> 3.U) / eewb
 
             unitSMopReg := unitStrideMop
             vmReg       := vm
             eewbReg     := eewb
             ldstTypeReg := ldstType
-            membReg     := memb
+            memwbReg    := memwb
             elenReg     := elen
             mlenReg     := mlen
 
@@ -246,8 +246,8 @@ class SVlsu(implicit p: Parameters) extends Module {
 
                     when(i.U < memVl && i.U >= memVstart) {
                         for(j <- 0 until vlenb) {
-                            when(j.U < memb) {
-                                vregInfo(i.U * memb + j.U).status := VRegSegmentStatus.needData
+                            when(j.U < memwb) {
+                                vregInfo(i.U * memwb + j.U).status := VRegSegmentStatus.needData
                             }
                         }
                     }
@@ -259,7 +259,7 @@ class SVlsu(implicit p: Parameters) extends Module {
             val curVl       = mUopReg.uop.uopIdx * Mux(elenReg < mlenReg, elenReg, mlenReg) + splitStart + curSplitIdx
             val addr        = WireInit(0.U(64.W))
             val offset      = WireInit(0.U(log2Ceil(8).W))
-            val baseSegIdx  = (curVl % mlenReg) * membReg
+            val baseSegIdx  = (curVl % mlenReg) * memwbReg
 
             val maskVal = mUopReg.uopRegInfo.mask(curVl)
 
@@ -268,16 +268,16 @@ class SVlsu(implicit p: Parameters) extends Module {
                 /*                                                                                                         */
                 val baseAddr = mUopReg.scalar_opnd_1
                 when(ldstTypeReg === Mop.unit_stride) {
-                    // align addr to memb
-                    addr := ((baseAddr + curVl * membReg) >> membAlignIdxReg) << membAlignIdxReg
+                    // align addr to memwb
+                    addr := ((baseAddr + curVl * memwbReg) >> memwAlignReg) << memwAlignReg
                 }.elsewhen(ldstTypeReg === Mop.constant_stride) {
                     when(mUopReg.scalar_opnd_2 === 0.U) {
-                        addr := (baseAddr >> membAlignIdxReg) << membAlignIdxReg
+                        addr := (baseAddr >> memwAlignReg) << memwAlignReg
                     }.otherwise {
                         val strideNeg = mUopReg.scalar_opnd_2(XLEN - 1)
                         val strideAbs = Mux(strideNeg, -mUopReg.scalar_opnd_2, mUopReg.scalar_opnd_2)
 
-                        addr := (Mux(strideNeg, baseAddr - curVl * strideAbs, baseAddr + curVl * strideAbs) >> membAlignIdxReg) << membAlignIdxReg
+                        addr := (Mux(strideNeg, baseAddr - curVl * strideAbs, baseAddr + curVl * strideAbs) >> memwAlignReg) << memwAlignReg
                     }
                 }.elsewhen(ldstTypeReg === Mop.index_ordered || ldstTypeReg === Mop.index_unodered) {
                     // indexed addr
@@ -294,7 +294,7 @@ class SVlsu(implicit p: Parameters) extends Module {
                     val idxNeg = idxVal(XLEN - 1)
                     val idxAbs = Mux(idxNeg, -idxVal, idxVal)
                     
-                    addr := (Mux(idxNeg, baseAddr - idxAbs, baseAddr + idxAbs) >> membAlignIdxReg) << membAlignIdxReg
+                    addr := (Mux(idxNeg, baseAddr - idxAbs, baseAddr + idxAbs) >> memwAlignReg) << memwAlignReg
                 }.otherwise {
                     // do something
                 }
@@ -314,7 +314,7 @@ class SVlsu(implicit p: Parameters) extends Module {
             }
 
             for(i <- 0 until vlenb) {
-                when(i.U < membReg) {
+                when(i.U < memwbReg) {
                     val segIdx = baseSegIdx + i.U
                     when(vmReg || maskVal) {
                         vregInfo(segIdx).status := VRegSegmentStatus.notReady
@@ -331,7 +331,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     /*-----------------SPLIT STAGE END-----------------------*/
 
 
-    /******************ISSUE STAGE START**********************/
+    /*********************************ISSUE START*********************************/
     // update issueLdPtr
     when(io.dataExchange.resp.valid && io.dataExchange.resp.bits.nack && !mem_xcpt) {
         issueLdstPtr := io.dataExchange.resp.bits.idx
@@ -356,10 +356,10 @@ class SVlsu(implicit p: Parameters) extends Module {
             uop => uop.valid := false.B
         )
     }
-    /*-----------------ISSUE STAGE END-----------------*/
+    /*---------------------------------ISSUE END---------------------------------*/
 
 
-    /******************RESP STAGE START**********************/
+    /*********************************RESP START*********************************/
     when(io.dataExchange.resp.valid && io.dataExchange.resp.bits.has_data && !mem_xcpt) {
         val loadData  = io.dataExchange.resp.bits.data
         val respLdPtr = io.dataExchange.resp.bits.idx
@@ -390,7 +390,7 @@ class SVlsu(implicit p: Parameters) extends Module {
 
     completeLd := ldstUopQueue.forall(uop => uop.valid === false.B) // ld completed or xcpt happened
     
-    /******************RESP STAGE END**********************/
+    /*---------------------------------RESP END---------------------------------*/
 
     /************************** Ldest data writeback to uopQueue********************/
     val vreg_wb_xcpt  = vregInfo.map(info => info.status === VRegSegmentStatus.xcpt).reduce(_ || _)
@@ -423,13 +423,13 @@ class SVlsu(implicit p: Parameters) extends Module {
             io.xcpt.exception_vld   := true.B
             io.xcpt.xcpt_cause      := hellaXcptReg
         }
-        io.xcpt.update_vl       := true.B
-        io.xcpt.update_data     := xcptVlReg
+        io.xcpt.update_vl           := true.B
+        io.xcpt.update_data         := xcptVlReg
     }.otherwise {
-        io.xcpt.exception_vld   := false.B
-        io.xcpt.update_vl       := false.B
-        io.xcpt.update_data     := DontCare
-        io.xcpt.xcpt_cause      := 0.U.asTypeOf(new HellaCacheExceptions)
+        io.xcpt.exception_vld       := false.B
+        io.xcpt.update_vl           := false.B
+        io.xcpt.update_data         := DontCare
+        io.xcpt.xcpt_cause          := 0.U.asTypeOf(new HellaCacheExceptions)
     }
 
 }
