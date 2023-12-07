@@ -35,6 +35,13 @@ class ScoreboardReadIO extends Bundle {
     val readBypassed2 = Output(Bool())
 }
 
+class CommitInfo extends Bundle{
+    val scalarRegWriteEn = Bool() 
+    val ldest = UInt(5.W)
+    val data = UInt(64.W)
+}
+
+
 class SmartVector extends Module {
     val io = IO(new Bundle{
         val in = Flipped(Decoupled(new RVUissue))
@@ -46,7 +53,6 @@ class SmartVector extends Module {
         //val rfData = Output(Vec(NVPhyRegs, UInt(VLEN.W)))
         val rfData = Output(Vec(NVPhyRegs, UInt(VLEN.W)))
     })
-
 
     val p = Parameters.empty.alterPartial({
         case SmartParamsKey => SmartParameters(VLEN = 128)
@@ -61,7 +67,6 @@ class SmartVector extends Module {
     val iex     = Module(new VIexWrapper()(p))
     val regFile = Module(new SVRegFileWrapper()(p))
 
-
     decoder.io.in.bits  := io.in.bits
     decoder.io.in.valid := io.in.valid
     split.io.in.decodeIn <> decoder.io.out
@@ -69,6 +74,8 @@ class SmartVector extends Module {
     iex.io.in <> RegNext(split.io.out.mUop)
     merge.io.in.aluIn <> iex.io.out
     commit.io.in.commitInfo <> merge.io.out.commitInfo
+    commit.io.in.excpInfo <> split.io.excpInfo
+    io.out.rvuCommit <> commit.io.out.commitInfo
 
     //ChenLu change
     split.io.lsuStallSplit     := false.B
@@ -86,15 +93,7 @@ class SmartVector extends Module {
     //TODO: This is reserved for verification, delete it later
     io.rfData := regFile.io.rfData
 
-    io.out.rvuCommit.commit_vld      := commit.io.out.commitInfo.valid
-    io.out.rvuCommit.exception_vld   := false.B
-    io.out.rvuCommit.update_vl       := false.B
-    io.out.rvuCommit.update_vl_data  := 0.U
-    io.out.rvuCommit.illegal_inst    := false.B
-    io.out.rvuCommit.return_data_vld := commit.io.out.commitInfo.bits.scalarRegWriteEn
-    io.out.rvuCommit.return_data     := commit.io.out.commitInfo.bits.data
-    io.out.rvuCommit.return_reg_idx  := commit.io.out.commitInfo.bits.ldest
-
+    
     
     val sboard  = new Scoreboard(NVPhyRegs, false)
     sboard.clear(merge.io.scoreBoardCleanIO.clearEn, merge.io.scoreBoardCleanIO.clearAddr)

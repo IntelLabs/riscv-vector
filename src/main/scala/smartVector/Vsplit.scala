@@ -9,6 +9,7 @@ import chipsalliance.rocketchip.config
 import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import xiangshan.MicroOp
 import SmartParam._
+import freechips.rocketchip.rocket.HellaCacheExceptions
 
 class MuopMergeAttr extends Bundle {
     val scalarRegWriteEn = Bool()
@@ -34,24 +35,25 @@ class MuopMergeAttr extends Bundle {
 }
 
 class VUopCtrlW extends Bundle {
-  val funct6 = UInt(6.W)
-  val funct3 = UInt(3.W)
-  val vm = Bool()
-  val vs1_imm = UInt(5.W)
-  val widen = Bool()
-  val widen2 = Bool()
-  val narrow = Bool()
+  val funct6      = UInt(6.W)
+  val funct3      = UInt(3.W)
+  val vm          = Bool()
+  val vs1_imm     = UInt(5.W)
+  val vs2         = UInt(5.W)
+  val widen       = Bool()
+  val widen2      = Bool()
+  val narrow      = Bool()
   val narrow_to_1 = Bool()
-  val load = Bool()
-  val store = Bool()
-  val alu = Bool() // All low-latency operations
-  val mul = Bool()
-  val fp = Bool()
-  val div = Bool()
-  val fixP = Bool()
-  val redu = Bool()
-  val mask = Bool()
-  val perm = Bool()
+  val load        = Bool()
+  val store       = Bool()
+  val alu         = Bool() // All low-latency operations
+  val mul         = Bool()
+  val fp          = Bool()
+  val div         = Bool()
+  val fixP        = Bool()
+  val redu        = Bool()
+  val mask        = Bool()
+  val perm        = Bool()
   def vv = !funct3(2) && !(funct3(1) && funct3(0))
   def vx = funct3(2)
   def vi = !funct3(2) && funct3(1) && funct3(0)
@@ -82,6 +84,21 @@ class Muop(implicit p : Parameters) extends Bundle {
     val uopRegInfo    = new UopRegInfo
 }
 
+class VLSUXcpt extends Bundle {
+    val exception_vld   = Bool()
+    val update_vl       = Bool()
+    val update_data     = UInt(bVL.W)
+    val xcpt_cause      = new HellaCacheExceptions()
+}
+
+class ExcpInfo extends Bundle {
+    val exception_vld   = Bool()
+    val update_vl       = Bool()
+    val update_data     = UInt(bVL.W)
+    val xcpt_cause      = new HellaCacheExceptions()
+    val illegalInst     = Bool()
+}
+
 class Vsplit(implicit p : Parameters) extends Module {
     val io = IO(new Bundle{
         val in = new Bundle{
@@ -97,6 +114,8 @@ class Vsplit(implicit p : Parameters) extends Module {
         val scoreBoardReadIO = Flipped(new ScoreboardReadIO)
         val lsuStallSplit = Input(Bool()) 
         val iexNeedStall  = Input(Bool())
+        val vLSUXcpt = Input (new VLSUXcpt)
+        val excpInfo = Output(new ExcpInfo)
     })
     
     val vCtrl         = RegInit(VecInit(Seq.fill(1)(0.U.asTypeOf(new darecreek.VCtrl))))
@@ -113,19 +132,19 @@ class Vsplit(implicit p : Parameters) extends Module {
     val instFirstIn = (currentState === empty && io.in.decodeIn.valid)
 
     when (instFirstIn){       
-        vCtrl(0)                 := io.in.decodeIn.bits.vCtrl
-        vInfo(0)                 := io.in.decodeIn.bits.vInfo
-        scalar_opnd_1(0)         := io.in.decodeIn.bits.scalar_opnd_1
-        scalar_opnd_2(0)         := io.in.decodeIn.bits.scalar_opnd_2
-        uopRegInfo(0).vxsat      := false.B
+        vCtrl(0)            := io.in.decodeIn.bits.vCtrl
+        vInfo(0)            := io.in.decodeIn.bits.vInfo
+        scalar_opnd_1(0)    := io.in.decodeIn.bits.scalar_opnd_1
+        scalar_opnd_2(0)    := io.in.decodeIn.bits.scalar_opnd_2
+        uopRegInfo(0).vxsat := false.B
     }
 
     //To save power, when do not need to update the vs1, keep it unchanged. 
     //ALU will judge whether use the data, do not worry to send the wrong data 
-    uopRegInfo(0).vs1        := Mux(io.in.regFileIn.readVld(0), io.in.regFileIn.readData(0), uopRegInfo(0).vs1)
-    uopRegInfo(0).vs2        := Mux(io.in.regFileIn.readVld(1), io.in.regFileIn.readData(1), uopRegInfo(0).vs2)
-    uopRegInfo(0).mask       := Mux(io.in.regFileIn.readVld(2), io.in.regFileIn.readData(2), uopRegInfo(0).mask)
-    uopRegInfo(0).old_vd     := Mux(io.in.regFileIn.readVld(3), io.in.regFileIn.readData(3), uopRegInfo(0).old_vd)
+    uopRegInfo(0).vs1       := Mux(io.in.regFileIn.readVld(0), io.in.regFileIn.readData(0), uopRegInfo(0).vs1)
+    uopRegInfo(0).vs2       := Mux(io.in.regFileIn.readVld(1), io.in.regFileIn.readData(1), uopRegInfo(0).vs2)
+    uopRegInfo(0).mask      := Mux(io.in.regFileIn.readVld(2), io.in.regFileIn.readData(2), uopRegInfo(0).mask)
+    uopRegInfo(0).old_vd    := Mux(io.in.regFileIn.readVld(3), io.in.regFileIn.readData(3), uopRegInfo(0).old_vd)
 
     val ctrl    = Mux(instFirstIn,io.in.decodeIn.bits.vCtrl,vCtrl(0))
     val info    = Mux(instFirstIn,io.in.decodeIn.bits.vInfo,vInfo(0))
@@ -218,7 +237,8 @@ class Vsplit(implicit p : Parameters) extends Module {
         hasRegConf(1) := true.B
     }
 
-    needStall := hasRegConf(0) || hasRegConf(1) || io.lsuStallSplit || io.iexNeedStall
+    needStall := hasRegConf(0) || hasRegConf(1) || io.lsuStallSplit || io.iexNeedStall || 
+                 io.in.decodeIn.bits.vCtrl.illegal || io.vLSUXcpt.exception_vld
          
     io.out.mUop.bits.uop.uopIdx := idx
     io.out.mUop.bits.uop.uopEnd := (idx + 1.U === vInfo(0).vlmul)
@@ -227,6 +247,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.out.mUop.bits.uop.ctrl.funct3      := ctrl.funct3
     io.out.mUop.bits.uop.ctrl.vm          := ctrl.vm
     io.out.mUop.bits.uop.ctrl.vs1_imm     := ctrl.lsrc(0)
+    io.out.mUop.bits.uop.ctrl.vs2         := ctrl.lsrc(1)  
     io.out.mUop.bits.uop.ctrl.widen       := ctrl.widen
     io.out.mUop.bits.uop.ctrl.widen2      := ctrl.widen2
     io.out.mUop.bits.uop.ctrl.narrow      := ctrl.narrow
@@ -310,6 +331,18 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.in.decodeIn.ready := (currentState === empty)
     
     //assert(io.in.valid && currentState === ongoing, "when has ongoing inst, can not accept a new one")
+
+    when(io.in.decodeIn.bits.vCtrl.illegal || io.vLSUXcpt.exception_vld){
+        currentStateNext := empty
+        idx := 0.U
+        io.in.decodeIn.ready := true.B
+    }
+
+    io.excpInfo.exception_vld := io.vLSUXcpt.exception_vld || io.in.decodeIn.bits.vCtrl.illegal
+    io.excpInfo.illegalInst   := io.in.decodeIn.bits.vCtrl.illegal
+    io.excpInfo.update_vl     := io.vLSUXcpt.update_vl
+    io.excpInfo.update_data   := io.vLSUXcpt.update_data
+    io.excpInfo.xcpt_cause    := io.vLSUXcpt.xcpt_cause
 
 }
 

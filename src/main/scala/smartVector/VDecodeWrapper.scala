@@ -48,10 +48,6 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   io.out.bits.vInfo.vxrm    := RegEnable(io.in.bits.vInfo.vxrm  , io.in.valid)
   io.out.bits.vInfo.frm     := RegEnable(io.in.bits.vInfo.frm   , io.in.valid)
 
-  //The following code is only for the mv instruction. It needs to be adjusted according to different instructions later.
-
-
-  //Only receive one instruction, and then set ready to false
   io.in.ready := io.out.ready && ~io.iexNeedStall
 }
 
