@@ -110,7 +110,7 @@ class SVlsu(implicit p: Parameters) extends Module {
                           io.dataExchange.xcpt.pf.st || io.dataExchange.xcpt.pf.ld ||
                           io.dataExchange.xcpt.ae.st || io.dataExchange.xcpt.ae.ld ||
                           io.dataExchange.xcpt.ma.st || io.dataExchange.xcpt.ma.ld)
-    
+
     /****************************SPLIT STAGE*********************************/
     /*
                                                      splitId+1
@@ -154,55 +154,56 @@ class SVlsu(implicit p: Parameters) extends Module {
     }
     // SPLIT FSM -- transition
     uopState := nextUopState
+
+    /*****************************SPLIT -- muop decode****************************************/
+    val (funct6, funct3) = (io.mUop.bits.uop.ctrl.funct6, io.mUop.bits.uop.ctrl.funct3)
+    val (vstart, vl)     = (io.mUop.bits.uop.info.vstart, io.mUop.bits.uop.info.vl)
+    val (uopIdx, uopEnd) = (io.mUop.bits.uop.uopIdx, io.mUop.bits.uop.uopEnd)
+    val (vsew, vm)       = (io.mUop.bits.uop.info.vsew, io.mUop.bits.uop.ctrl.vm)
+    val unitStrideMop    = io.mUop.bits.uop.ctrl.lsrc(1)
     
+    // eew and sew in bytes calculation
+    val eewb = MuxLookup(Cat(funct6(2), funct3), 1.U, Seq(
+        "b0000".U -> 1.U, "b0101".U -> 2.U, "b0110".U -> 4.U, "b0111".U -> 8.U
+    ))
+    val sewb = MuxLookup(vsew, 1.U, Seq(
+        "b000".U -> 1.U, "b001".U -> 2.U, "b010".U -> 4.U, "b011".U -> 8.U
+    ))
+
+    // ldst type determination
+    val ldstType = MuxLookup(funct6(1, 0), Mop.unit_stride, Seq(
+        "b00".U -> Mop.unit_stride,     "b01".U -> Mop.index_unodered,
+        "b10".U -> Mop.constant_stride, "b11".U -> Mop.index_ordered
+    ))
+
+    // unit-stride & strided use eew as memwb, indexed use sew
+    val memwb       = Mux(ldstType === Mop.index_ordered || ldstType === Mop.index_unodered, sewb, eewb)
+    val mlen        = vlenb.U / memwb
+    val elen        = vlenb.U / eewb
+    val minLen      = elen min mlen
+
+    // decide micro vl
+    val actualVl    = Mux(unitStrideMop === UnitStrideMop.mask, (vl + 7.U) >> 3.U, vl) // ceil(vl/8)
+    val doneLen     = minLen * uopIdx
+    val leftLen     = actualVl - doneLen
+    val microVl     = Mux(uopEnd, leftLen, minLen)
+
+    val microVStart = Mux(vstart < doneLen, 0.U, minLen min (vstart - doneLen))
+    val vregClean   = vregInfo.forall(info => info.status === VRegSegmentStatus.invalid)
+    val memVl       = leftLen min mlen
+    val memVstart   = Mux(vstart < doneLen, 0.U, mlen min (vstart - doneLen))
+
     when(uopState === uop_idle) {
         when(io.mUop.valid) {
             mUopReg := io.mUop.bits
 
-            val (funct6, funct3) = (io.mUop.bits.uop.ctrl.funct6, io.mUop.bits.uop.ctrl.funct3)
-            val (vstart, vl)     = (io.mUop.bits.uop.info.vstart, io.mUop.bits.uop.info.vl)
-            val (uopIdx, uopEnd) = (io.mUop.bits.uop.uopIdx, io.mUop.bits.uop.uopEnd)
-            val (vsew, vm)       = (io.mUop.bits.uop.info.vsew, io.mUop.bits.uop.ctrl.vm)
-            val unitStrideMop    = io.mUop.bits.uop.ctrl.lsrc(1)
-            
-            // eew in bytes 
-            val mwCatWidth = Cat(funct6(2), funct3)
-            val eewb = MuxCase(1.U, Array(
-                (mwCatWidth === "b0000".U) -> 1.U,
-                (mwCatWidth === "b0101".U) -> 2.U,
-                (mwCatWidth === "b0110".U) -> 4.U,
-                (mwCatWidth === "b0111".U) -> 8.U,
-            ))
-            
-            // sew in bytes
-            val sewb = MuxCase(1.U, Array(
-                (vsew === "b000".U) -> 1.U,
-                (vsew === "b001".U) -> 2.U,
-                (vsew === "b010".U) -> 4.U,
-                (vsew === "b011".U) -> 8.U,
-            ))
-
-            // ldst type
-            val ldstType = MuxCase(0.U, Array(
-                (funct6(1, 0) === "b00".U) -> Mop.unit_stride,
-                (funct6(1, 0) === "b01".U) -> Mop.index_unodered,
-                (funct6(1, 0) === "b10".U) -> Mop.constant_stride,
-                (funct6(1, 0) === "b11".U) -> Mop.index_ordered,
-            ))
-
-            // unit-stride & strided use eew as memwb
-            // indexed use sew
-            val memwb = Mux(ldstType === Mop.index_ordered || ldstType === Mop.index_unodered, sewb, eewb)
-
-            memwAlignReg := MuxCase(1.U, Array(
+            // 1->0, 2->1, 4->2, 8->3
+            memwAlignReg := MuxCase(0.U, Array(
                 (memwb === 1.U) -> 0.U,
                 (memwb === 2.U) -> 1.U,
                 (memwb === 4.U) -> 2.U,
                 (memwb === 8.U) -> 3.U,
             ))
-
-            val mlen = (VLEN.U >> 3.U) / memwb
-            val elen = (VLEN.U >> 3.U) / eewb
 
             unitSMopReg := unitStrideMop
             vmReg       := vm
@@ -212,17 +213,6 @@ class SVlsu(implicit p: Parameters) extends Module {
             elenReg     := elen
             mlenReg     := mlen
 
-            val minLen = Mux(elen < mlen, elen, mlen)
-            // decide micro vl
-            // vstart > vl ??
-            val actualVl = Mux(unitStrideMop === UnitStrideMop.mask, (vl + 7.U) >> 3.U, vl) // ceil(vl/8)
-            val leftLen  = actualVl - minLen * uopIdx
-            val microVl  = Mux(uopEnd, leftLen, minLen)
-
-            val microVStart = Mux(vstart < minLen * uopIdx, 0.U, 
-                Mux(vstart - minLen * uopIdx > minLen, minLen, vstart - minLen * uopIdx)
-            )
-
             // Set split info
             ldstEnqPtr   := 0.U
             issueLdstPtr := 0.U
@@ -230,17 +220,8 @@ class SVlsu(implicit p: Parameters) extends Module {
             splitCount   := microVl - microVStart      
             splitStart   := microVStart
 
-
             // set vreg
-            val vregClean = vregInfo.forall(info => info.status === VRegSegmentStatus.invalid)
-
             when(vregClean) {
-                val memVl = Mux(leftLen < mlen, leftLen, mlen)
-                val memVstart = Mux(vstart < minLen * uopIdx, 
-                    0.U, 
-                    Mux(vstart - minLen * uopIdx > mlen, mlen, vstart - minLen * uopIdx)
-                )
-
                 for(i <- 0 until vlenb) {
                     vregInfo(i).data := Reverse(io.mUop.bits.uopRegInfo.old_vd(8 * i + 7, 8 * i))
 
@@ -254,57 +235,60 @@ class SVlsu(implicit p: Parameters) extends Module {
                 }
             }
         }
-    }.elsewhen(uopState === uop_split && !mem_xcpt) {
+    }
+
+    /*-----------------------------------------calc addr start-------------------------------------------------*/
+    /*                                                                                                         */
+    val curVl       = mUopReg.uop.uopIdx * (elenReg min mlenReg) + splitStart + curSplitIdx
+    val addr        = WireInit(0.U(64.W))
+    val alignedAddr = WireInit(0.U(64.W))
+    val offset      = WireInit(0.U(log2Ceil(8).W))
+    val baseSegIdx  = (curVl % mlenReg) * memwbReg
+
+    val maskVal     = mUopReg.uopRegInfo.mask(curVl)
+    val baseAddr    = mUopReg.scalar_opnd_1
+
+    val strideNeg   = mUopReg.scalar_opnd_2(XLEN - 1)
+    val strideAbs   = Mux(strideNeg, -mUopReg.scalar_opnd_2, mUopReg.scalar_opnd_2)
+
+    val idxVal      = WireInit(0.U(XLEN.W))
+    val remain      = WireInit(0.U(XLEN.W))
+    val rShiftVal   = WireInit(0.U(VLEN.W))
+    val eew         = eewbReg << 3.U
+
+    val beginIdx    = (curVl % elenReg) * (eew)
+    val idxNeg      = idxVal(XLEN - 1)
+    val idxAbs      = Mux(idxNeg, -idxVal, idxVal)
+
+    when(ldstTypeReg === Mop.unit_stride) {
+        // align addr to memwb
+        addr := ((baseAddr + curVl * memwbReg) >> memwAlignReg) << memwAlignReg
+    }.elsewhen(ldstTypeReg === Mop.constant_stride) {
+        when(mUopReg.scalar_opnd_2 === 0.U) {
+            addr := (baseAddr >> memwAlignReg) << memwAlignReg
+        }.otherwise {
+            addr := (Mux(strideNeg, baseAddr - curVl * strideAbs, baseAddr + curVl * strideAbs) >> memwAlignReg) << memwAlignReg
+        }
+    }.elsewhen(ldstTypeReg === Mop.index_ordered || ldstTypeReg === Mop.index_unodered) {
+        // indexed addr
+        rShiftVal := (mUopReg.uopRegInfo.vs2 >> beginIdx)
+        remain := ((1.U << eew) - 1.U)
+        idxVal := (mUopReg.uopRegInfo.vs2 >> beginIdx) & remain
+        
+        addr := (Mux(idxNeg, baseAddr - idxAbs, baseAddr + idxAbs) >> memwAlignReg) << memwAlignReg
+    }.otherwise {
+        // do something
+    }
+
+    // align addr to 64 bits
+    alignedAddr := (addr >> 3.U) << 3.U
+    offset := addr - alignedAddr
+    /*                                                                                                         */
+    /*-----------------------------------------calc addr end---------------------------------------------------*/
+
+    when(uopState === uop_split && !mem_xcpt) {
         when(curSplitIdx < splitCount) {
-            val curVl       = mUopReg.uop.uopIdx * Mux(elenReg < mlenReg, elenReg, mlenReg) + splitStart + curSplitIdx
-            val addr        = WireInit(0.U(64.W))
-            val offset      = WireInit(0.U(log2Ceil(8).W))
-            val baseSegIdx  = (curVl % mlenReg) * memwbReg
-
-            val maskVal = mUopReg.uopRegInfo.mask(curVl)
-
             when(vmReg || maskVal) {
-                /*-----------------------------------------calc addr start-------------------------------------------------*/
-                /*                                                                                                         */
-                val baseAddr = mUopReg.scalar_opnd_1
-                when(ldstTypeReg === Mop.unit_stride) {
-                    // align addr to memwb
-                    addr := ((baseAddr + curVl * memwbReg) >> memwAlignReg) << memwAlignReg
-                }.elsewhen(ldstTypeReg === Mop.constant_stride) {
-                    when(mUopReg.scalar_opnd_2 === 0.U) {
-                        addr := (baseAddr >> memwAlignReg) << memwAlignReg
-                    }.otherwise {
-                        val strideNeg = mUopReg.scalar_opnd_2(XLEN - 1)
-                        val strideAbs = Mux(strideNeg, -mUopReg.scalar_opnd_2, mUopReg.scalar_opnd_2)
-
-                        addr := (Mux(strideNeg, baseAddr - curVl * strideAbs, baseAddr + curVl * strideAbs) >> memwAlignReg) << memwAlignReg
-                    }
-                }.elsewhen(ldstTypeReg === Mop.index_ordered || ldstTypeReg === Mop.index_unodered) {
-                    // indexed addr
-                    val idxVal = WireInit(0.U(XLEN.W))
-                    val remain = WireInit(0.U(XLEN.W))
-                    val rShiftVal = WireInit(0.U(VLEN.W))
-                    val eew = eewbReg << 3.U
-
-                    val beginIdx = (curVl % elenReg) * (eew)
-
-                    rShiftVal := (mUopReg.uopRegInfo.vs2 >> beginIdx)
-                    remain := ((1.U << eew) - 1.U)
-                    idxVal := (mUopReg.uopRegInfo.vs2 >> beginIdx) & remain
-                    val idxNeg = idxVal(XLEN - 1)
-                    val idxAbs = Mux(idxNeg, -idxVal, idxVal)
-                    
-                    addr := (Mux(idxNeg, baseAddr - idxAbs, baseAddr + idxAbs) >> memwAlignReg) << memwAlignReg
-                }.otherwise {
-                    // do something
-                }
-
-                // align addr to 64 bits
-                val alignedAddr = (addr >> 3.U) << 3.U
-                offset := addr - alignedAddr
-                /*                                                                                                         */
-                /*-----------------------------------------calc addr end---------------------------------------------------*/
-
                 ldstUopQueue(ldstEnqPtr).valid   := true.B
                 ldstUopQueue(ldstEnqPtr).addr    := alignedAddr
                 ldstUopQueue(ldstEnqPtr).isLast  := (curSplitIdx === splitCount - 1.U)
@@ -352,37 +336,33 @@ class SVlsu(implicit p: Parameters) extends Module {
     }
 
     when(mem_xcpt) {
-        ldstUopQueue.foreach(
-            uop => uop.valid := false.B
-        )
+        ldstUopQueue.foreach(uop => uop.valid := false.B)
     }
     /*---------------------------------ISSUE END---------------------------------*/
 
 
     /*********************************RESP START*********************************/
-    when(io.dataExchange.resp.valid && io.dataExchange.resp.bits.has_data && !mem_xcpt) {
-        val loadData  = io.dataExchange.resp.bits.data
-        val respLdPtr = io.dataExchange.resp.bits.idx
+    val (respLdPtr, respData) = (io.dataExchange.resp.bits.idx, io.dataExchange.resp.bits.data)
 
+    when(io.dataExchange.resp.valid && io.dataExchange.resp.bits.has_data && !mem_xcpt) {
         ldstUopQueue(respLdPtr).valid := false.B
         
         for(i <- 0 until vlenb) {
             when(vregInfo(i).status === VRegSegmentStatus.notReady && vregInfo(i).idx === respLdPtr) {
                 for(j <- 0 until 8) {
                     when(vregInfo(i).offset === j.U) {
-                        vregInfo(i).data := Reverse(loadData(j * 8 + 7, j * 8))
+                        vregInfo(i).data := Reverse(respData(j * 8 + 7, j * 8))
                     }
                 }
                 vregInfo(i).status := VRegSegmentStatus.ready
             }
         }
     }.elsewhen(mem_xcpt) { // exception handling
-        val xcptQueueIdx = io.dataExchange.resp.bits.idx
-        xcptVlReg       := ldstUopQueue(xcptQueueIdx).firstvl
+        xcptVlReg       := ldstUopQueue(respLdPtr).firstvl
         hellaXcptReg    := io.dataExchange.xcpt
 
         for(i <- 0 until vlenb) {
-            when(vregInfo(i).status === VRegSegmentStatus.notReady && vregInfo(i).idx === xcptQueueIdx) {
+            when(vregInfo(i).status === VRegSegmentStatus.notReady && vregInfo(i).idx === respLdPtr) {
                 vregInfo(i).status := VRegSegmentStatus.xcpt
             }
         }
