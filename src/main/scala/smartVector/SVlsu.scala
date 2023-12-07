@@ -18,9 +18,9 @@ class VLSUXcpt extends Bundle {
 class LdstIO(implicit p: Parameters) extends ParameterizedBundle()(p) {
     val mUop            = Input(ValidIO(new Muop()(p)))
     val mUopMergeAttr   = Input(ValidIO(new MuopMergeAttr))
-    val lsuOut          = ValidIO(new LsuOutput)
-    val dataExchange    = new RVUMemory()
+    val lsuOut          = Output(ValidIO(new LsuOutput))
     val xcpt            = Output(new VLSUXcpt)
+    val dataExchange    = new RVUMemory()
     val lsuReady        = Output(Bool())
 }
 
@@ -48,10 +48,9 @@ object VMemCmd {
 }
 
 class LdstUop extends Bundle {
-    val valid       = Bool()
-    val addr        = Output(UInt(64.W))
-    val firstvl     = Output(UInt(bVL.W))
-    val isLast      = Output(Bool())
+    val valid   = Bool()
+    val addr    = Output(UInt(64.W))
+    val vl      = Output(UInt(bVL.W))
 }
 
 class VRegSegmentInfo extends Bundle {
@@ -97,7 +96,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     // ldQueue
     val ldstEnqPtr      = RegInit(0.U(ldUopQueueWidth.W))
     val issueLdstPtr    = RegInit(0.U(ldUopQueueWidth.W))
-    val ldstUopQueue    = RegInit(VecInit(Seq.fill(ldUopQueueSize)(0.U.asTypeOf(new LdstUop))))
+    val ldUopQueue    = RegInit(VecInit(Seq.fill(ldUopQueueSize)(0.U.asTypeOf(new LdstUop))))
 
     // xcpt info
     val xcptVlReg       = RegInit(0.U(bVL.W))
@@ -152,7 +151,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     // SPLIT FSM -- transition
     uopState := nextUopState
 
-    /*****************************SPLIT -- muop decode****************************************/
+    /*****************************SPLIT -- IDLE stage****************************************/
     val (funct6, funct3) = (io.mUop.bits.uop.ctrl.funct6, io.mUop.bits.uop.ctrl.funct3)
     val (vstart, vl)     = (io.mUop.bits.uop.info.vstart, io.mUop.bits.uop.info.vl)
     val (uopIdx, uopEnd) = (io.mUop.bits.uop.uopIdx, io.mUop.bits.uop.uopEnd)
@@ -184,8 +183,8 @@ class SVlsu(implicit p: Parameters) extends Module {
     val doneLen     = minLen * uopIdx
     val leftLen     = actualVl - doneLen
     val microVl     = Mux(uopEnd, leftLen, minLen)
-
     val microVStart = Mux(vstart < doneLen, 0.U, minLen min (vstart - doneLen))
+
     val vregClean   = vregInfo.forall(info => info.status === VRegSegmentStatus.invalid)
     val memVl       = leftLen min mlen
     val memVstart   = Mux(vstart < doneLen, 0.U, mlen min (vstart - doneLen))
@@ -238,59 +237,51 @@ class SVlsu(implicit p: Parameters) extends Module {
     /*-----------------------------------------calc addr start-------------------------------------------------*/
     /*                                                                                                         */
     val curVl       = mUopReg.uop.uopIdx * (elenReg min mlenReg) + splitStart + curSplitIdx
+    val calcAddr    = WireInit(0.U(64.W))
     val addr        = WireInit(0.U(64.W))
+    val addrMask    = WireInit(0.U(64.W))
     val alignedAddr = WireInit(0.U(64.W))
     val offset      = WireInit(0.U(log2Ceil(8).W))
     val baseSegIdx  = (curVl % mlenReg) * memwbReg
 
-    val maskVal     = mUopReg.uopRegInfo.mask(curVl)
+    val isNotMasked = mUopReg.uopRegInfo.mask(curVl)
     val baseAddr    = mUopReg.scalar_opnd_1
 
-    val strideNeg   = mUopReg.scalar_opnd_2(XLEN - 1)
-    val strideAbs   = Mux(strideNeg, -mUopReg.scalar_opnd_2, mUopReg.scalar_opnd_2)
-
+    // indexed addr
     val idxVal      = WireInit(0.U(XLEN.W))
-    val remain      = WireInit(0.U(XLEN.W))
-    val rShiftVal   = WireInit(0.U(VLEN.W))
+    val idxMask     = WireInit(0.U(XLEN.W))
     val eew         = eewbReg << 3.U
-
     val beginIdx    = (curVl % elenReg) * (eew)
-    val idxNeg      = idxVal(XLEN - 1)
-    val idxAbs      = Mux(idxNeg, -idxVal, idxVal)
+    idxMask := ((1.U << eew) - 1.U)
+    idxVal := (mUopReg.uopRegInfo.vs2 >> beginIdx) & idxMask
 
     when(ldstTypeReg === Mop.unit_stride) {
-        // align addr to memwb
-        addr := ((baseAddr + curVl * memwbReg) >> memwAlignReg) << memwAlignReg
+        calcAddr := baseAddr + curVl * memwbReg
     }.elsewhen(ldstTypeReg === Mop.constant_stride) {
         when(mUopReg.scalar_opnd_2 === 0.U) {
-            addr := (baseAddr >> memwAlignReg) << memwAlignReg
+            calcAddr := baseAddr
         }.otherwise {
-            addr := (Mux(strideNeg, baseAddr - curVl * strideAbs, baseAddr + curVl * strideAbs) >> memwAlignReg) << memwAlignReg
+            calcAddr := (Cat(false.B, baseAddr).asSInt + curVl * (mUopReg.scalar_opnd_2).asSInt).asUInt
         }
-    }.elsewhen(ldstTypeReg === Mop.index_ordered || ldstTypeReg === Mop.index_unodered) {
-        // indexed addr
-        rShiftVal := (mUopReg.uopRegInfo.vs2 >> beginIdx)
-        remain := ((1.U << eew) - 1.U)
-        idxVal := (mUopReg.uopRegInfo.vs2 >> beginIdx) & remain
-        
-        addr := (Mux(idxNeg, baseAddr - idxAbs, baseAddr + idxAbs) >> memwAlignReg) << memwAlignReg
+    }.elsewhen(ldstTypeReg === Mop.index_ordered || ldstTypeReg === Mop.index_unodered) {        
+        calcAddr := (Cat(false.B, baseAddr).asSInt + idxVal.asSInt).asUInt
     }.otherwise {
         // do something
     }
 
-    // align addr to 64 bits
-    alignedAddr := (addr >> 3.U) << 3.U
-    offset := addr - alignedAddr
+    addrMask    := ~((1.U << memwAlignReg) - 1.U)
+    addr        := calcAddr & addrMask  // align calcAddr to memwb
+    alignedAddr := (addr >> 3.U) << 3.U // align addr to 64 bits
+    offset      := addr - alignedAddr 
     /*                                                                                                         */
     /*-----------------------------------------calc addr end---------------------------------------------------*/
 
     when(uopState === uop_split && !mem_xcpt) {
         when(curSplitIdx < splitCount) {
-            when(vmReg || maskVal) {
-                ldstUopQueue(ldstEnqPtr).valid   := true.B
-                ldstUopQueue(ldstEnqPtr).addr    := alignedAddr
-                ldstUopQueue(ldstEnqPtr).isLast  := (curSplitIdx === splitCount - 1.U)
-                ldstUopQueue(ldstEnqPtr).firstvl := curVl
+            when(vmReg || isNotMasked) {
+                ldUopQueue(ldstEnqPtr).valid  := true.B
+                ldUopQueue(ldstEnqPtr).addr   := alignedAddr
+                ldUopQueue(ldstEnqPtr).vl     := curVl
 
                 ldstEnqPtr  := ldstEnqPtr  + 1.U
             }
@@ -298,7 +289,7 @@ class SVlsu(implicit p: Parameters) extends Module {
             for(i <- 0 until vlenb) {
                 when(i.U < memwbReg) {
                     val segIdx = baseSegIdx + i.U
-                    when(vmReg || maskVal) {
+                    when(vmReg || isNotMasked) {
                         vregInfo(segIdx).status := VRegSegmentStatus.notReady
                         vregInfo(segIdx).idx    := ldstEnqPtr
                         vregInfo(segIdx).offset := offset + i.U
@@ -317,13 +308,13 @@ class SVlsu(implicit p: Parameters) extends Module {
     // update issueLdPtr
     when(io.dataExchange.resp.valid && io.dataExchange.resp.bits.nack && !mem_xcpt) {
         issueLdstPtr := io.dataExchange.resp.bits.idx
-    }.elsewhen(ldstUopQueue(issueLdstPtr).valid && io.dataExchange.req.ready) {
+    }.elsewhen(ldUopQueue(issueLdstPtr).valid && io.dataExchange.req.ready) {
         issueLdstPtr := issueLdstPtr + 1.U
     }
 
-    when(ldstUopQueue(issueLdstPtr).valid && io.dataExchange.req.ready) {
+    when(ldUopQueue(issueLdstPtr).valid && io.dataExchange.req.ready) {
         io.dataExchange.req.valid       := true.B
-        io.dataExchange.req.bits.addr   := ldstUopQueue(issueLdstPtr).addr
+        io.dataExchange.req.bits.addr   := ldUopQueue(issueLdstPtr).addr
         io.dataExchange.req.bits.cmd    := VMemCmd.read
         io.dataExchange.req.bits.idx    := issueLdstPtr
         io.dataExchange.req.bits.data   := DontCare
@@ -333,9 +324,6 @@ class SVlsu(implicit p: Parameters) extends Module {
         io.dataExchange.req.bits        := DontCare
     }
 
-    when(mem_xcpt) {
-        ldstUopQueue.foreach(uop => uop.valid := false.B)
-    }
     /*---------------------------------ISSUE END---------------------------------*/
 
 
@@ -343,7 +331,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     val (respLdPtr, respData) = (io.dataExchange.resp.bits.idx, io.dataExchange.resp.bits.data)
 
     when(io.dataExchange.resp.valid && io.dataExchange.resp.bits.has_data && !mem_xcpt) {
-        ldstUopQueue(respLdPtr).valid := false.B
+        ldUopQueue(respLdPtr).valid := false.B
         
         for(i <- 0 until vlenb) {
             when(vregInfo(i).status === VRegSegmentStatus.notReady && vregInfo(i).idx === respLdPtr) {
@@ -356,7 +344,8 @@ class SVlsu(implicit p: Parameters) extends Module {
             }
         }
     }.elsewhen(mem_xcpt) { // exception handling
-        xcptVlReg       := ldstUopQueue(respLdPtr).firstvl
+        ldUopQueue.foreach(uop => uop.valid := false.B)
+        xcptVlReg       := ldUopQueue(respLdPtr).vl
         hellaXcptReg    := io.dataExchange.xcpt
 
         for(i <- 0 until vlenb) {
@@ -366,7 +355,7 @@ class SVlsu(implicit p: Parameters) extends Module {
         }
     }
 
-    completeLd := ldstUopQueue.forall(uop => uop.valid === false.B) // ld completed or xcpt happened
+    completeLd := ldUopQueue.forall(uop => uop.valid === false.B) // ld completed or xcpt happened
     
     /*---------------------------------RESP END---------------------------------*/
 
@@ -377,10 +366,10 @@ class SVlsu(implicit p: Parameters) extends Module {
 
     when(vreg_wb_ready || vreg_wb_xcpt) {
         io.lsuOut.valid             := true.B
-        io.lsuOut.bits.data           := Cat(vregInfo.reverseMap(entry => Reverse(entry.data))) // Concatenate data from all vregInfo elements)
-        io.lsuOut.bits.muopEnd          := mUopMergeReg.muopEnd
-        io.lsuOut.bits.rfWriteEn        := mUopMergeReg.rfWriteEn
-        io.lsuOut.bits.rfWriteIdx       := mUopMergeReg.ldest
+        io.lsuOut.bits.data         := Cat(vregInfo.reverseMap(entry => Reverse(entry.data))) // Concatenate data from all vregInfo elements)
+        io.lsuOut.bits.muopEnd      := mUopMergeReg.muopEnd
+        io.lsuOut.bits.rfWriteEn    := mUopMergeReg.rfWriteEn
+        io.lsuOut.bits.rfWriteIdx   := mUopMergeReg.ldest
 
         // Reset vreg info
         for (i <- 0 until vlenb) {
