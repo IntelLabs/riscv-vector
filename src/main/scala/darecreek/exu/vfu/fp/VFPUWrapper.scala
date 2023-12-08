@@ -442,7 +442,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
 
   val fpu = Seq.fill(NLanes)(Module(new VFPUTop))
   for (i <- 0 until NLanes / 2) {
-    fpu(i).io.in.valid := (io.in.valid & !fpu_red) || red_in_valid
+    fpu(i).io.in.valid := (io.in.valid & !fpu_red & !red_busy) || red_in_valid
     fpu(i).io.in.bits.uop.ctrl.lsrc(0) := Mux(red_in_valid, red_in(i).uop.ctrl.lsrc(0), vs1_imm)
     fpu(i).io.in.bits.uop.ctrl.lsrc(1) := Mux(red_in_valid, red_in(i).uop.ctrl.lsrc(1), 0.U)
     fpu(i).io.in.bits.uop.ctrl.ldest := Mux(red_in_valid, red_in(i).uop.ctrl.ldest, 0.U)
@@ -484,7 +484,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   }
 
   for (i <- NLanes / 2 until NLanes) {
-    fpu(i).io.in.valid := io.in.valid & !fpu_red
+    fpu(i).io.in.valid := io.in.valid & !fpu_red & !red_busy
     fpu(i).io.in.bits.uop.ctrl.lsrc(0) := vs1_imm
     fpu(i).io.in.bits.uop.ctrl.lsrc(1) := 0.U
     fpu(i).io.in.bits.uop.ctrl.ldest := 0.U
