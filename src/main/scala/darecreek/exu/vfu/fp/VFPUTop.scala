@@ -231,33 +231,6 @@ class VFInputGenFP(implicit val p: Parameters) extends VFPUBaseModule {
   io.out.valid := validVec.last & !io.out.bits.uop.sysUop.robIdx.needFlush(io.redirect)
   io.in.ready := rdyVec(0)
 
-
-  //   //  Redirect handling
-  //   def latency = 1
-  //
-  //
-  //   val validVec = (io.in.valid) +: Array.fill(latency)(RegInit(false.B))
-  //   val rdyVec = Array.fill(latency)(Wire(Bool())) :+ io.out.ready
-  //   // val uopVec = io.in.bits.uop +: Array.fill(latency)(Reg(new VExpdUOp))
-  //  // val flushVec = validVec.zip(uopVec).map(x => x._1 && x._2.sysUop.robIdx.needFlush(io.redirect))
-  //
-  //   // def regEnable(i: Int): Bool = validVec(i - 1) && rdyVec(i - 1) && !flushVec(i - 1)
-  //   def regEnable(i: Int): Bool = validVec(i - 1) && rdyVec(i - 1)
-  //
-  //   for (i <- 0 until latency) {
-  //     rdyVec(i) := !validVec(i + 1) || rdyVec(i + 1)
-  //   }
-  //
-  //   for (i <- 1 to latency) {
-  //     when(regEnable(i)) {
-  //       validVec(i) := validVec(i - 1)
-  //      // uopVec(i) := uopVec(i - 1)
-  //     // }.elsewhen(flushVec(i) || rdyVec(i)) {
-  //     }.elsewhen(rdyVec(i)) {
-  //       validVec(i) := false.B
-  //     }
-  //   }
-
   //---- vstart >= vl ----
   val vstart_gte_vl = io.in.bits.uop.info.vstart >= io.in.bits.uop.info.vl
 
