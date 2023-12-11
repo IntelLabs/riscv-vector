@@ -50,7 +50,7 @@ object VMemCmd {
 class LdstUop extends Bundle {
     val valid   = Bool()
     val addr    = Output(UInt(64.W))
-    val vl      = Output(UInt(bVL.W))
+    val pos     = Output(UInt(bVL.W)) // position in vl
 }
 
 class VRegSegmentInfo extends Bundle {
@@ -94,14 +94,17 @@ class SVlsu(implicit p: Parameters) extends Module {
     val splitStart      = RegInit(0.U(vlenbWidth.W))
 
     // ldQueue
-    val ldstEnqPtr      = RegInit(0.U(ldUopQueueWidth.W))
-    val issueLdstPtr    = RegInit(0.U(ldUopQueueWidth.W))
-    val ldUopQueue    = RegInit(VecInit(Seq.fill(ldUopQueueSize)(0.U.asTypeOf(new LdstUop))))
+    val ldEnqPtr        = RegInit(0.U(ldUopQueueWidth.W))
+    val issueLdPtr      = RegInit(0.U(ldUopQueueWidth.W))
+    val ldUopQueue      = RegInit(VecInit(Seq.fill(ldUopQueueSize)(0.U.asTypeOf(new LdstUop))))
 
     // xcpt info
     val xcptVlReg       = RegInit(0.U(bVL.W))
     val hellaXcptReg    = RegInit(0.U.asTypeOf(new HellaCacheExceptions))
 
+    // val hasXcptHappened
+    // assertion
+    // exception only once
     val mem_xcpt        = io.dataExchange.resp.valid && (
                           io.dataExchange.xcpt.pf.st || io.dataExchange.xcpt.pf.ld ||
                           io.dataExchange.xcpt.ae.st || io.dataExchange.xcpt.ae.ld ||
@@ -211,8 +214,8 @@ class SVlsu(implicit p: Parameters) extends Module {
             mlenReg     := mlen
 
             // Set split info
-            ldstEnqPtr   := 0.U
-            issueLdstPtr := 0.U
+            ldEnqPtr   := 0.U
+            issueLdPtr := 0.U
             curSplitIdx  := 0.U
             splitCount   := microVl - microVStart      
             splitStart   := microVStart
@@ -279,11 +282,11 @@ class SVlsu(implicit p: Parameters) extends Module {
     when(uopState === uop_split && !mem_xcpt) {
         when(curSplitIdx < splitCount) {
             when(vmReg || isNotMasked) {
-                ldUopQueue(ldstEnqPtr).valid  := true.B
-                ldUopQueue(ldstEnqPtr).addr   := alignedAddr
-                ldUopQueue(ldstEnqPtr).vl     := curVl
+                ldUopQueue(ldEnqPtr).valid  := true.B
+                ldUopQueue(ldEnqPtr).addr   := alignedAddr
+                ldUopQueue(ldEnqPtr).pos    := curVl
 
-                ldstEnqPtr  := ldstEnqPtr  + 1.U
+                ldEnqPtr  := ldEnqPtr  + 1.U
             }
 
             for(i <- 0 until vlenb) {
@@ -291,7 +294,7 @@ class SVlsu(implicit p: Parameters) extends Module {
                     val segIdx = baseSegIdx + i.U
                     when(vmReg || isNotMasked) {
                         vregInfo(segIdx).status := VRegSegmentStatus.notReady
-                        vregInfo(segIdx).idx    := ldstEnqPtr
+                        vregInfo(segIdx).idx    := ldEnqPtr
                         vregInfo(segIdx).offset := offset + i.U
                     }.otherwise {
                         vregInfo(segIdx).status := VRegSegmentStatus.ready
@@ -307,16 +310,16 @@ class SVlsu(implicit p: Parameters) extends Module {
     /*********************************ISSUE START*********************************/
     // update issueLdPtr
     when(io.dataExchange.resp.valid && io.dataExchange.resp.bits.nack && !mem_xcpt) {
-        issueLdstPtr := io.dataExchange.resp.bits.idx
-    }.elsewhen(ldUopQueue(issueLdstPtr).valid && io.dataExchange.req.ready) {
-        issueLdstPtr := issueLdstPtr + 1.U
+        issueLdPtr := io.dataExchange.resp.bits.idx
+    }.elsewhen(ldUopQueue(issueLdPtr).valid && io.dataExchange.req.ready) {
+        issueLdPtr := issueLdPtr + 1.U
     }
 
-    when(ldUopQueue(issueLdstPtr).valid && io.dataExchange.req.ready) {
+    when(ldUopQueue(issueLdPtr).valid && io.dataExchange.req.ready) {
         io.dataExchange.req.valid       := true.B
-        io.dataExchange.req.bits.addr   := ldUopQueue(issueLdstPtr).addr
+        io.dataExchange.req.bits.addr   := ldUopQueue(issueLdPtr).addr
         io.dataExchange.req.bits.cmd    := VMemCmd.read
-        io.dataExchange.req.bits.idx    := issueLdstPtr
+        io.dataExchange.req.bits.idx    := issueLdPtr
         io.dataExchange.req.bits.data   := DontCare
         io.dataExchange.req.bits.mask   := DontCare
     }.otherwise {
@@ -333,21 +336,46 @@ class SVlsu(implicit p: Parameters) extends Module {
     when(io.dataExchange.resp.valid && io.dataExchange.resp.bits.has_data && !mem_xcpt) {
         ldUopQueue(respLdPtr).valid := false.B
         
-        for(i <- 0 until vlenb) {
+        // for(i <- 0 until vlenb) {
+        //     when(vregInfo(i).status === VRegSegmentStatus.notReady && vregInfo(i).idx === respLdPtr) {
+        //         for(j <- 0 until 8) {
+        //             when(vregInfo(i).offset === j.U) {
+        //                 vregInfo(i).data := Reverse(respData(j * 8 + 7, j * 8))
+        //             }
+        //         }
+        //         vregInfo(i).status := VRegSegmentStatus.ready
+        //     }
+        // }
+
+        (0 until vlenb).foreach { i =>
             when(vregInfo(i).status === VRegSegmentStatus.notReady && vregInfo(i).idx === respLdPtr) {
-                for(j <- 0 until 8) {
-                    when(vregInfo(i).offset === j.U) {
-                        vregInfo(i).data := Reverse(respData(j * 8 + 7, j * 8))
-                    }
-                }
+                val reverseData = Reverse(respData)
+                val offset = vregInfo(i).offset
+
+                vregInfo(i).data := MuxLookup(offset, reverseData(63, 56), Seq(
+                    1.U -> reverseData(55, 48),
+                    2.U -> reverseData(47, 40),
+                    3.U -> reverseData(39, 32),
+                    4.U -> reverseData(31, 24),
+                    5.U -> reverseData(23, 16),
+                    6.U -> reverseData(15, 8),
+                    7.U -> reverseData(7, 0)
+                ))
+
                 vregInfo(i).status := VRegSegmentStatus.ready
             }
         }
+
+
     }.elsewhen(mem_xcpt) { // exception handling
+        // 1. clear ldUopQueue
         ldUopQueue.foreach(uop => uop.valid := false.B)
-        xcptVlReg       := ldUopQueue(respLdPtr).vl
+
+        // 2. update xcpt info
+        xcptVlReg       := ldUopQueue(respLdPtr).pos
         hellaXcptReg    := io.dataExchange.xcpt
 
+        // 3. update vreg
         for(i <- 0 until vlenb) {
             when(vregInfo(i).status === VRegSegmentStatus.notReady && vregInfo(i).idx === respLdPtr) {
                 vregInfo(i).status := VRegSegmentStatus.xcpt
