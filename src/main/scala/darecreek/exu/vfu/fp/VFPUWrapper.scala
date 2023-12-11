@@ -22,13 +22,14 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   val vs1_imm = io.in.bits.uop.ctrl.vs1_imm
   val widen = io.in.bits.uop.ctrl.widen
   val narrow = io.in.bits.uop.ctrl.narrow
-  val narrow_to_1 = io.in.bits.uop.ctrl.narrow_to_1
   val ma = io.in.bits.uop.info.ma
   val ta = io.in.bits.uop.info.ta
   val vsew = io.in.bits.uop.info.vsew
   val vlmul = io.in.bits.uop.info.vlmul
   val vl = io.in.bits.uop.info.vl
   val vstart = io.in.bits.uop.info.vstart
+  val in_vstart_gte_vl = vstart >= vl
+  val narrow_to_1 = io.in.bits.uop.ctrl.narrow_to_1 & !in_vstart_gte_vl
   val vxrm = io.in.bits.uop.info.vxrm
   val frm = io.in.bits.uop.info.frm
   val uopIdx = io.in.bits.uop.uopIdx
