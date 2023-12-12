@@ -88,8 +88,10 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   val idle :: calc_vs2 :: calc_vs1 :: Nil = Enum(3)
 
   val vd_vsew = Mux(widen | widen2, vsew + 1.U, vsew)
+  val vsew_reg = RegEnable(vsew, 0.U, fire)
   val vd_vsew_reg = RegEnable(vd_vsew, 0.U, fire)
   val eew = SewOH(vsew)
+  val eew_reg = SewOH(vsew_reg)
   val eewVd = SewOH(vd_vsew)
   val eewVd_reg = SewOH(vd_vsew_reg)
   val vsew_bits = RegEnable(Mux1H(eew.oneHot, Seq(8.U(7.W), 16.U(7.W), 32.U(7.W), 64.U(7.W))), 0.U, fire)
@@ -325,7 +327,8 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
 
   val red_zero = RegEnable(red_out_bits(63, 0), (red_state === calc_vs1) && red_out_valid && red_out_ready)
   val red_vs1_zero = Mux(expdIdxZero, vs1_zero, red_zero)
-  val vs2_order = (vs2m_bits >> vs2_in_cnt * vsew_bits) & (vd_mask >> ((VLEN).U - vsew_bits))
+  val vs2_shift = Mux1H(eew_reg.oneHot, Seq(3, 4, 5, 6).map(k => Cat(vs2_in_cnt, 0.U(k.W))))
+  val vs2_order = (vs2m_bits >> vs2_shift) & (vd_mask >> ((VLEN).U - vsew_bits))
   val red_vs1_bits = Wire(UInt((VLEN / 2).W))
   val red_vs2_bits = Wire(UInt((VLEN / 2).W))
   val red_vs1 = VecInit(Seq.tabulate(NLanes / 2)(i => red_vs1_bits((i + 1) * LaneWidth - 1, i * LaneWidth)))
@@ -442,7 +445,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   widen_vs2 := Mux(widen, Cat(vs2(127, 96), vs2(63, 32), vs2(95, 64), vs2(31, 0)), vs2)
   narrow_old_vd := Mux(narrow, Cat(old_vd(127, 96), old_vd(63, 32), old_vd(95, 64), old_vd(31, 0)), old_vd)
 
-  val fpu = Seq.fill(NLanes)(Module(new VFPUTop))
+  val fpu = Seq.fill(NLanes)(Module(new VFPUTop()(p)))
   for (i <- 0 until NLanes / 2) {
     fpu(i).io.in.valid := (io.in.valid & !fpu_red & !red_busy) || red_in_valid
     fpu(i).io.in.bits.uop.ctrl.lsrc(0) := Mux(red_in_valid, red_in(i).uop.ctrl.lsrc(0), vs1_imm)
