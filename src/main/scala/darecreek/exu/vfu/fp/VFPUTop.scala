@@ -255,13 +255,9 @@ class VFInputGenFP(implicit val p: Parameters) extends VFPUBaseModule {
   io.out.bits.uop.vfpCtrl := RegEnable(vfpCtrl, regEnable(1))
   io.out.bits.uop.fWidenEnd := false.B // default false
   io.out.bits.vs1 := RegEnable(rs1Expd, regEnable(1))
-  io.out.bits.uop.maskKeep := RegEnable(Mux(narrow_to_1, maskGen.io.maskKeep_cmp, maskGen.io.maskKeep), regEnable(1))
-  io.out.bits.uop.maskOff := RegEnable(Mux(narrow_to_1, maskGen.io.maskOff_cmp, maskGen.io.maskOff), regEnable(1))
+  io.out.bits.uop.maskKeep := RegEnable(Mux(narrow_to_1 & !vstart_gte_vl, maskGen.io.maskKeep_cmp, maskGen.io.maskKeep), regEnable(1))
+  io.out.bits.uop.maskOff := RegEnable(Mux(narrow_to_1 & !vstart_gte_vl, maskGen.io.maskOff_cmp, maskGen.io.maskOff), regEnable(1))
 
-
-  // def isCmp: Bool = {
-  //   io.in.bits.uop.ctrl.funct6(5, 3) === "b011".U
-  // }
 }
 
 
