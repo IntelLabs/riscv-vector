@@ -11,19 +11,15 @@ import firrtl.Utils
 
 class VAluWrapper (implicit p : Parameters) extends VFuModule {
 
-  class vAluIn extends Bundle {
-    val vfuInput = new VFuInput 
-  }
-
   val io = IO(new Bundle {
-    val in      = Input(ValidIO(new vAluIn))
+    val in      = Input(ValidIO(new VFuInput))
     val out     = ValidIO(new VAluOutput)
   })
 
   val vAlu = Module(new VAlu)
 
   vAlu.io.in.valid := io.in.valid
-  vAlu.io.in.bits := io.in.bits.vfuInput
+  vAlu.io.in.bits  := io.in.bits
 
   io.out := vAlu.io.out
 }

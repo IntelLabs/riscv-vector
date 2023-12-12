@@ -233,7 +233,7 @@ class Vsplit(implicit p : Parameters) extends Module {
                  io.in.decodeIn.bits.vCtrl.illegal || io.vLSUXcpt.exception_vld
          
     io.out.mUop.bits.uop.uopIdx := idx
-    io.out.mUop.bits.uop.uopEnd := (idx + 1.U === vInfo(0).vlmul)
+    io.out.mUop.bits.uop.uopEnd := (idx + 1.U === info.vlmul)
 
     io.out.mUop.bits.uop.ctrl.funct6      := ctrl.funct6
     io.out.mUop.bits.uop.ctrl.funct3      := ctrl.funct3
@@ -293,14 +293,20 @@ class Vsplit(implicit p : Parameters) extends Module {
         io.out.mUop.valid := false.B
     }
 
+    val expdLen = Wire(UInt(4.W))
+    val emulVd  = io.in.decodeIn.bits.eewEmulInfo.emulVd
+    val emulVs1 = io.in.decodeIn.bits.eewEmulInfo.emulVs1
+    val emulVs2 = io.in.decodeIn.bits.eewEmulInfo.emulVs2
+    expdLen := Mux(emulVd >= emulVs1, Mux(emulVd >= emulVs2, emulVd, emulVs2), Mux(emulVs1 >= emulVs2, emulVs1, emulVs2))
+
     switch(currentState){
         is(empty){
             when(instFirstIn && needStall){
                 currentStateNext := ongoing
-            }.elsewhen(io.in.decodeIn.valid && io.in.decodeIn.bits.vInfo.vlmul === 1.U){
+            }.elsewhen(io.in.decodeIn.valid && expdLen === 1.U){
                 currentStateNext := empty
                 idx := 0.U              
-            }.elsewhen(io.in.decodeIn.valid && io.in.decodeIn.bits.vInfo.vlmul =/= 1.U){
+            }.elsewhen(io.in.decodeIn.valid && expdLen =/= 1.U){
                 currentStateNext := ongoing
             }.otherwise{
                 currentStateNext := empty
@@ -309,10 +315,10 @@ class Vsplit(implicit p : Parameters) extends Module {
         is(ongoing){
             when(needStall){
                 currentStateNext := ongoing
-            }.elsewhen(idx + 1.U === vInfo(0).vlmul){
+            }.elsewhen(idx + 1.U === expdLen){
                 currentStateNext := empty
                 idx := 0.U
-            }.elsewhen(idx + 1.U < vInfo(0).vlmul){
+            }.elsewhen(idx + 1.U < expdLen){
                 currentStateNext := ongoing
             }
         }

@@ -7,20 +7,20 @@ import chipsalliance.rocketchip.config
 import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import darecreek.exu.vfu.alu.VAlu
 import firrtl.Utils
-import darecreek.exu.vfu.mac.VMac
+import darecreek.exu.vfu.reduction
 
 
-class VMacWrapper (implicit p : Parameters) extends Module {
+class VReducWrapper (implicit p : Parameters) extends Module {
 
   val io = IO(new Bundle {
     val in = Input(ValidIO(new VFuInput))
     val out = ValidIO(new VAluOutput)
   })
 
-  val vMac = Module(new VMac)
+  val vReduc = Module(new reduction.Reduction)
 
-  vMac.io.in.valid := io.in.valid
-  vMac.io.in.bits := io.in.bits
+  vReduc.io.in.valid := io.in.valid
+  vReduc.io.in.bits := io.in.bits
 
-  io.out := vMac.io.out
+  io.out := vReduc.io.out
 }

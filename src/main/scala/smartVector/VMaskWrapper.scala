@@ -10,21 +10,17 @@ import firrtl.Utils
 import darecreek.exu.vfu.vmask.VMask
 
 
-class VMaskWrapper (implicit p : Parameters) extends VFuModule {
-
-  class vMaskIn extends Bundle {
-    val vfuInput = new VFuInput 
-  }
+class VMaskWrapper (implicit p : Parameters) extends Module {
 
   val io = IO(new Bundle {
-    val in = Input(ValidIO(new vMaskIn))
+    val in = Input(ValidIO(new VFuInput))
     val out = ValidIO(new VAluOutput)
   })
 
   val vMac = Module(new VMask)
 
   vMac.io.in.valid := io.in.valid
-  vMac.io.in.bits := io.in.bits.vfuInput
+  vMac.io.in.bits := io.in.bits
 
   io.out := vMac.io.out
 }
