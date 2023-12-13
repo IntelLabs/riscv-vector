@@ -12,6 +12,13 @@ import chipsalliance.rocketchip.config.Parameters
 import xiangshan._
 import smartVector._
 
+class FakeDCache extends Module {
+    val io = IO(Flipped(new RVUMemory))
+    io.req.ready  := true.B
+    io.resp.valid := false.B
+    io.resp.bits  := DontCare
+    io.xcpt       := 0.U.asTypeOf(new HellaCacheExceptions())
+}
 
 class RVUTestResult extends Bundle {
     val commit_vld   = Output(Bool())
@@ -31,14 +38,13 @@ class SmartVectorWrapper extends Module {
     val rfData = Output(Vec(32, UInt(128.W)))
   })
   val smartVector = Module(new SmartVector)
+  val dcache      = Module(new FakeDCache)
 
   smartVector.io.in <> io.in
   //smartVector.io.in.valid := io.in.valid
-
+  smartVector.io.rvuMemory <> dcache.io
   io.out := smartVector.io.out
   io.rfData := smartVector.io.rfData
-  
-  
 }
 
 trait SmartBehavior {
@@ -1081,6 +1087,6 @@ class SmartSpec extends AnyFlatSpec with ChiselScalatestTester with SBundleGenHe
   //it should behave like vAluTest5()  // mask/tail/prestart
   //it should behave like vAluTest6()  // lmul < 1
   //it should behave like vAluTest7()  // 16.1 16.2 16.6
-  //it should behave like vAluTest8()  // New compare/vmadc test for nanhu_v3
-  it should behave like vAluTest10()
+  it should behave like vAluTest8()  // New compare/vmadc test for nanhu_v3
+  // it should behave like vAluTest10()
 }
