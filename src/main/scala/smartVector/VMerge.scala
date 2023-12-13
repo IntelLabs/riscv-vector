@@ -20,7 +20,7 @@ class VMerge (implicit p : Parameters) extends Module {
     val io = IO(new Bundle{
         val in = new Bundle{
             val mergeInfo = Input(ValidIO(new MuopMergeAttr))
-            val aluIn = Input(ValidIO(new VAluOutput))
+            val aluIn = Input(ValidIO(new IexOutput))
             val lsuIn = Input(ValidIO(new LsuOutput))
         }
         val out = new Bundle{

@@ -14,7 +14,7 @@ class VDivWrapper (implicit p : Parameters) extends Module {
 
   val io = IO(new Bundle {
     val in  = Flipped(Decoupled((new VFuInput)))
-    val out = ValidIO(new VAluOutput)
+    val out = ValidIO(new VFpuOutput)
   })
 
   val vDiv = Module(new VDiv)
@@ -24,6 +24,10 @@ class VDivWrapper (implicit p : Parameters) extends Module {
   vDiv.io.redirect.bits := DontCare
   vDiv.io.in.bits  := io.in.bits
 
-  io.out := vDiv.io.out
-  io.in.ready := vDiv.io.in.ready
+  io.out.bits  := vDiv.io.out.bits
+  io.out.valid := vDiv.io.out.valid
+  io.in.ready  := vDiv.io.in.ready
+
+  //when io.out.ready is true, the data can be sent to next module
+  vDiv.io.out.ready := true.B
 }

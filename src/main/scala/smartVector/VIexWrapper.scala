@@ -1,9 +1,7 @@
 package smartVector
 
-//import org.scalatest.flatspec.AnyFlatSpec
 import chisel3._
 import chisel3.util._
-//import chiseltest.WriteVcdAnnotation
 import darecreek.exu.vfu._
 import darecreek.exu.vfu.alu._
 import darecreek.exu.vfu.mac._
@@ -14,12 +12,17 @@ import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import chipsalliance.rocketchip.config
 import xiangshan.backend.rob.RobPtr
 
+class IexOutput extends Bundle {
+  val vd = UInt(128.W)
+  val vxsat = Bool()
+  val fflags = UInt(5.W)
+}
 
 class VIexWrapper(implicit p : Parameters) extends Module {
   
   val io = IO(new Bundle {
     val in = Input(ValidIO(new Muop))
-    val out = ValidIO(new VAluOutput)
+    val out = ValidIO(new IexOutput)
     val iexNeedStall = Output(Bool())
   })
 
@@ -73,13 +76,31 @@ class VIexWrapper(implicit p : Parameters) extends Module {
     fu.mask  := io.in.bits.uopRegInfo.mask
   }
 
-  val validOneHot = Seq(SValu.io.out.valid, SVMac.io.out.valid, SVMask.io.out.valid, 
-                        SVReduc.io.out.valid, SVDiv.io.out.valid)
+  val fixCycleResult = Wire(new VAluOutput)
 
-  val resultOneHot = Seq(SValu.io.out.bits, SVMac.io.out.bits, SVMask.io.out.bits,
-                      SVReduc.io.out.bits, SVDiv.io.out.bits)
+  val fixCycleVld1H = Seq(SValu.io.out.valid, SVMac.io.out.valid, SVMask.io.out.valid, 
+                          SVReduc.io.out.valid)
 
-  io.out.bits  := Mux1H(validOneHot, resultOneHot)
+  val fixCycleResult1H = Seq(SValu.io.out.bits, SVMac.io.out.bits, SVMask.io.out.bits,
+                             SVReduc.io.out.bits)
+
+  fixCycleResult  := Mux1H(fixCycleVld1H, fixCycleResult1H)
+
+  val fixCycleValid = SValu.io.out.valid || SVMac.io.out.valid || SVMask.io.out.valid || SVReduc.io.out.valid
+  
+  when(fixCycleValid){
+    io.out.bits.fflags := false.B
+    io.out.bits.vd     := fixCycleResult.vd
+    io.out.bits.vxsat  := fixCycleResult.vxsat
+  }.elsewhen(SVDiv.io.out.valid){
+    io.out.bits.fflags := SVDiv.io.out.bits.fflags
+    io.out.bits.vd     := SVDiv.io.out.bits.vd
+    io.out.bits.vxsat  := false.B
+  }.otherwise{
+    io.out.bits.fflags := false.B
+    io.out.bits.vd     := 0.U
+    io.out.bits.vxsat  := false.B
+  }
   io.out.valid := outValid
 
 }
