@@ -607,7 +607,7 @@ trait VLsuBehavior_ld {
                 // 1000~1001(cdef), 1008~1009(ffff), 1010~1011(0f0f), 1018~1019(3210)
                 // 1020~1021(3456), 1028~1029(0101), 1030~1031(4567), 1038~1039(1111)
                 (vlse16.copy(vm=false, vl=10, uopIdx=0, uopEnd=false), SrcBundleLd(scalar_opnd_2="h8", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fefe"), "h111145670101345632100f0fffff1211".U),
-                (vlse16.copy(vm=false, vl=10, uopIdx=1, uopEnd=true),  SrcBundleLd(scalar_opnd_2="h8", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fdfe"), "h201f1e1d1c1b1a191817161514132222".U),
+                (vlse16.copy(vm=false, vl=10, uopIdx=1, uopEnd=true),  SrcBundleLd(scalar_opnd_2="h8", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fefe"), "h201f1e1d1c1b1a191817161533331211".U),
             )
 
             next_is_load_and_step(dut)
@@ -624,6 +624,7 @@ trait VLsuBehavior_ld {
                     dut.clock.step(1)
                 }
                 dut.io.lsuOut.valid.expect(true.B)
+                // dut.clock.step(100)
                 dut.io.lsuOut.bits.data.expect(r)
                 dut.clock.step(4)
             }

@@ -39,6 +39,7 @@ class SVlsuStore(implicit p: Parameters) extends Module {
     val mlenReg         = RegInit(0.U(vlenbWidth.W))
     val ldstTypeReg     = RegInit(0.U(2.W))
     val vmReg           = RegInit(true.B)
+    val noUseMuop       = RegInit(false.B)
 
     // vreg seg info
     val vregInfo        = RegInit(VecInit(Seq.fill(vlenb)(0.U.asTypeOf(new VRegSegmentInfo))))
@@ -172,22 +173,22 @@ class SVlsuStore(implicit p: Parameters) extends Module {
             stEnqPtr   := 0.U
             issueStPtr := 0.U
             curSplitIdx  := 0.U
-            splitCount   := microVl - microVStart      
+            splitCount   := microVl - microVStart
+            noUseMuop    := (microVl === microVStart)      
             splitStart   := microVStart
-
+            
             // set vreg
             when(vregClean) {
-                for(i <- 0 until vlenb) {
-                    vregInfo(i).data := io.vs3(8 * i + 7, 8 * i)
+                (0 until vlenb).foreach { i => vregInfo(i).data := io.vs3(8 * i + 7, 8 * i) }
 
-                    when(i.U < memVl && i.U >= memVstart) {
-                        for(j <- 0 until vlenb) {
-                            when(j.U < memwb) {
-                                vregInfo(i.U * memwb + j.U).status := VRegSegmentStatus.needLdst
-                            }
+                (0 until vlenb).foreach { i =>
+                    (0 until vlenb).foreach { j =>
+                        when(i.U < mlen && j.U < memwb) {
+                            vregInfo(i.U * memwb + j.U).status :=
+                                Mux(i.U < memVl && i.U >= memVstart, VRegSegmentStatus.needLdst, VRegSegmentStatus.srcData)
                         }
                     }
-                }
+                }   
             }
         }
     }
@@ -235,6 +236,7 @@ class SVlsuStore(implicit p: Parameters) extends Module {
     /*-----------------------------------------calc addr end---------------------------------------------------*/
 
     when(uopState === uop_split && !mem_xcpt) {
+        noUseMuop := false.B
         when(curSplitIdx < splitCount) {
             when(vmReg || isNotMasked) {
                 stUopQueue(stEnqPtr).valid  := true.B
@@ -252,7 +254,7 @@ class SVlsuStore(implicit p: Parameters) extends Module {
                         vregInfo(segIdx).idx    := stEnqPtr
                         vregInfo(segIdx).offset := offset + i.U
                     }.otherwise {
-                        vregInfo(segIdx).status := VRegSegmentStatus.ready
+                        vregInfo(segIdx).status := VRegSegmentStatus.srcData
                     }
                 }
             }
@@ -331,8 +333,9 @@ class SVlsuStore(implicit p: Parameters) extends Module {
 
     /************************** Ldest data writeback to uopQueue********************/
     val vreg_wb_xcpt  = vregInfo.map(info => info.status === VRegSegmentStatus.xcpt).reduce(_ || _)
-    val vreg_wb_ready = vregInfo.forall(info => info.status === VRegSegmentStatus.ready || info.status === VRegSegmentStatus.invalid) && 
-        !vregInfo.forall(info => info.status === VRegSegmentStatus.invalid)
+    val vreg_wb_ready =
+        vregInfo.forall(info => info.status === VRegSegmentStatus.ready || info.status === VRegSegmentStatus.srcData) ||
+        (vregInfo.forall(info => info.status === VRegSegmentStatus.invalid) && noUseMuop)
 
     when(vreg_wb_ready || vreg_wb_xcpt) {
         io.lsuOut.valid             := true.B

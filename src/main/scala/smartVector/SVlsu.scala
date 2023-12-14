@@ -26,7 +26,7 @@ class LdstIO(implicit p: Parameters) extends ParameterizedBundle()(p) {
 }
 
 object VRegSegmentStatus {
-  val invalid :: needLdst :: notReady :: ready :: xcpt :: Nil = Enum(5)
+  val invalid :: srcData :: needLdst :: notReady :: ready :: xcpt :: Nil = Enum(6)
 }
 
 object Mop {
@@ -225,17 +225,16 @@ class SVlsu(implicit p: Parameters) extends Module {
 
             // set vreg
             when(vregClean) {
-                for(i <- 0 until vlenb) {
-                    vregInfo(i).data := io.mUop.bits.uopRegInfo.old_vd(8 * i + 7, 8 * i)
+                (0 until vlenb).foreach { i => vregInfo(i).data := io.mUop.bits.uopRegInfo.old_vd(8 * i + 7, 8 * i) }
 
-                    when(i.U < memVl && i.U >= memVstart) {
-                        for(j <- 0 until vlenb) {
-                            when(j.U < memwb) {
-                                vregInfo(i.U * memwb + j.U).status := VRegSegmentStatus.needLdst
-                            }
+                (0 until vlenb).foreach { i =>
+                    (0 until vlenb).foreach { j =>
+                        when(i.U < mlen && j.U < memwb) {
+                            vregInfo(i.U * memwb + j.U).status :=
+                                Mux(i.U < memVl && i.U >= memVstart, VRegSegmentStatus.needLdst, VRegSegmentStatus.srcData)
                         }
                     }
-                }
+                }   
             }
         }
     }
@@ -301,7 +300,7 @@ class SVlsu(implicit p: Parameters) extends Module {
                         vregInfo(segIdx).idx    := ldEnqPtr
                         vregInfo(segIdx).offset := offset + i.U
                     }.otherwise {
-                        vregInfo(segIdx).status := VRegSegmentStatus.ready
+                        vregInfo(segIdx).status := VRegSegmentStatus.srcData
                     }
                 }
             }
@@ -382,8 +381,9 @@ class SVlsu(implicit p: Parameters) extends Module {
 
     /************************** Ldest data writeback to uopQueue********************/
     val vreg_wb_xcpt  = vregInfo.map(info => info.status === VRegSegmentStatus.xcpt).reduce(_ || _)
-    val vreg_wb_ready = (vregInfo.forall(info => info.status === VRegSegmentStatus.ready || info.status === VRegSegmentStatus.invalid) && 
-        !vregInfo.forall(info => info.status === VRegSegmentStatus.invalid)) || (vregInfo.forall(info => info.status === VRegSegmentStatus.invalid) && noUseMuop)
+    val vreg_wb_ready =
+        vregInfo.forall(info => info.status === VRegSegmentStatus.ready || info.status === VRegSegmentStatus.srcData) ||
+        (vregInfo.forall(info => info.status === VRegSegmentStatus.invalid) && noUseMuop)
 
     when(vreg_wb_ready || vreg_wb_xcpt) {
         io.lsuOut.valid             := true.B

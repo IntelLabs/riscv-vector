@@ -137,7 +137,7 @@ trait VLsuBehavior_st_idx {
     }
 
     def vLsuTest2(): Unit = {
-        it should "pass: indexed store (uops=2, eew=8, sew=64, vl=3, vstart=0)" in {
+        it should "pass: indexed store (uops=3, eew=16, sew=64, vl=5, vstart=0)" in {
         test(new SmartVectorLsuStoreTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             test_init_store(dut)
             dut.clock.step(1)
@@ -173,13 +173,13 @@ trait VLsuBehavior_st_idx {
     }
 
     def vLsuTest3(): Unit = {
-        it should "pass: indexed store (uops=2, eew=8, sew=64, vl=3, vstart=0)" in {
+        it should "pass: indexed store (uops=2, eew=32, sew=16, vl=5, vstart=0)" in {
         test(new SmartVectorLsuStoreTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             test_init_store(dut)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsuxei32.copy(vl=5, uopIdx=0, uopEnd=false, vsew=3), SrcBundleSt(vs2="h00000010_00000000_00000008")),
-                (vsuxei32.copy(vl=5, uopIdx=1, uopEnd=true,  vsew=3), SrcBundleSt(vs2="h18")),
+                (vsuxei32.copy(vl=5, uopIdx=0, uopEnd=false, vsew=1), SrcBundleSt(vs2="h00000010_00000000_00000008")),
+                (vsuxei32.copy(vl=5, uopIdx=1, uopEnd=true,  vsew=1), SrcBundleSt(vs2="h18")),
             )
 
             next_is_store_and_step(dut)
@@ -192,17 +192,121 @@ trait VLsuBehavior_st_idx {
                 dut.io.mUop.bits.poke(genStInput(c, s))
                 dut.clock.step(1)
                 dut.io.mUop.valid.poke(false.B)
-
-                while (!dut.io.lsuOut.valid.peekBoolean()) {
-                    dut.clock.step(1)
-                }
-                dut.io.lsuOut.valid.expect(true.B)
+            }
+            while (!dut.io.lsuOut.valid.peekBoolean()) {
                 dut.clock.step(1)
             }
-            dut.io.memInfo(index1000).expect("h201f1e1d1c1b1a19".U)
-            dut.io.memInfo(index1008).expect("h1817161514131211".U)
-            dut.io.memInfo(index1010).expect("h1817161514131211".U)
-            dut.io.memInfo(index1018).expect("h1817161514131211".U)
+            dut.io.lsuOut.valid.expect(true.B)
+            dut.clock.step(1)
+
+            dut.io.memInfo(index1000).expect("h1817".U)
+            dut.io.memInfo(index1008).expect("h1211".U)
+            dut.io.memInfo(index1010).expect("h1615".U)
+            dut.io.memInfo(index1018).expect("h1a19".U)
+        }
+        }
+    }
+
+    def vLsuTest4(): Unit = {
+        it should "pass: indexed store (uops=2, eew=64, sew=16, vl=3, vstart=0)" in {
+        test(new SmartVectorLsuStoreTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            test_init_store(dut)
+            dut.clock.step(1)
+            val stReqs = Seq(
+                (vsuxei64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1), SrcBundleSt(vs2="h00010")),
+                (vsuxei64.copy(vl=3, uopIdx=1, uopEnd=true,  vsew=1), SrcBundleSt(vs2="h00020")),
+            )
+
+            next_is_store_and_step(dut)
+
+            for ((c, s) <- stReqs) {
+                while (!dut.io.lsuReady.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.mUop.valid.poke(true.B)
+                dut.io.mUop.bits.poke(genStInput(c, s))
+                dut.clock.step(1)
+                dut.io.mUop.valid.poke(false.B)
+            }
+            while (!dut.io.lsuOut.valid.peekBoolean()) {
+                dut.clock.step(1)
+            }
+            dut.io.lsuOut.valid.expect(true.B)
+            dut.clock.step(1)
+
+            dut.io.memInfo(index1010).expect("h1211".U)
+            dut.io.memInfo(index1020).expect("h1615".U)
+        }
+        }
+    }
+
+    def vLsuTest5(): Unit = {
+        it should "pass: indexed store (uops=2, eew=64, sew=16, vl=3, vstart=0) neg index value" in {
+        test(new SmartVectorLsuStoreTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            test_init_store(dut)
+            dut.clock.step(1)
+            val stReqs = Seq(
+                (vsuxei64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1), SrcBundleSt(vs2="hffff_ffff_ffff_fff0_ffff_ffff_ffff_fff8")),
+                (vsuxei64.copy(vl=3, uopIdx=1, uopEnd=true,  vsew=1), SrcBundleSt(vs2="h00020")),
+            )
+
+            next_is_store_and_step(dut)
+
+            for ((c, s) <- stReqs) {
+                while (!dut.io.lsuReady.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.mUop.valid.poke(true.B)
+                dut.io.mUop.bits.poke(genStInput(c, s))
+                dut.clock.step(1)
+                dut.io.mUop.valid.poke(false.B)
+            }
+            while (!dut.io.lsuOut.valid.peekBoolean()) {
+                dut.clock.step(1)
+            }
+            dut.io.lsuOut.valid.expect(true.B)
+            dut.clock.step(1)
+
+            dut.io.memInfo(index0ff0).expect("h1413".U)
+            dut.io.memInfo(index0ff8).expect("h1211".U)
+            dut.io.memInfo(index1020).expect("h1615".U)
+        }
+        }
+    }
+
+    def vLsuTest6(): Unit = {
+        it should "pass: indexed store (uops=2, eew=32, sew=16, vl=5, vstart=0) exception" in {
+        test(new SmartVectorLsuStoreTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            test_init_store(dut)
+            dut.clock.step(1)
+            val stReqs = Seq(
+                (vsuxei32.copy(vl=5, uopIdx=0, uopEnd=false, vsew=1), SrcBundleSt(vs2="h000000100000000000000008")),
+                (vsuxei32.copy(vl=5, uopIdx=1, uopEnd=true,  vsew=1), SrcBundleSt(vs2="h60")),
+            )
+
+            next_is_store_and_step(dut)
+
+            for ((c, s) <- stReqs) {
+                while (!dut.io.lsuReady.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.mUop.valid.poke(true.B)
+                dut.io.mUop.bits.poke(genStInput(c, s))
+                dut.clock.step(1)
+                dut.io.mUop.valid.poke(false.B)
+            }
+            while (!dut.io.lsuOut.valid.peekBoolean()) {
+                dut.clock.step(1)
+            }
+            dut.io.lsuOut.valid.expect(true.B)
+            if(dut.io.xcpt.update_vl.peekBoolean()) {
+                dut.io.xcpt.update_vl.expect(true.B)
+                dut.io.xcpt.update_data.expect(4.U)
+            }
+            dut.clock.step(1)
+
+            dut.io.memInfo(index1008).expect("h1211".U)
+            dut.io.memInfo(index1010).expect("h1615".U)
         }
         }
     }
@@ -210,16 +314,11 @@ trait VLsuBehavior_st_idx {
 
 class VLsuSpec_st_idx extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VLsuBehavior_st_idx {
   behavior of "LSU test"
-    // it should behave like vLsuTest0()   // unit-stride store
-    // it should behave like vLsuTest1()   // unit-stride store
-    // it should behave like vLsuTest2()   // unit-stride store
-    it should behave like vLsuTest3()   // unit-stride store
-    // it should behave like vLsuTest4()   // unit-stride store
-    // it should behave like vLsuTest5()   // unit-stride store 
-    // it should behave like vLsuTest6()   // unit-stride mask store
-    // it should behave like vLsuTest7()   // strided store
-    // it should behave like vLsuTest8()   // strided store
-    // it should behave like vLsuTest9()   // strided store
-    // it should behave like vLsuTest10()  // strided store with mask enabled
-    // it should behave like vLsuTest11()  // unit-stride exception
+    it should behave like vLsuTest0() 
+    it should behave like vLsuTest1() 
+    it should behave like vLsuTest2()  
+    it should behave like vLsuTest3() 
+    it should behave like vLsuTest4()   
+    it should behave like vLsuTest5()  
+    it should behave like vLsuTest6() 
 }
