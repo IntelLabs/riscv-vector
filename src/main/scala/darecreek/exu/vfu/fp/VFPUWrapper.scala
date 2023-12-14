@@ -38,7 +38,8 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   val sysUop = io.in.bits.uop.sysUop
   val vs1 = io.in.bits.vs1
   val vs2 = io.in.bits.vs2
-  val rs1 = io.in.bits.rs1
+  val ftype = VFPU.getTypeTagFromVSEW(vsew)
+  val rs1 = VFPU.unbox(io.in.bits.rs1, ftype)
   val old_vd = io.in.bits.oldVd
   val vmask = io.in.bits.mask
   val fire = io.in.fire
