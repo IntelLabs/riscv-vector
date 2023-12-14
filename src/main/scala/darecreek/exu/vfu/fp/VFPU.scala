@@ -2,6 +2,7 @@ package darecreek.exu.vfu.fp
 
 import chisel3.util.{Cat, Fill, log2Ceil}
 import chisel3._
+import fudian.FloatPoint
 
 object VFPU {
 
@@ -30,6 +31,34 @@ object VFPU {
   def dup32(x: UInt): UInt = {
     require(x.getWidth == 64)
     Cat(Fill(2, x.tail(32)))
+  }
+
+  def unbox(x: UInt, typeTag: UInt): UInt = {
+    require(x.getWidth == 64)
+    val isBoxed = x.head(32).andR()
+    Mux(typeTag === D,
+      x,
+      Mux(isBoxed,
+        x.tail(32),
+        FloatPoint.defaultNaNUInt(f32.expWidth, f32.precision)
+      )
+    )
+  }
+
+  def box(x: UInt, typeTag: UInt): UInt = {
+    require(x.getWidth == 64)
+    Mux(typeTag === D, x, Cat(~0.U(32.W), x(31, 0)))
+  }
+
+  def box(x: UInt, t: FType): UInt = {
+    if(t == f32){
+      Cat(~0.U(32.W), x(31, 0))
+    } else if(t == f64){
+      x(63, 0)
+    } else {
+      assert(cond = false, "Unknown ftype!")
+      0.U
+    }
   }
 
 }
