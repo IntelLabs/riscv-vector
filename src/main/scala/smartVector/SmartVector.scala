@@ -86,7 +86,7 @@ class SmartVector extends Module {
     split.io.vLSUXcpt <> svlsu.io.xcpt
 
     //ChenLu change
-    split.io.lsuStallSplit := svlsu.io.lsuReady
+    split.io.lsuStallSplit := ~svlsu.io.lsuReady
     merge.io.in.lsuIn <> svlsu.io.lsuOut
     
     merge.io.in.mergeInfo <> split.io.out.mUopMergeAttr  

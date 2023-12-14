@@ -210,6 +210,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     val vs2Idx = ctrl.lsrc(1) + lsrc1_inc
     val needStall  = Wire(Bool())
     val hasRegConf = Wire(Vec(2,Bool()))
+    val expdLen = Wire(UInt(4.W))
     
     io.scoreBoardReadIO.readAddr1 := vs1Idx
     io.scoreBoardReadIO.readAddr2 := vs2Idx
@@ -233,7 +234,7 @@ class Vsplit(implicit p : Parameters) extends Module {
                  io.in.decodeIn.bits.vCtrl.illegal || io.vLSUXcpt.exception_vld
          
     io.out.mUop.bits.uop.uopIdx := idx
-    io.out.mUop.bits.uop.uopEnd := (idx + 1.U === info.vlmul)
+    io.out.mUop.bits.uop.uopEnd := (idx + 1.U === expdLen)
 
     io.out.mUop.bits.uop.ctrl.funct6      := ctrl.funct6
     io.out.mUop.bits.uop.ctrl.funct3      := ctrl.funct3
@@ -293,7 +294,6 @@ class Vsplit(implicit p : Parameters) extends Module {
         io.out.mUop.valid := false.B
     }
 
-    val expdLen = Wire(UInt(4.W))
     val emulVd  = io.in.decodeIn.bits.eewEmulInfo.emulVd
     val emulVs1 = io.in.decodeIn.bits.eewEmulInfo.emulVs1
     val emulVs2 = io.in.decodeIn.bits.eewEmulInfo.emulVs2
