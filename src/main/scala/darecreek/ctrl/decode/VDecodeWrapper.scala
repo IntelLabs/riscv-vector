@@ -46,9 +46,9 @@ class VDecodeUnit extends Module {
   io.out.bits.csr.frm := RegEnable(io.in.v_csr(33, 31), io.in.valid)
   io.out.bits.csr.vlmul := RegEnable(io.in.v_csr(36, 34), io.in.valid)
   io.out.bits.csr.vsew := RegEnable(io.in.v_csr(39, 37), io.in.valid)
-  io.out.bits.csr.vill := RegEnable(io.in.v_csr(40), io.in.valid)
+  io.out.bits.csr.ta := RegEnable(io.in.v_csr(40), io.in.valid)
   io.out.bits.csr.ma := RegEnable(io.in.v_csr(41), io.in.valid)
-  io.out.bits.csr.ta := RegEnable(io.in.v_csr(42), io.in.valid)
+  io.out.bits.csr.vill := RegEnable(io.in.v_csr(42), io.in.valid)
   // io.out.bits.vInfo.destEew := 0.U  // don't care
   // io.out.bits.vInfo.emulVd := 0.U  // don't care
 }
