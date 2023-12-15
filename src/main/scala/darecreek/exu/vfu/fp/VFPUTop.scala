@@ -147,9 +147,11 @@ class VFInputGen(implicit val p: Parameters) extends VFPUBaseModule {
   val typeTag = VFPU.getTypeTagFromVSEW(io.in.uop.info.vsew)
   val vfpCtrl = VFDecoder(instCat).io.fpCtrl
   // src expand
+  val rs1_unbox = Wire(UInt(32.W))
+  rs1_unbox := VFPU.unbox(io.in.rs1, VFPU.S)
   val rs1Expd = Mux(
     ctrl.vx && typeTag === VFPU.S,
-    Cat(Seq.fill(2)(io.in.rs1.tail(VFPU.f32.len))),
+    Cat(Seq.fill(2)(rs1_unbox)),
     Mux(ctrl.vx && typeTag === VFPU.D,
       io.in.rs1,
       io.in.vs1)
