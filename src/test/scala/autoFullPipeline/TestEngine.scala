@@ -122,18 +122,24 @@ abstract class TestEngine extends BundleGenHelper {
             }*/
 
             // refill test case
-            while (
+            breakable{ while (
                 (curTestCasePool.size - exhaustedCount) < MAX_PARA_TESTCASES &&
                 testBehaviorPool.length > 0
             ) {
                 var candidTBs : Seq[TestBehavior] = Seq()
-                val orderedTestCases = curTestCasePool.filter(_._2._1.isOrdered())
+                val orderedTestCases = curTestCasePool.filter(x => {
+                    x._2._1.isOrdered() && !x._2._2.isExhausted()
+                })
                 if (orderedTestCases.size == 0) {
                     candidTBs = testBehaviorPool.filter(_.isOrdered())
                 }
 
                 if (orderedTestCases.size != 0 || candidTBs.length == 0) {
                     candidTBs = testBehaviorPool.filter(!_.isOrdered())
+                }
+
+                if (candidTBs.length == 0) {
+                    break
                 }
 
                 val randIx = RandomGen.rand.nextInt(candidTBs.length)
@@ -148,7 +154,7 @@ abstract class TestEngine extends BundleGenHelper {
                     println(s"0. Adding ${randomTBinPool.getInstid()}, robIdx ${robIndex} to the pool")
                     advRobIdx()
                 }
-            }
+            } }
 
             // TODO 1.2. Randomly choose one among TestCases
             //  TODO 1.2.1. Randomly redirect and remove 
