@@ -275,7 +275,7 @@ class VAlu(implicit p: Parameters) extends VFuModule {
    */
   val old_cmpOutResult = Reg(UInt(128.W))
   val cmpOutResult = old_cmpOutResult & cmpOutOff | cmpOutKeep // Compare and carry-out instrns
-  when (RegNext(valid)) { old_cmpOutResult := cmpOutResult }
+  when (RegNext(valid && narrow_to_1)) { old_cmpOutResult := cmpOutResult }
   io.out.valid := RegNext(Mux(narrow_to_1, uopEnd && valid, valid), init = false.B)
 
   /**
