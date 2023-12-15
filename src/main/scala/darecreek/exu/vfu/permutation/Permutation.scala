@@ -6,6 +6,7 @@ import darecreek.exu.vfu._
 // import darecreek.exu.vfu.VFUParam._
 import chipsalliance.rocketchip.config._
 import xiangshan.Redirect
+import darecreek.exu.vfu.fp.VFPU
 
 class Permutation(implicit p: Parameters) extends VFuModule {
   val io = IO(new Bundle {
@@ -20,7 +21,6 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   val vm = io.in.uop.ctrl.vm
   val vs1_imm = io.in.uop.ctrl.vs1_imm
   val vsew = io.in.uop.info.vsew
-  val rs1 = io.in.rs1
   val vs1_preg_idx = io.in.vs1_preg_idx
   val vs2_preg_idx = io.in.vs2_preg_idx
   val old_vd_preg_idx = io.in.old_vd_preg_idx
@@ -33,7 +33,6 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   val uop_valid = io.in.uop_valid && !io.out.perm_busy
   val rdata = io.in.rdata
   val rvalid = io.in.rvalid
-  val rs1_imm = Mux(ctrl.vi, Cat(0.U(59.W), vs1_imm), rs1)
 
   val vslideup_vx = (funct6 === "b001110".U) && (funct3 === "b100".U)
   val vslideup_vi = (funct6 === "b001110".U) && (funct3 === "b011".U)
@@ -58,6 +57,12 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   val vrgather16_sew64 = vrgather16 && (vsew === 3.U)
   val vslide = vslideup || vslidedn || vslide1up || vslide1dn
   val vrgather = vrgather_vv || vrgather_vxi || vrgather16
+
+  val perm_fp = vfslide1up_vf || vfslide1dn_vf
+  val ftype = VFPU.getTypeTagFromVSEW(vsew)
+  val rs1_fp = VFPU.unbox(io.in.rs1, ftype)
+  val rs1 = Mux(perm_fp, rs1_fp, io.in.rs1)
+  val rs1_imm = Mux(ctrl.vi, Cat(0.U(59.W), vs1_imm), rs1)
 
   val funct6_reg = RegInit(0.U(6.W))
   val funct3_reg = RegInit(0.U(3.W))
