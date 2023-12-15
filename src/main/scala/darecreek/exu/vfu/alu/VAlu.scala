@@ -73,6 +73,7 @@ class VIntFixpAlu64b(implicit p: Parameters) extends VFuModule {
     val isFixp = Input(Bool())
     val isMisc = Input(Bool())
     val isSub = Input(Bool())  // subtract (exclude vrsub)
+    val fs1 = Input(UInt(FLEN.W)) // for vfmv.s.f
 
     val vd = Output(UInt(64.W))
     val narrowVd = Output(UInt(32.W))
@@ -109,6 +110,7 @@ class VIntFixpAlu64b(implicit p: Parameters) extends VFuModule {
   vIntMisc64b.io.vs1 := io.vs1
   vIntMisc64b.io.vs2 := io.vs2_misc
   vIntMisc64b.io.vmask := io.vmask
+  vIntMisc64b.io.fs1 := io.fs1
 
   val vdAdderS1 = RegEnable(vIntAdder64b.io.vd, io.valid)
   val vdMiscS1 = RegEnable(vIntMisc64b.io.vd, io.valid)
@@ -173,6 +175,7 @@ class VAlu(implicit p: Parameters) extends VFuModule {
     vIntFixpAlu64bs(i).io.vi := io.in.bits.uop.ctrl.vi
     vIntFixpAlu64bs(i).io.vm := io.in.bits.uop.ctrl.vm
     vIntFixpAlu64bs(i).io.vs1_imm := io.in.bits.uop.ctrl.vs1_imm
+    vIntFixpAlu64bs(i).io.fs1:= io.in.bits.rs1(FLEN-1, 0)
     vIntFixpAlu64bs(i).io.ma := io.in.bits.uop.info.ma
     vIntFixpAlu64bs(i).io.widen := io.in.bits.uop.ctrl.widen
     vIntFixpAlu64bs(i).io.widen2 := io.in.bits.uop.ctrl.widen2

@@ -144,7 +144,7 @@ class LaneVAlu(implicit p: Parameters) extends VFuModule {
   vIntMisc.io.vs1 := vs1_rs1_imm
   vIntMisc.io.vs2 := io.in.bits.vs2
   vIntMisc.io.vmask := io.in.bits.mask
-
+  vIntMisc.io.fs1:= io.in.bits.rs1(FLEN-1, 0)
 
   //------------------------------------
   //-------- Mask/Tail data gen --------
