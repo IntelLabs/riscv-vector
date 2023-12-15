@@ -52,7 +52,7 @@ abstract class TestBehavior(filename : String, val ctrl : CtrlBundle, sign : Str
     // change depending on test behavior =================================
     def getTargetTestEngine(): Int = TestEngine.ALU_TEST_ENGINE
     def isOrdered(): Boolean = {
-        println(s"!!!!!!!! $instid not specified isOrdered")
+        // println(s"!!!!!!!! $instid not specified isOrdered")
         false
     }
     // ====================================================================

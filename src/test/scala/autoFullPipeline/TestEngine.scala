@@ -89,7 +89,7 @@ abstract class TestEngine extends BundleGenHelper {
     }
 
     def runThroughTBs(
-        dut:Module, tbs:Seq[TestBehavior], 
+        dut:Module, tbs:Seq[TestBehavior], orderedTbs:Seq[TestBehavior],
         MAX_PARA_INSTS: Int = 3, MAX_PARA_TESTCASES: Int = 6
     ) : Unit = {
         
@@ -97,15 +97,15 @@ abstract class TestEngine extends BundleGenHelper {
         var exhaustedCount : Int = 0
 
         var tbIx : Int = 0
-        var testBehaviorPool : Seq[TestBehavior] = Seq()
+        var testBehaviorPool : Seq[TestBehavior] = tbs ++ orderedTbs
         var failedTBs : Map[Int, TestBehavior] = Map()
 
 
         while(true) {
         breakable{
             if (
-                tbIx >= tbs.length 
-                && testBehaviorPool.length == 0
+                //tbIx >= tbs.length &&
+                testBehaviorPool.length == 0
                 && curTestCasePool.isEmpty
             ) {
                 // no more test case and test behavior
@@ -113,21 +113,32 @@ abstract class TestEngine extends BundleGenHelper {
             }
             
             // refill test behavior
-            while (
+            /*while (
                 testBehaviorPool.length < MAX_PARA_TESTCASES &&
                 tbIx < tbs.length
             ) {
                 testBehaviorPool :+= tbs(tbIx)
                 tbIx += 1
-            }
+            }*/
 
             // refill test case
             while (
                 (curTestCasePool.size - exhaustedCount) < MAX_PARA_TESTCASES &&
                 testBehaviorPool.length > 0
             ) {
-                val randIx = RandomGen.rand.nextInt(testBehaviorPool.length)
-                val randomTBinPool = testBehaviorPool(randIx)
+                var candidTBs : Seq[TestBehavior] = Seq()
+                val orderedTestCases = curTestCasePool.filter(_._2._1.isOrdered())
+                if (orderedTestCases.size == 0) {
+                    candidTBs = testBehaviorPool.filter(_.isOrdered())
+                }
+
+                if (orderedTestCases.size != 0 || candidTBs.length == 0) {
+                    candidTBs = testBehaviorPool.filter(!_.isOrdered())
+                }
+
+                val randIx = RandomGen.rand.nextInt(candidTBs.length)
+                val randomTBinPool = candidTBs(randIx)
+
                 if (randomTBinPool.isFinished()) {
                     testBehaviorPool = testBehaviorPool.filterNot(_ == randomTBinPool)
                 } else {
@@ -299,12 +310,14 @@ abstract class TestEngine extends BundleGenHelper {
     def run(dut:Module) = {
 
         // TODO 11.1: Add redirect later..
-        this.runThroughTBs(dut, this.normalModeTBs)
-        println("TestEngine: All normal mode instructions are tested")
+        if (this.normalModeTBs.length > 0) {
+            this.runThroughTBs(dut, this.normalModeTBs, this.orderedTBs)
+            println("TestEngine: All normal mode instructions are tested")
+        } else {
+            println("Starting Tests for Ordered Instructions ============================")
 
-        println("Starting Tests for Ordered Instructions ============================")
-
-        this.runThroughTBs(dut, this.orderedTBs, 1, 1)
+            this.runThroughTBs(dut, Seq(), this.orderedTBs, 1, 1)
+        }
 
         println("TestEngine: All ordered mode instructions are tested")
     }
