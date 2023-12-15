@@ -943,7 +943,7 @@ trait VAluBehavior {
           genVAluOutput("hffffffffb851ea82"), //vfmvfs handmade
           genVAluOutput("hb851ea9eb851ea82"), //vfmvfs handmade
           genVAluOutput("hffffffffb851ea82"), //vfmvfs handmade
-          genVAluOutput("hffffffffffffffffffffffffb851ea82"), //vfmvsf handmade
+          genVAluOutput("hffffffffffffffffffffffff7fc00000"), //vfmvsf handmade
           genVAluOutput("h1122"), //vfmvsf handmade
           genVAluOutput("hffffffffffffffffb851ea9eb851ea82"), //vfmvsf handmade
           genVAluOutput("h3579bdf93579bdf82345678123456780"), //vmv<nr>r handmade
