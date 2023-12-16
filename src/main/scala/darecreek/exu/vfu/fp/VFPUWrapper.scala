@@ -555,7 +555,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
 
   val old_cmpOutResult = RegInit(0.U(128.W))
   val cmpOutResult = Mux(io.out.bits.uop.uopIdx === 0.U, cmpOutKeep, old_cmpOutResult & cmpOutOff | cmpOutKeep) // Compare
-  when(fpu(0).io.out.valid) {
+  when(io.out.bits.uop.ctrl.narrow_to_1 && fpu(0).io.out.valid) {
     old_cmpOutResult := cmpOutResult
   }
 
@@ -589,13 +589,15 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
     red_fflag := red_fflag | fpu(0).io.out.bits.fflags
   }
 
-  when(io.out.valid && io.out.ready) {
-    old_cmp_fflag := 0.U
-  }.elsewhen(fpu(0).io.out.valid & !red_busy) {
-    when(io.out.bits.uop.uopIdx === 0.U) {
-      old_cmp_fflag := fpu(0).io.out.bits.fflags | fpu(1).io.out.bits.fflags
-    }.otherwise {
-      old_cmp_fflag := old_cmp_fflag | fpu(0).io.out.bits.fflags | fpu(1).io.out.bits.fflags
+  when(io.out.bits.uop.ctrl.narrow_to_1) {
+    when(io.out.valid && io.out.ready) {
+      old_cmp_fflag := 0.U
+    }.elsewhen(fpu(0).io.out.valid & !red_busy) {
+      when(io.out.bits.uop.uopIdx === 0.U) {
+        old_cmp_fflag := fpu(0).io.out.bits.fflags | fpu(1).io.out.bits.fflags
+      }.otherwise {
+        old_cmp_fflag := old_cmp_fflag | fpu(0).io.out.bits.fflags | fpu(1).io.out.bits.fflags
+      }
     }
   }
 
