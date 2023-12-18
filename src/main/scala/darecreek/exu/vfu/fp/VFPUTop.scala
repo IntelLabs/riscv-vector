@@ -20,6 +20,7 @@ class VFPUTop(implicit val p: Parameters)
   val fpu_ready = Wire(Bool())
   val inputGen = Module(new VFInputGenFP)
   inputGen.io.in.bits := io.in.bits
+  inputGen.io.redirect := io.redirect
   inputGen.io.in.valid := io.in.valid
   inputGen.io.out.ready := fpu_ready
   io.in.ready := inputGen.io.in.ready
@@ -74,9 +75,9 @@ class VFPUTop(implicit val p: Parameters)
   outArbiter.io.out.ready := rdyVec(0)
 
 
-//  val fpu_out = Reg(new LaneFUOutput)
-//  outArbiter.io.out.bits.outputToLaneFU(fpu_out)
-//  io.out.bits := fpu_out
+  //  val fpu_out = Reg(new LaneFUOutput)
+  //  outArbiter.io.out.bits.outputToLaneFU(fpu_out)
+  //  io.out.bits := fpu_out
   io.out.bits.uop := RegEnable(fpu_out_w.uop, regEnable(1))
   io.out.bits.vd := RegEnable(outArbiter.io.out.bits.vd, 0.U, regEnable(1))
   io.out.bits.fflags := RegEnable(outArbiter.io.out.bits.fflags, 0.U, regEnable(1))
@@ -185,6 +186,7 @@ class VFInputGen(implicit val p: Parameters) extends VFPUBaseModule {
 class VFInputGenFP(implicit val p: Parameters) extends VFPUBaseModule {
   val io = IO(new Bundle() {
     val in = Flipped(DecoupledIO(new LaneFUInput))
+    val redirect = Input(ValidIO(new Redirect))
     val out = DecoupledIO(new LaneFloatFUIn)
   })
 
@@ -206,13 +208,12 @@ class VFInputGenFP(implicit val p: Parameters) extends VFPUBaseModule {
   def latency = 1
 
 
-  val validVec = (io.in.valid) +: Array.fill(latency)(RegInit(false.B))
+  val validVec = io.in.valid +: Array.fill(latency)(RegInit(false.B))
   val rdyVec = Array.fill(latency)(Wire(Bool())) :+ io.out.ready
-  // val uopVec = io.in.bits.uop +: Array.fill(latency)(Reg(new VExpdUOp))
- // val flushVec = validVec.zip(uopVec).map(x => x._1 && x._2.sysUop.robIdx.needFlush(io.redirect))
+  val uopVec = io.in.bits.uop +: Array.fill(latency)(Reg(new VExpdUOp))
+  val flushVec = validVec.zip(uopVec).map(x => x._1 && x._2.sysUop.robIdx.needFlush(io.redirect))
 
-  // def regEnable(i: Int): Bool = validVec(i - 1) && rdyVec(i - 1) && !flushVec(i - 1)
-  def regEnable(i: Int): Bool = validVec(i - 1) && rdyVec(i - 1)
+  def regEnable(i: Int): Bool = validVec(i - 1) && rdyVec(i - 1) && !flushVec(i - 1)
 
   for (i <- 0 until latency) {
     rdyVec(i) := !validVec(i + 1) || rdyVec(i + 1)
@@ -221,12 +222,14 @@ class VFInputGenFP(implicit val p: Parameters) extends VFPUBaseModule {
   for (i <- 1 to latency) {
     when(regEnable(i)) {
       validVec(i) := validVec(i - 1)
-     // uopVec(i) := uopVec(i - 1)
-    // }.elsewhen(flushVec(i) || rdyVec(i)) {
-    }.elsewhen(rdyVec(i)) {
+      uopVec(i) := uopVec(i - 1)
+    }.elsewhen(flushVec(i) || rdyVec(i)) {
       validVec(i) := false.B
     }
   }
+
+  io.out.valid := validVec.last & !io.out.bits.uop.sysUop.robIdx.needFlush(io.redirect)
+  io.in.ready := rdyVec(0)
 
   //---- vstart >= vl ----
   val vstart_gte_vl = io.in.bits.uop.info.vstart >= io.in.bits.uop.info.vl
@@ -242,18 +245,18 @@ class VFInputGenFP(implicit val p: Parameters) extends VFPUBaseModule {
   maskGen.io.opi := false.B
 
   val fuop = Reg(new LaneFloatFUIn)
-  when (regEnable(1)) {fuop.connectFromLaneFUInput(io.in.bits)}
+  when(regEnable(1)) {
+    fuop.connectFromLaneFUInput(io.in.bits)
+  }
 
   io.out.bits := fuop
   io.out.bits.uop.typeTag := RegEnable(typeTag, regEnable(1))
   io.out.bits.uop.vfpCtrl := RegEnable(vfpCtrl, regEnable(1))
   io.out.bits.uop.fWidenEnd := false.B // default false
   io.out.bits.vs1 := RegEnable(rs1Expd, regEnable(1))
-  io.out.bits.uop.maskKeep := RegEnable(Mux(isCmp, maskGen.io.maskKeep_cmp, maskGen.io.maskKeep), regEnable(1))
-  io.out.bits.uop.maskOff := RegEnable(Mux(isCmp, maskGen.io.maskOff_cmp, maskGen.io.maskOff), regEnable(1))
+  io.out.bits.uop.maskKeep := RegEnable(Mux(isCmp & !vstart_gte_vl, maskGen.io.maskKeep_cmp, maskGen.io.maskKeep), regEnable(1))
+  io.out.bits.uop.maskOff := RegEnable(Mux(isCmp & !vstart_gte_vl, maskGen.io.maskOff_cmp, maskGen.io.maskOff), regEnable(1))
 
-  io.out.valid := validVec.last
-  io.in.ready := rdyVec(0)
 
   def isCmp: Bool = {
     io.in.bits.uop.ctrl.funct6(5, 3) === "b011".U

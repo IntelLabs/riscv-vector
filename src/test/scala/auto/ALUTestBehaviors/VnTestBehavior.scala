@@ -72,21 +72,18 @@ class VnTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String, 
             val sewIndex = n_inputs - 1 - (j / 2)
             val sew2Index = n_ops - 1 - j
             var oldvd = oldvddata(sewIndex)
-            /* if(j % 2 == 0) 
-            oldvd = oldvddata(sewIndex) */
+            /*if(j % 2 == 0) 
+                oldvd = oldvddata(sewIndex)*/
             
-            println(s"vs2data(sew2Index) ${vs2data(sew2Index)}, sew2Index ${sew2Index}")
+            // println(s"vs2data(sew2Index) ${vs2data(sew2Index)}, sew2Index ${sew2Index}")
             var srcBundle = SrcBundle(
                     vs2=vs2data(sew2Index), 
                     old_vd=oldvd,
                     mask=mask(0))
             if (vx) srcBundle.rs1=vs1data(0)
             if (vv) srcBundle.vs1=vs1data(sewIndex)
-            dut.io.out.ready.poke(true.B)
-            dut.io.in.valid.poke(true.B)
-            dut.io.in.bits.poke(genVFuInput(
-                srcBundle, 
-                ctrl.copy(
+            val uopIdx = j
+            val ctrlBundle = ctrl.copy(
                     vsew=vsew,
                     vs1_imm=getImm(simi),
                     narrow=true,
@@ -95,25 +92,47 @@ class VnTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String, 
                     ma = (simi.get("ma").get.toInt == 1),
                     ta = (simi.get("ta").get.toInt == 1),
                     vm = (simi.get("vm").get.toInt == 1),
-                    uopIdx=j,
+                    uopIdx=uopIdx,
                     vxrm = vxrm,
                     vstart = getVstart(simi)
                 )
+
+            dut.io.out.ready.poke(true.B)
+            dut.io.in.valid.poke(true.B)
+            dut.io.in.bits.poke(genVFuInput(
+                srcBundle, 
+                ctrlBundle
             ))
+            // println(s"uopIdx ${j}, ctrlBundle: \n .. ${ctrlBundle}")
             dut.clock.step(1)
             finalVxsat = finalVxsat || dut.io.out.bits.vxsat.peek().litValue == 1
             vd = dut.io.out.bits.vd.peek().litValue
-            vdres = f"h$vd%032x".equals(expectvd(sewIndex))
-            if (j % 2 == 1 || (n_ops == 1)) {
-                // compare when it's odd uopidx or it has only one uop
-                Logger.printvds(f"h$vd%032x", expectvd(sewIndex))
-                if (!vdres) dump(simi, f"h$vd%032x", expectvd(sewIndex))
-                assert(vdres)
+
+            val expectvdIdx = uopIdx / 2
+            val lower = uopIdx % 2 == 0
+            var goldenvd = ""
+            // var vd = dut.io.out.bits.vd.peek().litValue
+            var dutvd = f"h$vd%032x"
+            
+            if (vflmul != "0.250000" && 
+                vflmul != "0.500000" && 
+                vflmul != "0.125000") {
+                
+                goldenvd = expectvd((n_ops / 2) - 1 - expectvdIdx)
+                if (lower) {
+                    goldenvd = s"h${goldenvd.slice(17, 33)}"
+                    dutvd = s"h${dutvd.slice(17, 33)}"
+                } else {
+                    goldenvd = s"h${goldenvd.slice(1, 17)}"
+                    dutvd = s"h${dutvd.slice(1, 17)}"
+                }
+            }else {
+                goldenvd = expectvd(0)
             }
-
-            /*if (j % 2 == 0)
-                prevVd = f"h$vd%032x"*/
-
+            vdres = dutvd.equals(goldenvd)
+            Logger.printvds(dutvd, goldenvd)
+            if (!vdres) dump(simi, dutvd, goldenvd)
+            assert(vdres)
         }
         if(useVxsat) {
             if (finalVxsat != vxsat) dump(simi, s"(vxsat) ${finalVxsat}", s"(vxsat) ${vxsat}")

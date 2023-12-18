@@ -13,10 +13,10 @@ import darecreek.exu.vfu.VInstructions._
 import chipsalliance.rocketchip.config.Parameters
 
 class VmadcvvTestBehavior extends VmadcsbcTestBehavior("vmadc.vv.data", ctrlBundles.vmadc_vv, "u", "vmadc_vv") {}
-class VmadcvvmTestBehavior extends VmadcsbcTestBehavior("vmadc.vvm.data", ctrlBundles.vmadc_vvm, "u", "vmadc_vvm", _vm = Option(false)) {}
+class VmadcvvmTestBehavior extends VmadcsbcTestBehavior("vmadc.vvm.data", ctrlBundles.vmadc_vvm, "u", "vmadc_vvm") {}
 
 class VmsbcvvTestBehavior extends VmadcsbcTestBehavior("vmsbc.vv.data", ctrlBundles.vmsbc_vv, "u", "vmsbc_vv") {}
-class VmsbcvvmTestBehavior extends VmadcsbcTestBehavior("vmsbc.vvm.data", ctrlBundles.vmsbc_vvm, "u", "vmsbc_vvm", _vm = Option(false)) {}
+class VmsbcvvmTestBehavior extends VmadcsbcTestBehavior("vmsbc.vvm.data", ctrlBundles.vmsbc_vvm, "u", "vmsbc_vvm") {}
 
 class VmseqvvTestBehavior extends VmadcsbcTestBehavior("vmseq.vv.data", ctrlBundles.vmseq_vv, "u", "vmseq_vv") {}
 class VmsnevvTestBehavior extends VmadcsbcTestBehavior("vmsne.vv.data", ctrlBundles.vmsne_vv, "u", "vmsne_vv") {}
@@ -30,10 +30,10 @@ class VmsgtuvxTestBehavior extends VmadcsbcTestBehavior("vmsgtu.vx.data", ctrlBu
 class VmsgtvxTestBehavior extends VmadcsbcTestBehavior("vmsgt.vx.data", ctrlBundles.vmsgt_vx, "s", "vmsgt_vx") {}
 
 class VmadcvxTestBehavior extends VmadcsbcTestBehavior("vmadc.vx.data", ctrlBundles.vmadc_vx, "u", "vmadc_vx") {}
-class VmadcvxmTestBehavior extends VmadcsbcTestBehavior("vmadc.vxm.data", ctrlBundles.vmadc_vxm, "u", "vmadc_vxm", _vm = Option(false)) {}
+class VmadcvxmTestBehavior extends VmadcsbcTestBehavior("vmadc.vxm.data", ctrlBundles.vmadc_vxm, "u", "vmadc_vxm") {}
 
 class VmsbcvxTestBehavior extends VmadcsbcTestBehavior("vmsbc.vx.data", ctrlBundles.vmsbc_vx, "u", "vmsbc_vx") {}
-class VmsbcvxmTestBehavior extends VmadcsbcTestBehavior("vmsbc.vxm.data", ctrlBundles.vmsbc_vxm, "u", "vmsbc_vxm", _vm = Option(false)) {}
+class VmsbcvxmTestBehavior extends VmadcsbcTestBehavior("vmsbc.vxm.data", ctrlBundles.vmsbc_vxm, "u", "vmsbc_vxm") {}
 
 class VmseqvxTestBehavior extends VmadcsbcTestBehavior("vmseq.vx.data", ctrlBundles.vmseq_vx, "u", "vmseq_vx") {}
 class VmsnevxTestBehavior extends VmadcsbcTestBehavior("vmsne.vx.data", ctrlBundles.vmsne_vx, "u", "vmsne_vx") {}
@@ -51,7 +51,7 @@ class VmsneviTestBehavior extends VmadcsbcTestBehavior("vmsne.vi.data", ctrlBund
 class VmsleviTestBehavior extends VmadcsbcTestBehavior("vmsle.vi.data", ctrlBundles.vmsle_vi, "s", "vmsle_vi") {}
 
 class VmadcviTestBehavior extends VmadcsbcTestBehavior("vmadc.vi.data", ctrlBundles.vmadc_vi, "u", "vmadc_vi") {}
-class VmadcvimTestBehavior extends VmadcsbcTestBehavior("vmadc.vim.data", ctrlBundles.vmadc_vim, "u", "vmadc_vim", _vm = Option(false)) {}
+class VmadcvimTestBehavior extends VmadcsbcTestBehavior("vmadc.vim.data", ctrlBundles.vmadc_vim, "u", "vmadc_vim") {}
 
 
 class VmadcsbcTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String, 
@@ -104,7 +104,7 @@ class VmadcsbcTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : St
             var srcBundle = SrcBundle(
                 vs2=vs2data(reversej),
                 // old_vd=prevVd
-                old_vd=oldvddata(reversej)
+                old_vd=oldvddata(n_ops - 1)
             )
             if (vx) srcBundle.rs1 = vs1data(0)
             if (vv) srcBundle.vs1 = vs1data(reversej)

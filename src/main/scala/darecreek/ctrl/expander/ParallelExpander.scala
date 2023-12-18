@@ -19,12 +19,24 @@ import darecreek.lsu._
 /** Parallel ordered expanding method for renaming
   * parallel input --> calc expanded length --> expd len accumulator --> expander --> RF addrs update --> parallel output
   * First version: insert pipeline regs between accumulator and expander
+  * 
+  * Example of one vadd (lmul=4) and one vsub (lmul=4) instruction (assume VRenameWidth = 2):
+  *          clock1   clock2      clock3      clock4      clock5
+  * Input0   vadd
+  * Input1   vsub
+  * Output0          vadd_expd0  vadd_expd2  vsub_expd0  vsub_expd2
+  * Output1          vadd_expd1  vadd_expd3  vsub_expd1  vsub_expd3
+  * 
+  * Example of one vadd (lmul=1) and one vsub (lmul=2) instruction (assume VRenameWidth = 2):
+  *          clock1   clock2      clock3    
+  * Input0   vadd
+  * Input1   vsub
+  * Output0          vadd_expd0  vsub_expd1
+  * Output1          vsub_expd0  n/a
   *
   * Requirement: inputs valid must be consecutive
   * Others: all inputs of io.in share one 'ready'. 'Ready' of all outputs are from one source.
-  * 
   */
-
 class ParallelExpander extends Module {
   val io = IO(new Bundle {
     val in = Vec(VRenameWidth, Flipped(Decoupled(new VMicroOp)))
@@ -51,35 +63,31 @@ class ParallelExpander extends Module {
     * Calculate expanded length
     */
   val expdLen = Wire(Vec(VRenameWidth, UInt(4.W)))
-  val destEew = Wire(Vec(VRenameWidth, UInt(3.W)))
+  val veewVd = io.in.map(_.bits.info.destEew)
+  val emulVd = io.in.map(_.bits.info.emulVd)
+  val emulVs2 = io.in.map(_.bits.info.emulVs2)
   val lmul = Wire(Vec(VRenameWidth, UInt(4.W)))
-  val veew = Wire(Vec(VRenameWidth, UInt(3.W)))
+  // val veew = Wire(Vec(VRenameWidth, UInt(3.W)))
   val veew_minus_vsew = Wire(Vec(VRenameWidth, UInt(3.W)))
-  val vemul = Wire(Vec(VRenameWidth, UInt(3.W)))
-  val emul = Wire(Vec(VRenameWidth, UInt(4.W)))
   val ldstCtrl = Wire(Vec(VRenameWidth, new LdstCtrl))
   val expdLen_indexVd = Wire(Vec(VRenameWidth, UInt(4.W)))
   for (i <- 0 until VRenameWidth) {
     lmul(i) := Vlmul_to_lmul(info(i).vlmul)
-    // EMUL = (EEW/SEW)*LMUL
-    veew(i) := Cat(false.B, ctrl(i).funct3(1,0)) //!! Only for ld/st !!
-    veew_minus_vsew(i) := veew(i) - info(i).vsew
-    vemul(i) := info(i).vlmul + veew_minus_vsew(i)
-    emul(i) := Vlmul_to_lmul(vemul(i))
+    veew_minus_vsew(i) := veewVd(i) - info(i).vsew
     ldstCtrl(i) := LdstDecoder(ctrl(i).funct6, ctrl(i).lsrc(1))
 
     val nf_ldst = Wire(UInt(4.W))
     nf_ldst := ctrl(i).funct6(5,3) +& 1.U
     // For ld/st indexed and segment-indexed instrns, the final expdLen is the larger of data and indices 
-    val expdLen_ldst = Mux(ldstCtrl(i).wholeReg, nf_ldst,
-                       Mux(ldstCtrl(i).indexed, Mux(veew_minus_vsew(i)(2), lmul(i), emul(i)),
-                           emul(i)))
+    val expdLen_ldst = Mux(ldstCtrl(i).wholeReg, emulVd(i),
+                       Mux(ldstCtrl(i).indexed, Mux(veew_minus_vsew(i)(2), lmul(i), emulVd(i)),
+                           emulVd(i)))
     val expdLen_segVd = Wire(UInt(4.W))
     expdLen_segVd := lmul(i) * nf_ldst
-    val expdLen_segVs2 = emul(i)
+    val expdLen_segVs2 = emulVs2(i)
     val expdLen_seg = Mux(expdLen_segVd > expdLen_segVs2, expdLen_segVd, expdLen_segVs2)
     // For ld/st indexed and segment-indexed instrns, the pdestVal should stop at expd_len of vd
-    expdLen_indexVd(i) := Mux(ldstCtrl(i).segment, expdLen_segVd, emul(i))
+    expdLen_indexVd(i) := Mux(ldstCtrl(i).segment, expdLen_segVd, emulVd(i))
     val perm_vmv_vfmv = ctrl(i).perm && ctrl(i).funct6 === "b010000".U
                                                  // 15.1     or      //15.4/5/6: vmsb(o/i)f
     val mask_onlyOneReg = ctrl(i).mask && (ctrl(i).funct6(3) || ctrl(i).funct6(2) && !ctrl(i).lsrc(0)(4))
@@ -94,14 +102,6 @@ class ParallelExpander extends Module {
       expdLen(i) := ctrl(i).lsrc(0)(2, 0) +& 1.U
     }.otherwise {
       expdLen(i) := lmul(i)
-    }
-    //---- destEew ----
-    when (ctrl(i).widen || ctrl(i).widen2) {
-      destEew(i) := info(i).vsew + 1.U
-    }.elsewhen (ctrl(i).isLdst && !ldstCtrl(i).indexed) {
-      destEew(i) := veew(i)
-    }.otherwise {
-      destEew(i) := info(i).vsew
     }
   }
 
@@ -137,7 +137,7 @@ class ParallelExpander extends Module {
   val io_in_updateDestEew = Wire(Vec(VRenameWidth, new VMicroOp))
   for (i <- 0 until VRenameWidth) {
     io_in_updateDestEew(i) := io.in(i).bits
-    io_in_updateDestEew(i).info.destEew := destEew(i)
+    io_in_updateDestEew(i).info.destEew := veewVd(i)
   }
   val expdIn = io_in_updateDestEew.map(x => RegEnable(x, fire))
   val expdLenReg = RegEnable(expdLen, fire)
@@ -177,12 +177,6 @@ class ParallelExpander extends Module {
     io.out(i).valid := state === BUSY && expdOutValid(i)
     val ctrl = expdOut(i).ctrl
     val info = expdOut(i).info
-
-    // // Reg addr increment of EEW part reg
-    // val eewSide_inc = Mux(veew_minus_vsew_out(i) === 5.U, 0.U,
-    //                Mux(veew_minus_vsew_out(i) === 6.U, expdIdx(i) >> 2,
-    //                Mux(veew_minus_vsew_out(i) === 7.U, expdIdx(i) >> 1,
-    //                    expdIdx(i))))
     
     // out lsrc(1), which is vs2
     val lsrc1_inc = Wire(UInt(3.W))
@@ -234,7 +228,6 @@ class ParallelExpander extends Module {
     val needOldVd = (maskNeedOldVd || tailNeedOldVd || info.vstart =/= 0.U || slideUpOffset) && !noWriteback
 
     io.out(i).bits.lsrcValExpd(2) := ctrl.lsrcVal(2) || needOldVd
-
 
     // Reg addr increment of SEW part reg
     val sewSide_inc = Mux(veew_minus_vsew_out(i) === 3.U, 0.U,
@@ -292,6 +285,4 @@ class ParallelExpander extends Module {
   // when (io.out(0).fire) {
   //   debugCnt := debugCnt + 1.U
   // }
-
-
 }

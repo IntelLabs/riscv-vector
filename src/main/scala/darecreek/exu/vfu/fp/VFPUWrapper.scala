@@ -50,14 +50,19 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   // val vfwredusum_vs = (funct6 === "b110001".U) && (funct3 === "b001".U)
   val vfwredusum_vs = false.B
 
+  val reg_vfredosum_vs = RegEnable(vfredosum_vs, false.B, fire)
+  val reg_vfredusum_vs = RegEnable(vfredusum_vs, false.B, fire)
+  val reg_vfredmax_vs = RegEnable(vfredmax_vs, false.B, fire)
+  val reg_vfredmin_vs = RegEnable(vfredmin_vs, false.B, fire)
+  val reg_vfwredosum_vs = RegEnable(vfwredosum_vs, false.B, fire)
+  val reg_vfwredusum_vs = RegEnable(vfwredusum_vs, false.B, fire)
+
   val fpu_red = vfredosum_vs ||
     vfredusum_vs ||
     vfredmax_vs ||
     vfredmin_vs ||
     vfwredosum_vs ||
     vfwredusum_vs
-
-  val fpu_red_osum = vfredosum_vs || vfwredosum_vs
 
   val widen2 = Mux(vfwredosum_vs || vfwredusum_vs, true.B, io.in.bits.uop.ctrl.widen2)
 
@@ -167,8 +172,10 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
 
   val expdIdxZero = RegInit(false.B)
   val output_en = RegInit(false.B)
-  when(fire && fpu_red) {
-    when(uopEnd) {
+  when(flush) {
+    output_en := false.B
+  }.elsewhen(fire) {
+    when(fpu_red && uopEnd) {
       output_en := true.B
     }.otherwise {
       output_en := false.B
@@ -284,7 +291,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
 
   when(flush) {
     vs1_zero_bypass := false.B
-  }.elsewhen(fpu_red_osum && fire && !vm && !(vmask_vl.orR)) {
+  }.elsewhen(fpu_red && fire && !vm && !(vmask_vl.orR)) {
     vs1_zero_bypass := true.B
   }.elsewhen(output_valid) {
     vs1_zero_bypass := false.B
@@ -324,7 +331,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   val red_uop = Reg(new VExpdUOp)
   red_in_valid := (fpu_valid || ((red_state === calc_vs2) && red_out_valid)) & !flush & !red_uop.sysUop.robIdx.needFlush(io.redirect)
 
-  when(vfredosum_vs || vfwredosum_vs || vfwredusum_vs) {
+  when(reg_vfredosum_vs || reg_vfwredosum_vs || reg_vfwredusum_vs) {
     when(vs2_rnd0) {
       red_vs2_bits := red_vs1_zero
     }.otherwise {
@@ -435,7 +442,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
 
   val fpu = Seq.fill(NLanes)(Module(new VFPUTop))
   for (i <- 0 until NLanes / 2) {
-    fpu(i).io.in.valid := (io.in.valid & !fpu_red) || red_in_valid
+    fpu(i).io.in.valid := (io.in.valid & !fpu_red & !red_busy) || red_in_valid
     fpu(i).io.in.bits.uop.ctrl.lsrc(0) := Mux(red_in_valid, red_in(i).uop.ctrl.lsrc(0), vs1_imm)
     fpu(i).io.in.bits.uop.ctrl.lsrc(1) := Mux(red_in_valid, red_in(i).uop.ctrl.lsrc(1), 0.U)
     fpu(i).io.in.bits.uop.ctrl.ldest := Mux(red_in_valid, red_in(i).uop.ctrl.ldest, 0.U)
@@ -477,7 +484,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   }
 
   for (i <- NLanes / 2 until NLanes) {
-    fpu(i).io.in.valid := io.in.valid & !fpu_red
+    fpu(i).io.in.valid := io.in.valid & !fpu_red & !red_busy
     fpu(i).io.in.bits.uop.ctrl.lsrc(0) := vs1_imm
     fpu(i).io.in.bits.uop.ctrl.lsrc(1) := 0.U
     fpu(i).io.in.bits.uop.ctrl.ldest := 0.U
@@ -541,9 +548,9 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   cmpOutOff := ~(cmpOutOff128b << shiftCmpOut)
 
   val old_cmpOutResult = RegInit(0.U(128.W))
-  val cmpOutResult = old_cmpOutResult & cmpOutOff | cmpOutKeep // Compare
+  val cmpOutResult = Mux(io.out.bits.uop.uopIdx === 0.U, cmpOutKeep, old_cmpOutResult & cmpOutOff | cmpOutKeep) // Compare
   when(fpu(0).io.out.valid) {
-    old_cmpOutResult := Mux(io.out.bits.uop.uopEnd, 0.U, cmpOutResult)
+    old_cmpOutResult := cmpOutResult
   }
 
   val old_vd_vl_mask = Wire(UInt(VLEN.W))
@@ -578,11 +585,14 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   when(io.out.valid && io.out.ready) {
     cmp_fflag := 0.U
   }.elsewhen(fpu(0).io.out.valid & !red_busy) {
-    cmp_fflag := cmp_fflag | fpu(0).io.out.bits.fflags | fpu(1).io.out.bits.fflags
+    when(io.out.bits.uop.uopIdx === 0.U) {
+      cmp_fflag := fpu(0).io.out.bits.fflags | fpu(1).io.out.bits.fflags
+    }.otherwise {
+      cmp_fflag := cmp_fflag | fpu(0).io.out.bits.fflags | fpu(1).io.out.bits.fflags
+    }
   }
 
-  io.out.bits.vd := Mux(output_en, output_data, Mux(io.out.bits.uop.ctrl.narrow_to_1, cmp_tail_vd, Mux(io.out.bits.uop.ctrl.narrow, narrow_tail_vd, normal_tail_vd)))
-  // io.in.ready := fpu(0).io.in.ready & fpu(1).io.in.ready & io.out.ready & !red_busy
+  io.out.bits.vd := Mux(output_en, output_data, Mux(io.out.bits.uop.ctrl.narrow_to_1 & !vstart_gte_vl, cmp_tail_vd, Mux(io.out.bits.uop.ctrl.narrow, narrow_tail_vd, normal_tail_vd)))
   io.in.ready := fpu(0).io.in.ready & fpu(1).io.in.ready & !red_busy & !flush
   io.out.bits.fflags := Mux(vstart_gte_vl, 0.U, Mux(output_en, red_fflag, Mux(io.out.bits.uop.ctrl.narrow_to_1, cmp_fflag | fpu(0).io.out.bits.fflags | fpu(1).io.out.bits.fflags, fpu(0).io.out.bits.fflags | fpu(1).io.out.bits.fflags)))
   io.out.valid := Mux(output_en, output_valid, Mux(io.out.bits.uop.ctrl.narrow_to_1, io.out.bits.uop.uopEnd & fpu(0).io.out.valid & !red_busy, fpu(0).io.out.valid & !red_busy))

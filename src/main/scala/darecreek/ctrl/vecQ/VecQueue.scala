@@ -32,7 +32,7 @@ class VecQueue extends Module with HasCircularQueuePtrHelper {
     val partialVInfo = Flipped(ValidIO(new PartialVInfo))
     // flush from ROB
     val flush = Flipped(ValidIO(new VRobPtr))
-    // to illegal instrn module
+    // enqPtr
     val enqPtrOut = Output(new VRobPtr)
 
     val out = Decoupled(new VMicroOp)
@@ -55,8 +55,10 @@ class VecQueue extends Module with HasCircularQueuePtrHelper {
     * Enq
     */
   when (io.in.valid) {
-    vq(enqPtr.value).ctrl := io.in.bits.vCtrl
-    vq(enqPtr.value).info := io.in.bits.vInfo
+    vq(enqPtr.value).ctrl := io.in.bits.ctrl
+    io.in.bits.csr.elements.foreach {
+      case (name, data) => vq(enqPtr.value).info.elements(name) := data
+    }
     sop(enqPtr.value) := io.in.bits.scalar_opnd
     sb_id(enqPtr.value) := io.in.bits.sb_id
     valid(enqPtr.value) := true.B
@@ -72,7 +74,9 @@ class VecQueue extends Module with HasCircularQueuePtrHelper {
 
   // Partial VInfo
   when (io.partialVInfo.valid) {
+    vq(io.partialVInfo.bits.vRobPtr.value).info.destEew := io.partialVInfo.bits.destEew
     vq(io.partialVInfo.bits.vRobPtr.value).info.emulVd := io.partialVInfo.bits.emulVd
+    vq(io.partialVInfo.bits.vRobPtr.value).info.emulVs2 := io.partialVInfo.bits.emulVs2
   }
 
   /**
@@ -90,7 +94,9 @@ class VecQueue extends Module with HasCircularQueuePtrHelper {
 
   when (io.out.fire) {
     when (io.partialVInfo.valid && io.partialVInfo.bits.vRobPtr === deqPtr) {
+      io.out.bits.info.destEew := io.partialVInfo.bits.destEew
       io.out.bits.info.emulVd := io.partialVInfo.bits.emulVd
+      io.out.bits.info.emulVs2 := io.partialVInfo.bits.emulVs2
     }
   }
 

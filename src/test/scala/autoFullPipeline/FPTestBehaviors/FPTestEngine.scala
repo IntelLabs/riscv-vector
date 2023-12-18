@@ -25,6 +25,8 @@ class FPTestEngine extends TestEngine {
     override def getName() = "FPTestEngine"
     override def getDut() = new VFPUWrapper
 
+    var noRes = 0
+
     var historyTCs : List[(Int, Int, TestCase)] = List() // robIdx, uopIdx, TestCase
     var historyTCIx = 0
 
@@ -34,14 +36,15 @@ class FPTestEngine extends TestEngine {
         results = results.filter(_._2 > robIdx) // flush compare
     }
 
-    def checkOutput(dut : VFPUWrapper) = {
-        val block = randomBlock()
+    def checkOutput(dut : VFPUWrapper, enableRandomBlock : Boolean = true) = {
+        var block = randomBlock()
+        if (!enableRandomBlock) block = false
         dut.io.out.ready.poke((!block).B) // TODO randomly block
 
         println(s".. checkOutput block = ${block}, ready = ${!block}")
 
         if (!block && dut.io.out.valid.peek().litValue == 1) {
-
+            noRes = 0
             println(".. valid == true, checking results..")
 
             println("historyTCs:")
@@ -106,6 +109,8 @@ class FPTestEngine extends TestEngine {
 
                 results :+= (resCorrectness, resRobIdx, resUopIdx)
             }
+        } else if (!block) {
+            noRes += 1
         }
     }
 
@@ -200,18 +205,42 @@ class FPTestEngine extends TestEngine {
                 //  the result for the first time".
                 //  then here we should not check for the result second time.
                 // dut.io.in.valid.poke(false.B)
-                checkOutput(dut)
+                checkOutput(dut, false)
             }
             dut.clock.step(1)
+            noRes = 0
         } else {
             dut.io.in.valid.poke(false.B)
             dut.io.in.bits.uop.uopEnd.poke(false.B)
 
             // dut.io.dontCare.poke(true.B)
             dut.io.in.bits.poke(getEmptyVFuInput()) // don't care..
-            dut.io.redirect.poke(genFSMRedirect())
+            if (flush) {
+                dut.io.redirect.poke(genFSMRedirect(flush, flush, flushedRobIdx))
+                noRes = 0
+            } else {
+                dut.io.redirect.poke(genFSMRedirect())
+            }
 
             checkOutput(dut)
+            assert(noRes < MAX_NO_RES_ITER)
+
+            if (flush) {
+                for (i <- 0 until historyTCs.length) {
+                    if(historyTCs(i)._1 <= flushedRobIdx) { // flush compare
+                        println(s".. flush robIdx ${historyTCs(i)._1}, uopIdx ${historyTCs(i)._2}")
+                        historyTCs(i)._3.flush()
+                    }
+                }
+
+                historyTCs = historyTCs.filter(!_._3.flushed)
+
+                // clear past results of test case with less robIdx
+                clearFlushedRes(flushedRobIdx)
+                println(s"2. Flushed (all <= ${flushedRobIdx}), from FPTestEngine")
+            }
+            // dut.io.redirect.poke(genFSMRedirect())
+
             dut.clock.step(1)
         }
 

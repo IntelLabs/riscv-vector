@@ -261,40 +261,6 @@ object Dump {
   }
 }
 
-/*object TestResults {
-
-  case class InstTestRes(
-    inst : String,
-    failed : Boolean = false,
-    fault_dut_out : String = "",
-    fault_golden_out : String = "",
-    fault_fsm_wb_idx : String = "",
-  )
-
-  var results: ConCurMap[String, InstTestRes] = new ConcurrentHashMap().asScala
-
-  def initResults(insts : Array[String]) : Unit = {
-    for(inst <- insts) {
-      results(inst) = InstTestRes(inst)
-    }
-  }
-
-  def addResult(testRes : InstTestRes) : Unit = {
-    results(testRes.inst) = testRes
-  }
-
-  def checkResult(inst : String) : Boolean = {
-    return results(inst).failed
-  }
-
-  def print() : Unit = {
-    println("TestResults: ")
-    results.foreach {
-        case (key, value) => println(s"$key=${value.failed}, ${value.fault_dut_out}")
-    }
-  }
-}*/
-
 object Datapath {
   // val testdataRoot = "/home/maoting/nanhu/testdata/8_23/unittest/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/8_29/unittest/"
@@ -303,7 +269,8 @@ object Datapath {
   // val testdataRoot = "/home/maoting/nanhu/testdata/9_4/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/9_6/unittest/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/10_10/unittest/"
-  val testdataRoot = "/home/maoting/nanhu/testdata/10_13/unittest/"
+  // val testdataRoot = "/home/maoting/nanhu/testdata/10_13/unittest/"
+  val testdataRoot = "/home/maoting/nanhu/testdata/12_4/unittest/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/debug/"
   //val testdataRoot = "C:\\kou\\XS_Vector_Unit\\src\\test\\scala\\unittest\\"
   // val testdataRoot = "/home/kou/unittest/"
@@ -320,9 +287,23 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
 
   var tbs : Seq[TestBehavior] = Seq(
 
+    new VslidedownvxFSMTestBehavior,
+
+    // new VredsumvsTestBehavior,
+    // new VredmaxuvsTestBehavior,
+    // new VredmaxvsTestBehavior,
+    // new VredminuvsTestBehavior,
+    // new VredminvsTestBehavior,
+    // new VredandvsTestBehavior,
+    // new VredorvsTestBehavior,
+    // new VredxorvsTestBehavior,
+
+    // new VwredsumuvsTestBehavior,
+    // new VwredsumvsTestBehavior,
+
     // new VredsumvsTestBehavior,
 
-    new VredsumvsTestBehavior,
+    // new VnclipwvTestBehavior,
     // new Vrgatherei16vvFSMTestBehavior,
     // new VfaddvvTestBehavior,
     // new VnclipwiTestBehavior,

@@ -28,26 +28,33 @@ class DivTestEngine extends TestEngine {
     var historyTCs : List[(Int, Int, TestCase)] = List() // robIdx, uopIdx, TestCase
     var historyTCIx = 0
 
-    var results : List[(Boolean, Int)] = List()
+    var results : List[(Boolean, Int, Int)] = List() // correctness, robIdx, uopIdx
 
     def clearFlushedRes(robIdx : Int) = {
         results = results.filter(_._2 > robIdx) // flush compare
     }
 
-    def checkOutput(dut : VDiv) = {
-        val block = randomBlock()
+    def checkOutput(dut : VDiv, enableRandomBlock : Boolean = true) = {
+        var block = randomBlock()
+        if (!enableRandomBlock) block = false
         dut.io.out.ready.poke((!block).B) // TODO randomly block
 
-        // println(s".. checkOutput block = ${block}, ready = ${!block}")
+        println(s".. checkOutput block = ${block}, ready = ${!block}")
 
         if (!block && dut.io.out.valid.peek().litValue == 1) {
 
-            // println(".. valid == true, checking results..")
+            println(".. valid == true, checking results..")
+
+            println("historyTCs:")
+            historyTCs.foreach(x => {
+                println(s".. robIdx ${x._1}, uopIdx ${x._2}")
+            })
             
             var robIdx = dut.io.out.bits.uop.sysUop.robIdx.value.peek().litValue.toInt
             var uopIdx = dut.io.out.bits.uop.uopIdx.peek().litValue.toInt
 
-            while(
+            // ========
+            /*while(
                 historyTCs.length > 0 &&
                 // && (historyTCs(0)._1 != robIdx || historyTCs(0)._2 != uopIdx)
                 historyTCs(0)._3.flushed
@@ -62,13 +69,27 @@ class DivTestEngine extends TestEngine {
             if (historyTCs.length == 0) {
                 println(s"historyTCs is empty!!!!!!!!")
                 assert(false)
-            }
+            }*/
+            // ========
 
-            val resRobIdx = historyTCs(0)._1
-            val resUopIdx = historyTCs(0)._2
-            val resTestCase = historyTCs(0)._3
+            val filteredCandids = historyTCs.filter(x => {x._1 == robIdx && x._2 == uopIdx})
+            historyTCs = historyTCs.filter(x => { x._1 != robIdx || x._2 != uopIdx })
+
+            /*println("historyTCs:")
+            historyTCs.foreach(x => {
+                println(s".. robIdx ${x._1}, uopIdx ${x._2}")
+            })*/
+
+            assert(filteredCandids.length != 0, s"ERROR!!!!!! (flushed?) Not expecting robIdx ${robIdx}, uopIdx ${uopIdx}")
+            assert(filteredCandids.length == 1, s"ERROR!!!!!! Waiting for multiple outputs of robIdx ${robIdx}, uopIdx ${uopIdx}")
+
+            val resRobIdx = filteredCandids(0)._1
+            val resUopIdx = filteredCandids(0)._2
+            val resTestCase = filteredCandids(0)._3
             val testCaseFlushed = resTestCase.flushed
-            historyTCs = historyTCs.tail
+            assert(!testCaseFlushed, s"ERROR!!!!!! Flushed before! robIdx ${resRobIdx}, uopIdx ${resUopIdx}")
+
+            // historyTCs = historyTCs.tail
             
             println(s"2.2. Received result for robIdx ${robIdx}, uopIdx ${uopIdx}, in DivTestEngine:")
             if (testCaseFlushed) {
@@ -84,7 +105,7 @@ class DivTestEngine extends TestEngine {
                 val resCorrectness = resTestCase.rc.checkRes(dutVd, uopIdx, dutFflags=fflags)
                 val resRobIdx = robIdx
 
-                results :+= (resCorrectness, resRobIdx)
+                results :+= (resCorrectness, resRobIdx, resUopIdx)
             }
         }
     }
@@ -95,7 +116,7 @@ class DivTestEngine extends TestEngine {
         flush : Boolean, flushedRobIdx : Int
     ) : (Boolean, Int) = {
 
-        val MAX_READY_WAIT = 100
+        val MAX_READY_WAIT = 200
         var curReadyWait = 0
         
         if (!allExhausted) {
@@ -125,9 +146,12 @@ class DivTestEngine extends TestEngine {
             if (flush) {
                 for (i <- 0 until historyTCs.length) {
                     if(historyTCs(i)._1 <= flushedRobIdx) { // flush compare
+                        println(s".. flush robIdx ${historyTCs(i)._1}, uopIdx ${historyTCs(i)._2}")
                         historyTCs(i)._3.flush()
                     }
                 }
+
+                historyTCs = historyTCs.filter(!_._3.flushed)
 
                 // clear past results of test case with less robIdx
                 clearFlushedRes(flushedRobIdx)
@@ -136,15 +160,20 @@ class DivTestEngine extends TestEngine {
                 // dut.io.redirect.poke(genFSMRedirect())
             }
 
+            var jumpBeforeStep = false
             // waiting for dut's ready signal, which represents an ack of the uop ========
-            while((dut.io.in.ready.peek().litValue != 1) &&
+            breakable { while((dut.io.in.ready.peek().litValue != 1) &&
                     curReadyWait < MAX_READY_WAIT) {
                 
-                if (curReadyWait != 0) checkOutput(dut)
+                if (curReadyWait != 0) checkOutput(dut) // might affact in.ready
+                if (dut.io.in.ready.peek().litValue == 1) {
+                    jumpBeforeStep = true
+                    break
+                }
                 dut.clock.step(1)
                 dut.io.redirect.poke(genFSMRedirect())
                 curReadyWait += 1
-            }
+            } }
 
             // waits too long.. =====================================
             if (!(curReadyWait < MAX_READY_WAIT)) {
@@ -162,7 +191,7 @@ class DivTestEngine extends TestEngine {
                 historyTCs :+= (sendRobIdx, uopIdx, chosenTestCase)
             }
 
-            if (curReadyWait > 0) {
+            if (curReadyWait > 0 && !jumpBeforeStep) {
                 // Here, the Engine passed through the while loop,
                 //  clock ticked inside it
                 //  then one should check one more time for the result
@@ -171,7 +200,8 @@ class DivTestEngine extends TestEngine {
                 //  then the engine didn't tick after "sending the input and checking
                 //  the result for the first time".
                 //  then here we should not check for the result second time.
-                checkOutput(dut)
+                // dut.io.in.valid.poke(false.B)
+                checkOutput(dut, false)
             }
             dut.clock.step(1)
         } else {
@@ -180,9 +210,30 @@ class DivTestEngine extends TestEngine {
 
             // dut.io.dontCare.poke(true.B)
             dut.io.in.bits.poke(getEmptyVFuInput()) // don't care..
-            dut.io.redirect.poke(genFSMRedirect())
+            if (flush) {
+                dut.io.redirect.poke(genFSMRedirect(flush, flush, flushedRobIdx))
+            } else {
+                dut.io.redirect.poke(genFSMRedirect())
+            }
 
             checkOutput(dut)
+
+            if (flush) {
+                for (i <- 0 until historyTCs.length) {
+                    if(historyTCs(i)._1 <= flushedRobIdx) { // flush compare
+                        println(s".. flush robIdx ${historyTCs(i)._1}, uopIdx ${historyTCs(i)._2}")
+                        historyTCs(i)._3.flush()
+                    }
+                }
+
+                historyTCs = historyTCs.filter(!_._3.flushed)
+
+                // clear past results of test case with less robIdx
+                clearFlushedRes(flushedRobIdx)
+                println(s"2. Flushed (all <= ${flushedRobIdx}), from DivTestEngine")
+            }
+            // dut.io.redirect.poke(genFSMRedirect())
+
             dut.clock.step(1)
         }
 
@@ -192,7 +243,9 @@ class DivTestEngine extends TestEngine {
         if (results.length > 0) {
             val resCorrectness = results(0)._1
             val resRobIdx = results(0)._2
+            val resUopIdx = results(0)._3
             results = results.tail
+            println(s"Returning robIdx ${resRobIdx}, uop ${resUopIdx}'s result: ${resCorrectness}.")
             return (resCorrectness, resRobIdx)
         }
         return (false, NO_RESULT_ROBIDX)

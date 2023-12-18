@@ -7,13 +7,18 @@ import darecreek.exu.vfu.VUopInfo
 
 import chipsalliance.rocketchip.config
 import chipsalliance.rocketchip.config.{Config, Field, Parameters}
+import darecreek.VInfoCalc
+import darecreek.VInfoAll
 
 class VDecodeOutput(implicit p: Parameters) extends Bundle{
-  val vCtrl = new darecreek.VCtrl
+  val vCtrl         = new darecreek.VCtrl
   val scalar_opnd_1 = UInt(64.W)
   val scalar_opnd_2 = UInt(64.W)
-  val vInfo = new VInfo
-  //val valid = Bool()
+  val vInfo         = new VInfo
+  val eewEmulInfo   = new VInfoAll
+
+  //TODO: need to package the bundle from darecreek
+  //val extraInfo_for_VIllegal = new 
 }
 
 class SVDecodeUnit(implicit p: Parameters) extends Module {
@@ -48,10 +53,21 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   io.out.bits.vInfo.vxrm    := RegEnable(io.in.bits.vInfo.vxrm  , io.in.valid)
   io.out.bits.vInfo.frm     := RegEnable(io.in.bits.vInfo.frm   , io.in.valid)
 
-  //The following code is only for the mv instruction. It needs to be adjusted according to different instructions later.
+  
+  val infoCalc = Module(new VInfoCalc)
+  infoCalc.io.ctrl       := decode.io.out
+  infoCalc.io.csr.frm    := io.in.bits.vInfo.frm   
+  infoCalc.io.csr.vxrm   := io.in.bits.vInfo.vxrm  
+  infoCalc.io.csr.vl     := io.in.bits.vInfo.vl    
+  infoCalc.io.csr.vstart := io.in.bits.vInfo.vstart
+  infoCalc.io.csr.vsew   := io.in.bits.vInfo.vsew  
+  infoCalc.io.csr.vill   := decode.io.out.illegal  
+  infoCalc.io.csr.ma     := io.in.bits.vInfo.vma    
+  infoCalc.io.csr.ta     := io.in.bits.vInfo.vta    
+  infoCalc.io.csr.vlmul  := io.in.bits.vInfo.vlmul 
 
+  io.out.bits.eewEmulInfo := RegEnable(infoCalc.io.infoAll, io.in.valid)
 
-  //Only receive one instruction, and then set ready to false
   io.in.ready := io.out.ready && ~io.iexNeedStall
 }
 

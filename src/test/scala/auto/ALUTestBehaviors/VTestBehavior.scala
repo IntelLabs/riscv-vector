@@ -157,6 +157,12 @@ class VTestBehavior(fn : String, cb : CtrlBundle, s : String, instid : String,
         if (hasFd)
             expectvd = UtilFuncs.multilmuldatahandle(simi.get("FD").get)
 
+        if (hasFd) {
+            expectvd = expectvd.map(x => {
+                "h" + x.slice(17, 33)
+            })
+        }
+
         var n_inputs = 1
         if(vflmul == "2.000000") n_inputs = 2
         if(vflmul == "4.000000") n_inputs = 4

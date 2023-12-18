@@ -77,42 +77,26 @@ class Vred(fn : String, cb : CtrlBundle, s : String, instid : String, widen : Bo
                 vstart = getVstart(simi)
             )
 
-            var robIdx = (false, 0)
+            // var robIdx = (false, 0)
             robIdxValid = randomFlush()
-            if (robIdxValid) {
+            /*if (robIdxValid) {
                 robIdx = (true, 1)
             }
-            ctrlBundle.robIdx = robIdx
+            ctrlBundle.robIdx = robIdx*/
 
-            dut.io.in.valid.poke(true.B)
-            dut.io.in.bits.poke(genVFuInput(
-                SrcBundle(
-                    vs2=vs2, vs1=vs1,
-                    old_vd=oldvd,mask=mask(0)), 
-                ctrlBundle
-            ))
-            // dut.io.redirect.poke(genFSMRedirect((robIdxValid, robIdxValid, 0)))
-
-            dut.clock.step(1)
-
-            if (robIdxValid) {
-                // flushed
-                println("flushed")
-
-                /*dut.io.in.valid.poke(false.B)
-
-
-                var srcBundle = SrcBundle()
-                ctrlBundle = ctrl.copy()
-
-                // turning off redirect bits
+            if (!robIdxValid) {
+                dut.io.in.valid.poke(true.B)
                 dut.io.in.bits.poke(genVFuInput(
-                    srcBundle,
+                    SrcBundle(
+                        vs2=vs2, vs1=vs1,
+                        old_vd=oldvd,mask=mask(0)), 
                     ctrlBundle
                 ))
-                // dut.io.redirect.poke(genFSMRedirect())
-                
-                dut.clock.step(1)*/
+                // dut.io.redirect.poke(genFSMRedirect((robIdxValid, robIdxValid, 0)))
+
+                dut.clock.step(1)
+            } else {
+                println("flushed")
                 return
             }
 

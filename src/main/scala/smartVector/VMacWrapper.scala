@@ -10,21 +10,17 @@ import firrtl.Utils
 import darecreek.exu.vfu.mac.VMac
 
 
-class VMacWrapper (implicit p : Parameters) extends VFuModule {
-
-  class vMacIn extends Bundle {
-    val vfuInput = new VFuInput 
-  }
+class VMacWrapper (implicit p : Parameters) extends Module {
 
   val io = IO(new Bundle {
-    val in = Input(ValidIO(new vMacIn))
+    val in = Input(ValidIO(new VFuInput))
     val out = ValidIO(new VAluOutput)
   })
 
   val vMac = Module(new VMac)
 
   vMac.io.in.valid := io.in.valid
-  vMac.io.in.bits := io.in.bits.vfuInput
+  vMac.io.in.bits := io.in.bits
 
   io.out := vMac.io.out
 }

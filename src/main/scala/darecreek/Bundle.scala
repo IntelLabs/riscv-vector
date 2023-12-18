@@ -108,22 +108,24 @@ class VExcptInfo extends Bundle {
   val excptPosition = UInt(bVstart.W)
 }
 
-// Information of the micro-op which is not directly from decoder.
-// Basically they are information for both unexpanded and expanded uop
-class VInfo extends Bundle {
-  val vstart = UInt(bVstart.W) // from CSR
-  val vl = UInt(bVL.W) //---- Todo: width reduction
+// Vector CSR
+class VCsr extends Bundle {
+  val vstart = UInt(bVstart.W)
+  val vl = UInt(bVL.W)
   val vxrm = UInt(2.W)
   val frm = UInt(3.W)
-  val vlmul = UInt(3.W) // see spec
-  val vsew = UInt(3.W)  // see spec
+  val vlmul = UInt(3.W)
+  val vsew = UInt(3.W)
   val vill = Bool()
-  val ma = Bool() // mask agnostic
-  val ta = Bool() // tail agnostic
-  // val lmul = UInt(4.W) // 1, 2, 4, 8
+  val ma = Bool()
+  val ta = Bool()
+}
+// Information of the micro-op which is not directly from decoder.
+// Basically they are information for both unexpanded and expanded uop
+class VInfo extends VCsr {
   val destEew = UInt(3.W) // Destination EEW
-  val emulVd = UInt(4.W)
-  // val wenRF = Bool() // RF wen. E.g., vstart >= vl or vl=0 
+  val emulVd = UInt(4.W) // EMUL of vd
+  val emulVs2 = UInt(4.W)
 }
 
 class VCtrlInfo extends Bundle {

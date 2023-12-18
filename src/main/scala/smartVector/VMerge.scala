@@ -2,33 +2,25 @@ package smartVector
 
 import chisel3._
 import chisel3.util._
-import darecreek.exu.vfu._
 import chipsalliance.rocketchip.config
 import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import darecreek.exu.vfu.alu.VAlu
 import firrtl.Utils
 import SmartParam._
-
-class CommitInfo extends Bundle{
-    val scalarRegWriteEn = Bool() 
-    val ldest = UInt(5.W)
-    val data = UInt(64.W)
-}
+import darecreek.exu.vfu.VAluOutput
 
 class LsuOutput extends Bundle{
     val data = UInt(VLEN.W)
     val rfWriteEn         = Bool()
     val rfWriteIdx        = UInt(5.W)
-    val scalarRegWriteEn  = Bool()
-    val scalarRegWriteIdx = UInt(5.W)
     val muopEnd           = Bool()
 }
-class VMerge (implicit p : Parameters) extends VFuModule {
+class VMerge (implicit p : Parameters) extends Module {
 
     val io = IO(new Bundle{
         val in = new Bundle{
             val mergeInfo = Input(ValidIO(new MuopMergeAttr))
-            val aluIn = Input(ValidIO(new VAluOutput))
+            val aluIn = Input(ValidIO(new IexOutput))
             val lsuIn = Input(ValidIO(new LsuOutput))
         }
         val out = new Bundle{
@@ -95,8 +87,8 @@ class VMerge (implicit p : Parameters) extends VFuModule {
         io.out.commitInfo.bits.data             := io.in.aluIn.bits.vd
     }.elsewhen(io.in.lsuIn.valid && io.in.lsuIn.bits.muopEnd){
         io.out.commitInfo.valid := true.B
-        io.out.commitInfo.bits.scalarRegWriteEn := io.in.lsuIn.bits.scalarRegWriteEn
-        io.out.commitInfo.bits.ldest            := io.in.lsuIn.bits.scalarRegWriteIdx
+        io.out.commitInfo.bits.scalarRegWriteEn := false.B
+        io.out.commitInfo.bits.ldest            := DontCare
         io.out.commitInfo.bits.data             := io.in.lsuIn.bits.data
     }otherwise{
         io.out.commitInfo.valid := false.B

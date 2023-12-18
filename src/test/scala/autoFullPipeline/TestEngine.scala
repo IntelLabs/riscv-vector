@@ -52,6 +52,9 @@ object TestEngine {
 abstract class TestEngine extends BundleGenHelper {
     val NO_RESULT_ROBIDX = -1
 
+    val MAX_NO_RES_ITER = 20
+    var noResIter = 0
+
     var normalModeTBs : Seq[TestBehavior] = Seq()
     var orderedTBs : Seq[TestBehavior] = Seq()
 
@@ -65,6 +68,10 @@ abstract class TestEngine extends BundleGenHelper {
 
     def advRobIdx() = {
         robIndex = (robIndex + 1) % 256
+    }
+
+    def calAdvRobIdx(step : Int) : Int = {
+        return (robIndex + step) % 256
     }
 
     def randomFlush() : Boolean = {
@@ -147,38 +154,56 @@ abstract class TestEngine extends BundleGenHelper {
                 // TODO randomly flush
                 if (!flush) {
                     flush = randomFlush()
+                    /*if (flush && 
+                        curTestCasePool.filter(x._1 <= flushedRobIdx)
+                        (robIndex <= flushedRobIdx)) 
+                    { // flush compare
+                        // in case of robIdx wrapped around, send=0 flush=255
+                        println("1.1. flushedRobIdx wrapped around! Ignoring..")
+                        flush = false
+                    }*/
+
                     if (flush) {
-                        flushedRobIdx = sendRobIdx + 1
-                        println(s"1.1. Flush (all <= ${flushedRobIdx})")
+                        flushedRobIdx = sendRobIdx // + 1
+                        val needToFill = curTestCasePool.filter(_._1 <= flushedRobIdx).size // flush compare
 
-                        val prevSize = curTestCasePool.size
-                        var deletedTBs : Set[TestBehavior] = Set()
+                        if (
+                            calAdvRobIdx(needToFill) <= flushedRobIdx // flush compare
+                        ) {
+                            println("1.1. flushedRobIdx wrapped around! Ignoring..")
+                            flush = false
+                        } else {
+                            println(s"1.1. Flush (all <= ${flushedRobIdx})")
 
-                        // delete flushed test cases, so TestEngine will not
-                        // give new uops of them to the next level detailed TestEngine
-                        curTestCasePool = curTestCasePool.filterNot(x => {
-                            if (x._1 <= flushedRobIdx) { // flush compare
-                                val tb : TestBehavior = x._2._1
-                                deletedTBs = deletedTBs + tb
-                                println(s".. deleted robIdx ${x._1}")
+                            val prevSize = curTestCasePool.size
+                            var deletedTBs : Set[TestBehavior] = Set()
+
+                            // delete flushed test cases, so TestEngine will not
+                            // give new uops of them to the next level detailed TestEngine
+                            curTestCasePool = curTestCasePool.filterNot(x => {
+                                if (x._1 <= flushedRobIdx) { // flush compare
+                                    val tb : TestBehavior = x._2._1
+                                    deletedTBs = deletedTBs + tb
+                                    println(s".. deleted robIdx ${x._1}")
+                                }
+                                x._1 <= flushedRobIdx // flush compare
+                            })
+
+                            // if any TB has no test case left, record success
+                            for (tb <- deletedTBs) {
+                                if (!curTestCasePool.values.exists(_._1 == tb) &&
+                                    tb.isFinished()
+                                ) {
+                                    tbSuccess(tb)
+                                }
                             }
-                            x._1 <= flushedRobIdx // flush compare
-                        })
 
-                        // if any TB has no test case left, record success
-                        for (tb <- deletedTBs) {
-                            if (!curTestCasePool.values.exists(_._1 == tb) &&
-                                tb.isFinished()
-                            ) {
-                                tbSuccess(tb)
-                            }
+                            println(s"1.2. curTestCasePool shrinked from ${prevSize} to ${curTestCasePool.size}")
+                            exhaustedCount = curTestCasePool.filter(_._2._2.isExhausted()).size
+                            
+                            // give uop and flush info in the next iteration
+                            break // continue
                         }
-
-                        println(s"1.2. curTestCasePool shrinked from ${prevSize} to ${curTestCasePool.size}")
-                        exhaustedCount = curTestCasePool.filter(_._2._2.isExhausted()).size
-                        
-                        // give uop and flush info in the next iteration
-                        break // continue
                     }
                 }
 
@@ -197,23 +222,26 @@ abstract class TestEngine extends BundleGenHelper {
             } else {
                 if (curTestCasePool.size == 0) break
                 // Rest test cases are all waiting for results, no more uop to give
-                stepRes = iterate(dut, curTestCasePool.toList.head._2._2, -1, true)
+                stepRes = iterate(dut, curTestCasePool.toList.head._2._2, -1, true, flush=flush, flushedRobIdx=flushedRobIdx)
             }
             val resCorrectness = stepRes._1
             val resRobIdx = stepRes._2
 
             if (resRobIdx != NO_RESULT_ROBIDX) {
+                noResIter = 0
                 //  TODO 1.3.0. if the result is incorrect, record the incorrect result and remove the TestCase and TestBehavior
                 // TODO When robIdx does not exist in the pool.. failed or flushed..
                 if (!curTestCasePool.contains(resRobIdx)) {
                     if (failedTBs.contains(resRobIdx)) {
-                        println(s"Received result ${resRobIdx} for already incorrect ${failedTBs(resRobIdx).getInstid()}..")
+                        println(s"WARNING: Received result ${resRobIdx} for already incorrect ${failedTBs(resRobIdx).getInstid()}.. Ignoring..")
+                        println("=============================================================================")
+                        break
                     } else {
                         /*for ((key, value) <- curTestCasePool) {
                             // Do something with each key-value pair
                             println(s".. in curTestCasePool, robIdx: $key, Value: $value")
                         }*/
-                        assert(false, s"ERROR!!! Received result ${resRobIdx} for flushed robIdx ${resRobIdx}!!!")
+                        assert(false, s"ERROR!!! Received result for flushed robIdx ${resRobIdx}!!!")
                     }
                 }
 
@@ -224,12 +252,15 @@ abstract class TestEngine extends BundleGenHelper {
                     println(s"${resTestCase.instid}, result incorrect")
 
                     resTestBehavior.recordFail()
+                    curTestCasePool.foreach(x => {
+                        if (x._2._1 == resTestBehavior) {
+                            failedTBs += (x._1 -> resTestBehavior)
+                        }
+                    })
                     curTestCasePool = curTestCasePool.filterNot(_._2._1 == resTestBehavior)
                     testBehaviorPool = testBehaviorPool.filterNot(_ == resTestBehavior)
 
                     exhaustedCount = curTestCasePool.filter(_._2._2.isExhausted()).size
-
-                    failedTBs += (resRobIdx -> resTestBehavior)
                 } else {
                     //  TODO 1.3.1. check if all uops' results are checked and remove the TestCase from the pool
                     if (resTestCase.isCompleted() && resTestCase.areAllAcked()) {
@@ -257,7 +288,9 @@ abstract class TestEngine extends BundleGenHelper {
                     testBehaviorPool = testBehaviorPool.filterNot(_ == resTestBehavior)
                 }
             } else {
+                // assert(noResIter < MAX_NO_RES_ITER)
                 println("Waiting for TestCase result..")
+                // noResIter += 1
             }
             println("=============================================================================")
         } }

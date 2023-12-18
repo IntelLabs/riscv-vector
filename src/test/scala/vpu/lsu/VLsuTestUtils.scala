@@ -66,6 +66,7 @@ case class CtrlBundle(instrn: BitPat,
                       vl: Int = 32,
                       vstart: Int = 0,
                       destEew: Int = 0,
+                      emulVd: Int = 1,
                       uopIdx: Int = 0,
                       uopEnd: Boolean = false,
                       robIdx: (Boolean, Int) = (false, 0)
@@ -123,6 +124,7 @@ trait BundleGenHelper {
       _.info_vl -> c.vl.U,
       _.info_vstart -> c.vstart.U,
       _.info_destEew -> c.destEew.U,
+      _.info_emulVd -> c.emulVd.U,
       _.expdIdx -> c.uopIdx.U,
       _.expdEnd -> c.uopEnd.B,
     )

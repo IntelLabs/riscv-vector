@@ -12,6 +12,13 @@ import chipsalliance.rocketchip.config.Parameters
 import xiangshan._
 import smartVector._
 
+class FakeDCache extends Module {
+    val io = IO(Flipped(new RVUMemory))
+    io.req.ready  := true.B
+    io.resp.valid := false.B
+    io.resp.bits  := DontCare
+    io.xcpt       := 0.U.asTypeOf(new HellaCacheExceptions())
+}
 
 class RVUTestResult extends Bundle {
     val commit_vld   = Output(Bool())
@@ -31,14 +38,13 @@ class SmartVectorWrapper extends Module {
     val rfData = Output(Vec(32, UInt(128.W)))
   })
   val smartVector = Module(new SmartVector)
+  val dcache      = Module(new FakeDCache)
 
   smartVector.io.in <> io.in
   //smartVector.io.in.valid := io.in.valid
-
+  smartVector.io.rvuMemory <> dcache.io
   io.out := smartVector.io.out
   io.rfData := smartVector.io.rfData
-  
-  
 }
 
 trait SmartBehavior {
@@ -1064,7 +1070,7 @@ trait SmartBehavior {
           // dut.io.out.expectDequeueSeq(outputSeq)
         }.join()
         dut.clock.step(10)
-        dut.clock.setTimeout(0)
+        dut.clock.setTimeout(1)
       }
     }
   }
