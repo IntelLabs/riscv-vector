@@ -45,7 +45,7 @@ case class VInfoBundle(vl: Int = 4,
                        vma: Boolean = false,
                        vta: Boolean = false,
                        vsew: Int = 3,
-                       vlmul: Int = 0,
+                       vlmul: Int = 2,
                        vxrm : Int = 0,
                        frm : Int = 0
 )

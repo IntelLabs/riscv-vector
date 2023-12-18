@@ -41,7 +41,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
 
   switch(currentState){
     is(empty){
-      when(io.in.valid && ~io.in.bits.uop.ctrl.alu && ~io.in.bits.uop.ctrl.isLdst && ~io.in.bits.uop.ctrl.mask){
+      when(io.in.valid && ~io.in.bits.uop.ctrl.alu && ~io.in.bits.uop.ctrl.mask){
         currentStateNext := ongoing
       }.otherwise{
         currentStateNext := empty
