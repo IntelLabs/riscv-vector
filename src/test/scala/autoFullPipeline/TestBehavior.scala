@@ -146,4 +146,8 @@ abstract class TestBehavior(filename : String, val ctrl : CtrlBundle, sign : Str
     }
 
     def _getNextTestCase(simi : Map[String, String]) : TestCase
+
+    def destory() = {
+        this.inputMaps = null
+    }
 }

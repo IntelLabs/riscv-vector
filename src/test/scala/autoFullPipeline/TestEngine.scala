@@ -147,6 +147,7 @@ abstract class TestEngine extends BundleGenHelper {
 
                 if (randomTBinPool.isFinished()) {
                     testBehaviorPool = testBehaviorPool.filterNot(_ == randomTBinPool)
+                    randomTBinPool.destory()
                 } else {
                     curTestCasePool += (this.robIndex -> (randomTBinPool, randomTBinPool.getNextTestCase()))
                     failedTBs = failedTBs - this.robIndex
@@ -215,6 +216,8 @@ abstract class TestEngine extends BundleGenHelper {
                                 }
                             }
 
+                            deletedTBs = null
+
                             println(s"1.2. curTestCasePool shrinked from ${prevSize} to ${curTestCasePool.size}")
                             exhaustedCount = curTestCasePool.filter(_._2._2.isExhausted()).size
                             
@@ -276,6 +279,7 @@ abstract class TestEngine extends BundleGenHelper {
                     })
                     curTestCasePool = curTestCasePool.filterNot(_._2._1 == resTestBehavior)
                     testBehaviorPool = testBehaviorPool.filterNot(_ == resTestBehavior)
+                    resTestBehavior.destory()
 
                     exhaustedCount = curTestCasePool.filter(_._2._2.isExhausted()).size
                 } else {
@@ -303,6 +307,7 @@ abstract class TestEngine extends BundleGenHelper {
                 // of the removed TestBehavior running
                 if (resTestBehavior.isFinished()) {
                     testBehaviorPool = testBehaviorPool.filterNot(_ == resTestBehavior)
+                    resTestBehavior.destory()
                 }
             } else {
                 // assert(noResIter < MAX_NO_RES_ITER)
