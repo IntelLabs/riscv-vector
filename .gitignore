@@ -5,8 +5,6 @@ test_run_dir/
 generated/
 build/
 *~
-<<<<<<< HEAD
-=======
 
 .bloop/
 .metals/
@@ -29,4 +27,3 @@ src/test/scala/autoFullPipeline/IncorrectInputs/*/*.data
 src/test/scala/autoFullPipeline/AutoTestRes/*/
 src/test/scala/autoFullPipeline/AutoTestRes/*/*.txt
 src/test/scala/autoFullPipeline/*.txt
->>>>>>> dev

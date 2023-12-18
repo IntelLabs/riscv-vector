@@ -341,23 +341,16 @@ class SVlsu(implicit p: Parameters) extends Module {
 
         (0 until vlenb).foreach { i =>
             when(vregInfo(i).status === VRegSegmentStatus.notReady && vregInfo(i).idx === respLdPtr) {
-                val offset = vregInfo(i).offset
-
-                vregInfo(i).data := ParallelLookUp(offset, Seq(
-                    0.U -> respData(7, 0),
-                    1.U -> respData(15, 8),
-                    2.U -> respData(23, 16),
-                    3.U -> respData(31, 24),
-                    4.U -> respData(39, 32),
-                    5.U -> respData(47, 40),
-                    6.U -> respData(55, 48),
-                    7.U -> respData(63, 56)
-                ))
+                val offsetOH = UIntToOH(vregInfo(i).offset, 8)
+                vregInfo(i).data := Mux1H(
+                    offsetOH, 
+                    Seq (respData( 7,  0), respData(15,  8), respData(23, 16), respData(31, 24),
+                         respData(39, 32), respData(47, 40), respData(55, 48), respData(63, 56))
+                )
 
                 vregInfo(i).status := VRegSegmentStatus.ready
             }
         }
-
 
     }.elsewhen(mem_xcpt) { // exception handling
         // 1. clear ldUopQueue
