@@ -1043,7 +1043,7 @@ trait SmartBehavior {
 
           
           //vadd.v.v has no dependency with vmv.v.v
-          genRVUissue("b00000010101001111000011101010111".U, Smartvmvxs),
+          //genRVUissue("b00000010101001111000011101010111".U, Smartvmvxs),
 
           //vadd.v.v has dependency with vmv.v.v
           //genRVUissue("b00000010001000110000011101010111".U, Smartvmvxs),
@@ -1070,7 +1070,7 @@ trait SmartBehavior {
           // dut.io.out.expectDequeueSeq(outputSeq)
         }.join()
         dut.clock.step(10)
-        dut.clock.setTimeout(0)
+        dut.clock.setTimeout(1)
       }
     }
   }
@@ -1087,6 +1087,6 @@ class SmartSpec extends AnyFlatSpec with ChiselScalatestTester with SBundleGenHe
   //it should behave like vAluTest5()  // mask/tail/prestart
   //it should behave like vAluTest6()  // lmul < 1
   //it should behave like vAluTest7()  // 16.1 16.2 16.6
-  it should behave like vAluTest8()  // New compare/vmadc test for nanhu_v3
-  // it should behave like vAluTest10()
+  //it should behave like vAluTest8()  // New compare/vmadc test for nanhu_v3
+  it should behave like vAluTest10()
 }
