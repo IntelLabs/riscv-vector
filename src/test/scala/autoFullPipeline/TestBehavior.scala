@@ -10,6 +10,7 @@ import java.nio.file.{Paths, Files}
 import scala.reflect.io.File
 import scala.reflect.runtime.universe._
 import scala.collection.mutable.Map
+import scala.collection.mutable.LinkedList
 
 import darecreek.exu.vfu._
 import darecreek.exu.vfu.alu._
@@ -25,8 +26,9 @@ import chipsalliance.rocketchip.config.Parameters
 
 abstract class TestBehavior(filename : String, val ctrl : CtrlBundle, sign : String, val instid : String) extends BundleGenHelper {
 
-    var inputMaps : Seq[Map[String, String]] = Seq()
+    var inputMaps : LinkedList[Map[String, String]] = LinkedList()
     var inputMapCurIx = 0
+    var totalInputs = 0
 
     var testResult = true
 
@@ -46,7 +48,7 @@ abstract class TestBehavior(filename : String, val ctrl : CtrlBundle, sign : Str
     def recordFail() = {this.testResult = false}
     def recordSuccess() = {this.testResult = true}
     def isFinished() : Boolean = {
-        return mapLoaded && (this.inputMapCurIx >= this.inputMaps.length)
+        return mapLoaded && (this.inputMapCurIx >= this.totalInputs)
     }
 
     // change depending on test behavior =================================
@@ -124,6 +126,7 @@ abstract class TestBehavior(filename : String, val ctrl : CtrlBundle, sign : Str
                 val keymap = ReadTxt.KeyFileUtil(key.slice(startingIndex, startingIndex + each_asisgned_lines))
 
                 this.inputMaps = keymap
+                this.totalInputs = this.inputMaps.length
             }
         } else {
             println(s"Data file does not exist for instruction: ${getInstid()} , skipping")
@@ -134,11 +137,14 @@ abstract class TestBehavior(filename : String, val ctrl : CtrlBundle, sign : Str
     }
 
     def getNextTestCase() : TestCase = {
-        if (this.inputMaps.length == 0) {
+        if (!this.mapLoaded) {
             this._readInputsToMap()
         }
 
-        val testCase = this._getNextTestCase(this.inputMaps(this.inputMapCurIx))
+        val testCase = this._getNextTestCase(
+            this.inputMaps.head
+        )
+        this.inputMaps = this.inputMaps.tail
         this.inputMapCurIx += 1
 
         // println(s"Adding ${this.instid}, number ${this.inputMapCurIx - 1} input to pool")
