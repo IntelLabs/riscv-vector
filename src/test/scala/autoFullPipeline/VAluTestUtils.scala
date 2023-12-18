@@ -17,6 +17,7 @@ import xiangshan._
 import scala.util._
 import scala.collection.mutable.Map
 import scala.collection.mutable.LinkedList
+import scala.util.control.Breaks._
 import xiangshan.backend.rob.RobPtr
 
 
@@ -85,6 +86,28 @@ object ReadTxt {
       }*/
     }
     keyMapList2
+  }
+
+  def readOneInput(array:Array[String]) : Map[String, String] = {
+    var keyMapList = Map[String, String]()
+    // var keyMapList2 = LinkedList[Map[String,String]]()
+    // var number = 0
+    breakable{ for (i <- 0 until array.length) {
+      val lineArray = array(i).trim.split("=")
+      if(lineArray.size==2){
+        keyMapList += (lineArray(0).trim -> lineArray(1))
+      }
+
+      if(lineArray.size != 2 || lineArray(0).equals("--------------------------test_cnt")) {
+        break
+      }
+      // keyMapList2 = keyMapList2 ++ Map(number -> keyMapList)
+      /*if(lineArray(0).equals("--------------------------test_cnt")) {
+        number = number + 1
+      }*/
+    } }
+
+    keyMapList
   }
 }
 
