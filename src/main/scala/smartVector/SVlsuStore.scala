@@ -85,7 +85,7 @@ class SVlsuStore(implicit p: Parameters) extends Module {
     io.lsuReady := Mux(uopState === uop_idle, true.B, false.B)
     // SPLIT FSM -- decide next state
     when(uopState === uop_idle) {
-        when(io.mUop.valid) {
+        when(io.mUop.valid && io.mUop.bits.uop.ctrl.isLdst) {
             nextUopState := uop_split
         }.otherwise {
             nextUopState := uop_idle
@@ -149,7 +149,7 @@ class SVlsuStore(implicit p: Parameters) extends Module {
     val memVstart   = Mux(vstart < doneLen, 0.U, mlen min (vstart - doneLen))
 
     when(uopState === uop_idle) {
-        when(io.mUop.valid) {
+        when(io.mUop.valid && io.mUop.bits.uop.ctrl.isLdst) {
             mUopReg      := io.mUop.bits
             mUopMergeReg := io.mUopMergeAttr.bits
 
