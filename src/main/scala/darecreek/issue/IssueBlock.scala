@@ -181,7 +181,7 @@ class VIssueBlock extends Module {
   }
   io.toLSU.ld.valid := validPipe_ld
   // Ready
-  lsIQ(0).io.out.ready := io.toLSU.ld.ready || !validPipe_ld
+  lsIQ(0).io.out.ready := io.toLSU.ld.ready || !lsIQ(0).io.out.valid
   // RF write of Ld
   regFile.io.write(NArithIQs).wen := io.fromLSU.ld.valid
   regFile.io.write(NArithIQs).addr := io.fromLSU.ld.bits.uop.pdest
@@ -221,7 +221,7 @@ class VIssueBlock extends Module {
   }
   io.toLSU.st.valid := validPipe_st
   // Ready
-  lsIQ(1).io.out.ready := io.toLSU.st.ready || !validPipe_st
+  lsIQ(1).io.out.ready := io.toLSU.st.ready || !lsIQ(1).io.out.valid
   // Write-back: to BusyTable, to ROB 
   io.wbLSU(1).valid := io.fromLSU.st.valid
   io.wbLSU(1).bits := io.fromLSU.st.bits.uop
