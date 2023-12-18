@@ -183,6 +183,14 @@ class SVlsu(implicit p: Parameters) extends Module {
     val elen        = vlenb.U / eewb
     val minLen      = elen min mlen
 
+    // 1->0, 2->1, 4->2, 8->3
+    val memwAlign = MuxCase(0.U, Array(
+        (memwb === 1.U) -> 0.U,
+        (memwb === 2.U) -> 1.U,
+        (memwb === 4.U) -> 2.U,
+        (memwb === 8.U) -> 3.U,
+    ))
+
     // decide micro vl
     val actualVl    = Mux(unitStrideMop === UnitStrideMop.mask, (vl + 7.U) >> 3.U, vl) // ceil(vl/8)
     val doneLen     = minLen * uopIdx
@@ -198,26 +206,18 @@ class SVlsu(implicit p: Parameters) extends Module {
         when(io.mUop.valid && io.mUop.bits.uop.ctrl.isLdst) {
             mUopReg      := io.mUop.bits
             mUopMergeReg := io.mUopMergeAttr.bits
-
-            // 1->0, 2->1, 4->2, 8->3
-            memwAlignReg := MuxCase(0.U, Array(
-                (memwb === 1.U) -> 0.U,
-                (memwb === 2.U) -> 1.U,
-                (memwb === 4.U) -> 2.U,
-                (memwb === 8.U) -> 3.U,
-            ))
-
-            unitSMopReg := unitStrideMop
-            vmReg       := vm
-            eewbReg     := eewb
-            ldstTypeReg := ldstType
-            memwbReg    := memwb
-            elenReg     := elen
-            mlenReg     := mlen
+            memwAlignReg := memwAlign
+            unitSMopReg  := unitStrideMop
+            vmReg        := vm
+            eewbReg      := eewb
+            ldstTypeReg  := ldstType
+            memwbReg     := memwb
+            elenReg      := elen
+            mlenReg      := mlen
 
             // Set split info
-            ldEnqPtr   := 0.U
-            issueLdPtr := 0.U
+            ldEnqPtr     := 0.U
+            issueLdPtr   := 0.U
             curSplitIdx  := 0.U
             splitCount   := microVl - microVStart     
             noUseMuop    := (microVl === microVStart) 
@@ -225,16 +225,11 @@ class SVlsu(implicit p: Parameters) extends Module {
 
             // set vreg
             when(vregClean) {
-                (0 until vlenb).foreach { i => vregInfo(i).data := io.mUop.bits.uopRegInfo.old_vd(8 * i + 7, 8 * i) }
-
-                (0 until vlenb).foreach { i =>
-                    (0 until vlenb).foreach { j =>
-                        when(i.U < mlen && j.U < memwb) {
-                            vregInfo(i.U * memwb + j.U).status :=
-                                Mux(i.U < memVl && i.U >= memVstart, VRegSegmentStatus.needLdst, VRegSegmentStatus.srcData)
-                        }
-                    }
-                }   
+                (0 until vlenb).foreach { i => 
+                    val pos = i.U >> memwAlign
+                    vregInfo(i).data := io.mUop.bits.uopRegInfo.old_vd(8 * i + 7, 8 * i) 
+                    vregInfo(i).status := Mux(pos < memVl && pos >= memVstart, VRegSegmentStatus.needLdst, VRegSegmentStatus.srcData)
+                }
             }
         }
     }
@@ -292,18 +287,14 @@ class SVlsu(implicit p: Parameters) extends Module {
                 ldEnqPtr  := ldEnqPtr  + 1.U
             }
 
-            for(i <- 0 until vlenb) {
-                when(i.U < memwbReg) {
-                    val segIdx = baseSegIdx + i.U
-                    when(vmReg || isNotMasked) {
-                        vregInfo(segIdx).status := VRegSegmentStatus.notReady
-                        vregInfo(segIdx).idx    := ldEnqPtr
-                        vregInfo(segIdx).offset := offset + i.U
-                    }.otherwise {
-                        vregInfo(segIdx).status := VRegSegmentStatus.srcData
-                    }
+            (0 until vlenb).foreach { i =>
+                when((i.U >> memwAlignReg) === (baseSegIdx >> memwAlignReg)) {
+                    vregInfo(i).status  := Mux(vmReg || isNotMasked, VRegSegmentStatus.notReady, VRegSegmentStatus.srcData)
+                    vregInfo(i).idx     := Mux(vmReg || isNotMasked, ldEnqPtr, vregInfo(i).idx)
+                    vregInfo(i).offset  := Mux(vmReg || isNotMasked, offset + (i.U - baseSegIdx), vregInfo(i).offset)
                 }
             }
+
             curSplitIdx := curSplitIdx + 1.U
         }
     }
