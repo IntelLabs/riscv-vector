@@ -315,10 +315,10 @@ class Vsplit(implicit p : Parameters) extends Module {
         is(ongoing){
             when(needStall){
                 currentStateNext := ongoing
-            }.elsewhen(idx + 1.U === expdLen){
+            }.elsewhen((idx + 1.U) === expdLen){
                 currentStateNext := empty
                 idx := 0.U
-            }.elsewhen(idx + 1.U < expdLen){
+            }.elsewhen((idx + 1.U) < expdLen){
                 currentStateNext := ongoing
             }
         }
