@@ -50,6 +50,8 @@ class VMask(implicit p: Parameters) extends VFuModule {
   val vmsof_m = (funct6 === "b010100".U) && (funct3 === "b010".U) && (vs1_imm === "b00010".U)
   val viota_m = (funct6 === "b010100".U) && (funct3 === "b010".U) && (vs1_imm === "b10000".U)
   val vid_v = (funct6 === "b010100".U) && (funct3 === "b010".U) && (vs1_imm === "b10001".U)
+  val vmask_order = vcpop_m || viota_m || vid_v
+
 
   val vm_logical = vmand_mm ||
     vmnand_mm ||
@@ -158,7 +160,7 @@ class VMask(implicit p: Parameters) extends VFuModule {
     one_cnt_uop(i + 1) := PopCount(vs2m_uop_vid(i, 0))
   }
 
-  when(fire) {
+  when(fire && vmask_order) {
     one_sum := one_cnt(ele_cnt)
   }
 
