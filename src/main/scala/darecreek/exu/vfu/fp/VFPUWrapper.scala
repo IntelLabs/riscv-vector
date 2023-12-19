@@ -115,8 +115,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   val red_out_valid = Wire(Bool())
   val red_out_ready = Wire(Bool())
   // red_out_ready := true.B
-  // red_out_ready := red_busy
-  red_out_ready := io.out.ready
+  red_out_ready := red_busy
   val fpu_valid = RegInit(false.B)
   val red_in_valid = Wire(Bool())
   val red_in_ready = Wire(Bool())
@@ -482,7 +481,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
     fpu(i).io.in.bits.mask := Mux(red_in_valid, red_in(i).mask, Mux(narrow, Cat(mask16bReorg(11, 8), mask16bReorg(3, 0)), Mux(narrow_to_1_vstart_svl, cmp_mask(i), UIntSplit(mask16bReorg, 8)(i))))
     fpu(i).io.in.bits.tail := Mux(red_in_valid, red_in(i).tail, Mux(narrow, Cat(tailReorg(11, 8), tailReorg(3, 0)), Mux(narrow_to_1_vstart_svl, cmp_tail(i), UIntSplit(tailReorg, 8)(i))))
     // fpu(i).io.out.ready := io.out.ready || red_out_ready
-    fpu(i).io.out.ready := io.out.ready
+    fpu(i).io.out.ready := Mux(fpu(i).io.out.bits.uop.sysUop.robIdx === currentRobIdx, red_out_ready, io.out.ready)
     fpu(i).io.redirect := io.redirect
     vd(i) := fpu(i).io.out.bits.vd
     maskKeep(i) := fpu(i).io.maskKeep
