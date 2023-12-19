@@ -107,10 +107,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     // val hasXcptHappened
     // assertion
     // exception only once
-    val mem_xcpt        = io.dataExchange.resp.valid && (
-                          io.dataExchange.xcpt.pf.st || io.dataExchange.xcpt.pf.ld ||
-                          io.dataExchange.xcpt.ae.st || io.dataExchange.xcpt.ae.ld ||
-                          io.dataExchange.xcpt.ma.st || io.dataExchange.xcpt.ma.ld)
+    val mem_xcpt        = io.dataExchange.xcpt.asUInt.orR
 
     /****************************SPLIT STAGE*********************************/
     /*
@@ -303,7 +300,8 @@ class SVlsu(implicit p: Parameters) extends Module {
 
     /*********************************ISSUE START*********************************/
     // update issueLdPtr
-    when(io.dataExchange.resp.valid && io.dataExchange.resp.bits.nack && !mem_xcpt) {
+    when(io.dataExchange.resp.bits.nack) {
+        assert(!mem_xcpt)
         issueLdPtr := io.dataExchange.resp.bits.idx
     }.elsewhen(ldUopQueue(issueLdPtr).valid && io.dataExchange.req.ready) {
         issueLdPtr := issueLdPtr + 1.U
@@ -327,7 +325,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     /*********************************RESP START*********************************/
     val (respLdPtr, respData) = (io.dataExchange.resp.bits.idx, io.dataExchange.resp.bits.data)
 
-    when(io.dataExchange.resp.valid && io.dataExchange.resp.bits.has_data && !mem_xcpt) { // !nack
+    when(io.dataExchange.resp.valid && io.dataExchange.resp.bits.has_data && !mem_xcpt) {
         ldUopQueue(respLdPtr).valid := false.B
 
         (0 until vlenb).foreach { i =>

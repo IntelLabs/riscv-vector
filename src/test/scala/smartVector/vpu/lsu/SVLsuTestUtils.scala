@@ -182,11 +182,6 @@ class FakeLdDCache extends Module {
         (0x1058.U, BigInt("5555555555555555", 16).U, false.B),
         (0x1060.U, BigInt("6666666666666666", 16).U, true.B),
     )
-    
-    io.req.ready            := true.B
-    io.resp.bits.data       := 0.U
-    io.resp.bits.nack       := false.B
-    io.xcpt                 := 0.U.asTypeOf(new HellaCacheExceptions())
 
     val hasXcpt = WireInit(false.B)
     val hasMiss = WireInit(false.B)
@@ -201,42 +196,38 @@ class FakeLdDCache extends Module {
         s2_valid := false.B
     }
 
-    io.resp.valid           := s2_valid
-    io.resp.bits.has_data   := true.B
-    io.resp.bits.mask       := 0.U
-    io.resp.bits.idx        := s2_req.idx
-
     val noise = RegInit("b011000001".U(32.W))
     noise := noise >> 1.U
-    val random = noise(0)
+    val miss = noise(0)
+
+    io.resp.bits.idx        := s2_req.idx
+    io.req.ready            := true.B
+    io.xcpt                 := 0.U.asTypeOf(new HellaCacheExceptions())
+    io.resp.bits.mask       := 0.U
 
     when(s2_valid) {
-        when(random) {
-            io.resp.bits.nack := true.B
-            hasMiss := true.B
-            io.resp.bits.has_data := false.B
-        }.otherwise {
-            io.resp.bits.nack := false.B
-            hasMiss := false.B
-            io.resp.bits.has_data := Mux(s2_req.cmd === VMemCmd.write, false.B, true.B)
-        }
+        val isXcpt = WireInit(false.B)
+        val data = WireInit(0.U(64.W))
         for(i <- 0 until dataTable.length) {
             when(dataTable(i)._1 === s2_req.addr) {
-                when(s2_req.cmd === VMemCmd.read) {
-                  io.resp.bits.data := dataTable(i)._2
-                }.otherwise {
-                  io.resp.bits.data := DontCare
-                }
-
-                when(dataTable(i)._3) {
-                    io.xcpt.ma.ld := true.B
-                    hasXcpt := true.B
-                }.otherwise {
-                    io.xcpt.ma.ld := false.B
-                    hasXcpt := false.B
-                }
+              isXcpt := dataTable(i)._3
+              data   := dataTable(i)._2
             }
         }
+
+        io.resp.bits.nack     := miss
+        io.resp.bits.data     := data
+        io.resp.valid         := ~isXcpt && ~miss
+        io.xcpt.ma.ld         := isXcpt && ~miss
+        hasXcpt               := isXcpt && ~miss
+        hasMiss               := miss
+
+        io.resp.bits.has_data := ~isXcpt && ~miss
+    }.otherwise {
+        io.resp.valid         := false.B
+        io.resp.bits.nack     := false.B
+        io.resp.bits.has_data := false.B
+        io.resp.bits.data     := 0.U
     }
 }
 
@@ -321,12 +312,6 @@ class FakeStDCache extends Module {
                       io.dataExchange.xcpt.ma.ld := false.B
                       hasXcpt := false.B
                       when(s2_req.cmd === VMemCmd.write) {
-                        // for(j <- 0 until 8) {
-                        //   when(s2_req.mask(j)) {
-                        //     val bitmask = (BigInt(0xff) << (j * 8)).U
-                        //     dataVec(i) := (dataVec(i) & ~bitmask) | (s2_req.data & bitmask)
-                        //   }
-                        // }
                         for(j <- 0 until 8) {
                           when(s2_req.mask(j)) {
                               dataVec(i)(j) := s2_req.data(j * 8 + 7, j * 8)

@@ -151,9 +151,6 @@ trait VLsuBehavior_ld_idx {
             dut.clock.step(1)
             dut.io.mUop.valid.poke(false.B)
 
-            dut.clock.step(100)
-            dut.clock.step(4)
-
             while (!dut.io.lsuReady.peekBoolean()) {
                 dut.clock.step(1)
             }
@@ -162,7 +159,10 @@ trait VLsuBehavior_ld_idx {
             dut.clock.step(1)
             dut.io.mUop.valid.poke(false.B)
 
-            dut.clock.step(100)
+            while (!dut.io.lsuOut.valid.peekBoolean()) {
+                dut.clock.step(1)
+            }
+            dut.io.lsuOut.valid.expect(true.B)
             dut.io.lsuOut.bits.data.expect(ldReqs(1)._3)
         }
         }
@@ -188,8 +188,6 @@ trait VLsuBehavior_ld_idx {
             dut.clock.step(1)
             dut.io.mUop.valid.poke(false.B)
 
-            dut.clock.step(100)
-
             while (!dut.io.lsuReady.peekBoolean()) {
                 dut.clock.step(1)
             }
@@ -201,7 +199,6 @@ trait VLsuBehavior_ld_idx {
                 dut.clock.step(1)
             }
             dut.io.lsuOut.valid.expect(true.B)
-            dut.clock.step(100)
             dut.io.lsuOut.bits.data.expect(ldReqs(1)._3)
         }
         }
@@ -227,8 +224,6 @@ trait VLsuBehavior_ld_idx {
             dut.clock.step(1)
             dut.io.mUop.valid.poke(false.B)
 
-            dut.clock.step(100)
-
             while (!dut.io.lsuReady.peekBoolean()) {
                 dut.clock.step(1)
             }
@@ -240,7 +235,6 @@ trait VLsuBehavior_ld_idx {
                 dut.clock.step(1)
             }
             dut.io.lsuOut.valid.expect(true.B)
-            dut.clock.step(100)
             dut.io.lsuOut.bits.data.expect(ldReqs(1)._3)
         }
         }
@@ -265,8 +259,6 @@ trait VLsuBehavior_ld_idx {
             dut.io.mUop.bits.poke(genLdInput(ldReqs(0)._1, ldReqs(0)._2))
             dut.clock.step(1)
             dut.io.mUop.valid.poke(false.B)
-
-            dut.clock.step(100)
 
             while (!dut.io.lsuReady.peekBoolean()) {
                 dut.clock.step(1)
@@ -300,5 +292,4 @@ class VLsuSpec_ld_idx extends AnyFlatSpec with ChiselScalatestTester with Bundle
     it should behave like vLsuTest4()   
     it should behave like vLsuTest5()  
     it should behave like vLsuTest6() 
-    // it should behave like vLsuTest7()   
 }

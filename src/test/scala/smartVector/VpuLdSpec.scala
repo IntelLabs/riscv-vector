@@ -10,6 +10,7 @@ import darecreek.exu.vfu.VFuParamsKey
 import darecreek.exu.vfu.VFuParameters
 import xiangshan.XSCoreParamsKey
 import xiangshan.XSCoreParameters
+import smartVector.lsutest.FakeLdDCache
 import smartVector._
 import darecreek.ctrl.decode.VInstructions._
 import SmartParam._
