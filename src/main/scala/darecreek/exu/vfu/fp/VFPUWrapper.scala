@@ -490,7 +490,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   }
 
   for (i <- NLanes / 2 until NLanes) {
-    fpu(i).io.in.valid := io.in.valid & !fpu_red & !red_busy
+    fpu(i).io.in.valid := io.in.valid & !fpu_red & !red_busy & !flush
     fpu(i).io.in.bits.uop.ctrl.lsrc(0) := vs1_imm
     fpu(i).io.in.bits.uop.ctrl.lsrc(1) := 0.U
     fpu(i).io.in.bits.uop.ctrl.ldest := 0.U
