@@ -349,7 +349,7 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     currentState := currentStateNext
 
-    io.in.decodeIn.ready := (currentState === empty)
+    io.in.decodeIn.ready := (currentStateNext === empty)
     
     //assert(io.in.valid && currentState === ongoing, "when has ongoing inst, can not accept a new one")
 
