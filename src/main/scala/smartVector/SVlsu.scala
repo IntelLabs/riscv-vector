@@ -23,6 +23,7 @@ class LdstIO(implicit p: Parameters) extends ParameterizedBundle()(p) {
     val xcpt            = Output(new VLSUXcpt)
     val dataExchange    = new RVUMemory()
     val lsuReady        = Output(Bool())
+    val segmentIdx      = Input(UInt(log2Ceil(8).W))
 }
 
 object VRegSegmentStatus {
@@ -85,6 +86,8 @@ class SVlsu(implicit p: Parameters) extends Module {
     val mlenReg         = RegInit(0.U(vlenbWidth.W))
     val ldstTypeReg     = RegInit(0.U(2.W))
     val vmReg           = RegInit(true.B)
+    val nfieldReg       = RegInit(0.U(3.W))
+    val segIdxReg       = RegInit(0.U(log2Ceil(8).W))
     val noUseMuop       = RegInit(false.B)
 
     // vreg seg info
@@ -174,6 +177,12 @@ class SVlsu(implicit p: Parameters) extends Module {
         "b10".U -> Mop.constant_stride, "b11".U -> Mop.index_ordered
     ))
 
+    val nfield = Mux(
+        ldstType === Mop.unit_stride && unitStrideMop === UnitStrideMop.whole_register,
+        1.U,
+        funct6(5, 3) +& 1.U
+    )
+
     // unit-stride & strided use eew as memwb, indexed use sew
     val memwb       = Mux(ldstType === Mop.index_ordered || ldstType === Mop.index_unodered, sewb, eewb)
     val mlen        = vlenb.U / memwb
@@ -181,11 +190,8 @@ class SVlsu(implicit p: Parameters) extends Module {
     val minLen      = elen min mlen
 
     // 1->0, 2->1, 4->2, 8->3
-    val memwAlign = MuxCase(0.U, Array(
-        (memwb === 1.U) -> 0.U,
-        (memwb === 2.U) -> 1.U,
-        (memwb === 4.U) -> 2.U,
-        (memwb === 8.U) -> 3.U,
+    val memwAlign = Mux1H(memwb, Seq(
+        0.U, 1.U, 2.U, 3.U
     ))
 
     // decide micro vl
@@ -204,6 +210,7 @@ class SVlsu(implicit p: Parameters) extends Module {
             mUopReg      := io.mUop.bits
             mUopMergeReg := io.mUopMergeAttr.bits
             memwAlignReg := memwAlign
+            nfieldReg    := nfield
             unitSMopReg  := unitStrideMop
             vmReg        := vm
             eewbReg      := eewb
@@ -219,6 +226,7 @@ class SVlsu(implicit p: Parameters) extends Module {
             splitCount   := microVl - microVStart     
             noUseMuop    := (microVl === microVStart) 
             splitStart   := microVStart
+            segIdxReg    := io.segmentIdx
 
             // set vreg
             when(vregClean) {
@@ -252,19 +260,13 @@ class SVlsu(implicit p: Parameters) extends Module {
     idxMask := (("h1".asUInt(64.W) << eew) - 1.U)
     idxVal := (mUopReg.uopRegInfo.vs2 >> beginIdx) & idxMask
 
-    when(ldstTypeReg === Mop.unit_stride) {
-        calcAddr := baseAddr + curVl * memwbReg
-    }.elsewhen(ldstTypeReg === Mop.constant_stride) {
-        when(mUopReg.scalar_opnd_2 === 0.U) {
-            calcAddr := baseAddr
-        }.otherwise {
-            calcAddr := (Cat(false.B, baseAddr).asSInt + curVl * (mUopReg.scalar_opnd_2).asSInt).asUInt
-        }
-    }.elsewhen(ldstTypeReg === Mop.index_ordered || ldstTypeReg === Mop.index_unodered) {        
-        calcAddr := (Cat(false.B, baseAddr).asSInt + idxVal.asSInt).asUInt
-    }.otherwise {
-        // do something
-    }
+    calcAddr := (segIdxReg << memwAlignReg) + 
+        MuxLookup(ldstTypeReg, 0.U, Seq(
+            Mop.unit_stride     -> (baseAddr + (curVl * nfieldReg << memwAlignReg)),
+            Mop.constant_stride -> Mux(mUopReg.scalar_opnd_2 === 0.U, baseAddr, (Cat(false.B, baseAddr).asSInt + curVl * (mUopReg.scalar_opnd_2).asSInt).asUInt),
+            Mop.index_ordered   -> (Cat(false.B, baseAddr).asSInt + idxVal.asSInt).asUInt,
+            Mop.index_unodered  -> (Cat(false.B, baseAddr).asSInt + idxVal.asSInt).asUInt
+        ))
 
     addrMask    := ~(("h1".asUInt(64.W) << memwAlignReg) - 1.U)
     addr        := calcAddr & addrMask  // align calcAddr to memwb

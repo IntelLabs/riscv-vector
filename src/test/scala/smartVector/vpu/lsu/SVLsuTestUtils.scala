@@ -50,6 +50,7 @@ case class CtrlBundle(instrn: BitPat,
                       vstart: Int = 0,
                       uopIdx: Int = 0,
                       uopEnd: Boolean = false,
+                      segIdx: Int = 0,
                       vs2: Int = 0,
 )
 
@@ -91,6 +92,7 @@ trait BundleGenHelper {
       _.info_vstart -> c.vstart.U,
       _.splitUopIdx -> c.uopIdx.U,
       _.splitUopEnd -> c.uopEnd.B,
+      _.segIdx -> c.segIdx.U,
       _.ctrl_vs2 -> {
         if(c.instrn(24, 20).equals(BitPat("b?????"))) {
           0.U
@@ -144,6 +146,7 @@ class VUopTest extends Bundle {
     val info_vstart = UInt(bVstart.W)
     val splitUopIdx = UInt(3.W)
     val splitUopEnd = Bool()
+    val segIdx      = UInt(3.W)
 }
 
 class MuopTest extends Bundle {
