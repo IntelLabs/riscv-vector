@@ -541,7 +541,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
     outUopReg := io.in.bits.uop
   }
 
-  io.out.bits.uop := Mux(output_valid, outUopReg, outVUop)
+  io.out.bits.uop := Mux(output_en, outUopReg, outVUop)
 
   val o_eew = SewOH(io.out.bits.uop.info.vsew)
   //---- Compare vd rearrangement ----
