@@ -40,11 +40,11 @@ import smartVector.RVUissue
 //                      robIdx: (Boolean, Int) = (false, 0)
 //)
 
-case class VInfoBundle(vl: Int = 64,
+case class VInfoBundle(vl: Int = 32,
                        vstart: Int = 0,
                        vma: Boolean = false,
                        vta: Boolean = false,
-                       vsew: Int = 3,
+                       vsew: Int = 0,
                        vlmul: Int = 2,
                        vxrm : Int = 0,
                        frm : Int = 0
