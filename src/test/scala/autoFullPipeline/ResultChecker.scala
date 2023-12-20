@@ -88,12 +88,14 @@ class ResultChecker(val n_ops : Int, val expectvd : Array[String],
                     if (this.goldenFflags != this.resFflags) {
                         println(".. fflags incorrect")
                         dump(f"(fflags) h${this.resFflags}%016x", f"(fflags) h${this.goldenFflags}%016x")
+                        assert(false, "fflags")
                     }
                 } else {
                     res = res && (this.goldenVxsat == this.resVxsat)
                     if (this.goldenVxsat != this.resVxsat) {
                         println(".. vxsat incorrect")
                         dump(f"(vxsat) ${this.resVxsat}", f"(vxsat) ${this.goldenVxsat}")
+                        assert(false, "vxsat")
                     }
                 }
             }
