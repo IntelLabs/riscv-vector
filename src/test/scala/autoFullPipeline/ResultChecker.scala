@@ -80,6 +80,7 @@ class ResultChecker(val n_ops : Int, val expectvd : Array[String],
         this.resVxsat = this.resVxsat || dutVxsat
 
         this.checkedRes += 1
+        assert(res) // jump out when incorrect output comes out
         if (res) {
             if (this.isCompleted() && this.testVxsatOrFflags) {
                 if (this.isFPDIV) {
