@@ -307,7 +307,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.out.toRegFileRead.rfReadIdx(2)         := 0.U
     io.out.toRegFileRead.rfReadIdx(3)         := ctrl.ldest + ldest_inc
 
-    io.scoreBoardSetIO.setEn     := true.B
+    io.scoreBoardSetIO.setEn     := io.out.mUop.valid && ctrl.ldestVal
     io.scoreBoardSetIO.setAddr   := io.out.mUopMergeAttr.bits.ldest
 
     when ((instFirstIn || currentState === ongoing) & ~needStall){
