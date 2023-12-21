@@ -300,14 +300,15 @@ class SVlsu(implicit p: Parameters) extends Module {
 
     /*********************************ISSUE START*********************************/
     // update issueLdPtr
+    val dcacheReadyNext = RegNext(io.dataExchange.req.ready)
     when(io.dataExchange.resp.bits.nack) {
         assert(!mem_xcpt)
         issueLdPtr := io.dataExchange.resp.bits.idx
-    }.elsewhen(ldUopQueue(issueLdPtr).valid && io.dataExchange.req.ready) {
+    }.elsewhen(ldUopQueue(issueLdPtr).valid && dcacheReadyNext) {
         issueLdPtr := issueLdPtr + 1.U
     }
 
-    when(ldUopQueue(issueLdPtr).valid && io.dataExchange.req.ready) {
+    when(ldUopQueue(issueLdPtr).valid && dcacheReadyNext) {
         io.dataExchange.req.valid       := true.B
         io.dataExchange.req.bits.addr   := ldUopQueue(issueLdPtr).addr
         io.dataExchange.req.bits.cmd    := VMemCmd.read
