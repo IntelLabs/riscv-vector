@@ -272,12 +272,6 @@ class FakeStDCache extends Module {
       io.memInfo(i) := flattenedData
     }
     
-    io.dataExchange.req.ready            := true.B
-    io.dataExchange.resp.bits.data       := 0.U
-    io.dataExchange.resp.bits.nack       := false.B
-    io.dataExchange.xcpt                 := 0.U.asTypeOf(new HellaCacheExceptions())
-    io.dataExchange.resp.bits.has_data   := false.B
-
     val hasXcpt = WireInit(false.B)
     val hasMiss = WireInit(false.B)
 
@@ -291,39 +285,45 @@ class FakeStDCache extends Module {
         s2_valid := false.B
     }
 
-    io.dataExchange.resp.valid           := s2_valid
-    io.dataExchange.resp.bits.mask       := 0.U
-    io.dataExchange.resp.bits.idx        := s2_req.idx
-
     val noise = RegInit("b011000001".U(32.W))
     noise := noise >> 1.U
-    val random = noise(0)
+    val miss = noise(0)
+
+    io.dataExchange.resp.bits.has_data   := false.B
+    io.dataExchange.resp.bits.data       := 0.U
+    io.dataExchange.resp.bits.idx        := s2_req.idx
+    io.dataExchange.req.ready            := true.B
+    io.dataExchange.xcpt                 := 0.U.asTypeOf(new HellaCacheExceptions())
+    io.dataExchange.resp.bits.mask       := 0.U
 
     when(s2_valid) {
-        when(random) {
-            io.dataExchange.resp.bits.nack := true.B
-            hasMiss := true.B
-        }.otherwise {
-            io.dataExchange.resp.bits.nack := false.B
-            hasMiss := false.B
-            for(i <- 0 until dataTable.length) {
+        val isXcpt = WireInit(false.B)
+        for(i <- 0 until dataTable.length) {
+            when(dataTable(i)._1 === s2_req.addr) {
+              isXcpt := dataTable(i)._2
+            }
+        }
+
+        for(i <- 0 until dataTable.length) {
               when(dataTable(i)._1 === s2_req.addr) {
-                  when(dataTable(i)._2) {
-                      io.dataExchange.xcpt.ma.ld := true.B
-                      hasXcpt := true.B
-                  }.otherwise {
-                      io.dataExchange.xcpt.ma.ld := false.B
-                      hasXcpt := false.B
-                      when(s2_req.cmd === VMemCmd.write) {
-                        for(j <- 0 until 8) {
-                          when(s2_req.mask(j)) {
-                              dataVec(i)(j) := s2_req.data(j * 8 + 7, j * 8)
-                          }
-                        }
+                  isXcpt := dataTable(i)._2
+                  when(s2_req.cmd === VMemCmd.write && !miss && !isXcpt) {
+                    for(j <- 0 until 8) {
+                      when(s2_req.mask(j)) {
+                          dataVec(i)(j) := s2_req.data(j * 8 + 7, j * 8)
+                      }
                     }
                   }
               }
           }
-        }
+
+        io.dataExchange.resp.bits.nack    := miss
+        io.dataExchange.resp.valid        := ~isXcpt && ~miss
+        io.dataExchange.xcpt.ma.ld        := isXcpt && ~miss
+        hasXcpt                           := isXcpt && ~miss
+        hasMiss                           := miss
+    }.otherwise {
+        io.dataExchange.resp.valid         := false.B
+        io.dataExchange.resp.bits.nack     := false.B
     }
 }

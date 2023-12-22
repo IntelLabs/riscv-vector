@@ -30,7 +30,7 @@ class SmartVectorLsuStoreTestWrapper extends Module {
         case XSCoreParamsKey => XSCoreParameters()
     })
 
-    val vLsu = Module(new SVlsuStore()(p))
+    val vLsu = Module(new SVlsu()(p))
   
     io.lsuReady                             := vLsu.io.lsuReady
     vLsu.io.mUop.valid                      := io.mUop.valid
@@ -47,6 +47,7 @@ class SmartVectorLsuStoreTestWrapper extends Module {
     vLsu.io.mUop.bits.uop.sysUop            := DontCare
     vLsu.io.mUop.bits.uop.uopIdx            := io.mUop.bits.uop.splitUopIdx
     vLsu.io.mUop.bits.uop.uopEnd            := io.mUop.bits.uop.splitUopEnd
+    vLsu.io.segmentIdx                      := io.mUop.bits.uop.segIdx
 
     vLsu.io.mUop.bits.uop.ctrl.vs2          := io.mUop.bits.uop.ctrl_vs2
     vLsu.io.mUop.bits.uop.ctrl.funct6       := io.mUop.bits.uop.ctrl_funct6
@@ -178,7 +179,7 @@ trait VLsuBehavior_st {
             test_init_store(dut)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vse8.copy(vl=8, uopIdx=0, uopEnd=true), stReqSrc_default),
+                (vse8.copy(vl=8, uopIdx=0, uopEnd=true, isLoad=false), stReqSrc_default),
             )
 
             next_is_store_and_step(dut)
@@ -196,6 +197,7 @@ trait VLsuBehavior_st {
                         dut.clock.step(1)
                     }
                     dut.io.lsuOut.valid.expect(true.B)
+                    // dut.clock.step(100)
                     dut.clock.step(1)
             }
             dut.io.memInfo(index1000).expect("h1817161514131211".U)
@@ -209,8 +211,8 @@ trait VLsuBehavior_st {
             test_init_store(dut)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vse8.copy(vl=19, uopIdx=0, uopEnd=false), stReqSrc_default),
-                (vse8.copy(vl=19, uopIdx=1, uopEnd=true), stReqSrc_default),
+                (vse8.copy(vl=19, uopIdx=0, uopEnd=false, isLoad=false), stReqSrc_default),
+                (vse8.copy(vl=19, uopIdx=1, uopEnd=true, isLoad=false), stReqSrc_default),
             )
 
             next_is_store_and_step(dut)
@@ -244,10 +246,10 @@ trait VLsuBehavior_st {
             test_init_store(dut)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vse16.copy(vl=27, uopIdx=0, uopEnd=false), stReqSrc_default),
-                (vse16.copy(vl=27, uopIdx=1, uopEnd=false), SrcBundleSt(vs3="hfedcba98765432100f0f0f0f0f0f0f0f")),
-                (vse16.copy(vl=27, uopIdx=2, uopEnd=false), SrcBundleSt(vs3="h01010101010101011234567890123456")),
-                (vse16.copy(vl=27, uopIdx=3, uopEnd=true),  SrcBundleSt(vs3="h201f1e1d1c1b1a191817678901234567")),
+                (vse16.copy(vl=27, uopIdx=0, uopEnd=false, isLoad=false), stReqSrc_default),
+                (vse16.copy(vl=27, uopIdx=1, uopEnd=false, isLoad=false), SrcBundleSt(vs3="hfedcba98765432100f0f0f0f0f0f0f0f")),
+                (vse16.copy(vl=27, uopIdx=2, uopEnd=false, isLoad=false), SrcBundleSt(vs3="h01010101010101011234567890123456")),
+                (vse16.copy(vl=27, uopIdx=3, uopEnd=true, isLoad=false),  SrcBundleSt(vs3="h201f1e1d1c1b1a191817678901234567")),
             )
 
             next_is_store_and_step(dut)
@@ -285,9 +287,9 @@ trait VLsuBehavior_st {
             test_init_store(dut)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vse32.copy(vl=10, uopIdx=0, uopEnd=false), stReqSrc_default),
-                (vse32.copy(vl=10, uopIdx=1, uopEnd=false), SrcBundleSt(vs3="hfedcba98765432100f0f0f0f0f0f0f0f")),
-                (vse32.copy(vl=10, uopIdx=2, uopEnd=true),  SrcBundleSt(vs3="h01010101010101011234567890123456")),
+                (vse32.copy(vl=10, uopIdx=0, uopEnd=false, isLoad=false), stReqSrc_default),
+                (vse32.copy(vl=10, uopIdx=1, uopEnd=false, isLoad=false), SrcBundleSt(vs3="hfedcba98765432100f0f0f0f0f0f0f0f")),
+                (vse32.copy(vl=10, uopIdx=2, uopEnd=true, isLoad=false),  SrcBundleSt(vs3="h01010101010101011234567890123456")),
             )
 
             next_is_store_and_step(dut)
@@ -323,8 +325,8 @@ trait VLsuBehavior_st {
             test_init_store(dut)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vse64.copy(vl=3, uopIdx=0, uopEnd=false), stReqSrc_default),
-                (vse64.copy(vl=3, uopIdx=1, uopEnd=true),  SrcBundleSt(vs3="hfedcba98765432100f0f0f0f0f0f0f0f")),
+                (vse64.copy(vl=3, uopIdx=0, uopEnd=false, isLoad=false), stReqSrc_default),
+                (vse64.copy(vl=3, uopIdx=1, uopEnd=true, isLoad=false),  SrcBundleSt(vs3="hfedcba98765432100f0f0f0f0f0f0f0f")),
             )
 
             next_is_store_and_step(dut)
@@ -358,8 +360,8 @@ trait VLsuBehavior_st {
             test_init_store(dut)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vse64.copy(vl=3, vstart=1, uopIdx=0, uopEnd=false), stReqSrc_default),
-                (vse64.copy(vl=3, vstart=1, uopIdx=1, uopEnd=true),  SrcBundleSt(vs3="hfedcba98765432100f0f0f0f0f0f0f0f")),
+                (vse64.copy(vl=3, vstart=1, uopIdx=0, uopEnd=false, isLoad=false), stReqSrc_default),
+                (vse64.copy(vl=3, vstart=1, uopIdx=1, uopEnd=true, isLoad=false),  SrcBundleSt(vs3="hfedcba98765432100f0f0f0f0f0f0f0f")),
             )
 
             next_is_store_and_step(dut)
@@ -393,7 +395,7 @@ trait VLsuBehavior_st {
             test_init_store(dut)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsm.copy(vl=27, uopIdx=0, uopEnd=true), stReqSrc_default),
+                (vsm.copy(vl=27, uopIdx=0, uopEnd=true, isLoad=false), stReqSrc_default),
             )
 
             next_is_store_and_step(dut)
@@ -425,7 +427,7 @@ trait VLsuBehavior_st {
             test_init_store(dut)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsse8.copy(vl=6, uopIdx=0, uopEnd=true), SrcBundleSt(scalar_opnd_2="hffffffff_fffffffb"))
+                (vsse8.copy(vl=6, uopIdx=0, uopEnd=true, isLoad=false), SrcBundleSt(scalar_opnd_2="hffffffff_fffffffb"))
             )
 
             next_is_store_and_step(dut)
@@ -460,7 +462,7 @@ trait VLsuBehavior_st {
             test_init_store(dut)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsse32.copy(vl=2, uopIdx=0, uopEnd=true), SrcBundleSt(scalar_opnd_2="hffffffff_ffffffff"))
+                (vsse32.copy(vl=2, uopIdx=0, uopEnd=true, isLoad=false), SrcBundleSt(scalar_opnd_2="hffffffff_ffffffff"))
             )
 
             next_is_store_and_step(dut)
@@ -492,8 +494,8 @@ trait VLsuBehavior_st {
             test_init_store(dut)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsse16.copy(vl=10, uopIdx=0, uopEnd=true), SrcBundleSt(scalar_opnd_2="h8")),
-                (vsse16.copy(vl=10, uopIdx=1, uopEnd=true), SrcBundleSt(scalar_opnd_2="h8"))
+                (vsse16.copy(vl=10, uopIdx=0, uopEnd=true, isLoad=false), SrcBundleSt(scalar_opnd_2="h8")),
+                (vsse16.copy(vl=10, uopIdx=1, uopEnd=true, isLoad=false), SrcBundleSt(scalar_opnd_2="h8"))
             )
 
             next_is_store_and_step(dut)
@@ -529,8 +531,8 @@ trait VLsuBehavior_st {
             test_init_store(dut)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsse16.copy(vm=false, vl=10, uopIdx=0, uopEnd=true), SrcBundleSt(scalar_opnd_2="h8", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fefe")),
-                (vsse16.copy(vm=false, vl=10, uopIdx=1, uopEnd=true), SrcBundleSt(scalar_opnd_2="h8", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fefe"))
+                (vsse16.copy(vm=false, vl=10, uopIdx=0, uopEnd=true, isLoad=false), SrcBundleSt(scalar_opnd_2="h8", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fefe")),
+                (vsse16.copy(vm=false, vl=10, uopIdx=1, uopEnd=true, isLoad=false), SrcBundleSt(scalar_opnd_2="h8", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fefe"))
             )
 
             next_is_store_and_step(dut)
@@ -567,7 +569,7 @@ trait VLsuBehavior_st {
             test_init_store(dut)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vse8.copy(vl=19, uopIdx=0, uopEnd=false), SrcBundleSt(scalar_opnd_1="h1058")),
+                (vse8.copy(vl=19, uopIdx=0, uopEnd=false, isLoad=false), SrcBundleSt(scalar_opnd_1="h1058")),
             )
 
             next_is_store_and_step(dut)

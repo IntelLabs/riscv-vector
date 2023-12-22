@@ -97,6 +97,7 @@ trait VLsuBehavior_ld_seg {
         }
         }
     }
+
     def vLsuTest2(): Unit = {
         it should "pass: unit-stride segment load (uops=2, eew=16, vl=3, vstart=0, segments=3)" in {
         test(new SmartVectorLsuTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
