@@ -44,10 +44,10 @@ trait DarecreekParameters {
   // Issue Queue
   val NArithIQs = 1
   val ArithIQSize = 40
-  val LsIQSize = 20
-  val LdIQSize = 20
-  val StaIQSize = 20
-  val StdIQSize = 20
+  val LsIQSize = 40
+  // val LdIQSize = 20
+  // val StaIQSize = 20
+  // val StdIQSize = 20
   val NLaneExuFUs = 4
   val NArithFUs = NLaneExuFUs + 3 // Number of FUs in EXU
 

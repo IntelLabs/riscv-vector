@@ -44,8 +44,7 @@ class VPUCore extends Module {
 
   for (i <- 0 until VRenameWidth) {
     issueBlock.io.in.toArithIQ(i) <> ctrlBlock.io.out.toArithIQ(i) 
-    issueBlock.io.in.toLsIQ(0)(i) <> ctrlBlock.io.out.toLdIQ(i)
-    issueBlock.io.in.toLsIQ(1)(i) <> ctrlBlock.io.out.toStaIQ(i)
+    issueBlock.io.in.toLsIQ(i) <> ctrlBlock.io.out.toLsIQ(i)
   }
   issueBlock.io.fromBusyTable := ctrlBlock.io.readBusyTable
   ctrlBlock.io.wbArith := issueBlock.io.wbArith
@@ -63,7 +62,6 @@ class VPUCore extends Module {
   lsu.io.fromIQ.st <> issueBlock.io.toLSU.st
   issueBlock.io.fromLSU.ld := lsu.io.wb.ld
   issueBlock.io.fromLSU.st := lsu.io.wb.st
-  issueBlock.io.fromLSU.stateIsStore := lsu.io.stateIsStore
 
   lsu.io.ovi_memop <> io.ovi_memop
   lsu.io.ovi_load := io.ovi_load

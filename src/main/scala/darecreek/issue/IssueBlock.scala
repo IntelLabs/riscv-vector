@@ -27,11 +27,7 @@ class GetScalarOperand extends Bundle {
     val addr = Output(new VRobPtr)
     val data = Input(UInt(xLen.W))
   }
-  val ld = new Bundle {
-    val addr = Output(new VRobPtr)
-    val data = Input(UInt(xLen.W))
-  }
-  val st = new Bundle {
+  val ls = new Bundle {
     val addr = Output(new VRobPtr)
     val data = Input(UInt(xLen.W))
   }
@@ -43,7 +39,7 @@ class VIssueBlock extends Module {
     // from Dispatch
     val in = new Bundle {
       val toArithIQ = Vec(VRenameWidth, Flipped(Decoupled(new VExpdUOp)))
-      val toLsIQ = Vec(2, Vec(VRenameWidth, Flipped(Decoupled(new VExpdUOp))))
+      val toLsIQ = Vec(VRenameWidth, Flipped(Decoupled(new VExpdUOp)))
     }
     // from BusyTable
     val fromBusyTable = Vec(VRenameWidth, Vec(4, Input(Bool())))
@@ -51,9 +47,9 @@ class VIssueBlock extends Module {
     val get_rs1 = new GetScalarOperand
     // EXU
     val toExu = new Bundle {
-        val bits = Output(new VExuInput)
-        val valid = Output(Bool())
-        val readys = Input(Vec(NArithFUs, Bool()))
+      val bits = Output(new VExuInput)
+      val valid = Output(Bool())
+      val readys = Input(Vec(NArithFUs, Bool()))
     }
     val fromExu = Flipped(ValidIO(new VExuOutput))
     // LSU
@@ -64,7 +60,6 @@ class VIssueBlock extends Module {
     val fromLSU = new Bundle {
       val ld = Flipped(ValidIO(new VLdOutput))
       val st = Flipped(ValidIO(new VStOutput))
-      val stateIsStore = Input(Bool())
     }
     // writeback: to BusyTable, to ROB
     val wbArith = ValidIO(new WbArith)
@@ -74,7 +69,7 @@ class VIssueBlock extends Module {
   })
 
   val arithIQ = Module(new VArithIssueQ(ArithIQSize, VRenameWidth))
-  val lsIQ = Seq.fill(2)(Module(new VLdstIssueQ(LsIQSize, VRenameWidth))) // 0: ld    1: st
+  val lsIQ = Module(new VLdstIssueQ(LsIQSize, VRenameWidth))
   // Arith: 4    Ld: 3 (idx + old_dst + mask)  st: 3 (idx + vs3 + mask)
   // Todo: reduce num of read ports of ld/st
   val nVRFReadPorts = NArithIQs * 4 + 3 // So far load and store are serial, they need 3 read ports
@@ -145,43 +140,42 @@ class VIssueBlock extends Module {
     * ---- Load/Store ----
     */
   // Inputs of ld/st IQs
-  for (i <- 0 until 2) {
-    lsIQ(i).io.flush := io.flush
-    lsIQ(i).io.in <> io.in.toLsIQ(i)
-    lsIQ(i).io.fromBusyTable := io.fromBusyTable
-    lsIQ(i).io.vRFWriteback := wbRFAddrs
-  }
+  lsIQ.io.flush := io.flush
+  lsIQ.io.in <> io.in.toLsIQ
+  lsIQ.io.fromBusyTable := io.fromBusyTable
+  lsIQ.io.vRFWriteback := wbRFAddrs
   
   // -- Load --
-  // A uop of load IQ is successfully issued
-  val fireLdIQout = lsIQ(0).io.out.fire
+  // A uop of load/store IQ is successfully issued
+  val fireLsIQout = lsIQ.io.out.fire
   // Info for LSU
-  io.toLSU.ld.bits.nextVRobIdx := lsIQ(0).io.out.bits.vRobIdx
-  io.toLSU.ld.bits.iqEmpty := lsIQ(0).io.empty
   // Read RF, and regEnable the read data
-  regFile.io.read(NArithIQs * 4).addr := lsIQ(0).io.out.bits.psrc(1)
-  regFile.io.read(NArithIQs * 4 + 1).addr := lsIQ(0).io.out.bits.psrc(2)
-  regFile.io.read(NArithIQs * 4 + 2).addr := lsIQ(0).io.out.bits.psrc(3)
-  io.toLSU.ld.bits.vs2 := RegEnable(Cat(regFile.io.read(NArithIQs * 4).data.reverse), fireLdIQout)
-  io.toLSU.ld.bits.oldVd := RegEnable(Cat(regFile.io.read(NArithIQs * 4 + 1).data.reverse), fireLdIQout)
-  io.toLSU.ld.bits.vmask := RegEnable(Cat(regFile.io.read(NArithIQs * 4 + 2).data.reverse), fireLdIQout)
+  regFile.io.read(NArithIQs * 4).addr := lsIQ.io.out.bits.psrc(1)
+  regFile.io.read(NArithIQs * 4 + 1).addr := lsIQ.io.out.bits.psrc(2)
+  regFile.io.read(NArithIQs * 4 + 2).addr := lsIQ.io.out.bits.psrc(3)
+  io.toLSU.ld.bits.vs2 := RegEnable(Cat(regFile.io.read(NArithIQs * 4).data.reverse), fireLsIQout)
+  io.toLSU.ld.bits.oldVd := RegEnable(Cat(regFile.io.read(NArithIQs * 4 + 1).data.reverse), fireLsIQout)
+  io.toLSU.ld.bits.vmask := RegEnable(Cat(regFile.io.read(NArithIQs * 4 + 2).data.reverse), fireLsIQout)
   // RegEnable the uop
-  io.toLSU.ld.bits.uop := RegEnable(lsIQ(0).io.out.bits, fireLdIQout)
+  io.toLSU.ld.bits.uop := RegEnable(lsIQ.io.out.bits, fireLsIQout)
   // RegEnable the rs1
-  io.get_rs1.ld.addr := lsIQ(0).io.out.bits.vRobIdx
-  io.toLSU.ld.bits.rs2 := RegEnable(io.get_rs1.ld.data, fireLdIQout)
+  io.get_rs1.ls.addr := lsIQ.io.out.bits.vRobIdx
+  io.toLSU.ld.bits.rs2 := RegEnable(io.get_rs1.ls.data, fireLsIQout)
+  // So far, the ready of io.toLSU is ld.ready && st.ready
+  // Todo: support overlapping of load and store excution
+  val io_toLSU_ready = io.toLSU.ld.ready && io.toLSU.st.ready
   // Pipeline of valid
-  val validPipe_ld = RegInit(false.B)
+  val validPipe_ls = RegInit(false.B)
   when (io.flush) {
-    validPipe_ld := false.B
-  }.elsewhen (fireLdIQout) {
-    validPipe_ld := true.B
-  }.elsewhen (io.toLSU.ld.ready) {
-    validPipe_ld := false.B
+    validPipe_ls := false.B
+  }.elsewhen (fireLsIQout) {
+    validPipe_ls := true.B
+  }.elsewhen (io_toLSU_ready) {
+    validPipe_ls := false.B
   }
-  io.toLSU.ld.valid := validPipe_ld
+  io.toLSU.ld.valid := validPipe_ls && io.toLSU.ld.bits.uop.ctrl.load
   // Ready
-  lsIQ(0).io.out.ready := io.toLSU.ld.ready
+  lsIQ.io.out.ready := io_toLSU_ready || !validPipe_ls
   // RF write of Ld
   regFile.io.write(NArithIQs).wen := io.fromLSU.ld.valid
   regFile.io.write(NArithIQs).addr := io.fromLSU.ld.bits.uop.pdest
@@ -191,37 +185,16 @@ class VIssueBlock extends Module {
   io.wbLSU(0).bits := io.fromLSU.ld.bits.uop
 
   // -- Store --
-  // A uop of store IQ is successfully issued
-  val fireStIQout = lsIQ(1).io.out.fire
-  // Info for LSU
-  io.toLSU.st.bits.nextVRobIdx := lsIQ(1).io.out.bits.vRobIdx
-  io.toLSU.st.bits.iqEmpty := lsIQ(1).io.empty
   // Read RF, and regEnable the read data
-  when (io.fromLSU.stateIsStore) {
-    regFile.io.read(NArithIQs * 4).addr := lsIQ(1).io.out.bits.psrc(1)
-    regFile.io.read(NArithIQs * 4 + 1).addr := lsIQ(1).io.out.bits.psrc(2)
-    regFile.io.read(NArithIQs * 4 + 2).addr := lsIQ(1).io.out.bits.psrc(3)
-  }
-  io.toLSU.st.bits.vs2 := RegEnable(Cat(regFile.io.read(NArithIQs * 4).data.reverse), fireStIQout)
-  io.toLSU.st.bits.vs3 := RegEnable(Cat(regFile.io.read(NArithIQs * 4 + 1).data.reverse), fireStIQout)
-  io.toLSU.st.bits.vmask := RegEnable(Cat(regFile.io.read(NArithIQs * 4 + 2).data.reverse), fireStIQout)
+  io.toLSU.st.bits.vs2 := io.toLSU.ld.bits.vs2 
+  io.toLSU.st.bits.vs3 := io.toLSU.ld.bits.oldVd 
+  io.toLSU.st.bits.vmask := io.toLSU.ld.bits.vmask 
   // RegEnable the uop
-  io.toLSU.st.bits.uop := RegEnable(lsIQ(1).io.out.bits, fireStIQout)
+  io.toLSU.st.bits.uop := io.toLSU.ld.bits.uop
   // RegEnable the rs1
-  io.get_rs1.st.addr := lsIQ(1).io.out.bits.vRobIdx
-  io.toLSU.st.bits.rs2 := RegEnable(io.get_rs1.st.data, fireStIQout)
-  // Pipeline of valid
-  val validPipe_st = RegInit(false.B)
-  when (io.flush) {
-    validPipe_st := false.B
-  }.elsewhen (fireStIQout) {
-    validPipe_st := true.B
-  }.elsewhen (io.toLSU.st.ready) {
-    validPipe_st := false.B
-  }
-  io.toLSU.st.valid := validPipe_st
-  // Ready
-  lsIQ(1).io.out.ready := io.toLSU.st.ready
+  io.toLSU.st.bits.rs2 := io.toLSU.ld.bits.rs2
+
+  io.toLSU.st.valid := validPipe_ls && io.toLSU.ld.bits.uop.ctrl.store
   // Write-back: to BusyTable, to ROB 
   io.wbLSU(1).valid := io.fromLSU.st.valid
   io.wbLSU(1).bits := io.fromLSU.st.bits.uop

@@ -22,8 +22,6 @@ class VLdInput extends Bundle {
   val vs2 = UInt(VLEN.W)
   val oldVd = UInt(VLEN.W)
   val vmask = UInt(VLEN.W)
-  val nextVRobIdx = new VRobPtr
-  val iqEmpty = Bool()
 }
 
 class VStInput extends Bundle {
@@ -32,8 +30,6 @@ class VStInput extends Bundle {
   val vs2 = UInt(VLEN.W)
   val vs3 = UInt(VLEN.W)
   val vmask = UInt(VLEN.W)
-  val nextVRobIdx = new VRobPtr
-  val iqEmpty = Bool()
 }
 
 class VLdOutput extends Bundle {
