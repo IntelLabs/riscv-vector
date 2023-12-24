@@ -15,6 +15,8 @@ package darecreek.exu.vfu
 import chisel3._
 import chisel3.util._
 import chipsalliance.rocketchip.config.Parameters
+import darecreek.exu.vfu.fp.fudian.FloatPoint
+import darecreek.exu.vfu.fp.VFPU
 
 object UIntSplit {
   //Split into elements, e.g., if sew=8, UInt(64.W) => Seq(UInt(8.W) * 8)
@@ -52,6 +54,48 @@ object MaskExtract {
     require(maskIn.getWidth == 16)
     val result16 = Mux1H(Seq(
       sew.is8  -> maskIn,
+      sew.is16 -> Cat(0.U(4.W), maskIn(7, 4), 0.U(4.W), maskIn(3, 0)),
+      sew.is32 -> Cat(0.U(6.W), maskIn(3, 2), 0.U(6.W), maskIn(1, 0)),
+      sew.is64 -> Cat(0.U(7.W), maskIn(1), 0.U(7.W), maskIn(0)),
+    ))
+    Seq(result16(7, 0), result16(15, 8))
+  }
+}
+
+object MaskExtractRed {
+  def apply(vmask128b: UInt, uopIdx: UInt, sew: SewOH, vs2: UInt) = {
+    val extracted = Wire(UInt(16.W))
+    val extracted_nan = Wire(UInt(16.W))
+    extracted := Mux1H(Seq.tabulate(8)(uopIdx === _.U),
+      Seq.tabulate(8)(idx => Mux1H(sew.oneHot, Seq(16, 8, 4, 2).map(stride =>
+        vmask128b((idx + 1) * stride - 1, idx * stride)))))
+
+    val vs2_ele_mask = Wire(UInt(16.W))
+    val vs2_ele32 = Wire(Vec(4, UInt(32.W)))
+    val vs2_ele32_nan = Wire(Vec(4, UInt(1.W)))
+    val vs2_ele64 = Wire(Vec(2, UInt(64.W)))
+    val vs2_ele64_nan = Wire(Vec(2, UInt(1.W)))
+
+    for (i <- 0 until 4) {
+      vs2_ele32(i) := vs2((i + 1) * 32 - 1, i * 32)
+      vs2_ele32_nan(i) := FloatPoint.fromUInt(vs2_ele32(i), VFPU.f32.expWidth, VFPU.f32.precision).decode.isNaN.asUInt
+    }
+
+    for (i <- 0 until 2) {
+      vs2_ele64(i) := vs2((i + 1) * 64 - 1, i * 64)
+      vs2_ele64_nan(i) := FloatPoint.fromUInt(vs2_ele64(i), VFPU.f64.expWidth, VFPU.f64.precision).decode.isNaN.asUInt
+    }
+
+    vs2_ele_mask := Mux(sew.is32, Cat(0.U(12.W), Cat(vs2_ele32_nan.reverse)), Cat(0.U(14.W), Cat(vs2_ele64_nan.reverse)))
+    extracted_nan := extracted | vs2_ele_mask
+
+    extracted_nan
+  }
+
+  def mask16_to_2x8(maskIn: UInt, sew: SewOH): Seq[UInt] = {
+    require(maskIn.getWidth == 16)
+    val result16 = Mux1H(Seq(
+      sew.is8 -> maskIn,
       sew.is16 -> Cat(0.U(4.W), maskIn(7, 4), 0.U(4.W), maskIn(3, 0)),
       sew.is32 -> Cat(0.U(6.W), maskIn(3, 2), 0.U(6.W), maskIn(1, 0)),
       sew.is64 -> Cat(0.U(7.W), maskIn(1), 0.U(7.W), maskIn(0)),
