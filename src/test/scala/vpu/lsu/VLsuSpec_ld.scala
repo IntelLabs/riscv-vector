@@ -60,7 +60,6 @@ class VLsuTestWrapper extends Module {
       val ld = ValidIO(new VLdOutput)
       val st = ValidIO(new VStOutput)
     }
-    val stateIsStore = Output(Bool())
     // OVI interfaces
     val ovi_memop = new OVImemop
     val ovi_load = new OVIload
@@ -74,7 +73,6 @@ class VLsuTestWrapper extends Module {
   vLsu.io.ovi_load <> io.ovi_load
   vLsu.io.ovi_store <> io.ovi_store
   vLsu.io.ovi_maskIdx <> io.ovi_maskIdx
-  io.stateIsStore := vLsu.io.stateIsStore
 
   vLsu.io.fromIQ.ld.valid := io.fromIQ.ld.valid
   vLsu.io.fromIQ.st.valid := io.fromIQ.st.valid

@@ -34,9 +34,7 @@ class VCtrlBlock extends Module {
     // Dispatch outputs
     val out = new Bundle {
       val toArithIQ = Vec(VRenameWidth, Decoupled(new VExpdUOp))
-      val toLdIQ = Vec(VRenameWidth, Decoupled(new VExpdUOp))
-      val toStaIQ = Vec(VRenameWidth, Decoupled(new VExpdUOp))
-      // val toStdIQ = Vec(VRenameWidth, Decoupled(new VExpdUOp))
+      val toLsIQ = Vec(VRenameWidth, Decoupled(new VExpdUOp))
     }
     // writeback: to update busyTable, to ROB
     val wbArith = Flipped(ValidIO(new WbArith))
