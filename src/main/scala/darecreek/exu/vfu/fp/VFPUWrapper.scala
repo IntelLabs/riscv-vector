@@ -288,7 +288,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   //---- Mask gen ----
   val maskIdx = Mux(narrow, uopIdx >> 1, uopIdx)
   val mask16b = MaskExtract(io.in.bits.mask, maskIdx, eewVd)
-  val mask16b_red = MaskExtract(io.in.bits.mask, maskIdx, eew)
+  val mask16b_red = MaskExtractRed(io.in.bits.mask, maskIdx, eew, vs2)
   val old_vd_16b = MaskExtract(io.in.bits.oldVd, maskIdx, eewVd)
 
   val tailReorg = MaskReorg.splash(tail, eewVd)
