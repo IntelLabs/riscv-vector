@@ -90,7 +90,7 @@ class VMask(implicit p: Parameters) extends VFuModule {
   val vlRemainBytes = vlRemain << vsew
   val all_one = (~0.U(VLEN.W))
 
-  val vmfirst = Wire(UInt(XLEN.W))
+  val vmfirst = Wire(SInt(XLEN.W))
   val vmsbf = Wire(UInt(VLEN.W))
   val vmsif = Cat(vmsbf(VLEN - 2, 0), 1.U)
   val vmsof = Wire(UInt(VLEN.W))
@@ -138,7 +138,12 @@ class VMask(implicit p: Parameters) extends VFuModule {
 
   vmsof := ~vmsbf & vmsif
   vmsbf := sbf(Cat(vs2m.reverse))
-  vmfirst := BitsExtend(vfirst(Cat(vs2m.reverse)), XLEN, true.B)
+
+  when(!Cat(vs2m.reverse).orR) {
+    vmfirst := (-1.S(XLEN.W))
+  }.otherwise {
+    vmfirst := vfirst(Cat(vs2m.reverse)).asSInt
+  }
 
   // viota/vid/vcpop
   val vs2m_uop = MaskExtract(Cat(vs2m.reverse), uopIdx, eew)
