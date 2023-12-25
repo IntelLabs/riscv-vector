@@ -46,7 +46,7 @@ object MaskExtract {
   def apply(vmask128b: UInt, uopIdx: UInt, sew: SewOH) = {
     val extracted = Wire(UInt(16.W))
     extracted := Mux1H(Seq.tabulate(8)(uopIdx === _.U),
-                 Seq.tabulate(8)(idx => Mux1H(sew.oneHot, Seq(16,8,4,2).map(stride => 
+                 Seq.tabulate(8)(idx => Mux1H(sew.oneHot, Seq(16,8,4,2).map(stride =>
                                               vmask128b((idx+1)*stride-1, idx*stride)))))
     extracted
   }
@@ -63,7 +63,7 @@ object MaskExtract {
 }
 
 object MaskExtractRed {
-  def apply(vmask128b: UInt, uopIdx: UInt, sew: SewOH, vs2: UInt) = {
+  def apply(vmask128b: UInt, uopIdx: UInt, sew: SewOH, vs2: UInt, fpu_red_cmp: Bool) = {
     val extracted = Wire(UInt(16.W))
     val extracted_nan = Wire(UInt(16.W))
     extracted := Mux1H(Seq.tabulate(8)(uopIdx === _.U),
@@ -78,12 +78,12 @@ object MaskExtractRed {
 
     for (i <- 0 until 4) {
       vs2_ele32(i) := vs2((i + 1) * 32 - 1, i * 32)
-      vs2_ele32_nan(i) := FloatPoint.fromUInt(vs2_ele32(i), VFPU.f32.expWidth, VFPU.f32.precision).decode.isNaN.asUInt
+      vs2_ele32_nan(i) := FloatPoint.fromUInt(vs2_ele32(i), VFPU.f32.expWidth, VFPU.f32.precision).decode.isNaN.asUInt & fpu_red_cmp.asUInt
     }
 
     for (i <- 0 until 2) {
       vs2_ele64(i) := vs2((i + 1) * 64 - 1, i * 64)
-      vs2_ele64_nan(i) := FloatPoint.fromUInt(vs2_ele64(i), VFPU.f64.expWidth, VFPU.f64.precision).decode.isNaN.asUInt
+      vs2_ele64_nan(i) := FloatPoint.fromUInt(vs2_ele64(i), VFPU.f64.expWidth, VFPU.f64.precision).decode.isNaN.asUInt & fpu_red_cmp.asUInt
     }
 
     vs2_ele_mask := Mux(sew.is32, Cat(0.U(12.W), Cat(vs2_ele32_nan.reverse)), Cat(0.U(14.W), Cat(vs2_ele64_nan.reverse)))
@@ -232,12 +232,12 @@ class MaskTailData(implicit p: Parameters) extends Module {
   //-------- Mask/Tail for non-compare instructions --------
   //--------------------------------------------------------
   io.maskKeep := Cat(maskTail.map(x => Mux(x(1), 0.U(8.W), ~(0.U(8.W)))).reverse)
-  io.maskOff := Cat(maskTail.zipWithIndex.map({case (x, i) => 
+  io.maskOff := Cat(maskTail.zipWithIndex.map({case (x, i) =>
                         Mux(!x(1), 0.U(8.W), Mux(x(0), ~0.U(8.W), UIntSplit(oldVd, 8)(i)))}).reverse)
   //----------------------------------------------------
   //---- Mask/Tail for compare instruction -------------
   //----------------------------------------------------
   io.maskKeep_cmp := Cat(maskTail.map(x => !x(1)).reverse)
-  io.maskOff_cmp := Cat(maskTail.zipWithIndex.map({case (x, i) => 
+  io.maskOff_cmp := Cat(maskTail.zipWithIndex.map({case (x, i) =>
                          Mux(!x(1), false.B, Mux(x(0), true.B, oldVd(i)))}).reverse)
 }
