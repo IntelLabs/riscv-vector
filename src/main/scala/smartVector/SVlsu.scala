@@ -85,7 +85,6 @@ class SVlsu(implicit p: Parameters) extends Module {
     val mlenReg         = RegInit(0.U(vlenbWidth.W))
     val ldstTypeReg     = RegInit(0.U(2.W))
     val vmReg           = RegInit(true.B)
-    val noUseMuop       = RegInit(false.B)
 
     // vreg seg info
     val vregInfo        = RegInit(VecInit(Seq.fill(vlenb)(0.U.asTypeOf(new VRegSegmentInfo))))
@@ -135,7 +134,7 @@ class SVlsu(implicit p: Parameters) extends Module {
         }
     }.elsewhen(uopState === uop_split) {
         when(splitCount === 0.U) {
-            nextUopState := uop_idle
+            nextUopState := uop_split_finish
         }.elsewhen((splitCount - 1.U === curSplitIdx) || mem_xcpt) {
             nextUopState := uop_split_finish
         }.otherwise {
@@ -217,7 +216,6 @@ class SVlsu(implicit p: Parameters) extends Module {
             issueLdPtr   := 0.U
             curSplitIdx  := 0.U
             splitCount   := microVl - microVStart     
-            noUseMuop    := (microVl === microVStart) 
             splitStart   := microVStart
 
             // set vreg
@@ -274,7 +272,6 @@ class SVlsu(implicit p: Parameters) extends Module {
     /*-----------------------------------------calc addr end---------------------------------------------------*/
 
     when(uopState === uop_split && !mem_xcpt) {
-        noUseMuop := false.B
         when(curSplitIdx < splitCount) {
             when(vmReg || isNotMasked) {
                 ldUopQueue(ldEnqPtr).valid  := true.B
@@ -364,9 +361,20 @@ class SVlsu(implicit p: Parameters) extends Module {
 
     /************************** Ldest data writeback to uopQueue********************/
     val vreg_wb_xcpt  = vregInfo.map(info => info.status === VRegSegmentStatus.xcpt).reduce(_ || _)
-    val vreg_wb_ready =
-        vregInfo.forall(info => info.status === VRegSegmentStatus.ready || info.status === VRegSegmentStatus.srcData) ||
-        (vregInfo.forall(info => info.status === VRegSegmentStatus.invalid) && noUseMuop)
+
+    val vreg_wb_ready = WireInit(false.B)
+
+    val allSrcData = vregInfo.forall(info => info.status === VRegSegmentStatus.srcData)
+    val allReadyOrSrcData = vregInfo.forall(info => info.status === VRegSegmentStatus.ready || info.status === VRegSegmentStatus.srcData)
+
+    when(splitCount === 0.U && allSrcData) {
+        vreg_wb_ready := RegNext(splitCount === 0.U && allSrcData) // RegNext for scoreboard clear & write contradiction
+    }.elsewhen(allReadyOrSrcData) {
+        vreg_wb_ready := true.B
+    }.otherwise {
+        vreg_wb_ready := false.B
+    }
+
 
     when(vreg_wb_ready || vreg_wb_xcpt) {
         io.lsuOut.valid             := true.B
