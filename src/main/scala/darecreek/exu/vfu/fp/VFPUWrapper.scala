@@ -69,6 +69,8 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
     vfwredosum_vs ||
     vfwredusum_vs
 
+  val fpu_red_cmp = vfredmax_vs || vfredmin_vs
+
   val widen2 = Mux(vfwredosum_vs || vfwredusum_vs, true.B, io.in.bits.uop.ctrl.widen2)
 
   val vd = Wire(Vec(2, UInt(64.W)))
@@ -288,7 +290,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   //---- Mask gen ----
   val maskIdx = Mux(narrow, uopIdx >> 1, uopIdx)
   val mask16b = MaskExtract(io.in.bits.mask, maskIdx, eewVd)
-  val mask16b_red = MaskExtractRed(io.in.bits.mask, maskIdx, eew, vs2)
+  val mask16b_red = MaskExtractRed(io.in.bits.mask, maskIdx, eew, vs2, fpu_red_cmp)
   val old_vd_16b = MaskExtract(io.in.bits.oldVd, maskIdx, eewVd)
 
   val tailReorg = MaskReorg.splash(tail, eewVd)
