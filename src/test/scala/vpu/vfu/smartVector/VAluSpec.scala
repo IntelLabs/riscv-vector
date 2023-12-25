@@ -1052,7 +1052,7 @@ trait SmartBehavior {
           //genRVUissue("b00001010001000110000011101010111".U, Smartvmvxs),
 
           //vmul.v.v
-          genRVUissue("b10010110001000110010011111010111".U, Smartvmvxs),
+          //genRVUissue("b10010110001000110010011111010111".U, Smartvmvxs),
           
           
         )

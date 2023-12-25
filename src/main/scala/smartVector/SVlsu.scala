@@ -74,7 +74,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     val uop_idle :: uop_split :: uop_split_finish :: Nil = Enum(3)
     val uopState        = RegInit(uop_idle)
     val nextUopState    = WireInit(uop_idle)
-    val completeLd      = WireInit(false.B)
+    val completeLdst    = WireInit(false.B)
 
     // uop & control related
     val mUopReg         = RegInit(0.U.asTypeOf(new Muop()(p)))
@@ -100,9 +100,9 @@ class SVlsu(implicit p: Parameters) extends Module {
     val splitStart      = RegInit(0.U(vlenbWidth.W))
 
     // ldQueue
-    val ldstEnqPtr        = RegInit(0.U(ldstUopQueueWidth.W))
-    val issueLdstPtr      = RegInit(0.U(ldstUopQueueWidth.W))
-    val ldstUopQueue      = RegInit(VecInit(Seq.fill(ldstUopQueueSize)(0.U.asTypeOf(new LdstUop))))
+    val ldstEnqPtr      = RegInit(0.U(ldstUopQueueWidth.W))
+    val issueLdstPtr    = RegInit(0.U(ldstUopQueueWidth.W))
+    val ldstUopQueue    = RegInit(VecInit(Seq.fill(ldstUopQueueSize)(0.U.asTypeOf(new LdstUop))))
 
     // xcpt info
     val xcptVlReg       = RegInit(0.U(bVL.W))
@@ -122,7 +122,7 @@ class SVlsu(implicit p: Parameters) extends Module {
                     |-> |uop_idle|--------------|uop_split| <-|
                         +---+----+              +----+----+
                             |                        |
-                  completeLd|                        |splitIdx = splitCount-1
+                completeLdst|                        |splitIdx = splitCount-1
                             |   +----------------+   |        || xcpt
                             |-> |uop_split_finish| <-|
                                 +----------------+
@@ -146,7 +146,7 @@ class SVlsu(implicit p: Parameters) extends Module {
             nextUopState := uop_split
         }
     }.elsewhen(uopState === uop_split_finish) {
-        when(completeLd) {
+        when(completeLdst) {
             nextUopState := uop_idle
         }.otherwise {
             nextUopState := uop_split_finish
@@ -221,8 +221,8 @@ class SVlsu(implicit p: Parameters) extends Module {
             mlenReg      := mlen
 
             // Set split info
-            ldstEnqPtr     := 0.U
-            issueLdstPtr   := 0.U
+            ldstEnqPtr   := 0.U
+            issueLdstPtr := 0.U
             curSplitIdx  := 0.U
             splitCount   := microVl - microVStart     
             noUseMuop    := (microVl === microVStart) 
@@ -305,17 +305,16 @@ class SVlsu(implicit p: Parameters) extends Module {
 
 
     /*********************************ISSUE START*********************************/
-    // update issueLdstPtr
-    val dcacheReadyNext = RegNext(io.dataExchange.req.ready)
-
-    when(io.dataExchange.resp.bits.nack) {
+    // update issueLdPtr
+    // <= or < ?
+    when(io.dataExchange.resp.bits.nack && io.dataExchange.resp.bits.idx <= issueLdstPtr) {
         assert(!mem_xcpt)
         issueLdstPtr := io.dataExchange.resp.bits.idx
-    }.elsewhen(ldstUopQueue(issueLdstPtr).valid && dcacheReadyNext) {
+    }.elsewhen(ldstUopQueue(issueLdstPtr).valid && io.dataExchange.req.ready) {
         issueLdstPtr := issueLdstPtr + 1.U
     }
 
-    when(ldstUopQueue(issueLdstPtr).valid && dcacheReadyNext) {
+    when(ldstUopQueue(issueLdstPtr).valid) {
         val storeDataVec = VecInit(Seq.fill(8)(0.U(8.W)))
         val storeMaskVec = VecInit(Seq.fill(8)(0.U(1.W)))
 
@@ -361,7 +360,7 @@ class SVlsu(implicit p: Parameters) extends Module {
                     val offsetOH = UIntToOH(vregInfo(i).offset, 8)
                     vregInfo(i).data := Mux1H(
                         offsetOH, 
-                        Seq (respData( 7,  0), respData(15,  8), respData(23, 16), respData(31, 24),
+                        Seq(respData( 7,  0), respData(15,  8), respData(23, 16), respData(31, 24),
                             respData(39, 32), respData(47, 40), respData(55, 48), respData(63, 56))
                     )
                 }
@@ -384,14 +383,14 @@ class SVlsu(implicit p: Parameters) extends Module {
         }
     }
 
-    completeLd := ldstUopQueue.forall(uop => uop.valid === false.B) // ld completed or xcpt happened
+    completeLdst := ldstUopQueue.forall(uop => uop.valid === false.B) // ld completed or xcpt happened
     
     /*---------------------------------RESP END---------------------------------*/
 
     /************************** Ldest data writeback to uopQueue********************/
     val vreg_wb_xcpt  = vregInfo.map(info => info.status === VRegSegmentStatus.xcpt).reduce(_ || _)
     val vreg_wb_ready =
-        vregInfo.forall(info => info.status === VRegSegmentStatus.ready || info.status === VRegSegmentStatus.srcData) ||
+         vregInfo.forall(info => info.status === VRegSegmentStatus.ready || info.status === VRegSegmentStatus.srcData) ||
         (vregInfo.forall(info => info.status === VRegSegmentStatus.invalid) && noUseMuop)
 
     when(vreg_wb_ready || vreg_wb_xcpt) {
@@ -430,5 +429,4 @@ class SVlsu(implicit p: Parameters) extends Module {
         io.xcpt.update_data         := DontCare
         io.xcpt.xcpt_cause          := 0.U.asTypeOf(new HellaCacheExceptions)
     }
-
 }
