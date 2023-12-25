@@ -338,7 +338,7 @@ class VMask(implicit p: Parameters) extends VFuModule {
   tail_vd := vstart_vd | old_vd_vl_mask | (mask_vd & vd_vl_mask & vstart_mask)
 
   vd_out := vd_reg
-  when(vstart_reg >= vl_reg) {
+  when((vstart_reg >= vl_reg) && !reg_vfirst_m && !reg_vcpop_m) {
     vd_out := old_vd_reg
   }.elsewhen(reg_vm_logical || reg_vmsbf_m || reg_vmsif_m || reg_vmsof_m) {
     vd_out := tail_vd
