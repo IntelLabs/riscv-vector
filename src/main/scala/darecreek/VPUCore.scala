@@ -47,7 +47,8 @@ class VPUCore extends Module {
     issueBlock.io.in.toLsIQ(i) <> ctrlBlock.io.out.toLsIQ(i)
   }
   issueBlock.io.fromBusyTable := ctrlBlock.io.readBusyTable
-  ctrlBlock.io.wbArith := issueBlock.io.wbArith
+  ctrlBlock.io.wbArith_lane := issueBlock.io.wbArith_lane
+  ctrlBlock.io.wbArith_cross := issueBlock.io.wbArith_cross
   ctrlBlock.io.wbLSU := issueBlock.io.wbLSU
   issueBlock.io.flush := ctrlBlock.io.flush
   issueBlock.io.get_rs1 <> ctrlBlock.io.get_rs1

@@ -11,7 +11,7 @@ class VCrossLaneExu extends Module {
       val valid = Input(Bool())
       val readys = Output(Vec(3, Bool()))
     }
-    val out = Decoupled(new VExuOutput)
+    val out = Decoupled(new VCrossExuOut)
   })
 
   val permutation = Module(new Permutation)
@@ -30,7 +30,7 @@ class VCrossLaneExu extends Module {
   permutation.io.in.valid := io.in.valid && io.in.bits.uop.ctrl.perm
   io.in.readys(2) := permutation.io.in.ready
 
-  val arb = Module(new Arbiter(new VExuOutput, 3))
+  val arb = Module(new Arbiter(new VCrossExuOut, 3))
   arb.io.in(0) <> reduction.io.out
   arb.io.in(1) <> vmask.io.out
   arb.io.in(2) <> permutation.io.out

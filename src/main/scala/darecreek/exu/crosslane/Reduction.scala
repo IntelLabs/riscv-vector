@@ -10,7 +10,7 @@ import VAluFunct6._
 class Reduction extends Module {
   val io = IO(new Bundle {
     val in = Flipped(Decoupled(new VExuInput))   
-    val out = Decoupled(new VExuOutput)
+    val out = Decoupled(new VCrossExuOut)
   })
 
 val vlenbWidth = log2Up(vlenb)+1
@@ -526,7 +526,6 @@ io.out.bits.vd := VecInit(Seq.tabulate(NLanes)(i => output_data((i+1)*LaneWidth-
 io.out.bits.uop := RegEnable(uop, fire) 
 // temp!!
 io.out.bits.fflags := Mux(alu_busy, alu(0).io.out.bits.fflags, fpu(0).io.out.bits.fflags)
-io.out.bits.vxsat := false.B
 
 
 }

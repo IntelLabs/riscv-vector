@@ -55,7 +55,7 @@ trait DarecreekParameters {
   val SPRegIdxWidth = log2Up(NPhyRegs) // Scalar
   val VPRegIdxWidth = log2Up(NVPhyRegs) // Vector
 
-  val nVRFWritePorts = NArithIQs + 1
+  val nVRFWritePorts = 2 + 1  //Arith:2 LSU:1
 
   val LaneWidth = 64  // constant
   val NLanes = VLEN / LaneWidth  // must be power of 2
