@@ -39,7 +39,6 @@ class SmartVectorLsuStoreTestWrapper extends Module {
     vLsu.io.mUop.bits.scalar_opnd_2         := io.mUop.bits.scalar_opnd_2
     vLsu.io.mUop.bits.uopRegInfo.vs1        := io.mUop.bits.vs1
     vLsu.io.mUop.bits.uopRegInfo.vs2        := io.mUop.bits.vs2
-    vLsu.io.vs3                             := io.mUop.bits.vs3
     vLsu.io.mUop.bits.uopRegInfo.old_vd     := io.mUop.bits.oldVd
     vLsu.io.mUop.bits.uopRegInfo.mask       := io.mUop.bits.mask
     vLsu.io.mUop.bits.uopRegInfo.vxsat      := false.B

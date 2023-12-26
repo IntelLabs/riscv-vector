@@ -82,7 +82,6 @@ class SmartVector extends Module {
     io.out.rvuCommit <> commit.io.out.commitInfo
 
     svlsu.io.mUop <> split.io.out.mUop
-    svlsu.io.vs3 := 0.U
     svlsu.io.mUopMergeAttr <> split.io.out.mUopMergeAttr
     split.io.vLSUXcpt <> svlsu.io.xcpt
 

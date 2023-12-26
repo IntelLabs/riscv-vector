@@ -24,7 +24,6 @@ class LdstIO(implicit p: Parameters) extends ParameterizedBundle()(p) {
     val dataExchange    = new RVUMemory()
     val lsuReady        = Output(Bool())
     val segmentIdx      = Input(UInt(log2Ceil(8).W))
-    val vs3             = Input(UInt(VLEN.W))
 }
 
 object VRegSegmentStatus {
@@ -231,11 +230,7 @@ class SVlsu(implicit p: Parameters) extends Module {
             when(vregClean) {
                 (0 until vlenb).foreach { i => 
                     val pos = i.U >> memwAlign
-                    vregInfo(i).data := Mux(
-                        io.mUop.bits.uop.ctrl.load,
-                        io.mUop.bits.uopRegInfo.old_vd(8 * i + 7, 8 * i),
-                        io.vs3(8 * i + 7, 8 * i)
-                    )
+                    vregInfo(i).data := io.mUop.bits.uopRegInfo.old_vd(8 * i + 7, 8 * i)
                     vregInfo(i).status := Mux(pos < memVl && pos >= memVstart, VRegSegmentStatus.needLdst, VRegSegmentStatus.srcData)
                 }
             }

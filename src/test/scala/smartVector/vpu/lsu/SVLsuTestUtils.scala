@@ -110,7 +110,6 @@ trait BundleGenHelper {
         _.scalar_opnd_2 -> s.scalar_opnd_2.U,
         _.vs1 -> s.vs1.U,
         _.vs2 -> s.vs2.U,
-        _.vs3 -> 0.U,
         _.oldVd -> s.oldVd.U,
         _.mask -> s.mask.U,
     )
@@ -123,8 +122,7 @@ trait BundleGenHelper {
         _.scalar_opnd_2 -> s.scalar_opnd_2.U,
         _.vs1 -> s.vs1.U,
         _.vs2 -> s.vs2.U,
-        _.vs3 -> s.vs3.U,
-        _.oldVd -> 0.U,
+        _.oldVd -> s.vs3.U,
         _.mask -> s.mask.U,
     )
   }
@@ -156,7 +154,6 @@ class MuopTest extends Bundle {
     val scalar_opnd_2 = UInt(XLEN.W)
     val vs1           = UInt(VLEN.W)
     val vs2           = UInt(VLEN.W)
-    val vs3           = UInt(VLEN.W)
     val mask          = UInt(VLEN.W)
 }
 
