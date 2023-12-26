@@ -45,7 +45,7 @@ class VLane extends Module{
       val valids = Input(Vec(NLaneExuFUs, Bool()))
       val readys = Output(Vec(NLaneExuFUs, Bool()))
     }
-    val out = Decoupled(new LaneFUOutput)
+    val out = Vec(2, Decoupled(new LaneFUOutput))
   })
 
   val p = Parameters.empty.alterPartial({
@@ -81,12 +81,12 @@ class VLane extends Module{
   io.in.readys(3) := vdiv.io.in.ready
 
   /**
-    * Output arbiter
+    * Outputs (two write-back ports)
     */
-  val arb = Module(new Arbiter(new LaneFUOutput, 4))
-  arb.io.in(0) <> valu.io.out
-  arb.io.in(1) <> vmac.io.out
-  arb.io.in(2) <> vfp.io.out
-  arb.io.in(3) <> vdiv.io.out
-  io.out <> arb.io.out  
+  io.out(0) <> valu.io.out
+  val arb = Module(new Arbiter(new LaneFUOutput, 3))
+  arb.io.in(0) <> vdiv.io.out
+  arb.io.in(1) <> vfp.io.out
+  arb.io.in(2) <> vmac.io.out
+  io.out(1) <> arb.io.out  
 }

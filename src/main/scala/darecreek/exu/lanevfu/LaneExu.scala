@@ -30,7 +30,7 @@ class VLaneExu extends Module {
       val valid = Input(Bool())
       val readys = Output(Vec(NLaneExuFUs, Bool()))
     }
-    val out = Decoupled(new VLaneExuOut)
+    val out = Vec(2, Decoupled(new VLaneExuOut))
   })
 
   require(NLanes > 1, s"Number of lanes: $NLanes must > 1 (XLEN >= 128)")
@@ -49,7 +49,8 @@ class VLaneExu extends Module {
     lanes(i).io.in.data.uop := uop
     lanes(i).io.in.data.rs1 := io.in.bits.rs1
     lanes(i).io.in.data.prestart := 0.U  // So far, set vstart = 0 for all arithmetic instructions
-    lanes(i).io.out.ready := io.out.ready
+    lanes(i).io.out(0).ready := io.out(0).ready
+    lanes(i).io.out(1).ready := io.out(1).ready
   }
   io.in.readys := lanes(0).io.in.readys
 
@@ -163,33 +164,40 @@ class VLaneExu extends Module {
              Mux(uop.ctrl.narrow, laneOldVdNarrow.asUInt, io.in.bits.vSrc(2)(i)))
   }
   
-  //---------- Output --------------
-  io.out.valid := lanes(0).io.out.valid
-  io.out.bits.uop := lanes(0).io.out.bits.uop
-  io.out.bits.fflags := lanes(0).io.out.bits.fflags
-  io.out.bits.vxsat := lanes(0).io.out.bits.vxsat
-
   /**
-    *  Output vd rearrangement
+    *  Output
     */
-  // -------- For narrow instrution ------ 
-  // Lane index:           3       2       1       0 (sew = destEew = 16)
-  // Output of lanes:   FE76     DC54   BA32    9810
-  // Rearranged vd:     FEDC     BA98   7654    3210
-  val vd = Wire(Vec(NLanes, UInt(64.W)))
-  for (i <- 0 until NLanes) {
-    when (io.out.bits.uop.ctrl.narrow) {
-      if (i < NLanes/2) {
-        vd(i) := Cat(lanes(2*i+1).io.out.bits.vd(31, 0), lanes(2*i).io.out.bits.vd(31, 0))
-      } else {
-        vd(i) := Cat(lanes(2*i+1-NLanes).io.out.bits.vd(63, 32), lanes(2*i-NLanes).io.out.bits.vd(63, 32))
+  // Two write-back ports of laneEXU (0: alu, 1: mul_fp)
+  for (wbIdx <- 0 until 2) {
+    io.out(wbIdx).valid := lanes(0).io.out(wbIdx).valid
+    io.out(wbIdx).bits.uop := lanes(0).io.out(wbIdx).bits.uop
+
+    // ----   Output vd rearrangement   ----
+    // -------- For narrow instrution ------ 
+    // Lane index:           3       2       1       0 (sew = destEew = 16)
+    // Output of lanes:   FE76     DC54   BA32    9810
+    // Rearranged vd:     FEDC     BA98   7654    3210
+    val vd = Wire(Vec(NLanes, UInt(64.W)))
+    for (i <- 0 until NLanes) {
+      when (io.out(wbIdx).bits.uop.ctrl.narrow) {
+        if (i < NLanes/2) {
+          vd(i) := Cat(lanes(2*i+1).io.out(wbIdx).bits.vd(31, 0), lanes(2*i).io.out(wbIdx).bits.vd(31, 0))
+        } else {
+          vd(i) := Cat(lanes(2*i+1-NLanes).io.out(wbIdx).bits.vd(63, 32), lanes(2*i-NLanes).io.out(wbIdx).bits.vd(63, 32))
+        }
+      }.otherwise {
+        vd(i) := lanes(i).io.out(wbIdx).bits.vd
       }
-    }.otherwise {
-      vd(i) := lanes(i).io.out.bits.vd
+    }
+    val vdCmp = Mux1H(SewOH(io.out(wbIdx).bits.uop.info.vsew).oneHot, Seq(8,16,32,64).map(sew => cmpOutRearrange(sew, wbIdx)))
+    // Final output vd
+    for (i <- 0 until NLanes) {
+      io.out(wbIdx).bits.vd(i) := Mux(io.out(wbIdx).bits.uop.ctrl.narrow_to_1, (UIntSplit(vdCmp))(i), vd(i))
     }
   }
+  
   // compare output (narrow-to-1)
-  def cmpOutRearrange(sew: Int):UInt = {
+  def cmpOutRearrange(sew: Int, wbIdx: Int):UInt = {
     val result = Wire(Vec(VLEN, Bool()))
     for (i <- 0 until VLEN) {
       if (i >= VLEN/(sew/8)) {result(i) := true.B}
@@ -197,15 +205,14 @@ class VLaneExu extends Module {
         val laneIdx = (i % (VLEN/sew)) / (64/sew)
         val lmulIdx = i / (VLEN/sew)
         val offset = (i % (VLEN/sew)) - laneIdx * (64/sew)
-        result(i) := lanes(laneIdx).io.out.bits.vd(lmulIdx*8 + offset)
+        result(i) := lanes(laneIdx).io.out(wbIdx).bits.vd(lmulIdx*8 + offset)
       }
     }
     Cat(result.reverse)
   }
-  val vdCmp = Mux1H(SewOH(io.out.bits.uop.info.vsew).oneHot, Seq(8,16,32,64).map(sew => cmpOutRearrange(sew)))
 
-  // Final output vd
-  for (i <- 0 until NLanes) {
-    io.out.bits.vd(i) := Mux(io.out.bits.uop.ctrl.narrow_to_1, (UIntSplit(vdCmp))(i), vd(i))
-  }
+  io.out(0).bits.fflags := 0.U
+  io.out(1).bits.fflags := lanes.map(_.io.out(1).bits.fflags).reduce(_ | _)
+  io.out(0).bits.vxsat := lanes.map(_.io.out(0).bits.vxsat).reduce(_ || _)
+  io.out(1).bits.vxsat := lanes.map(_.io.out(1).bits.vxsat).reduce(_ || _)
 }
