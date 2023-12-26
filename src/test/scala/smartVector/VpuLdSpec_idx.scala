@@ -10,7 +10,7 @@ import darecreek.exu.vfu.VFuParamsKey
 import darecreek.exu.vfu.VFuParameters
 import xiangshan.XSCoreParamsKey
 import xiangshan.XSCoreParameters
-import smartVector.lsutest.FakeLdDCache
+import smartVector.lsutest.LSUFakeDCache
 import smartVector._
 import darecreek.ctrl.decode.VInstructions._
 import SmartParam._
@@ -19,8 +19,8 @@ import SmartParam._
 trait SmartVectorBehavior_ld_idx {
   this: AnyFlatSpec with ChiselScalatestTester with BundleGenHelper =>
 
-    val ldReqCtrl_default = CtrlBundle()
-    val ldReqSrc_default  = SrcBundleLd()
+    val ldstReqCtrl_default = CtrlBundle()
+    val ldstReqSrc_default  = SrcBundleLdst()
 
     // def VLE8_V             = BitPat("b???000?00000?????000?????0000111")
     // vle8 v2, 0(x1), 0x0
@@ -52,18 +52,16 @@ trait SmartVectorBehavior_ld_idx {
     def vLsuTest0(): Unit = {
         it should "pass: indexed load (uops=1, sew=8, eew=8, vl=8, vstart=0)" in {
         test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            test_init(dut)
+            dut.clock.setTimeout(1000)
             dut.clock.step(1)
             
-            next_is_load_and_step(dut)
-
             val ldReqs = Seq(
-                (ldReqCtrl_default.copy(instrn=VLE8_V, vl=8, vlmul=1), SrcBundleLd(rs1="h1068")),
-                (ldReqCtrl_default.copy(instrn=VLUXEI8_V, vl=8, vlmul=1), ldReqSrc_default.copy()),
+                (ldstReqCtrl_default.copy(instrn=VLE8_V, vl=8, vlmul=1), SrcBundleLdst(rs1="h1068")),
+                (ldstReqCtrl_default.copy(instrn=VLUXEI8_V, vl=8, vlmul=1), ldstReqSrc_default.copy()),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
-            dut.io.rvuIssue.bits.poke(genLdInput(ldReqs(0)._1, ldReqs(0)._2))
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(0)._1, ldReqs(0)._2))
             dut.clock.step(1)
             dut.io.rvuIssue.valid.poke(false.B)
 
@@ -75,7 +73,7 @@ trait SmartVectorBehavior_ld_idx {
             dut.io.rfData(2).expect("h0807060504030201".U)
 
             dut.io.rvuIssue.valid.poke(true.B)
-            dut.io.rvuIssue.bits.poke(genLdInput(ldReqs(1)._1, ldReqs(1)._2))
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(1)._1, ldReqs(1)._2))
             dut.clock.step(1)
             dut.io.rvuIssue.valid.poke(false.B)
 
@@ -92,18 +90,16 @@ trait SmartVectorBehavior_ld_idx {
     def vLsuTest1(): Unit = {
         it should "pass: indexed load (uops=1, sew=32, eew=8, vl=8, vstart=0)" in {
         test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            test_init(dut)
+            dut.clock.setTimeout(1000)
             dut.clock.step(1)
             
-            next_is_load_and_step(dut)
-
             val ldReqs = Seq(
-                (ldReqCtrl_default.copy(instrn=VLE8_V, vl=8, vlmul=1), SrcBundleLd(rs1="h1078")),
-                (ldReqCtrl_default.copy(instrn=VLUXEI8_V, vl=8, vlmul=1, vsew=2), ldReqSrc_default.copy()),
+                (ldstReqCtrl_default.copy(instrn=VLE8_V, vl=8, vlmul=1), SrcBundleLdst(rs1="h1078")),
+                (ldstReqCtrl_default.copy(instrn=VLUXEI8_V, vl=8, vlmul=1, vsew=2), ldstReqSrc_default.copy()),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
-            dut.io.rvuIssue.bits.poke(genLdInput(ldReqs(0)._1, ldReqs(0)._2))
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(0)._1, ldReqs(0)._2))
             dut.clock.step(1)
             dut.io.rvuIssue.valid.poke(false.B)
 
@@ -115,7 +111,7 @@ trait SmartVectorBehavior_ld_idx {
             dut.io.rfData(2).expect("h081814100c1c0004".U)
 
             dut.io.rvuIssue.valid.poke(true.B)
-            dut.io.rvuIssue.bits.poke(genLdInput(ldReqs(1)._1, ldReqs(1)._2))
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(1)._1, ldReqs(1)._2))
             dut.clock.step(1)
             dut.io.rvuIssue.valid.poke(false.B)
 
@@ -133,18 +129,16 @@ trait SmartVectorBehavior_ld_idx {
     def vLsuTest2(): Unit = {
         it should "pass: indexed load (uops=1, sew=16, eew=16, vl=8, vstart=0)" in {
         test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            test_init(dut)
+            dut.clock.setTimeout(1000)
             dut.clock.step(1)
             
-            next_is_load_and_step(dut)
-
             val ldReqs = Seq(
-                (ldReqCtrl_default.copy(instrn=VLE16_V, vl=8, vlmul=1), SrcBundleLd(rs1="h1080")),
-                (ldReqCtrl_default.copy(instrn=VLUXEI16_V, vl=8, vlmul=1, vsew=1), ldReqSrc_default.copy()),
+                (ldstReqCtrl_default.copy(instrn=VLE16_V, vl=8, vlmul=1), SrcBundleLdst(rs1="h1080")),
+                (ldstReqCtrl_default.copy(instrn=VLUXEI16_V, vl=8, vlmul=1, vsew=1), ldstReqSrc_default.copy()),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
-            dut.io.rvuIssue.bits.poke(genLdInput(ldReqs(0)._1, ldReqs(0)._2))
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(0)._1, ldReqs(0)._2))
             dut.clock.step(1)
             dut.io.rvuIssue.valid.poke(false.B)
 
@@ -156,7 +150,7 @@ trait SmartVectorBehavior_ld_idx {
             dut.io.rfData(2).expect("h00080004001c00080000000c0004".U)
 
             dut.io.rvuIssue.valid.poke(true.B)
-            dut.io.rvuIssue.bits.poke(genLdInput(ldReqs(1)._1, ldReqs(1)._2))
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(1)._1, ldReqs(1)._2))
             dut.clock.step(1)
             dut.io.rvuIssue.valid.poke(false.B)
 

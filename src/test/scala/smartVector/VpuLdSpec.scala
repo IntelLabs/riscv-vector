@@ -4,60 +4,16 @@ import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
 import chisel3._
 import chisel3.util._
-import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import chiseltest.WriteVcdAnnotation
-import darecreek.exu.vfu.VFuParamsKey
-import darecreek.exu.vfu.VFuParameters
-import xiangshan.XSCoreParamsKey
-import xiangshan.XSCoreParameters
-import smartVector.lsutest.FakeLdDCache
 import smartVector._
 import darecreek.ctrl.decode.VInstructions._
 import SmartParam._
 
-class SmartVectorTestWrapper extends Module {
-    val io = IO(new Bundle{
-        val rvuIssue = Flipped(Decoupled(new VIssueTest))
-        val rvuCommit = Output(new RVUCommit)
-        val rfData = Output(Vec(NVPhyRegs, UInt(VLEN.W)))
-    })
-
-    val p = Parameters.empty.alterPartial({
-        case SmartParamsKey => SmartParameters(VLEN = 128)
-        case VFuParamsKey   => VFuParameters(XLEN = 64, VLEN = 128)
-        case XSCoreParamsKey => XSCoreParameters()
-    })
-
-    val smartVector = Module(new SmartVector())
-  
-    smartVector.io.in.valid := io.rvuIssue.valid
-    smartVector.io.in.bits.inst := io.rvuIssue.bits.ctrl.inst
-    smartVector.io.in.bits.rs1 := io.rvuIssue.bits.rs1
-    smartVector.io.in.bits.rs2 := io.rvuIssue.bits.rs2
-    smartVector.io.in.bits.vInfo.vl := io.rvuIssue.bits.ctrl.info_vl
-    smartVector.io.in.bits.vInfo.vstart := io.rvuIssue.bits.ctrl.info_vstart
-    smartVector.io.in.bits.vInfo.vma := io.rvuIssue.bits.ctrl.info_ma
-    smartVector.io.in.bits.vInfo.vta := io.rvuIssue.bits.ctrl.info_ta
-    smartVector.io.in.bits.vInfo.vsew := io.rvuIssue.bits.ctrl.info_vsew
-    smartVector.io.in.bits.vInfo.vlmul := io.rvuIssue.bits.ctrl.info_vlmul
-    smartVector.io.in.bits.vInfo.vxrm := 0.U
-    smartVector.io.in.bits.vInfo.frm := 0.U
-    
-
-    io.rvuIssue.ready := smartVector.io.in.ready
-    io.rfData := smartVector.io.rfData
-    io.rvuCommit <> smartVector.io.out.rvuCommit
-
-    val dcache = Module(new FakeLdDCache)
-    smartVector.io.rvuMemory <> dcache.io
-}
-
-
 trait SmartVectorBehavior_ld {
   this: AnyFlatSpec with ChiselScalatestTester with BundleGenHelper =>
 
-    val ldReqCtrl_default = CtrlBundle()
-    val ldReqSrc_default  = SrcBundleLd()
+    val ldstReqCtrl_default = CtrlBundle()
+    val ldstReqSrc_default  = SrcBundleLdst()
 
     // def VLE8_V             = BitPat("b???000?00000?????000?????0000111")
     // vle8 v2, 0(x1), 0x0
@@ -80,19 +36,16 @@ trait SmartVectorBehavior_ld {
 
   
     def vLsuTest0(): Unit = {
-        it should "pass: unit-stride load (uops=1, eew=8, vl=8, vstart=0)" in {
+        it should "pass: unit-stride load (uops=1, eew=8, vl=16, vstart=0)" in {
         test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            test_init(dut)
+            dut.clock.setTimeout(1000)
             dut.clock.step(1)
-            
-            next_is_load_and_step(dut)
-
             val ldReqs = Seq(
-                (ldReqCtrl_default.copy(instrn=VLE8_V), ldReqSrc_default.copy()),
+                (ldstReqCtrl_default.copy(instrn=VLE8_V), ldstReqSrc_default.copy()),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
-            dut.io.rvuIssue.bits.poke(genLdInput(ldReqs(0)._1, ldReqs(0)._2))
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(0)._1, ldReqs(0)._2))
             dut.clock.step(1)
             dut.io.rvuIssue.valid.poke(false.B)
 
@@ -111,17 +64,14 @@ trait SmartVectorBehavior_ld {
     def vLsuTest1(): Unit = {
         it should "pass: unit-stride load (uops=2, eew=8, vl=19, vstart=0)" in {
         test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            test_init(dut)
+            dut.clock.setTimeout(1000)
             dut.clock.step(1)
-            
-            next_is_load_and_step(dut)
-
             val ldReqs = Seq(
-                (ldReqCtrl_default.copy(instrn=VLE8_V, vl=19, vlmul=2), ldReqSrc_default.copy()),
+                (ldstReqCtrl_default.copy(instrn=VLE8_V, vl=19, vlmul=2), ldstReqSrc_default.copy()),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
-            dut.io.rvuIssue.bits.poke(genLdInput(ldReqs(0)._1, ldReqs(0)._2))
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(0)._1, ldReqs(0)._2))
             dut.clock.step(1)
             dut.io.rvuIssue.valid.poke(false.B)
 
@@ -140,17 +90,14 @@ trait SmartVectorBehavior_ld {
     def vLsuTest2(): Unit = {
         it should "pass: unit-stride load (uops=4, eew=16, vl=27, vstart=0)" in {
         test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            test_init(dut)
+            dut.clock.setTimeout(1000)
             dut.clock.step(1)
-            
-            next_is_load_and_step(dut)
-
             val ldReqs = Seq(
-                (ldReqCtrl_default.copy(instrn=VLE16_V, vl=27, vlmul=2, vsew=1), ldReqSrc_default.copy()),
+                (ldstReqCtrl_default.copy(instrn=VLE16_V, vl=27, vlmul=2, vsew=1), ldstReqSrc_default.copy()),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
-            dut.io.rvuIssue.bits.poke(genLdInput(ldReqs(0)._1, ldReqs(0)._2))
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(0)._1, ldReqs(0)._2))
             dut.clock.step(1)
             dut.io.rvuIssue.valid.poke(false.B)
 
@@ -171,17 +118,14 @@ trait SmartVectorBehavior_ld {
     def vLsuTest3(): Unit = {
         it should "pass: unit-stride load (uops=3, eew=32, vl=10, vstart=0)" in {
         test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            test_init(dut)
+            dut.clock.setTimeout(1000)
             dut.clock.step(1)
-            
-            next_is_load_and_step(dut)
-
             val ldReqs = Seq(
-                (ldReqCtrl_default.copy(instrn=VLE32_V, vl=10, vlmul=2, vsew=2), ldReqSrc_default.copy()),
+                (ldstReqCtrl_default.copy(instrn=VLE32_V, vl=10, vlmul=2, vsew=2), ldstReqSrc_default.copy()),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
-            dut.io.rvuIssue.bits.poke(genLdInput(ldReqs(0)._1, ldReqs(0)._2))
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(0)._1, ldReqs(0)._2))
             dut.clock.step(1)
             dut.io.rvuIssue.valid.poke(false.B)
 
@@ -201,17 +145,14 @@ trait SmartVectorBehavior_ld {
     def vLsuTest4(): Unit = {
         it should "pass: unit-stride load (uops=2, eew=64, vl=3, vstart=0)" in {
         test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            test_init(dut)
+            dut.clock.setTimeout(1000)
             dut.clock.step(1)
-            
-            next_is_load_and_step(dut)
-
             val ldReqs = Seq(
-                (ldReqCtrl_default.copy(instrn=VLE64_V, vl=3, vlmul=1, vsew=3), ldReqSrc_default.copy()),
+                (ldstReqCtrl_default.copy(instrn=VLE64_V, vl=3, vlmul=1, vsew=3), ldstReqSrc_default.copy()),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
-            dut.io.rvuIssue.bits.poke(genLdInput(ldReqs(0)._1, ldReqs(0)._2))
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(0)._1, ldReqs(0)._2))
             dut.clock.step(1)
             dut.io.rvuIssue.valid.poke(false.B)
 
@@ -230,17 +171,14 @@ trait SmartVectorBehavior_ld {
     def vLsuTest5(): Unit = {
         it should "pass: unit-stride load (uops=2, eew=64, vl=3, vstart=1)" in {
         test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            test_init(dut)
+            dut.clock.setTimeout(1000)
             dut.clock.step(1)
-            
-            next_is_load_and_step(dut)
-
             val ldReqs = Seq(
-                (ldReqCtrl_default.copy(instrn=VLE64_V, vl=3, vlmul=1, vstart=1, vsew=3), ldReqSrc_default.copy()),
+                (ldstReqCtrl_default.copy(instrn=VLE64_V, vl=3, vlmul=1, vstart=1, vsew=3), ldstReqSrc_default.copy()),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
-            dut.io.rvuIssue.bits.poke(genLdInput(ldReqs(0)._1, ldReqs(0)._2))
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(0)._1, ldReqs(0)._2))
             dut.clock.step(1)
             dut.io.rvuIssue.valid.poke(false.B)
 
@@ -259,17 +197,14 @@ trait SmartVectorBehavior_ld {
     def vLsuTest6(): Unit = {
         it should "pass: strided load (uops=1, eew=8, vl=6, vstart=0, stride=-5)" in {
         test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            test_init(dut)
+            dut.clock.setTimeout(1000)
             dut.clock.step(1)
-            
-            next_is_load_and_step(dut)
-
             val ldReqs = Seq(
-                (ldReqCtrl_default.copy(instrn=VLSE8_V, vl=6, vlmul=1, vsew=0), ldReqSrc_default.copy(rs2="hffffffff_fffffffb")),
+                (ldstReqCtrl_default.copy(instrn=VLSE8_V, vl=6, vlmul=1, vsew=0), ldstReqSrc_default.copy(rs2="hffffffff_fffffffb")),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
-            dut.io.rvuIssue.bits.poke(genLdInput(ldReqs(0)._1, ldReqs(0)._2))
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(0)._1, ldReqs(0)._2))
             dut.clock.step(1)
             dut.io.rvuIssue.valid.poke(false.B)
 
@@ -287,17 +222,14 @@ trait SmartVectorBehavior_ld {
     def vLsuTest7(): Unit = {
         it should "pass: strided load (uops=2, eew=64, vl=3, vstart=0, stride=-1)" in {
         test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            test_init(dut)
+            dut.clock.setTimeout(1000)
             dut.clock.step(1)
-            
-            next_is_load_and_step(dut)
-
             val ldReqs = Seq(
-                (ldReqCtrl_default.copy(instrn=VLSE32_V, vl=3, vlmul=1, vsew=2), ldReqSrc_default.copy(rs2="hffffffff_ffffffff")),
+                (ldstReqCtrl_default.copy(instrn=VLSE32_V, vl=3, vlmul=1, vsew=2), ldstReqSrc_default.copy(rs2="hffffffff_ffffffff")),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
-            dut.io.rvuIssue.bits.poke(genLdInput(ldReqs(0)._1, ldReqs(0)._2))
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(0)._1, ldReqs(0)._2))
             dut.clock.step(1)
             dut.io.rvuIssue.valid.poke(false.B)
 
@@ -315,17 +247,14 @@ trait SmartVectorBehavior_ld {
     def vLsuTest8(): Unit = {
         it should "pass: strided load (uops=2, eew=16, vl=10, vstart=0, stride=4)" in {
         test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            test_init(dut)
+            dut.clock.setTimeout(1000)
             dut.clock.step(1)
-            
-            next_is_load_and_step(dut)
-
             val ldReqs = Seq(
-                (ldReqCtrl_default.copy(instrn=VLSE16_V, vl=10, vlmul=1, vsew=1), ldReqSrc_default.copy(rs2="h8")),
+                (ldstReqCtrl_default.copy(instrn=VLSE16_V, vl=10, vlmul=1, vsew=1), ldstReqSrc_default.copy(rs2="h8")),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
-            dut.io.rvuIssue.bits.poke(genLdInput(ldReqs(0)._1, ldReqs(0)._2))
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(0)._1, ldReqs(0)._2))
             dut.clock.step(1)
             dut.io.rvuIssue.valid.poke(false.B)
 
@@ -344,17 +273,14 @@ trait SmartVectorBehavior_ld {
     def vLsuTest9(): Unit = {
         it should "pass: unit-strde exception" in {
         test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            test_init(dut)
+            dut.clock.setTimeout(1000)
             dut.clock.step(1)
-            
-            next_is_load_and_step(dut)
-
             val ldReqs = Seq(
-                (ldReqCtrl_default.copy(instrn=VLE8_V, vl=19, vlmul=1, vstart=1, vsew=0), ldReqSrc_default.copy(rs1="h1058")),
+                (ldstReqCtrl_default.copy(instrn=VLE8_V, vl=19, vlmul=1, vstart=1, vsew=0), ldstReqSrc_default.copy(rs1="h1058")),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
-            dut.io.rvuIssue.bits.poke(genLdInput(ldReqs(0)._1, ldReqs(0)._2))
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(0)._1, ldReqs(0)._2))
             dut.clock.step(1)
             dut.io.rvuIssue.valid.poke(false.B)
 
