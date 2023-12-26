@@ -52,7 +52,8 @@ class VIssueBlock extends Module {
       val readys = Input(Vec(NArithFUs, Bool()))
     }
     val fromExu = new Bundle {
-      val lane = Input(ValidIO(new VLaneExuOut))
+      val laneAlu = Input(ValidIO(new VLaneExuOut))
+      val laneMulFp = Input(ValidIO(new VLaneExuOut))
       val cross = Input(ValidIO(new VCrossExuOut))
     }
     // LSU
@@ -65,7 +66,8 @@ class VIssueBlock extends Module {
       val st = Flipped(ValidIO(new VStOutput))
     }
     // writeback: to BusyTable, to ROB
-    val wbArith_lane = ValidIO(new WbArith_lane)
+    val wbArith_laneAlu = ValidIO(new WbArith_lane)
+    val wbArith_laneMulFp = ValidIO(new WbArith_lane)
     val wbArith_cross = ValidIO(new WbArith_cross)
     val wbLSU = ValidIO(new VExpdUOp)
     // Just for debug
@@ -81,12 +83,14 @@ class VIssueBlock extends Module {
 
   // Write-back addresses: for wakeup (ready gen) of IQs
   val wbRFAddrs = Wire(Vec(nVRFWritePorts, ValidIO(UInt(VPRegIdxWidth.W))))
-  wbRFAddrs(0).valid := io.fromExu.lane.valid && io.fromExu.lane.bits.uop.pdestVal
-  wbRFAddrs(0).bits := io.fromExu.lane.bits.uop.pdest
-  wbRFAddrs(1).valid := io.fromExu.cross.valid && io.fromExu.cross.bits.uop.pdestVal
-  wbRFAddrs(1).bits := io.fromExu.cross.bits.uop.pdest
-  wbRFAddrs(2).valid := io.fromLSU.ld.valid && io.fromLSU.ld.bits.uop.pdestVal
-  wbRFAddrs(2).bits := io.fromLSU.ld.bits.uop.pdest
+  wbRFAddrs(0).valid := io.fromExu.laneAlu.valid && io.fromExu.laneAlu.bits.uop.pdestVal
+  wbRFAddrs(0).bits := io.fromExu.laneAlu.bits.uop.pdest
+  wbRFAddrs(1).valid := io.fromExu.laneMulFp.valid && io.fromExu.laneMulFp.bits.uop.pdestVal
+  wbRFAddrs(1).bits := io.fromExu.laneMulFp.bits.uop.pdest
+  wbRFAddrs(2).valid := io.fromExu.cross.valid && io.fromExu.cross.bits.uop.pdestVal
+  wbRFAddrs(2).bits := io.fromExu.cross.bits.uop.pdest
+  wbRFAddrs(3).valid := io.fromLSU.ld.valid && io.fromLSU.ld.bits.uop.pdestVal
+  wbRFAddrs(3).bits := io.fromLSU.ld.bits.uop.pdest
 
   /** ---- Arithmetic ----
     *  IQ --> Read RF --> EXU
@@ -132,18 +136,26 @@ class VIssueBlock extends Module {
   io.toExu.bits.vstartRemain := 0.U
   
   // RF write
-  regFile.io.write(0).wen := io.fromExu.lane.valid && io.fromExu.lane.bits.uop.pdestVal
-  regFile.io.write(0).addr := io.fromExu.lane.bits.uop.pdest
-  regFile.io.write(0).data := io.fromExu.lane.bits.vd
-  regFile.io.write(1).wen := io.fromExu.cross.valid && io.fromExu.cross.bits.uop.pdestVal
-  regFile.io.write(1).addr := io.fromExu.cross.bits.uop.pdest
-  regFile.io.write(1).data := io.fromExu.cross.bits.vd
+  regFile.io.write(0).wen := io.fromExu.laneAlu.valid && io.fromExu.laneAlu.bits.uop.pdestVal
+  regFile.io.write(0).addr := io.fromExu.laneAlu.bits.uop.pdest
+  regFile.io.write(0).data := io.fromExu.laneAlu.bits.vd
+  regFile.io.write(1).wen := io.fromExu.laneMulFp.valid && io.fromExu.laneMulFp.bits.uop.pdestVal
+  regFile.io.write(1).addr := io.fromExu.laneMulFp.bits.uop.pdest
+  regFile.io.write(1).data := io.fromExu.laneMulFp.bits.vd
+  regFile.io.write(2).wen := io.fromExu.cross.valid && io.fromExu.cross.bits.uop.pdestVal
+  regFile.io.write(2).addr := io.fromExu.cross.bits.uop.pdest
+  regFile.io.write(2).data := io.fromExu.cross.bits.vd
   // Write-backs: to BusyTable, to ROB 
-  io.wbArith_lane.valid := io.fromExu.lane.valid
-  io.wbArith_lane.bits.uop := io.fromExu.lane.bits.uop
-  io.wbArith_lane.bits.fflags := io.fromExu.lane.bits.fflags
-  io.wbArith_lane.bits.vxsat := io.fromExu.lane.bits.vxsat
-  io.wbArith_lane.bits.rd := io.fromExu.lane.bits.vd(0)(xLen-1, 0)
+  io.wbArith_laneAlu.valid := io.fromExu.laneAlu.valid
+  io.wbArith_laneAlu.bits.uop := io.fromExu.laneAlu.bits.uop
+  io.wbArith_laneAlu.bits.fflags := io.fromExu.laneAlu.bits.fflags
+  io.wbArith_laneAlu.bits.vxsat := io.fromExu.laneAlu.bits.vxsat
+  io.wbArith_laneAlu.bits.rd := io.fromExu.laneAlu.bits.vd(0)(xLen-1, 0)
+  io.wbArith_laneMulFp.valid := io.fromExu.laneMulFp.valid
+  io.wbArith_laneMulFp.bits.uop := io.fromExu.laneMulFp.bits.uop
+  io.wbArith_laneMulFp.bits.fflags := io.fromExu.laneMulFp.bits.fflags
+  io.wbArith_laneMulFp.bits.vxsat := io.fromExu.laneMulFp.bits.vxsat
+  io.wbArith_laneMulFp.bits.rd := io.fromExu.laneMulFp.bits.vd(0)(xLen-1, 0)
   io.wbArith_cross.valid := io.fromExu.cross.valid
   io.wbArith_cross.bits.uop := io.fromExu.cross.bits.uop
   io.wbArith_cross.bits.fflags := io.fromExu.cross.bits.fflags

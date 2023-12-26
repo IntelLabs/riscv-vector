@@ -37,7 +37,8 @@ class VCtrlBlock extends Module {
       val toLsIQ = Vec(VRenameWidth, Decoupled(new VExpdUOp))
     }
     // writeback: to update busyTable, to ROB
-    val wbArith_lane = Input(ValidIO(new WbArith_lane))
+    val wbArith_laneAlu = Input(ValidIO(new WbArith_lane))
+    val wbArith_laneMulFp = Input(ValidIO(new WbArith_lane))
     val wbArith_cross = Input(ValidIO(new WbArith_cross))
     val wbLSU = Input(ValidIO(new VExpdUOp))
     val readBusyTable = Vec(VRenameWidth, Vec(4, Output(Bool())))
@@ -120,10 +121,12 @@ class VCtrlBlock extends Module {
     busyTable.io.read(i).req := dispatch.io.readBusyTable(i / 4)(i % 4)
     io.readBusyTable(i / 4)(i % 4) := busyTable.io.read(i).resp
   }
-  busyTable.io.wbPregs(0).valid := io.wbArith_lane.valid && io.wbArith_lane.bits.uop.pdestVal
-  busyTable.io.wbPregs(0).bits := io.wbArith_lane.bits.uop.pdest
-  busyTable.io.wbPregs(1).valid := io.wbArith_cross.valid && io.wbArith_cross.bits.uop.pdestVal
-  busyTable.io.wbPregs(1).bits := io.wbArith_cross.bits.uop.pdest
+  busyTable.io.wbPregs(0).valid := io.wbArith_laneAlu.valid && io.wbArith_laneAlu.bits.uop.pdestVal
+  busyTable.io.wbPregs(0).bits := io.wbArith_laneAlu.bits.uop.pdest
+  busyTable.io.wbPregs(1).valid := io.wbArith_laneMulFp.valid && io.wbArith_laneMulFp.bits.uop.pdestVal
+  busyTable.io.wbPregs(1).bits := io.wbArith_laneMulFp.bits.uop.pdest
+  busyTable.io.wbPregs(2).valid := io.wbArith_cross.valid && io.wbArith_cross.bits.uop.pdestVal
+  busyTable.io.wbPregs(2).bits := io.wbArith_cross.bits.uop.pdest
   busyTable.io.wbPregs(nVRFWritePorts-1).valid := io.wbLSU.valid && io.wbLSU.bits.pdestVal
   busyTable.io.wbPregs(nVRFWritePorts-1).bits := io.wbLSU.bits.pdest
   busyTable.io.flush := flush
@@ -148,7 +151,8 @@ class VCtrlBlock extends Module {
   rob.io.illegal := vIllegalInstrn.io.ill
   rob.io.partialVInfo := partialVInfo_reg
   rob.io.fromDispatch <> dispatch.io.toRob
-  rob.io.wbArith_lane := io.wbArith_lane
+  rob.io.wbArith_laneAlu := io.wbArith_laneAlu
+  rob.io.wbArith_laneMulFp := io.wbArith_laneMulFp
   rob.io.wbArith_cross := io.wbArith_cross
   rob.io.wbLSU := io.wbLSU
   io.ovi_completed := rob.io.ovi_completed

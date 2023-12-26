@@ -28,7 +28,8 @@ class VExuBlock extends Module {
       val readys = Output(Vec(NArithFUs, Bool()))
     }
     val out = new Bundle {
-      val lane = ValidIO(new VLaneExuOut)
+      val laneAlu = ValidIO(new VLaneExuOut)
+      val laneMulFp = ValidIO(new VLaneExuOut)
       val cross = ValidIO(new VCrossExuOut)
     }
   })
@@ -49,9 +50,11 @@ class VExuBlock extends Module {
     io.in.readys(i + NLaneExuFUs) := crossLExu.io.in.readys(i)
   }
 
-  io.out.lane.valid := laneExu.io.out.valid
-  io.out.lane.bits := laneExu.io.out.bits
-  laneExu.io.out.ready := true.B
+  for ((exuOut, i) <- Seq(io.out.laneAlu, io.out.laneMulFp).zipWithIndex) {
+    exuOut.valid := laneExu.io.out(i).valid
+    exuOut.bits := laneExu.io.out(i).bits
+    laneExu.io.out(i).ready := true.B
+  }
   io.out.cross.valid := crossLExu.io.out.valid
   io.out.cross.bits := crossLExu.io.out.bits
   crossLExu.io.out.ready := true.B
