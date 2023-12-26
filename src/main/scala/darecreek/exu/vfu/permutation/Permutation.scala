@@ -481,13 +481,13 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   vperm_fifo.io.deq.ready := rvalid_reg && vperm_fifo.io.deq.valid
   rdata_rd_mask_en := rvalid_reg && vperm_fifo.io.deq.bits(0) && vperm_fifo.io.deq.valid
   rdata_wb_vld := rvalid_reg && vperm_fifo.io.deq.bits(1) && vperm_fifo.io.deq.valid
-  rdata_vslide_lo_valid := rvalid_reg && vperm_fifo.io.deq.bits(2) && vperm_fifo.io.deq.valid
-  rdata_vslide_hi_valid := rvalid_reg && vperm_fifo.io.deq.bits(3) && vperm_fifo.io.deq.valid
-  rdata_vslide_rd_cnt := Mux(rvalid_reg, vperm_fifo.io.deq.bits(5, 4), 0.U) & Fill(2, vperm_fifo.io.deq.valid)
-  rdata_update_vs_idx := rvalid_reg && vperm_fifo.io.deq.bits(2) && vperm_fifo.io.deq.valid
-  rdata_cmprs_rd_wb := rvalid_reg && vperm_fifo.io.deq.bits(3) && vperm_fifo.io.deq.valid
-  rdata_cmprs_rd_old_vd := rvalid_reg && vperm_fifo.io.deq.bits(4) && vperm_fifo.io.deq.valid
-  rdata_vrgather_rd_cnt := Mux(rvalid_reg, vperm_fifo.io.deq.bits(6, 3), 0.U) & Fill(4, vperm_fifo.io.deq.valid)
+  rdata_vslide_lo_valid := rvalid_reg && vperm_fifo.io.deq.bits(2) && vperm_fifo.io.deq.valid && reg_vslide
+  rdata_vslide_hi_valid := rvalid_reg && vperm_fifo.io.deq.bits(3) && vperm_fifo.io.deq.valid && reg_vslide
+  rdata_vslide_rd_cnt := Mux(rvalid_reg && reg_vslide, vperm_fifo.io.deq.bits(5, 4), 0.U) & Fill(2, vperm_fifo.io.deq.valid)
+  rdata_update_vs_idx := rvalid_reg && vperm_fifo.io.deq.bits(2) && vperm_fifo.io.deq.valid && (reg_vcompress || reg_vrgather)
+  rdata_cmprs_rd_wb := rvalid_reg && vperm_fifo.io.deq.bits(3) && vperm_fifo.io.deq.valid && reg_vcompress
+  rdata_cmprs_rd_old_vd := rvalid_reg && vperm_fifo.io.deq.bits(4) && vperm_fifo.io.deq.valid && reg_vcompress
+  rdata_vrgather_rd_cnt := Mux(rvalid_reg && reg_vrgather, vperm_fifo.io.deq.bits(6, 3), 0.U) & Fill(4, vperm_fifo.io.deq.valid)
 
   when(flush) {
     mask := 0.U
