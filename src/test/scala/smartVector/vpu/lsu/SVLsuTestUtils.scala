@@ -184,6 +184,11 @@ class FakeLdDCache extends Module {
         (0x1050.U, BigInt("4444444444444444", 16).U, false.B),
         (0x1058.U, BigInt("5555555555555555", 16).U, false.B),
         (0x1060.U, BigInt("6666666666666666", 16).U, true.B),
+        (0x1068.U, BigInt("0807060504030201", 16).U, false.B),
+        (0x1070.U, BigInt("1615141312111009", 16).U, false.B),
+        (0x1078.U, BigInt("081814100c1c0004", 16).U, false.B),
+        (0x1080.U, BigInt("00080000000c0004", 16).U, false.B),
+        (0x1088.U, BigInt("000000080004001c", 16).U, false.B),
     )
 
     val hasXcpt = WireInit(false.B)
@@ -233,7 +238,6 @@ class FakeLdDCache extends Module {
         io.resp.bits.data     := 0.U
     }
 }
-
 
 class FakeStDCache extends Module {
     val io = IO(new Bundle {

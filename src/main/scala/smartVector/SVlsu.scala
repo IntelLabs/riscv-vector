@@ -89,7 +89,6 @@ class SVlsu(implicit p: Parameters) extends Module {
     val vmReg           = RegInit(true.B)
     val nfieldReg       = RegInit(0.U(3.W))
     val segIdxReg       = RegInit(0.U(log2Ceil(8).W))
-    val noUseMuop       = RegInit(false.B)
 
     // vreg seg info
     val vregInfo        = RegInit(VecInit(Seq.fill(vlenb)(0.U.asTypeOf(new VRegSegmentInfo))))
@@ -139,7 +138,7 @@ class SVlsu(implicit p: Parameters) extends Module {
         }
     }.elsewhen(uopState === uop_split) {
         when(splitCount === 0.U) {
-            nextUopState := uop_idle
+            nextUopState := uop_split_finish
         }.elsewhen((splitCount - 1.U === curSplitIdx) || mem_xcpt) {
             nextUopState := uop_split_finish
         }.otherwise {
@@ -225,7 +224,6 @@ class SVlsu(implicit p: Parameters) extends Module {
             issueLdstPtr := 0.U
             curSplitIdx  := 0.U
             splitCount   := microVl - microVStart     
-            noUseMuop    := (microVl === microVStart) 
             splitStart   := microVStart
             segIdxReg    := io.segmentIdx
 
@@ -281,7 +279,6 @@ class SVlsu(implicit p: Parameters) extends Module {
     /*-----------------------------------------calc addr end---------------------------------------------------*/
 
     when(uopState === uop_split && !mem_xcpt) {
-        noUseMuop := false.B
         when(curSplitIdx < splitCount) {
             when(vmReg || isNotMasked) {
                 ldstUopQueue(ldstEnqPtr).valid  := true.B
@@ -388,12 +385,23 @@ class SVlsu(implicit p: Parameters) extends Module {
     /*---------------------------------RESP END---------------------------------*/
 
     /************************** Ldest data writeback to uopQueue********************/
-    val vreg_wb_xcpt  = vregInfo.map(info => info.status === VRegSegmentStatus.xcpt).reduce(_ || _)
-    val vreg_wb_ready =
-         vregInfo.forall(info => info.status === VRegSegmentStatus.ready || info.status === VRegSegmentStatus.srcData) ||
-        (vregInfo.forall(info => info.status === VRegSegmentStatus.invalid) && noUseMuop)
+    val vregWbXcpt  = vregInfo.map(info => info.status === VRegSegmentStatus.xcpt).reduce(_ || _)
 
-    when(vreg_wb_ready || vreg_wb_xcpt) {
+    val vregWbReady = WireInit(false.B)
+
+    val allSrcData = vregInfo.forall(info => info.status === VRegSegmentStatus.srcData)
+    val allReadyOrSrcData = vregInfo.forall(info => info.status === VRegSegmentStatus.ready || info.status === VRegSegmentStatus.srcData)
+
+    when(splitCount === 0.U && allSrcData) {
+        vregWbReady := RegNext(splitCount === 0.U && allSrcData) // RegNext for scoreboard clear & write contradiction
+    }.elsewhen(allReadyOrSrcData) {
+        vregWbReady := true.B
+    }.otherwise {
+        vregWbReady := false.B
+    }
+
+
+    when(vregWbReady || vregWbXcpt) {
         io.lsuOut.valid             := true.B
         io.lsuOut.bits.data         := Mux(mUopReg.uop.ctrl.load, Cat(vregInfo.reverseMap(entry => entry.data)), DontCare) // Concatenate data from all vregInfo elements)
         io.lsuOut.bits.muopEnd      := mUopMergeReg.muopEnd
@@ -413,7 +421,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     }
 
     // exception output
-    when(vreg_wb_xcpt) {
+    when(vregWbXcpt) {
         when(unitSMopReg === UnitStrideMop.fault_only_first && xcptVlReg > 0.U) {
             io.xcpt.exception_vld   := false.B
             io.xcpt.xcpt_cause      := 0.U.asTypeOf(new HellaCacheExceptions)

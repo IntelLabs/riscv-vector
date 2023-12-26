@@ -77,8 +77,8 @@ trait VLsuBehavior_st_idx {
             test_init_store(dut)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsuxei8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1), SrcBundleSt(vs2="h010004")),
-                (vsuxei8.copy(vl=16, uopIdx=1, uopEnd=true,  vsew=1), SrcBundleSt(vs2="h010004")),
+                (vsuxei8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1, isLoad=false), SrcBundleSt(vs2="h010004")),
+                (vsuxei8.copy(vl=16, uopIdx=1, uopEnd=true,  vsew=1, isLoad=false), SrcBundleSt(vs2="h010004")),
             )
 
             next_is_store_and_step(dut)
@@ -109,8 +109,8 @@ trait VLsuBehavior_st_idx {
             test_init_store(dut)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsuxei8.copy(vl=3, uopIdx=0, uopEnd=false, vsew=3), SrcBundleSt(vs2="h01000")),
-                (vsuxei8.copy(vl=3, uopIdx=0, uopEnd=false, vsew=3), SrcBundleSt(vs2="h01000")),
+                (vsuxei8.copy(vl=3, uopIdx=0, uopEnd=false, vsew=3, isLoad=false), SrcBundleSt(vs2="h01000")),
+                (vsuxei8.copy(vl=3, uopIdx=0, uopEnd=true,  vsew=3, isLoad=false), SrcBundleSt(vs2="h01000")),
             )
 
             next_is_store_and_step(dut)
@@ -142,9 +142,9 @@ trait VLsuBehavior_st_idx {
             test_init_store(dut)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsuxei16.copy(vl=5, uopIdx=0, uopEnd=false, vsew=3), SrcBundleSt(vs2="h000000180000001000080000")),
-                (vsuxei16.copy(vl=5, uopIdx=1, uopEnd=false, vsew=3), SrcBundleSt(vs2="h000000180000001000080000")),
-                (vsuxei16.copy(vl=5, uopIdx=2, uopEnd=true,  vsew=3), SrcBundleSt(vs2="h000000180000001000080000")),
+                (vsuxei16.copy(vl=5, uopIdx=0, uopEnd=false, vsew=3, isLoad=false), SrcBundleSt(vs2="h000000180000001000080000")),
+                (vsuxei16.copy(vl=5, uopIdx=1, uopEnd=false, vsew=3, isLoad=false), SrcBundleSt(vs2="h000000180000001000080000")),
+                (vsuxei16.copy(vl=5, uopIdx=2, uopEnd=true,  vsew=3, isLoad=false), SrcBundleSt(vs2="h000000180000001000080000")),
             )
 
             next_is_store_and_step(dut)
@@ -178,8 +178,8 @@ trait VLsuBehavior_st_idx {
             test_init_store(dut)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsuxei32.copy(vl=5, uopIdx=0, uopEnd=false, vsew=1), SrcBundleSt(vs2="h00000010_00000000_00000008")),
-                (vsuxei32.copy(vl=5, uopIdx=1, uopEnd=true,  vsew=1), SrcBundleSt(vs2="h18")),
+                (vsuxei32.copy(vl=5, uopIdx=0, uopEnd=false, vsew=1, isLoad=false), SrcBundleSt(vs2="h00000010_00000000_00000008")),
+                (vsuxei32.copy(vl=5, uopIdx=1, uopEnd=true,  vsew=1, isLoad=false), SrcBundleSt(vs2="h18")),
             )
 
             next_is_store_and_step(dut)
@@ -213,8 +213,8 @@ trait VLsuBehavior_st_idx {
             test_init_store(dut)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsuxei64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1), SrcBundleSt(vs2="h00010")),
-                (vsuxei64.copy(vl=3, uopIdx=1, uopEnd=true,  vsew=1), SrcBundleSt(vs2="h00020")),
+                (vsuxei64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1, isLoad=false), SrcBundleSt(vs2="h00010")),
+                (vsuxei64.copy(vl=3, uopIdx=1, uopEnd=true,  vsew=1, isLoad=false), SrcBundleSt(vs2="h00020")),
             )
 
             next_is_store_and_step(dut)
@@ -246,8 +246,8 @@ trait VLsuBehavior_st_idx {
             test_init_store(dut)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsuxei64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1), SrcBundleSt(vs2="hffff_ffff_ffff_fff0_ffff_ffff_ffff_fff8")),
-                (vsuxei64.copy(vl=3, uopIdx=1, uopEnd=true,  vsew=1), SrcBundleSt(vs2="h00020")),
+                (vsuxei64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1, isLoad=false), SrcBundleSt(vs2="hffff_ffff_ffff_fff0_ffff_ffff_ffff_fff8")),
+                (vsuxei64.copy(vl=3, uopIdx=1, uopEnd=true,  vsew=1, isLoad=false), SrcBundleSt(vs2="h00020")),
             )
 
             next_is_store_and_step(dut)
@@ -280,8 +280,8 @@ trait VLsuBehavior_st_idx {
             test_init_store(dut)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsuxei32.copy(vl=5, uopIdx=0, uopEnd=false, vsew=1), SrcBundleSt(vs2="h000000100000000000000008")),
-                (vsuxei32.copy(vl=5, uopIdx=1, uopEnd=true,  vsew=1), SrcBundleSt(vs2="h60")),
+                (vsuxei32.copy(vl=5, uopIdx=0, uopEnd=false, vsew=1, isLoad=false), SrcBundleSt(vs2="h000000100000000000000008")),
+                (vsuxei32.copy(vl=5, uopIdx=1, uopEnd=true,  vsew=1, isLoad=false), SrcBundleSt(vs2="h60")),
             )
 
             next_is_store_and_step(dut)
