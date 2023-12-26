@@ -301,7 +301,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.out.toRegFileRead.rfReadEn(0)          := io.out.mUop.valid && ctrl.lsrcVal(0)
     io.out.toRegFileRead.rfReadEn(1)          := io.out.mUop.valid && ctrl.lsrcVal(1)
     io.out.toRegFileRead.rfReadEn(2)          := io.out.mUop.valid && ~ctrl.vm
-    io.out.toRegFileRead.rfReadEn(3)          := io.out.mUop.valid && ctrl.ldestVal
+    io.out.toRegFileRead.rfReadEn(3)          := io.out.mUop.valid && (ctrl.ldestVal || ctrl.store)
     io.out.toRegFileRead.rfReadIdx(0)         := ctrl.lsrc(0) + lsrc0_inc
     io.out.toRegFileRead.rfReadIdx(1)         := ctrl.lsrc(1) + lsrc1_inc
     io.out.toRegFileRead.rfReadIdx(2)         := 0.U
