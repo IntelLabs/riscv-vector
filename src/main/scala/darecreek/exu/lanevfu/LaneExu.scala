@@ -30,7 +30,7 @@ class VLaneExu extends Module {
       val valid = Input(Bool())
       val readys = Output(Vec(NLaneExuFUs, Bool()))
     }
-    val out = Decoupled(new VExuOutput)
+    val out = Decoupled(new VLaneExuOut)
   })
 
   require(NLanes > 1, s"Number of lanes: $NLanes must > 1 (XLEN >= 128)")

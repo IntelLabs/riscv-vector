@@ -51,7 +51,10 @@ class VIssueBlock extends Module {
       val valid = Output(Bool())
       val readys = Input(Vec(NArithFUs, Bool()))
     }
-    val fromExu = Flipped(ValidIO(new VExuOutput))
+    val fromExu = new Bundle {
+      val lane = Input(ValidIO(new VLaneExuOut))
+      val cross = Input(ValidIO(new VCrossExuOut))
+    }
     // LSU
     val toLSU = new Bundle {
       val ld = Decoupled(new VLdInput)
@@ -62,7 +65,8 @@ class VIssueBlock extends Module {
       val st = Flipped(ValidIO(new VStOutput))
     }
     // writeback: to BusyTable, to ROB
-    val wbArith = ValidIO(new WbArith)
+    val wbArith_lane = ValidIO(new WbArith_lane)
+    val wbArith_cross = ValidIO(new WbArith_cross)
     val wbLSU = ValidIO(new VExpdUOp)
     // Just for debug
     val rfRdRvfi = Vec(VCommitWidth, new VRFReadPort(LaneWidth))
@@ -77,10 +81,12 @@ class VIssueBlock extends Module {
 
   // Write-back addresses: for wakeup (ready gen) of IQs
   val wbRFAddrs = Wire(Vec(nVRFWritePorts, ValidIO(UInt(VPRegIdxWidth.W))))
-  wbRFAddrs(0).valid := io.fromExu.valid && io.fromExu.bits.uop.pdestVal
-  wbRFAddrs(0).bits := io.fromExu.bits.uop.pdest
-  wbRFAddrs(1).valid := io.fromLSU.ld.valid && io.fromLSU.ld.bits.uop.pdestVal
-  wbRFAddrs(1).bits := io.fromLSU.ld.bits.uop.pdest
+  wbRFAddrs(0).valid := io.fromExu.lane.valid && io.fromExu.lane.bits.uop.pdestVal
+  wbRFAddrs(0).bits := io.fromExu.lane.bits.uop.pdest
+  wbRFAddrs(1).valid := io.fromExu.cross.valid && io.fromExu.cross.bits.uop.pdestVal
+  wbRFAddrs(1).bits := io.fromExu.cross.bits.uop.pdest
+  wbRFAddrs(2).valid := io.fromLSU.ld.valid && io.fromLSU.ld.bits.uop.pdestVal
+  wbRFAddrs(2).bits := io.fromLSU.ld.bits.uop.pdest
 
   /** ---- Arithmetic ----
     *  IQ --> Read RF --> EXU
@@ -126,15 +132,22 @@ class VIssueBlock extends Module {
   io.toExu.bits.vstartRemain := 0.U
   
   // RF write
-  regFile.io.write(0).wen := io.fromExu.valid && io.fromExu.bits.uop.pdestVal //&& io.fromExu.bits.uop.info.wenRF
-  regFile.io.write(0).addr := io.fromExu.bits.uop.pdest
-  regFile.io.write(0).data := io.fromExu.bits.vd
-  // Write-back: to BusyTable, to ROB 
-  io.wbArith.valid := io.fromExu.valid
-  io.wbArith.bits.uop := io.fromExu.bits.uop
-  io.wbArith.bits.fflags := io.fromExu.bits.fflags
-  io.wbArith.bits.vxsat := io.fromExu.bits.vxsat
-  io.wbArith.bits.rd := io.fromExu.bits.vd(0)(xLen-1, 0)
+  regFile.io.write(0).wen := io.fromExu.lane.valid && io.fromExu.lane.bits.uop.pdestVal
+  regFile.io.write(0).addr := io.fromExu.lane.bits.uop.pdest
+  regFile.io.write(0).data := io.fromExu.lane.bits.vd
+  regFile.io.write(1).wen := io.fromExu.cross.valid && io.fromExu.cross.bits.uop.pdestVal
+  regFile.io.write(1).addr := io.fromExu.cross.bits.uop.pdest
+  regFile.io.write(1).data := io.fromExu.cross.bits.vd
+  // Write-backs: to BusyTable, to ROB 
+  io.wbArith_lane.valid := io.fromExu.lane.valid
+  io.wbArith_lane.bits.uop := io.fromExu.lane.bits.uop
+  io.wbArith_lane.bits.fflags := io.fromExu.lane.bits.fflags
+  io.wbArith_lane.bits.vxsat := io.fromExu.lane.bits.vxsat
+  io.wbArith_lane.bits.rd := io.fromExu.lane.bits.vd(0)(xLen-1, 0)
+  io.wbArith_cross.valid := io.fromExu.cross.valid
+  io.wbArith_cross.bits.uop := io.fromExu.cross.bits.uop
+  io.wbArith_cross.bits.fflags := io.fromExu.cross.bits.fflags
+  io.wbArith_cross.bits.rd := io.fromExu.cross.bits.vd(0)(xLen-1, 0)
 
   /**
     * ---- Load/Store ----
@@ -177,9 +190,9 @@ class VIssueBlock extends Module {
   // Ready
   lsIQ.io.out.ready := io_toLSU_ready || !validPipe_ls
   // RF write of Ld
-  regFile.io.write(NArithIQs).wen := io.fromLSU.ld.valid
-  regFile.io.write(NArithIQs).addr := io.fromLSU.ld.bits.uop.pdest
-  for (i <- 0 until NLanes) {regFile.io.write(NArithIQs).data(i) := UIntSplit(io.fromLSU.ld.bits.vd)(i)}
+  regFile.io.write(nVRFWritePorts-1).wen := io.fromLSU.ld.valid
+  regFile.io.write(nVRFWritePorts-1).addr := io.fromLSU.ld.bits.uop.pdest
+  for (i <- 0 until NLanes) {regFile.io.write(nVRFWritePorts-1).data(i) := UIntSplit(io.fromLSU.ld.bits.vd)(i)}
 
   // -- Store --
   // Read RF, and regEnable the read data

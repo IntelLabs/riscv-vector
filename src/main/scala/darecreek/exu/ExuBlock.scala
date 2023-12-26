@@ -27,7 +27,10 @@ class VExuBlock extends Module {
       val valid = Input(Bool())
       val readys = Output(Vec(NArithFUs, Bool()))
     }
-  val out = ValidIO(new VExuOutput)
+    val out = new Bundle {
+      val lane = ValidIO(new VLaneExuOut)
+      val cross = ValidIO(new VCrossExuOut)
+    }
   })
 
   val laneExu = Module(new VLaneExu)
@@ -46,11 +49,10 @@ class VExuBlock extends Module {
     io.in.readys(i + NLaneExuFUs) := crossLExu.io.in.readys(i)
   }
 
-  // Output arbiter
-  val arb = Module(new Arbiter(new VExuOutput, 2))
-  arb.io.in(0) <> laneExu.io.out
-  arb.io.in(1) <> crossLExu.io.out
-  io.out.valid := arb.io.out.valid && !io.flush
-  io.out.bits := arb.io.out.bits
-  arb.io.out.ready := true.B
+  io.out.lane.valid := laneExu.io.out.valid
+  io.out.lane.bits := laneExu.io.out.bits
+  laneExu.io.out.ready := true.B
+  io.out.cross.valid := crossLExu.io.out.valid
+  io.out.cross.bits := crossLExu.io.out.bits
+  crossLExu.io.out.ready := true.B
 }

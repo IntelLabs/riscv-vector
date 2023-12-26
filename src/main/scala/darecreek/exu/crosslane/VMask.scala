@@ -7,7 +7,7 @@ import scala.language.postfixOps
 class VMask extends Module {
   val io = IO(new Bundle {
     val in = Flipped(Decoupled(new VExuInput))
-    val out = Decoupled(new VExuOutput)
+    val out = Decoupled(new VCrossExuOut)
   })
 
   val vlenbWidth = log2Up(vlenb) + 1
@@ -362,7 +362,6 @@ class VMask extends Module {
   io.out.bits.uop := RegEnable(uop, fire)
 
   io.out.bits.fflags := 0.U
-  io.out.bits.vxsat := false.B
 
 
   //   /////////////////////////////

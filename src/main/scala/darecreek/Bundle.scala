@@ -195,12 +195,17 @@ class VExuInput extends Bundle {
   val vstartRemain = UInt(bVstart.W)
   val vlRemain = UInt(bVL.W)
 }
-// Output of Arith EXU
-class VExuOutput extends Bundle {
+// Outputs of Arith EXU
+class VLaneExuOut extends Bundle {
   val uop = new VExpdUOp
   val vd = Vec(NLanes, UInt(LaneWidth.W))
   val fflags = UInt(5.W) // Floating-point accrued exception flag
   val vxsat = Bool() // Fixed-point accrued saturation flag
+}
+class VCrossExuOut extends Bundle {
+  val uop = new VExpdUOp
+  val vd = Vec(NLanes, UInt(LaneWidth.W))
+  val fflags = UInt(5.W) // Floating-point accrued exception flag
 }
 
 // Input of the lane FU
@@ -223,10 +228,15 @@ class LaneFUOutput extends Bundle {
 }
 
 // Write back of arithmetic exu
-class WbArith extends Bundle {
+class WbArith_lane extends Bundle {
   val uop = new VExpdUOp
   val fflags = UInt(5.W)
   val vxsat = Bool()
+  val rd = UInt(xLen.W)  // Only for OVI
+}
+class WbArith_cross extends Bundle {
+  val uop = new VExpdUOp
+  val fflags = UInt(5.W)
   val rd = UInt(xLen.W)  // Only for OVI
 }
 
