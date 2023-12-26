@@ -360,23 +360,23 @@ class SVlsu(implicit p: Parameters) extends Module {
     /*---------------------------------RESP END---------------------------------*/
 
     /************************** Ldest data writeback to uopQueue********************/
-    val vreg_wb_xcpt  = vregInfo.map(info => info.status === VRegSegmentStatus.xcpt).reduce(_ || _)
+    val vregWbXcpt  = vregInfo.map(info => info.status === VRegSegmentStatus.xcpt).reduce(_ || _)
 
-    val vreg_wb_ready = WireInit(false.B)
+    val vregWbReady = WireInit(false.B)
 
     val allSrcData = vregInfo.forall(info => info.status === VRegSegmentStatus.srcData)
     val allReadyOrSrcData = vregInfo.forall(info => info.status === VRegSegmentStatus.ready || info.status === VRegSegmentStatus.srcData)
 
     when(splitCount === 0.U && allSrcData) {
-        vreg_wb_ready := RegNext(splitCount === 0.U && allSrcData) // RegNext for scoreboard clear & write contradiction
+        vregWbReady := RegNext(splitCount === 0.U && allSrcData) // RegNext for scoreboard clear & write contradiction
     }.elsewhen(allReadyOrSrcData) {
-        vreg_wb_ready := true.B
+        vregWbReady := true.B
     }.otherwise {
-        vreg_wb_ready := false.B
+        vregWbReady := false.B
     }
 
 
-    when(vreg_wb_ready || vreg_wb_xcpt) {
+    when(vregWbReady || vregWbXcpt) {
         io.lsuOut.valid             := true.B
         io.lsuOut.bits.data         := Cat(vregInfo.reverseMap(entry => entry.data)) // Concatenate data from all vregInfo elements)
         io.lsuOut.bits.muopEnd      := mUopMergeReg.muopEnd
@@ -396,7 +396,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     }
 
     // exception output
-    when(vreg_wb_xcpt) {
+    when(vregWbXcpt) {
         when(unitSMopReg === UnitStrideMop.fault_only_first && xcptVlReg > 0.U) {
             io.xcpt.exception_vld   := false.B
             io.xcpt.xcpt_cause      := 0.U.asTypeOf(new HellaCacheExceptions)
