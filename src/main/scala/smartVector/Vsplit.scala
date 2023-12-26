@@ -239,7 +239,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.scoreBoardReadIO.readAddr2 := vs2Idx
     when(!vs1ReadEn){
         hasRegConf(0) := false.B
-    }.elsewhen (~io.scoreBoardReadIO.read1 || ~io.scoreBoardReadIO.readBypassed1){
+    }.elsewhen (~io.scoreBoardReadIO.readBypassed1){
         hasRegConf(0) := false.B
     }.otherwise{
         hasRegConf(0) := true.B
@@ -247,7 +247,7 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     when(!vs2ReadEn){
         hasRegConf(1) := false.B
-    }.elsewhen (~io.scoreBoardReadIO.read2 || ~io.scoreBoardReadIO.readBypassed2){
+    }.elsewhen (~io.scoreBoardReadIO.readBypassed2){
         hasRegConf(1) := false.B
     }.otherwise{
         hasRegConf(1) := true.B
