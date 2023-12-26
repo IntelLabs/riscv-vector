@@ -63,7 +63,7 @@ class VIssueBlock extends Module {
     }
     // writeback: to BusyTable, to ROB
     val wbArith = ValidIO(new WbArith)
-    val wbLSU = Vec(2, ValidIO(new VExpdUOp))
+    val wbLSU = ValidIO(new VExpdUOp)
     // Just for debug
     val rfRdRvfi = Vec(VCommitWidth, new VRFReadPort(LaneWidth))
   })
@@ -180,9 +180,6 @@ class VIssueBlock extends Module {
   regFile.io.write(NArithIQs).wen := io.fromLSU.ld.valid
   regFile.io.write(NArithIQs).addr := io.fromLSU.ld.bits.uop.pdest
   for (i <- 0 until NLanes) {regFile.io.write(NArithIQs).data(i) := UIntSplit(io.fromLSU.ld.bits.vd)(i)}
-  // Write-back: to BusyTable, to ROB 
-  io.wbLSU(0).valid := io.fromLSU.ld.valid
-  io.wbLSU(0).bits := io.fromLSU.ld.bits.uop
 
   // -- Store --
   // Read RF, and regEnable the read data
@@ -196,8 +193,8 @@ class VIssueBlock extends Module {
 
   io.toLSU.st.valid := validPipe_ls && io.toLSU.ld.bits.uop.ctrl.store
   // Write-back: to BusyTable, to ROB 
-  io.wbLSU(1).valid := io.fromLSU.st.valid
-  io.wbLSU(1).bits := io.fromLSU.st.bits.uop
+  io.wbLSU.valid := io.fromLSU.ld.valid || io.fromLSU.st.valid
+  io.wbLSU.bits := Mux(io.fromLSU.ld.valid, io.fromLSU.ld.bits.uop, io.fromLSU.st.bits.uop)
 
 
   def calcRemain(destEew: SewOH, fireIn: Bool, uop: VExpdUOp, vl: UInt) = {

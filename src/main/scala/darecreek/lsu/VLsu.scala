@@ -88,34 +88,13 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
 
   val ld = io.fromIQ.ld
   val st = io.fromIQ.st
-  // val s_idle :: s_load :: s_store :: Nil = Enum(3)
   val s_idle_LD :: s_issueUops_LD :: s_busy_LD :: s_complete_LD :: Nil = Enum(4)
   val s_idle_ST :: s_issueUops_ST :: s_busy_ST :: s_complete_ST :: Nil = Enum(4)
 
-  // val state = RegInit(s_idle)
   val stateLd = RegInit(s_idle_LD)
   val stateSt = RegInit(s_idle_ST)
   val completeLd = RegInit(false.B)
   val completeSt = RegInit(false.B)
-
-  // // Top FSM
-  // when (state === s_idle) {
-  //   when (ld.bits.iqEmpty && st.bits.iqEmpty) {
-  //     state := s_idle
-  //   }.elsewhen (st.bits.iqEmpty) {
-  //     state := s_load
-  //   }.elsewhen (ld.bits.iqEmpty) {
-  //     state := s_store
-  //   }.otherwise {
-  //     state := Mux(isBefore(ld.bits.nextVRobIdx, st.bits.nextVRobIdx), s_load, s_store)
-  //   }
-  // }.elsewhen (state === s_load) {
-  //   state := Mux(completeLd && stateLd === s_complete_LD, s_idle, s_load)
-  // }.elsewhen (state === s_store) {
-  //   state := Mux(completeSt && stateSt === s_complete_ST, s_idle, s_store)
-  // }.otherwise {
-  //   state := s_idle
-  // }
 
   val readyLd = Wire(Bool())
   val readySt = Wire(Bool())
