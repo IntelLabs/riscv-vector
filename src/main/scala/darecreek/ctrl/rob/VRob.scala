@@ -63,7 +63,7 @@ class VRob extends Module with HasCircularQueuePtrHelper {
     val fromDispatch = Vec(VRenameWidth, Flipped(Decoupled(new VExpdUOp)))
     // writebacks from EXU and LSU
     val wbArith = Flipped(ValidIO(new WbArith))
-    val wbLSU = Vec(2, Flipped(ValidIO(new VExpdUOp)))
+    val wbLSU = Flipped(ValidIO(new VExpdUOp))
     // OVI completed
     val ovi_completed = new OVIcompleted
     // Vec ROB commits
@@ -175,19 +175,20 @@ class VRob extends Module with HasCircularQueuePtrHelper {
     * Write back
     * Note: So far, set constant 0 to OVI_COMPLETED.vstart (does not support load retry)
     */
-  // Write back of arith
+  //---- Write back of arith ----
   val wbA = io.wbArith.bits.uop
-  // Write back of ld
-  val wbL = io.wbLSU(0).bits
-  // Write back of st
-  val wbS = io.wbLSU(1).bits
-  val wb_valid = io.wbArith.valid || io.wbLSU(0).valid || io.wbLSU(1).valid
-  val wb_expdEnd = Mux(io.wbArith.valid, wbA.expdEnd, Mux(io.wbLSU(0).valid, wbL.expdEnd, wbS.expdEnd))
-  val wb_vRobIdx_value = Mux(io.wbArith.valid, wbA.vRobIdx.value, Mux(io.wbLSU(0).valid, wbL.vRobIdx.value, wbS.vRobIdx.value))
+  val wbA_valid = io.wbArith.valid
+  val wbA_vRobIdx_value = wbA.vRobIdx.value
   // Only support in-order write-backs under the same instruction
-  when (wb_valid) { busy(wb_vRobIdx_value) := !wb_expdEnd }
-  val wb_oviComplt = Cat(io.wbArith.bits.fflags, io.wbArith.bits.vxsat).asTypeOf(new OviCompltSigs)
-  when (wb_valid) { oviCompltSigs(wb_vRobIdx_value) := wb_oviComplt }
+  when (wbA_valid) { busy(wbA_vRobIdx_value) := !wbA.expdEnd }
+  val wbA_oviComplt = Cat(io.wbArith.bits.fflags, io.wbArith.bits.vxsat).asTypeOf(new OviCompltSigs)
+  when (wbA_valid) { oviCompltSigs(wbA_vRobIdx_value) := wbA_oviComplt }
+  //---- Write back of ld/st ----
+  val wbLs = io.wbLSU.bits
+  val wbLs_valid = io.wbLSU.valid
+  val wbLs_vRobIdx_value = wbLs.vRobIdx.value
+  // Only support in-order write-backs under the same instruction
+  when (wbLs_valid) { busy(wbLs_vRobIdx_value) := !wbLs.expdEnd }
 
   /**
     * Complete

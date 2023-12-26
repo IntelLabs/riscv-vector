@@ -38,7 +38,7 @@ class VCtrlBlock extends Module {
     }
     // writeback: to update busyTable, to ROB
     val wbArith = Flipped(ValidIO(new WbArith))
-    val wbLSU = Vec(2, Flipped(ValidIO(new VExpdUOp)))
+    val wbLSU = Flipped(ValidIO(new VExpdUOp))
     val readBusyTable = Vec(VRenameWidth, Vec(4, Output(Bool())))
     // rs1 read requests from issue queues
     val get_rs1 = Flipped(new GetScalarOperand)
@@ -123,8 +123,8 @@ class VCtrlBlock extends Module {
     busyTable.io.wbPregs(i).valid := io.wbArith.valid && io.wbArith.bits.uop.pdestVal
     busyTable.io.wbPregs(i).bits := io.wbArith.bits.uop.pdest
   }
-  busyTable.io.wbPregs(NArithIQs).valid := io.wbLSU(0).valid && io.wbLSU(0).bits.pdestVal
-  busyTable.io.wbPregs(NArithIQs).bits := io.wbLSU(0).bits.pdest
+  busyTable.io.wbPregs(NArithIQs).valid := io.wbLSU.valid && io.wbLSU.bits.pdestVal
+  busyTable.io.wbPregs(NArithIQs).bits := io.wbLSU.bits.pdest
   busyTable.io.flush := flush
 
   // Illegal instrn module
