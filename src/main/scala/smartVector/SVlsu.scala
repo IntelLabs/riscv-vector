@@ -94,6 +94,8 @@ class SVlsu(implicit p: Parameters) extends Module {
     val nfieldReg       = RegInit(0.U(3.W))
     val segIdxReg       = RegInit(0.U(log2Ceil(8).W))
 
+    val addrReg         = RegInit(0.U(64.W))
+
     // vreg seg info
     val vregInfo        = RegInit(VecInit(Seq.fill(vlenb)(0.U.asTypeOf(new VRegSegmentInfo))))
 
@@ -224,11 +226,13 @@ class SVlsu(implicit p: Parameters) extends Module {
             mlenAlignReg := mlenAlign
             minLenAlignReg := minLenAlign
 
+            addrReg      := Mux(io.mUop.bits.uop.uopIdx === 0.U, io.mUop.bits.scalar_opnd_1, addrReg)
+
             // Set split info
             ldstEnqPtr   := 0.U
             issueLdstPtr := 0.U
             curSplitIdx  := 0.U
-            splitCount   := microVl - microVStart     
+            splitCount   := microVl  
             splitStart   := microVStart
             segIdxReg    := io.segmentIdx
 
@@ -237,7 +241,7 @@ class SVlsu(implicit p: Parameters) extends Module {
                 (0 until vlenb).foreach { i => 
                     val pos = i.U >> memwAlign
                     vregInfo(i).data := io.mUop.bits.uopRegInfo.old_vd(8 * i + 7, 8 * i)
-                    vregInfo(i).status := Mux(pos < memVl && pos >= memVstart, VRegSegmentStatus.needLdst, VRegSegmentStatus.srcData)
+                    vregInfo(i).status := Mux(pos < memVl, VRegSegmentStatus.needLdst, VRegSegmentStatus.srcData)
                 }
             }
         }
@@ -245,7 +249,7 @@ class SVlsu(implicit p: Parameters) extends Module {
 
     /*-----------------------------------------calc addr start-------------------------------------------------*/
     /*                                                                                                         */
-    val curVl       = (mUopReg.uop.uopIdx << minLenAlignReg) + splitStart + curSplitIdx
+    val curVl       = (mUopReg.uop.uopIdx << minLenAlignReg) + curSplitIdx
     val calcAddr    = WireInit(0.U(64.W))
     val addr        = WireInit(0.U(64.W))
     val addrMask    = WireInit(0.U(64.W))
@@ -264,12 +268,11 @@ class SVlsu(implicit p: Parameters) extends Module {
     idxMask := (("h1".asUInt(64.W) << eew) - 1.U)
     idxVal := (mUopReg.uopRegInfo.vs2 >> beginIdx) & idxMask
 
-    calcAddr := (segIdxReg << memwAlignReg) + 
-        MuxLookup(ldstTypeReg, 0.U, Seq(
-            Mop.unit_stride     -> (baseAddr + (curVl * nfieldReg << memwAlignReg)),
-            Mop.constant_stride -> Mux(mUopReg.scalar_opnd_2 === 0.U, baseAddr, (Cat(false.B, baseAddr).asSInt + curVl * (mUopReg.scalar_opnd_2).asSInt).asUInt),
-            Mop.index_ordered   -> (Cat(false.B, baseAddr).asSInt + idxVal.asSInt).asUInt,
-            Mop.index_unodered  -> (Cat(false.B, baseAddr).asSInt + idxVal.asSInt).asUInt
+    calcAddr := MuxLookup(ldstTypeReg, 0.U, Seq(
+            Mop.unit_stride     -> Mux(curSplitIdx === 0.U && mUopReg.uop.uopIdx === 0.U, addrReg + (segIdxReg << memwAlignReg), (addrReg + (nfieldReg << memwAlignReg))),
+            Mop.constant_stride -> Mux(curSplitIdx === 0.U && mUopReg.uop.uopIdx === 0.U, addrReg + (segIdxReg << memwAlignReg), (Cat(false.B, addrReg).asSInt + (mUopReg.scalar_opnd_2).asSInt).asUInt),
+            Mop.index_ordered   -> ((segIdxReg << memwAlignReg) + (Cat(false.B, baseAddr).asSInt + idxVal.asSInt).asUInt),
+            Mop.index_unodered  -> ((Cat(false.B, baseAddr).asSInt + idxVal.asSInt).asUInt + (segIdxReg << memwAlignReg))
         ))
 
     addrMask    := ~(("h1".asUInt(64.W) << memwAlignReg) - 1.U)
@@ -281,7 +284,8 @@ class SVlsu(implicit p: Parameters) extends Module {
 
     when(uopState === uop_split && !mem_xcpt) {
         when(curSplitIdx < splitCount) {
-            when(vmReg || isNotMasked) {
+            val maskCond = (vmReg || isNotMasked) && (curSplitIdx >= splitStart)
+            when(maskCond) {
                 ldstUopQueue(ldstEnqPtr).valid  := true.B
                 ldstUopQueue(ldstEnqPtr).addr   := alignedAddr
                 ldstUopQueue(ldstEnqPtr).pos    := curVl
@@ -291,12 +295,13 @@ class SVlsu(implicit p: Parameters) extends Module {
 
             (0 until vlenb).foreach { i =>
                 when((i.U >> memwAlignReg) === (baseSegIdx >> memwAlignReg)) {
-                    vregInfo(i).status  := Mux(vmReg || isNotMasked, VRegSegmentStatus.notReady, VRegSegmentStatus.srcData)
-                    vregInfo(i).idx     := Mux(vmReg || isNotMasked, ldstEnqPtr, vregInfo(i).idx)
-                    vregInfo(i).offset  := Mux(vmReg || isNotMasked, offset + (i.U - baseSegIdx), vregInfo(i).offset)
+                    vregInfo(i).status  := Mux(maskCond, VRegSegmentStatus.notReady, VRegSegmentStatus.srcData)
+                    vregInfo(i).idx     := Mux(maskCond, ldstEnqPtr, vregInfo(i).idx)
+                    vregInfo(i).offset  := Mux(maskCond, offset + (i.U - baseSegIdx), vregInfo(i).offset)
                 }
             }
             curSplitIdx := curSplitIdx + 1.U
+            addrReg := calcAddr
         }
     }
     /*-----------------SPLIT STAGE END-----------------------*/

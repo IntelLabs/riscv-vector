@@ -36,6 +36,7 @@ trait VLsuBehavior_ld_seg {
     def vLsuTest0(): Unit = {
         it should "pass: unit-stride segment load (uops=2, eew=8, vl=16, vstart=0, segments=2)" in {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
                 (vlseg2e8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1, segIdx=0), ldReqSrc_default, "hdc9854100f0f0f0fffffffff2367abef".U),
@@ -65,6 +66,7 @@ trait VLsuBehavior_ld_seg {
     def vLsuTest1(): Unit = {
         it should "pass: unit-stride segment load (uops=3, eew=8, vl=16, vstart=0, segments=3)" in {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
                 (vlseg3e8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1, segIdx=0), ldReqSrc_default, "h0101127834dc76100f0fffffff2389ef".U),
@@ -95,6 +97,7 @@ trait VLsuBehavior_ld_seg {
     def vLsuTest2(): Unit = {
         it should "pass: unit-stride segment load (uops=2, eew=16, vl=3, vstart=0, segments=3)" in {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
                 (vlseg3e16.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1, segIdx=0), ldReqSrc_default, "h201f1e1d1c1b1a191817ffff0123cdef".U),
@@ -125,6 +128,7 @@ trait VLsuBehavior_ld_seg {
     def vLsuTest3(): Unit = {
         it should "pass: unit-stride segment load (uops=4, eew=64, vl=3, vstart=0, segments=2)" in {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
                 (vlseg2e64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1, segIdx=0), ldReqSrc_default, "h0f0f0f0f0f0f0f0f0123456789abcdef".U),
@@ -156,6 +160,7 @@ trait VLsuBehavior_ld_seg {
     def vLsuTest4(): Unit = {
         it should "pass: strided segment load (uops=4, eew=64, vl=4, vstart=0, segments=2, stride=-5)" in {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
                 (vlsseg2e8.copy(vl=4, uopIdx=0, uopEnd=false, vsew=1, segIdx=0), SrcBundleLd(scalar_opnd_2="hffffffff_fffffffb"), "h201f1e1d1c1b1a19181716153478eeef".U),
@@ -185,6 +190,7 @@ trait VLsuBehavior_ld_seg {
     def vLsuTest5(): Unit = {
         it should "pass: strided segment load (uops=4, eew=64, vl=4, vstart=0, segments=3, stride=-1)" in {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
                 (vlsseg3e8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1, segIdx=0), SrcBundleLd(scalar_opnd_2="hffffffff_ffffffff"), "h34503412907856eeeeeeeeeeeeeeeeef".U),
@@ -215,6 +221,7 @@ trait VLsuBehavior_ld_seg {
     def vLsuTest6(): Unit = {
         it should "pass: strided segment load (uops=3, eew=16, vl=2, vstart=0, segments=3, stride=4)" in {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
                 (vlsseg3e16.copy(vl=2, uopIdx=0, uopEnd=false, vsew=1, segIdx=0), SrcBundleLd(scalar_opnd_2="h04"), "h201f1e1d1c1b1a19181716154567cdef".U),
