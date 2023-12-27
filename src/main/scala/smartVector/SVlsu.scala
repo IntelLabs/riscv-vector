@@ -37,6 +37,7 @@ object Mop {
 }
 
 object UnitStrideMop {
+    val not_unit_strde   = "b11111".U
     val unit_stride      = "b00000".U
     val whole_register   = "b01000".U
     val mask             = "b01011".U
@@ -157,7 +158,6 @@ class SVlsu(implicit p: Parameters) extends Module {
     val (vstart, vl)     = (io.mUop.bits.uop.info.vstart, io.mUop.bits.uop.info.vl)
     val (uopIdx, uopEnd) = (io.mUop.bits.uop.uopIdx, io.mUop.bits.uop.uopEnd)
     val (vsew, vm)       = (io.mUop.bits.uop.info.vsew, io.mUop.bits.uop.ctrl.vm)
-    val unitStrideMop    = io.mUop.bits.uop.ctrl.vs2
     
     // eew and sew in bytes calculation
     val eewb = MuxLookup(Cat(funct6(2), funct3), 1.U, Seq(
@@ -172,6 +172,8 @@ class SVlsu(implicit p: Parameters) extends Module {
         "b00".U -> Mop.unit_stride,     "b01".U -> Mop.index_unodered,
         "b10".U -> Mop.constant_stride, "b11".U -> Mop.index_ordered
     ))
+
+    val unitStrideMop    = Mux(ldstType === Mop.unit_stride, io.mUop.bits.uop.ctrl.vs2, UnitStrideMop.not_unit_strde)
 
     // unit-stride & strided use eew as memwb, indexed use sew
     val memwb       = Mux(ldstType === Mop.index_ordered || ldstType === Mop.index_unodered, sewb, eewb)
@@ -237,7 +239,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     val addrMask    = WireInit(0.U(64.W))
     val alignedAddr = WireInit(0.U(64.W))
     val offset      = WireInit(0.U(log2Ceil(8).W))
-    val baseSegIdx  = (curVl % mlenReg) * memwbReg
+    val baseSegIdx  = (curVl % mlenReg) << memwAlignReg
 
     val isNotMasked = mUopReg.uopRegInfo.mask(curVl)
     val baseAddr    = mUopReg.scalar_opnd_1
@@ -251,7 +253,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     idxVal := (mUopReg.uopRegInfo.vs2 >> beginIdx) & idxMask
 
     when(ldstTypeReg === Mop.unit_stride) {
-        calcAddr := baseAddr + curVl * memwbReg
+        calcAddr := baseAddr + (curVl << memwAlignReg)
     }.elsewhen(ldstTypeReg === Mop.constant_stride) {
         when(mUopReg.scalar_opnd_2 === 0.U) {
             calcAddr := baseAddr
