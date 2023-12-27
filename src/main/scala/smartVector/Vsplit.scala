@@ -317,10 +317,15 @@ class Vsplit(implicit p : Parameters) extends Module {
         io.out.mUop.valid := false.B
     }
 
+    val expdLenReg = Reg(UInt(4.W))
     val emulVd  = io.in.decodeIn.bits.eewEmulInfo.emulVd
     val emulVs1 = io.in.decodeIn.bits.eewEmulInfo.emulVs1
     val emulVs2 = io.in.decodeIn.bits.eewEmulInfo.emulVs2
-    expdLen := Mux(emulVd >= emulVs1, Mux(emulVd >= emulVs2, emulVd, emulVs2), Mux(emulVs1 >= emulVs2, emulVs1, emulVs2))
+    val expdLenTmp = Mux(emulVd >= emulVs1, Mux(emulVd >= emulVs2, emulVd, emulVs2), Mux(emulVs1 >= emulVs2, emulVs1, emulVs2))
+    when(instFirstIn){
+        expdLenReg := expdLenTmp
+    }
+    expdLen := Mux(instFirstIn, expdLenTmp, expdLenReg)
 
     switch(currentState){
         is(empty){
