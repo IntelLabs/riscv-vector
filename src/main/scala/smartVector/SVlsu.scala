@@ -38,6 +38,7 @@ object Mop {
 }
 
 object UnitStrideMop {
+    val not_unit_strde   = "b11111".U
     val unit_stride      = "b00000".U
     val whole_register   = "b01000".U
     val mask             = "b01011".U
@@ -82,8 +83,12 @@ class SVlsu(implicit p: Parameters) extends Module {
     val memwbReg        = RegInit(8.U)
     val eewbReg         = RegInit(8.U)
     val memwAlignReg    = RegInit(8.U)
+    val eewAlignReg     = RegInit(8.U)
     val elenReg         = RegInit(0.U(vlenbWidth.W))
     val mlenReg         = RegInit(0.U(vlenbWidth.W))
+    val elenAlignReg    = RegInit(0.U(vlenbWidth.W))
+    val mlenAlignReg    = RegInit(0.U(vlenbWidth.W))
+    val minLenAlignReg  = RegInit(0.U(vlenbWidth.W))
     val ldstTypeReg     = RegInit(0.U(2.W))
     val vmReg           = RegInit(true.B)
     val nfieldReg       = RegInit(0.U(3.W))
@@ -160,7 +165,6 @@ class SVlsu(implicit p: Parameters) extends Module {
     val (vstart, vl)     = (io.mUop.bits.uop.info.vstart, io.mUop.bits.uop.info.vl)
     val (uopIdx, uopEnd) = (io.mUop.bits.uop.uopIdx, io.mUop.bits.uop.uopEnd)
     val (vsew, vm)       = (io.mUop.bits.uop.info.vsew, io.mUop.bits.uop.ctrl.vm)
-    val unitStrideMop    = io.mUop.bits.uop.ctrl.vs2
     
     // eew and sew in bytes calculation
     val eewb = MuxLookup(Cat(funct6(2), funct3), 1.U, Seq(
@@ -176,26 +180,24 @@ class SVlsu(implicit p: Parameters) extends Module {
         "b10".U -> Mop.constant_stride, "b11".U -> Mop.index_ordered
     ))
 
-    val nfield = Mux(
-        ldstType === Mop.unit_stride && unitStrideMop === UnitStrideMop.whole_register,
-        1.U,
-        funct6(5, 3) +& 1.U
-    )
+    val unitStrideMop = Mux(ldstType === Mop.unit_stride, io.mUop.bits.uop.ctrl.vs2, UnitStrideMop.not_unit_strde)
+    val nfield = Mux(unitStrideMop === UnitStrideMop.whole_register, 1.U, funct6(5, 3) +& 1.U)
 
     // unit-stride & strided use eew as memwb, indexed use sew
     val memwb       = Mux(ldstType === Mop.index_ordered || ldstType === Mop.index_unodered, sewb, eewb)
-    val mlen        = vlenb.U / memwb
-    val elen        = vlenb.U / eewb
-    val minLen      = elen min mlen
-
     // 1->0, 2->1, 4->2, 8->3
-    val memwAlign = Mux1H(memwb, Seq(
-        0.U, 1.U, 2.U, 3.U
-    ))
+    val memwAlign   = Mux1H(memwb, Seq(0.U, 1.U, 2.U, 3.U))
+    val eewAlign    = Mux1H(eewb,  Seq(0.U, 1.U, 2.U, 3.U))
+    val mlen        = vlenb.U >> memwAlign
+    val elen        = vlenb.U >> eewAlign
+    val mlenAlign   = Mux1H(mlen, Seq(0.U, 1.U, 2.U, 3.U, 4.U))
+    val elenAlign   = Mux1H(elen, Seq(0.U, 1.U, 2.U, 3.U, 4.U))
+    val minLen      = elen min mlen
+    val minLenAlign = elenAlign min mlenAlign
 
     // decide micro vl
     val actualVl    = Mux(unitStrideMop === UnitStrideMop.mask, (vl + 7.U) >> 3.U, vl) // ceil(vl/8)
-    val doneLen     = minLen * uopIdx
+    val doneLen     = uopIdx << minLenAlign
     val leftLen     = Mux(actualVl > doneLen, actualVl - doneLen, 0.U)
     val microVl     = minLen min leftLen
     val microVStart = Mux(vstart < doneLen, 0.U, minLen min (vstart - doneLen))
@@ -215,8 +217,12 @@ class SVlsu(implicit p: Parameters) extends Module {
             eewbReg      := eewb
             ldstTypeReg  := ldstType
             memwbReg     := memwb
+            eewAlignReg  := eewAlign
             elenReg      := elen
             mlenReg      := mlen
+            elenAlignReg := elenAlign
+            mlenAlignReg := mlenAlign
+            minLenAlignReg := minLenAlign
 
             // Set split info
             ldstEnqPtr   := 0.U
@@ -239,13 +245,13 @@ class SVlsu(implicit p: Parameters) extends Module {
 
     /*-----------------------------------------calc addr start-------------------------------------------------*/
     /*                                                                                                         */
-    val curVl       = mUopReg.uop.uopIdx * (elenReg min mlenReg) + splitStart + curSplitIdx
+    val curVl       = (mUopReg.uop.uopIdx << minLenAlignReg) + splitStart + curSplitIdx
     val calcAddr    = WireInit(0.U(64.W))
     val addr        = WireInit(0.U(64.W))
     val addrMask    = WireInit(0.U(64.W))
     val alignedAddr = WireInit(0.U(64.W))
     val offset      = WireInit(0.U(log2Ceil(8).W))
-    val baseSegIdx  = (curVl % mlenReg) * memwbReg
+    val baseSegIdx  = (curVl - ((curVl >> mlenAlignReg) << mlenAlignReg)) << memwAlignReg
 
     val isNotMasked = mUopReg.uopRegInfo.mask(curVl)
     val baseAddr    = mUopReg.scalar_opnd_1
@@ -254,7 +260,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     val idxVal      = WireInit(0.U(XLEN.W))
     val idxMask     = WireInit(0.U(XLEN.W))
     val eew         = eewbReg << 3.U
-    val beginIdx    = (curVl % elenReg) * (eew)
+    val beginIdx    = (curVl - ((curVl >> elenAlignReg) << elenAlignReg)) << (eewAlignReg + 3.U)
     idxMask := (("h1".asUInt(64.W) << eew) - 1.U)
     idxVal := (mUopReg.uopRegInfo.vs2 >> beginIdx) & idxMask
 
