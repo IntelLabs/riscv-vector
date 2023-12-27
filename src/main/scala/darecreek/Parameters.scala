@@ -30,7 +30,7 @@ trait DarecreekParameters {
   val bVstart = bVL - 1
 
   // Vector Queue
-  val VQSize = 32
+  val VQSize = 16
   // Decode
   val VDecodeWidth = 1
   // Rename
