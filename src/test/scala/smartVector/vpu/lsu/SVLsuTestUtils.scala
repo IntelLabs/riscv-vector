@@ -5,39 +5,13 @@ import chisel3.util._
 import chiseltest._
 import chisel3.experimental.BundleLiterals._
 import chisel3.experimental.VecLiterals._
+import chipsalliance.rocketchip.config.{Config, Field, Parameters}
+import darecreek.exu.vfu.VFuParamsKey
+import darecreek.exu.vfu.VFuParameters
+import xiangshan.XSCoreParamsKey
+import xiangshan.XSCoreParameters
 import smartVector._
 import SmartParam._
-
-object test_init {
-  def apply(dut: SmartVectorLsuTestWrapper): Unit = {
-    dut.clock.setTimeout(0)
-    dut.io.mUop.valid.poke(false.B)
-    dut.io.mUop.bits.oldVd.poke(0.U)
-  }
-}
-object next_is_load_and_step {
-  def apply(dut: SmartVectorLsuTestWrapper): Unit = {
-    dut.io.mUop.valid.poke(false.B)
-    dut.io.mUop.bits.oldVd.poke(0.U)
-    dut.clock.step(1)
-  }
-}
-
-object test_init_store {
-  def apply(dut: SmartVectorLsuStoreTestWrapper): Unit = {
-    dut.clock.setTimeout(0)
-    dut.io.mUop.valid.poke(false.B)
-    // dut.io.mUop.bits.oldVd.poke(0.U)
-  }
-}
-
-object next_is_store_and_step {
-  def apply(dut: SmartVectorLsuStoreTestWrapper): Unit = {
-    dut.io.mUop.valid.poke(false.B)
-    // dut.io.mUop.bits.oldVd.poke(0.U)
-    dut.clock.step(1)
-  }
-}
 
 case class CtrlBundle(instrn: BitPat,
                       isLoad: Boolean = true,
@@ -50,6 +24,7 @@ case class CtrlBundle(instrn: BitPat,
                       vstart: Int = 0,
                       uopIdx: Int = 0,
                       uopEnd: Boolean = false,
+                      segIdx: Int = 0,
                       vs2: Int = 0,
 )
 
@@ -91,6 +66,7 @@ trait BundleGenHelper {
       _.info_vstart -> c.vstart.U,
       _.splitUopIdx -> c.uopIdx.U,
       _.splitUopEnd -> c.uopEnd.B,
+      _.segIdx -> c.segIdx.U,
       _.ctrl_vs2 -> {
         if(c.instrn(24, 20).equals(BitPat("b?????"))) {
           0.U
@@ -108,7 +84,6 @@ trait BundleGenHelper {
         _.scalar_opnd_2 -> s.scalar_opnd_2.U,
         _.vs1 -> s.vs1.U,
         _.vs2 -> s.vs2.U,
-        _.vs3 -> 0.U,
         _.oldVd -> s.oldVd.U,
         _.mask -> s.mask.U,
     )
@@ -121,8 +96,7 @@ trait BundleGenHelper {
         _.scalar_opnd_2 -> s.scalar_opnd_2.U,
         _.vs1 -> s.vs1.U,
         _.vs2 -> s.vs2.U,
-        _.vs3 -> s.vs3.U,
-        _.oldVd -> 0.U,
+        _.oldVd -> s.vs3.U,
         _.mask -> s.mask.U,
     )
   }
@@ -144,6 +118,7 @@ class VUopTest extends Bundle {
     val info_vstart = UInt(bVstart.W)
     val splitUopIdx = UInt(3.W)
     val splitUopEnd = Bool()
+    val segIdx      = UInt(3.W)
 }
 
 class MuopTest extends Bundle {
@@ -153,12 +128,14 @@ class MuopTest extends Bundle {
     val scalar_opnd_2 = UInt(XLEN.W)
     val vs1           = UInt(VLEN.W)
     val vs2           = UInt(VLEN.W)
-    val vs3           = UInt(VLEN.W)
     val mask          = UInt(VLEN.W)
 }
 
-class FakeLdDCache extends Module {
-    val io = IO(Flipped(new RVUMemory))
+class LSUFakeDCache extends Module {
+    val io = IO(new Bundle {
+      val dataExchange = Flipped(new RVUMemory)
+      val memInfo = Output(Vec(24, UInt(64.W)))
+    })
 
     val dataTable = Seq(
         // addr, data, exception
@@ -187,98 +164,15 @@ class FakeLdDCache extends Module {
         (0x1080.U, BigInt("00080000000c0004", 16).U, false.B),
         (0x1088.U, BigInt("000000080004001c", 16).U, false.B),
     )
-
-    val hasXcpt = WireInit(false.B)
-    val hasMiss = WireInit(false.B)
-
-    val s1_valid = RegNext(io.req.valid)
-    val s1_req   = RegNext(io.req.bits)
-    val s2_valid = RegNext(s1_valid)
-    val s2_req   = RegNext(s1_req)
-
-    when(hasXcpt || hasMiss) {
-        s1_valid := false.B
-        s2_valid := false.B
-    }
-
-    val noise = RegInit("b011000001".U(32.W))
-    noise := noise >> 1.U
-    val miss = noise(0)
-
-    io.resp.bits.idx        := s2_req.idx
-    io.req.ready            := true.B
-    io.xcpt                 := 0.U.asTypeOf(new HellaCacheExceptions())
-    io.resp.bits.mask       := 0.U
-
-    when(s2_valid) {
-        val isXcpt = WireInit(false.B)
-        val data = WireInit(0.U(64.W))
-        for(i <- 0 until dataTable.length) {
-            when(dataTable(i)._1 === s2_req.addr) {
-              isXcpt := dataTable(i)._3
-              data   := dataTable(i)._2
-            }
-        }
-
-        io.resp.bits.nack     := miss
-        io.resp.bits.data     := data
-        io.resp.valid         := ~isXcpt && ~miss
-        io.xcpt.ma.ld         := isXcpt && ~miss
-        hasXcpt               := isXcpt && ~miss
-        hasMiss               := miss
-
-        io.resp.bits.has_data := ~isXcpt && ~miss
-    }.otherwise {
-        io.resp.valid         := false.B
-        io.resp.bits.nack     := false.B
-        io.resp.bits.has_data := false.B
-        io.resp.bits.data     := 0.U
-    }
-}
-
-class FakeStDCache extends Module {
-    val io = IO(new Bundle {
-      val dataExchange = Flipped(new RVUMemory)
-      val memInfo = Output(Vec(20, UInt(64.W)))
-    })
-
-    val dataTable = Seq(
-        // addr, exception
-        (0x0fd0.U, false.B),
-        (0x0fd8.U, false.B),
-        (0x0fe0.U, false.B),
-        (0x0fe8.U, false.B),
-        (0x0ff0.U, false.B),
-        (0x0ff8.U, false.B),
-        (0x1000.U, false.B),
-        (0x1008.U, false.B),
-        (0x1010.U, false.B),
-        (0x1018.U, false.B),
-        (0x1020.U, false.B),
-        (0x1028.U, false.B),
-        (0x1030.U, false.B),
-        (0x1038.U, false.B),
-        (0x1040.U, false.B),
-        (0x1048.U, false.B),
-        (0x1050.U, false.B),
-        (0x1058.U, false.B),
-        (0x1060.U, true.B),
-        (0x1068.U, false.B)
-    )
-
-    val dataVec = RegInit(VecInit(Seq.fill(dataTable.length)(VecInit(Seq.fill(8)(0.U(8.W))))))
+    val dataVec = RegInit(VecInit(dataTable.map(entry =>
+      VecInit(Seq.tabulate(8)(i => entry._2(i*8 + 7, i*8)))
+    )))
 
     for (i <- 0 until dataTable.length) {
       val flattenedData = Cat(dataVec(i).reverse)
       io.memInfo(i) := flattenedData
     }
     
-    io.dataExchange.req.ready            := true.B
-    io.dataExchange.resp.bits.data       := 0.U
-    io.dataExchange.resp.bits.nack       := false.B
-    io.dataExchange.xcpt                 := 0.U.asTypeOf(new HellaCacheExceptions())
-    io.dataExchange.resp.bits.has_data   := false.B
-
     val hasXcpt = WireInit(false.B)
     val hasMiss = WireInit(false.B)
 
@@ -292,39 +186,143 @@ class FakeStDCache extends Module {
         s2_valid := false.B
     }
 
-    io.dataExchange.resp.valid           := s2_valid
-    io.dataExchange.resp.bits.mask       := 0.U
-    io.dataExchange.resp.bits.idx        := s2_req.idx
-
     val noise = RegInit("b011000001".U(32.W))
     noise := noise >> 1.U
-    val random = noise(0)
+    val miss = noise(0)
+
+    io.dataExchange.resp.bits.idx        := s2_req.idx
+    io.dataExchange.req.ready            := true.B
+    io.dataExchange.xcpt                 := 0.U.asTypeOf(new HellaCacheExceptions())
+    io.dataExchange.resp.bits.mask       := 0.U
 
     when(s2_valid) {
-        when(random) {
-            io.dataExchange.resp.bits.nack := true.B
-            hasMiss := true.B
-        }.otherwise {
-            io.dataExchange.resp.bits.nack := false.B
-            hasMiss := false.B
-            for(i <- 0 until dataTable.length) {
+        val isXcpt = WireInit(false.B)
+        val data = WireInit(0.U(64.W))
+
+        for(i <- 0 until dataTable.length) {
+            when(dataTable(i)._1 === s2_req.addr) {
+              isXcpt := dataTable(i)._3
+              data   := Cat(dataVec(i).reverse)
+            }
+        }
+
+        for(i <- 0 until dataTable.length) {
               when(dataTable(i)._1 === s2_req.addr) {
-                  when(dataTable(i)._2) {
-                      io.dataExchange.xcpt.ma.ld := true.B
-                      hasXcpt := true.B
-                  }.otherwise {
-                      io.dataExchange.xcpt.ma.ld := false.B
-                      hasXcpt := false.B
-                      when(s2_req.cmd === VMemCmd.write) {
-                        for(j <- 0 until 8) {
-                          when(s2_req.mask(j)) {
-                              dataVec(i)(j) := s2_req.data(j * 8 + 7, j * 8)
-                          }
-                        }
+                  isXcpt := dataTable(i)._3
+                  when(s2_req.cmd === VMemCmd.write && !miss && !isXcpt) {
+                    for(j <- 0 until 8) {
+                      when(s2_req.mask(j)) {
+                          dataVec(i)(j) := s2_req.data(j * 8 + 7, j * 8)
+                      }
                     }
                   }
               }
           }
-        }
+
+        io.dataExchange.resp.bits.nack    := miss
+        io.dataExchange.resp.bits.data    := data
+        io.dataExchange.resp.bits.has_data:= s2_req.cmd === VMemCmd.read && ~isXcpt && ~miss
+        io.dataExchange.resp.valid        := ~isXcpt && ~miss
+        io.dataExchange.xcpt.ma.ld        := isXcpt && ~miss
+        hasXcpt                           := isXcpt && ~miss
+        hasMiss                           := miss
+    }.otherwise {
+        io.dataExchange.resp.valid         := false.B
+        io.dataExchange.resp.bits.nack     := false.B
+        io.dataExchange.resp.bits.has_data := false.B
+        io.dataExchange.resp.bits.data     := 0.U
     }
+}
+
+
+class SmartVectorLsuTestWrapper(isLoad: Boolean) extends Module {
+    val io = IO(new Bundle {
+        val mUop = Input(ValidIO(new MuopTest))
+        val lsuOut = ValidIO(new LsuOutput)
+        val xcpt = Output(new VLSUXcpt)
+        val lsuReady = Output(Bool())
+        val memInfo = Output(Vec(24, UInt(64.W)))
+    })
+
+    val p = Parameters.empty.alterPartial({
+        case SmartParamsKey => SmartParameters(VLEN = 128)
+        case VFuParamsKey   => VFuParameters(XLEN = 64, VLEN = 128)
+        case XSCoreParamsKey => XSCoreParameters()
+    })
+
+    val vLsu = Module(new SVlsu()(p))
+  
+    io.lsuReady                             := vLsu.io.lsuReady
+    vLsu.io.mUop.valid                      := io.mUop.valid
+
+    vLsu.io.mUop.bits.scalar_opnd_1         := io.mUop.bits.scalar_opnd_1
+    vLsu.io.mUop.bits.scalar_opnd_2         := io.mUop.bits.scalar_opnd_2
+    vLsu.io.mUop.bits.uopRegInfo.vs1        := io.mUop.bits.vs1
+    vLsu.io.mUop.bits.uopRegInfo.vs2        := io.mUop.bits.vs2
+    vLsu.io.mUop.bits.uopRegInfo.old_vd     := io.mUop.bits.oldVd
+    vLsu.io.mUop.bits.uopRegInfo.mask       := io.mUop.bits.mask
+    vLsu.io.mUop.bits.uopRegInfo.vxsat      := false.B
+    
+    vLsu.io.mUop.bits.uop.sysUop            := DontCare
+    vLsu.io.mUop.bits.uop.uopIdx            := io.mUop.bits.uop.splitUopIdx
+    vLsu.io.mUop.bits.uop.uopEnd            := io.mUop.bits.uop.splitUopEnd
+    vLsu.io.segmentIdx                      := io.mUop.bits.uop.segIdx
+
+    vLsu.io.mUop.bits.uop.ctrl.vs2          := io.mUop.bits.uop.ctrl_vs2
+    vLsu.io.mUop.bits.uop.ctrl.funct6       := io.mUop.bits.uop.ctrl_funct6
+    vLsu.io.mUop.bits.uop.ctrl.funct3       := io.mUop.bits.uop.ctrl_funct3
+    vLsu.io.mUop.bits.uop.ctrl.load         := io.mUop.bits.uop.ctrl_load
+    vLsu.io.mUop.bits.uop.ctrl.store        := io.mUop.bits.uop.ctrl_store
+    vLsu.io.mUop.bits.uop.ctrl.vm           := io.mUop.bits.uop.ctrl_vm
+    vLsu.io.mUop.bits.uop.ctrl.vs1_imm      := DontCare
+    vLsu.io.mUop.bits.uop.ctrl.narrow       := DontCare
+    vLsu.io.mUop.bits.uop.ctrl.narrow_to_1  := DontCare
+    vLsu.io.mUop.bits.uop.ctrl.widen        := DontCare
+    vLsu.io.mUop.bits.uop.ctrl.widen2       := DontCare
+    vLsu.io.mUop.bits.uop.ctrl.alu          := false.B
+    vLsu.io.mUop.bits.uop.ctrl.mul          := false.B
+    vLsu.io.mUop.bits.uop.ctrl.fp           := false.B
+    vLsu.io.mUop.bits.uop.ctrl.div          := false.B
+    vLsu.io.mUop.bits.uop.ctrl.fixP         := false.B
+    vLsu.io.mUop.bits.uop.ctrl.redu         := false.B
+    vLsu.io.mUop.bits.uop.ctrl.mask         := false.B
+    vLsu.io.mUop.bits.uop.ctrl.perm         := false.B
+
+    vLsu.io.mUop.bits.uop.info.ma           := io.mUop.bits.uop.info_ma
+    vLsu.io.mUop.bits.uop.info.ta           := io.mUop.bits.uop.info_ta
+    vLsu.io.mUop.bits.uop.info.vsew         := io.mUop.bits.uop.info_vsew
+    vLsu.io.mUop.bits.uop.info.vlmul        := io.mUop.bits.uop.info_vlmul
+    vLsu.io.mUop.bits.uop.info.vl           := io.mUop.bits.uop.info_vl
+    vLsu.io.mUop.bits.uop.info.vstart       := io.mUop.bits.uop.info_vstart
+    vLsu.io.mUop.bits.uop.info.vxrm         := DontCare
+    vLsu.io.mUop.bits.uop.info.frm          := DontCare
+
+    vLsu.io.mUopMergeAttr.valid             := io.mUop.valid
+    vLsu.io.mUopMergeAttr.bits.rfWriteEn    := isLoad.asBool
+    vLsu.io.mUopMergeAttr.bits.ldest        := DontCare
+    vLsu.io.mUopMergeAttr.bits.muopEnd      := DontCare
+    vLsu.io.mUopMergeAttr.bits.alu          := false.B
+    vLsu.io.mUopMergeAttr.bits.mul          := false.B
+    vLsu.io.mUopMergeAttr.bits.fp           := false.B
+    vLsu.io.mUopMergeAttr.bits.div          := false.B
+    vLsu.io.mUopMergeAttr.bits.fixP         := false.B
+    vLsu.io.mUopMergeAttr.bits.redu         := false.B
+    vLsu.io.mUopMergeAttr.bits.mask         := false.B
+    vLsu.io.mUopMergeAttr.bits.perm         := false.B
+
+    vLsu.io.mUopMergeAttr.bits.scalarRegWriteEn := false.B
+    vLsu.io.mUopMergeAttr.bits.regBackWidth := 7.U
+    vLsu.io.mUopMergeAttr.bits.regWriteMuopIdx := 0.U
+
+    io.lsuOut.valid                         := vLsu.io.lsuOut.valid
+    io.lsuOut.bits.data                     := vLsu.io.lsuOut.bits.data
+    io.lsuOut.bits.rfWriteEn                := vLsu.io.lsuOut.bits.rfWriteEn
+    io.lsuOut.bits.rfWriteIdx               := vLsu.io.lsuOut.bits.rfWriteIdx
+    io.lsuOut.bits.muopEnd                  := vLsu.io.lsuOut.bits.muopEnd
+
+    io.xcpt <> vLsu.io.xcpt
+
+    val dcache = Module(new LSUFakeDCache)
+    vLsu.io.dataExchange <> dcache.io.dataExchange
+    io.memInfo := dcache.io.memInfo
 }
