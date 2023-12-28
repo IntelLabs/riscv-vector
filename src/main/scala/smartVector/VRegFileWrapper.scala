@@ -6,6 +6,7 @@ import darecreek.exu.vfu.VAluOutput
 import chipsalliance.rocketchip.config
 import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import SmartParam._
+import darecreek.exu.vfu.VPermOutput
 
 
 class SVRegFileWrapper(implicit p : Parameters) extends Module{ 
@@ -14,13 +15,15 @@ class SVRegFileWrapper(implicit p : Parameters) extends Module{
         val in = new Bundle{
             val readIn = Input(new regReadIn)
             val writeIn = Input(new regWriteIn)
+            val permReadIn = Input(new VPermOutput)
         }
         val out = Output(new regOut)
+        val permReadOut = Output(new VPermRegIn)
         //TODO: This is reserved for verification, delete it later
         val rfData = Output(Vec(NVPhyRegs, UInt(VLEN.W)))
     })
 
-    val nVRFReadPorts = 4
+    val nVRFReadPorts = 5
     val nVRFWritePorts = 1
   
     val regFile = Module(new SVRegFile(nVRFReadPorts, nVRFWritePorts))
@@ -41,6 +44,12 @@ class SVRegFileWrapper(implicit p : Parameters) extends Module{
     regFile.io.read(1).addr := io.in.readIn.rfReadIdx(1)
     regFile.io.read(2).addr := io.in.readIn.rfReadIdx(2)
     regFile.io.read(3).addr := io.in.readIn.rfReadIdx(3)
+
+    //permutation need to read register
+    regFile.io.read(4).ren  := io.in.permReadIn.rd_en
+    regFile.io.read(4).addr := io.in.permReadIn.rd_preg_idx
+    io.permReadOut.rvalid := regFile.io.read(4).ren
+    io.permReadOut.rdata := Cat(regFile.io.read(4).data(1), regFile.io.read(4).data(0))
 
     val regWriteDone = RegInit(false.B)
 

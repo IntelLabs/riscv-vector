@@ -53,6 +53,8 @@ class VUopCtrlW extends Bundle {
   val redu        = Bool()
   val mask        = Bool()
   val perm        = Bool()
+  val lsrc = Vec(2, UInt(5.W)) //0: vs1/imm5   1: vs2
+  val ldest = UInt(5.W)
   def vv = !funct3(2) && !(funct3(1) && funct3(0))
   def vx = funct3(2)
   def vi = !funct3(2) && funct3(1) && funct3(0)
@@ -237,8 +239,11 @@ class Vsplit(implicit p : Parameters) extends Module {
     
     io.scoreBoardReadIO.readAddr1 := vs1Idx
     io.scoreBoardReadIO.readAddr2 := vs2Idx
+    io.scoreBoardReadIO.readNum   := expdLen
     when(!vs1ReadEn){
         hasRegConf(0) := false.B
+    }.elsewhen(ctrl.perm){
+        hasRegConf(0) := io.scoreBoardReadIO.readBypassed1N
     }.elsewhen (~io.scoreBoardReadIO.readBypassed1){
         hasRegConf(0) := false.B
     }.otherwise{
@@ -247,6 +252,8 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     when(!vs2ReadEn){
         hasRegConf(1) := false.B
+    }.elsewhen(ctrl.perm){
+        hasRegConf(1) := io.scoreBoardReadIO.readBypassed2N
     }.elsewhen (~io.scoreBoardReadIO.readBypassed2){
         hasRegConf(1) := false.B
     }.otherwise{
@@ -307,8 +314,9 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.out.toRegFileRead.rfReadIdx(2)         := 0.U
     io.out.toRegFileRead.rfReadIdx(3)         := ctrl.ldest + ldest_inc
 
-    io.scoreBoardSetIO.setEn     := RegNext(io.out.mUop.valid && ctrl.ldestVal)
-    io.scoreBoardSetIO.setAddr   := RegNext(io.out.mUopMergeAttr.bits.ldest)
+    io.scoreBoardSetIO.setEn      := RegNext(io.out.mUop.valid && ctrl.ldestVal && ~ctrl.perm)
+    io.scoreBoardSetIO.setMultiEn := RegNext(io.out.mUop.valid && ctrl.ldestVal && ctrl.perm)
+    io.scoreBoardSetIO.setAddr    := RegNext(io.out.mUopMergeAttr.bits.ldest)
 
     when ((instFirstIn || currentState === ongoing) & ~needStall){
         io.out.mUop.valid := true.B
@@ -321,7 +329,9 @@ class Vsplit(implicit p : Parameters) extends Module {
     val emulVd  = io.in.decodeIn.bits.eewEmulInfo.emulVd
     val emulVs1 = io.in.decodeIn.bits.eewEmulInfo.emulVs1
     val emulVs2 = io.in.decodeIn.bits.eewEmulInfo.emulVs2
-    val expdLenTmp = Mux(emulVd >= emulVs1, Mux(emulVd >= emulVs2, emulVd, emulVs2), Mux(emulVs1 >= emulVs2, emulVs1, emulVs2))
+    val expdLenTmp = Mux(io.in.decodeIn.bits.vCtrl.perm, 1.U ,
+    Mux(emulVd >= emulVs1, Mux(emulVd >= emulVs2, emulVd, emulVs2), Mux(emulVs1 >= emulVs2, emulVs1, emulVs2)))
+    
     when(instFirstIn){
         expdLenReg := expdLenTmp
     }

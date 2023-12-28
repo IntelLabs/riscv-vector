@@ -19,6 +19,7 @@ class RVUTestResult extends Bundle {
 class ScoreboardSetIO extends Bundle {
     val setEn         = Input(Bool())
     val setAddr       = Input(UInt(log2Ceil(NVPhyRegs).W))
+    val setMultiEn    = Input(Bool())
 }
 
 class ScoreboardClearIO extends Bundle {
@@ -27,12 +28,15 @@ class ScoreboardClearIO extends Bundle {
 }
 
 class ScoreboardReadIO extends Bundle {
-    val readAddr1     = Input(UInt(log2Ceil(NVPhyRegs).W))
-    val readAddr2     = Input(UInt(log2Ceil(NVPhyRegs).W))
-    val read1         = Output(Bool())
-    val readBypassed1 = Output(Bool())
-    val read2         = Output(Bool())
-    val readBypassed2 = Output(Bool())
+    val readAddr1      = Input(UInt(log2Ceil(NVPhyRegs).W))
+    val readAddr2      = Input(UInt(log2Ceil(NVPhyRegs).W))
+    val readNum        = Input(UInt(3.W))
+    val read1          = Output(Bool())
+    val readBypassed1  = Output(Bool())
+    val readBypassed1N = Output(Bool())
+    val read2          = Output(Bool())
+    val readBypassed2  = Output(Bool())
+    val readBypassed2N = Output(Bool())
 }
 
 class CommitInfo extends Bundle{
@@ -77,6 +81,7 @@ class SmartVector extends Module {
     split.io.in.regFileIn <> regFile.io.out
     iex.io.in <> RegNext(split.io.out.mUop)
     merge.io.in.aluIn <> iex.io.out
+    merge.io.in.permIn <> iex.io.permOut
     commit.io.in.commitInfo <> merge.io.out.commitInfo
     commit.io.in.excpInfo <> split.io.excpInfo
     io.out.rvuCommit <> commit.io.out.commitInfo
@@ -92,6 +97,10 @@ class SmartVector extends Module {
     merge.io.in.mergeInfo <> split.io.out.mUopMergeAttr  
     regFile.io.in.readIn  <> split.io.out.toRegFileRead
     regFile.io.in.writeIn <> merge.io.out.toRegFileWrite
+
+    //perm read register file
+    regFile.io.in.permReadIn <> iex.SVPerm.io.out
+    iex.io.permRegIn <> regFile.io.permReadOut
 
     //stall pipeline
     split.io.iexNeedStall := iex.io.iexNeedStall
@@ -130,11 +139,13 @@ class SmartVector extends Module {
     val sboard  = new Scoreboard(NVPhyRegs, false)
     sboard.clear(merge.io.scoreBoardCleanIO.clearEn, merge.io.scoreBoardCleanIO.clearAddr)
     sboard.set(split.io.scoreBoardSetIO.setEn, split.io.scoreBoardSetIO.setAddr)
+    sboard.setN(split.io.scoreBoardSetIO.setMultiEn, split.io.scoreBoardSetIO.setAddr)
     split.io.scoreBoardReadIO.read1 := sboard.read(split.io.scoreBoardReadIO.readAddr1)
     split.io.scoreBoardReadIO.read2 := sboard.read(split.io.scoreBoardReadIO.readAddr2)
     split.io.scoreBoardReadIO.readBypassed1 := sboard.readBypassed(split.io.scoreBoardReadIO.readAddr1)
     split.io.scoreBoardReadIO.readBypassed2 := sboard.readBypassed(split.io.scoreBoardReadIO.readAddr2)
-    
+    split.io.scoreBoardReadIO.readBypassed1N := sboard.readBypassedN(split.io.scoreBoardReadIO.readNum, split.io.scoreBoardReadIO.readAddr1)
+    split.io.scoreBoardReadIO.readBypassed2N := sboard.readBypassedN(split.io.scoreBoardReadIO.readNum, split.io.scoreBoardReadIO.readAddr2)
     io.in.ready := decoder.io.in.ready
 }
 
