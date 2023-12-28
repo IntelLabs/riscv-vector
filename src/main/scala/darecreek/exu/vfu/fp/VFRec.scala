@@ -30,7 +30,7 @@ class OutTypeClassify(val t: VFPU.FType) extends Module {
   isSubnormal := decoded.isSubnormal
 
   rsqrtType := VecInit(
-    sign && (!decoded.expIsOnes && !decoded.isZero),// [-inf, -0), output:canonicalNaN, NV
+    sign && ((!decoded.expIsOnes && !decoded.isZero) || (decoded.isInf)),// [-inf, -0), output:canonicalNaN, NV
     decoded.isZero && sign, // -0, output:-Inf, DZ
     decoded.isZero && !sign, // +0, output:+Inf, DZ
     !sign && (!decoded.expIsOnes && !decoded.isZero),// (+0, +inf), output:estimate
