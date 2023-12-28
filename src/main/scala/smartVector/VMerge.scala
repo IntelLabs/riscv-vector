@@ -8,6 +8,7 @@ import darecreek.exu.vfu.alu.VAlu
 import firrtl.Utils
 import SmartParam._
 import darecreek.exu.vfu.VAluOutput
+import darecreek.exu.vfu.VPermOutput
 
 class LsuOutput extends Bundle{
     val data = UInt(VLEN.W)
@@ -22,6 +23,7 @@ class VMerge (implicit p : Parameters) extends Module {
             val mergeInfo = Input(ValidIO(new MuopMergeAttr))
             val aluIn = Input(ValidIO(new IexOutput))
             val lsuIn = Input(ValidIO(new LsuOutput))
+            val permIn = Input(new VPermOutput)
         }
         val out = new Bundle{
             //update register file
@@ -77,8 +79,6 @@ class VMerge (implicit p : Parameters) extends Module {
     }.otherwise{
             io.out.toRegFileWrite := 0.U.asTypeOf(new regWriteIn)
     }
-    io.scoreBoardCleanIO.clearEn   := io.out.toRegFileWrite.rfWriteEn
-    io.scoreBoardCleanIO.clearAddr := io.out.toRegFileWrite.rfWriteIdx
 
     when(io.in.aluIn.valid && muopEnd){
         io.out.commitInfo.valid := true.B
@@ -94,4 +94,19 @@ class VMerge (implicit p : Parameters) extends Module {
         io.out.commitInfo.valid := false.B
         io.out.commitInfo.bits := 0.U.asTypeOf(new CommitInfo)
     }
+
+    //Perm is not same as others, need to deal seperately
+    val permWriteNum = RegInit(0.U(3.W))
+    when(io.in.permIn.wb_vld){
+        io.out.toRegFileWrite.rfWriteEn  := true.B
+        io.out.toRegFileWrite.rfWriteIdx := io.in.permIn.wr_idx
+        io.out.toRegFileWrite.rfWriteData := io.in.permIn.wb_data
+        permWriteNum := permWriteNum + 1.U
+    }
+    when(permWriteNum === io.in.permIn.wb_num){
+        permWriteNum := 0.U
+    }
+    
+    io.scoreBoardCleanIO.clearEn   := io.out.toRegFileWrite.rfWriteEn
+    io.scoreBoardCleanIO.clearAddr := io.out.toRegFileWrite.rfWriteIdx
 }

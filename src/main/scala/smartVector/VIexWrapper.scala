@@ -18,11 +18,18 @@ class IexOutput extends Bundle {
   val fflags = UInt(5.W)
 }
 
+class VPermRegIn extends Bundle{
+  val rdata = UInt(128.W)
+  val rvalid = Bool()
+}
+
 class VIexWrapper(implicit p : Parameters) extends Module {
   
   val io = IO(new Bundle {
     val in = Input(ValidIO(new Muop))
     val out = ValidIO(new IexOutput)
+    val permOut = new(VPermOutput)
+    val permRegIn = Input(new(VPermRegIn))
     val iexNeedStall = Output(Bool())
   })
 
@@ -31,13 +38,14 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   val SVMask  = Module(new VMaskWrapper()(p))
   val SVReduc = Module(new VReducWrapper()(p))
   val SVDiv   = Module(new VDivWrapper()(p))
+  val SVPerm  = Module(new VPermWrapper()(p))
 
   val empty :: ongoing :: Nil = Enum(2)
   val currentState = RegInit(empty)
   val currentStateNext = WireDefault(empty) 
 
   val outValid = SValu.io.out.valid || SVMac.io.out.valid || SVMask.io.out.valid || 
-                 SVReduc.io.out.valid || SVDiv.io.out.valid
+                 SVReduc.io.out.valid || SVDiv.io.out.valid || SVPerm.io.out.wb_vld
 
   switch(currentState){
     is(empty){
@@ -60,12 +68,14 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   io.iexNeedStall := (currentStateNext === ongoing)
   assert(!(currentState === ongoing && io.in.valid), "when current state is ongoing, should not has new inst in")
   assert(!(!SVDiv.io.in.ready && io.in.valid), "when div is not ready, should not has new inst in")
+  assert(!(SVPerm.io.out.perm_busy && io.in.valid), "when perm is busy, should not has new inst in")
   
   SValu.io.in.valid   := io.in.valid && io.in.bits.uop.ctrl.alu
   SVMac.io.in.valid   := io.in.valid && io.in.bits.uop.ctrl.mul
   SVMask.io.in.valid  := io.in.valid && io.in.bits.uop.ctrl.mask
   SVReduc.io.in.valid := io.in.valid && io.in.bits.uop.ctrl.redu
   SVDiv.io.in.valid   := io.in.valid && io.in.bits.uop.ctrl.div
+  SVPerm.io.in.rvalid := io.in.valid && io.in.bits.uop.ctrl.perm
 
   Seq(SValu.io.in.bits, SVMac.io.in.bits, SVMask.io.in.bits, SVReduc.io.in.bits, SVDiv.io.in.bits).foreach {fu =>
     fu.uop   := io.in.bits.uop
@@ -75,6 +85,19 @@ class VIexWrapper(implicit p : Parameters) extends Module {
     fu.oldVd := io.in.bits.uopRegInfo.old_vd
     fu.mask  := io.in.bits.uopRegInfo.mask
   }
+
+  SVPerm.io.in.uop := io.in.bits.uop
+  SVPerm.io.in.rs1 := io.in.bits.scalar_opnd_1 || fudian
+  SVPerm.io.in.vs1_preg_idx := VecInit(Seq.tabulate(8)(i => io.in.bits.uop.ctrl.lsrc(0) + i.U))
+  SVPerm.io.in.vs2_preg_idx := VecInit(Seq.tabulate(8)(i => io.in.bits.uop.ctrl.lsrc(1) + i.U))
+  SVPerm.io.in.old_vd_preg_idx := VecInit(Seq.tabulate(8)(i => io.in.bits.uop.ctrl.ldest + i.U))
+  SVPerm.io.in.mask_preg_idx := 0.U cunyi
+  SVPerm.io.in.uop_valid := io.in.valid & io.in.bits.uop.ctrl.perm
+  SVPerm.io.in.rdata := io.permRegIn.rdata
+  SVPerm.io.in.rvalid := io.permRegIn.rvalid
+
+
+  io.permOut := SVPerm.io.out
 
   val fixCycleResult = Wire(new VAluOutput)
 
