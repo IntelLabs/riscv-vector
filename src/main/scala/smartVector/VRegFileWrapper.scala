@@ -60,10 +60,10 @@ class SVRegFileWrapper(implicit p : Parameters) extends Module{
     readDataOUt(3) := Cat(regFile.io.read(3).data(1), regFile.io.read(3).data(0))
 
     //bypass
-    io.out.readData(0) := Mux(io.in.readIn.rfReadIdx(0) === io.in.writeIn.rfWriteIdx, io.in.writeIn.rfWriteData, readDataOUt(0))
-    io.out.readData(1) := Mux(io.in.readIn.rfReadIdx(1) === io.in.writeIn.rfWriteIdx, io.in.writeIn.rfWriteData, readDataOUt(1))
-    io.out.readData(2) := Mux(io.in.readIn.rfReadIdx(2) === io.in.writeIn.rfWriteIdx, io.in.writeIn.rfWriteData, readDataOUt(2))
-    io.out.readData(3) := Mux(io.in.readIn.rfReadIdx(3) === io.in.writeIn.rfWriteIdx, io.in.writeIn.rfWriteData, readDataOUt(3))
+    io.out.readData(0) := Mux(io.in.writeIn.rfWriteEn & (io.in.readIn.rfReadIdx(0) === io.in.writeIn.rfWriteIdx), io.in.writeIn.rfWriteData, readDataOUt(0))
+    io.out.readData(1) := Mux(io.in.writeIn.rfWriteEn & (io.in.readIn.rfReadIdx(1) === io.in.writeIn.rfWriteIdx), io.in.writeIn.rfWriteData, readDataOUt(1))
+    io.out.readData(2) := Mux(io.in.writeIn.rfWriteEn & (io.in.readIn.rfReadIdx(2) === io.in.writeIn.rfWriteIdx), io.in.writeIn.rfWriteData, readDataOUt(2))
+    io.out.readData(3) := Mux(io.in.writeIn.rfWriteEn & (io.in.readIn.rfReadIdx(3) === io.in.writeIn.rfWriteIdx), io.in.writeIn.rfWriteData, readDataOUt(3))
 
     //TODO: This is reserved for verification, delete it later
     io.rfData := regFile.io.rfData

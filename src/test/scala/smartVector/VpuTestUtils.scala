@@ -5,21 +5,14 @@ import chisel3.util._
 import chiseltest._
 import chisel3.experimental.BundleLiterals._
 import chisel3.experimental.VecLiterals._
+import chipsalliance.rocketchip.config.{Config, Field, Parameters}
+import darecreek.exu.vfu.VFuParamsKey
+import darecreek.exu.vfu.VFuParameters
+import xiangshan.XSCoreParamsKey
+import xiangshan.XSCoreParameters
 import smartVector._
 import SmartParam._
-
-object test_init {
-  def apply(dut: SmartVectorTestWrapper): Unit = {
-    dut.clock.setTimeout(0)
-    dut.io.rvuIssue.valid.poke(false.B)
-  }
-}
-object next_is_load_and_step {
-  def apply(dut: SmartVectorTestWrapper): Unit = {
-    dut.io.rvuIssue.valid.poke(false.B)
-    dut.clock.step(1)
-  }
-}
+import smartVector.lsutest.LSUFakeDCache
 
 case class CtrlBundle(instrn: String = "h0",
                       ma: Boolean = false,
@@ -32,7 +25,7 @@ case class CtrlBundle(instrn: String = "h0",
                       frm: Int = 0,
 )
 
-case class SrcBundleLd(rs1: String = "h1000",
+case class SrcBundleLdst(rs1: String = "h1000",
                        rs2: String = "h0",
 )              
 
@@ -51,7 +44,7 @@ trait BundleGenHelper {
     )
   }
 
-  def genLdInput(c: CtrlBundle, s: SrcBundleLd) = {
+  def genLdstInput(c: CtrlBundle, s: SrcBundleLdst) = {
     (new VIssueTest).Lit(
         _.ctrl -> genCtrl(c),
         _.rs1 -> s.rs1.U,
@@ -76,4 +69,44 @@ class VIssueTest extends Bundle {
     val ctrl = new CtrlTest
     val rs1 = UInt(XLEN.W)
     val rs2 = UInt(XLEN.W)
+}
+
+class SmartVectorTestWrapper extends Module {
+    val io = IO(new Bundle{
+        val rvuIssue = Flipped(Decoupled(new VIssueTest))
+        val rvuCommit = Output(new RVUCommit)
+        val rfData = Output(Vec(NVPhyRegs, UInt(VLEN.W)))
+        val memInfo = Output(Vec(24, UInt(64.W)))
+    })
+
+    val p = Parameters.empty.alterPartial({
+        case SmartParamsKey => SmartParameters(VLEN = 128)
+        case VFuParamsKey   => VFuParameters(XLEN = 64, VLEN = 128)
+        case XSCoreParamsKey => XSCoreParameters()
+    })
+
+    val smartVector = Module(new SmartVector())
+  
+    smartVector.io.in.valid := io.rvuIssue.valid
+    smartVector.io.in.bits.inst := io.rvuIssue.bits.ctrl.inst
+    smartVector.io.in.bits.rs1 := io.rvuIssue.bits.rs1
+    smartVector.io.in.bits.rs2 := io.rvuIssue.bits.rs2
+    smartVector.io.in.bits.vInfo.vl := io.rvuIssue.bits.ctrl.info_vl
+    smartVector.io.in.bits.vInfo.vstart := io.rvuIssue.bits.ctrl.info_vstart
+    smartVector.io.in.bits.vInfo.vma := io.rvuIssue.bits.ctrl.info_ma
+    smartVector.io.in.bits.vInfo.vta := io.rvuIssue.bits.ctrl.info_ta
+    smartVector.io.in.bits.vInfo.vsew := io.rvuIssue.bits.ctrl.info_vsew
+    smartVector.io.in.bits.vInfo.vlmul := io.rvuIssue.bits.ctrl.info_vlmul
+    smartVector.io.in.bits.vInfo.vxrm := 0.U
+    smartVector.io.in.bits.vInfo.frm := 0.U
+    
+
+    io.rvuIssue.ready := smartVector.io.in.ready
+    io.rfData := smartVector.io.rfData
+    io.rvuCommit <> smartVector.io.out.rvuCommit
+
+    val dcache = Module(new LSUFakeDCache)
+    smartVector.io.rvuMemory <> dcache.io.dataExchange
+
+    io.memInfo := dcache.io.memInfo
 }

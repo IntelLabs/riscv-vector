@@ -73,15 +73,12 @@ trait VLsuBehavior_st_idx {
 
     def vLsuTest0(): Unit = {
         it should "pass: indexed store (uops=2, eew=8, sew=16, vl=16, vstart=0)" in {
-        test(new SmartVectorLsuStoreTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            test_init_store(dut)
+        test(new SmartVectorLsuTestWrapper(false)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsuxei8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1), SrcBundleSt(vs2="h010004")),
-                (vsuxei8.copy(vl=16, uopIdx=1, uopEnd=true,  vsew=1), SrcBundleSt(vs2="h010004")),
+                (vsuxei8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1, isLoad=false), SrcBundleSt(vs2="h010004")),
+                (vsuxei8.copy(vl=16, uopIdx=1, uopEnd=true,  vsew=1, isLoad=false), SrcBundleSt(vs2="h010004")),
             )
-
-            next_is_store_and_step(dut)
 
             for ((c, s) <- stReqs) {
                 while (!dut.io.lsuReady.peekBoolean()) {
@@ -98,22 +95,19 @@ trait VLsuBehavior_st_idx {
                 dut.io.lsuOut.valid.expect(true.B)
                 dut.clock.step(1)
             }
-            dut.io.memInfo(index1000).expect("h12110000201f".U)
+            dut.io.memInfo(index1000).expect("h123121189ab201f".U)
         }
         }
     }
 
     def vLsuTest1(): Unit = {
         it should "pass: indexed store (uops=2, eew=8, sew=64, vl=3, vstart=0)" in {
-        test(new SmartVectorLsuStoreTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            test_init_store(dut)
+        test(new SmartVectorLsuTestWrapper(false)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsuxei8.copy(vl=3, uopIdx=0, uopEnd=false, vsew=3), SrcBundleSt(vs2="h01000")),
-                (vsuxei8.copy(vl=3, uopIdx=0, uopEnd=false, vsew=3), SrcBundleSt(vs2="h01000")),
+                (vsuxei8.copy(vl=3, uopIdx=0, uopEnd=false, vsew=3, isLoad=false), SrcBundleSt(vs2="h01000")),
+                (vsuxei8.copy(vl=3, uopIdx=0, uopEnd=true,  vsew=3, isLoad=false), SrcBundleSt(vs2="h01000")),
             )
-
-            next_is_store_and_step(dut)
 
             for ((c, s) <- stReqs) {
                 while (!dut.io.lsuReady.peekBoolean()) {
@@ -138,16 +132,13 @@ trait VLsuBehavior_st_idx {
 
     def vLsuTest2(): Unit = {
         it should "pass: indexed store (uops=3, eew=16, sew=64, vl=5, vstart=0)" in {
-        test(new SmartVectorLsuStoreTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            test_init_store(dut)
+        test(new SmartVectorLsuTestWrapper(false)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsuxei16.copy(vl=5, uopIdx=0, uopEnd=false, vsew=3), SrcBundleSt(vs2="h000000180000001000080000")),
-                (vsuxei16.copy(vl=5, uopIdx=1, uopEnd=false, vsew=3), SrcBundleSt(vs2="h000000180000001000080000")),
-                (vsuxei16.copy(vl=5, uopIdx=2, uopEnd=true,  vsew=3), SrcBundleSt(vs2="h000000180000001000080000")),
+                (vsuxei16.copy(vl=5, uopIdx=0, uopEnd=false, vsew=3, isLoad=false), SrcBundleSt(vs2="h000000180000001000080000")),
+                (vsuxei16.copy(vl=5, uopIdx=1, uopEnd=false, vsew=3, isLoad=false), SrcBundleSt(vs2="h000000180000001000080000")),
+                (vsuxei16.copy(vl=5, uopIdx=2, uopEnd=true,  vsew=3, isLoad=false), SrcBundleSt(vs2="h000000180000001000080000")),
             )
-
-            next_is_store_and_step(dut)
 
             for ((c, s) <- stReqs) {
                 while (!dut.io.lsuReady.peekBoolean()) {
@@ -174,15 +165,12 @@ trait VLsuBehavior_st_idx {
 
     def vLsuTest3(): Unit = {
         it should "pass: indexed store (uops=2, eew=32, sew=16, vl=5, vstart=0)" in {
-        test(new SmartVectorLsuStoreTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            test_init_store(dut)
+        test(new SmartVectorLsuTestWrapper(false)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsuxei32.copy(vl=5, uopIdx=0, uopEnd=false, vsew=1), SrcBundleSt(vs2="h00000010_00000000_00000008")),
-                (vsuxei32.copy(vl=5, uopIdx=1, uopEnd=true,  vsew=1), SrcBundleSt(vs2="h18")),
+                (vsuxei32.copy(vl=5, uopIdx=0, uopEnd=false, vsew=1, isLoad=false), SrcBundleSt(vs2="h00000010_00000000_00000008")),
+                (vsuxei32.copy(vl=5, uopIdx=1, uopEnd=true,  vsew=1, isLoad=false), SrcBundleSt(vs2="h18")),
             )
-
-            next_is_store_and_step(dut)
 
             for ((c, s) <- stReqs) {
                 while (!dut.io.lsuReady.peekBoolean()) {
@@ -199,25 +187,22 @@ trait VLsuBehavior_st_idx {
             dut.io.lsuOut.valid.expect(true.B)
             dut.clock.step(1)
 
-            dut.io.memInfo(index1000).expect("h1817".U)
-            dut.io.memInfo(index1008).expect("h1211".U)
-            dut.io.memInfo(index1010).expect("h1615".U)
-            dut.io.memInfo(index1018).expect("h1a19".U)
+            dut.io.memInfo(index1000).expect("h123456789ab1817".U)
+            dut.io.memInfo(index1008).expect("hffffffffffff1211".U)
+            dut.io.memInfo(index1010).expect("hf0f0f0f0f0f1615".U)
+            dut.io.memInfo(index1018).expect("hfedcba9876541a19".U)
         }
         }
     }
 
     def vLsuTest4(): Unit = {
         it should "pass: indexed store (uops=2, eew=64, sew=16, vl=3, vstart=0)" in {
-        test(new SmartVectorLsuStoreTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            test_init_store(dut)
+        test(new SmartVectorLsuTestWrapper(false)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsuxei64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1), SrcBundleSt(vs2="h00010")),
-                (vsuxei64.copy(vl=3, uopIdx=1, uopEnd=true,  vsew=1), SrcBundleSt(vs2="h00020")),
+                (vsuxei64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1, isLoad=false), SrcBundleSt(vs2="h00010")),
+                (vsuxei64.copy(vl=3, uopIdx=1, uopEnd=true,  vsew=1, isLoad=false), SrcBundleSt(vs2="h00020")),
             )
-
-            next_is_store_and_step(dut)
 
             for ((c, s) <- stReqs) {
                 while (!dut.io.lsuReady.peekBoolean()) {
@@ -234,23 +219,20 @@ trait VLsuBehavior_st_idx {
             dut.io.lsuOut.valid.expect(true.B)
             dut.clock.step(1)
 
-            dut.io.memInfo(index1010).expect("h1211".U)
-            dut.io.memInfo(index1020).expect("h1615".U)
+            dut.io.memInfo(index1010).expect("hf0f0f0f0f0f1211".U)
+            dut.io.memInfo(index1020).expect("h1234567890121615".U)
         }
         }
     }
 
     def vLsuTest5(): Unit = {
         it should "pass: indexed store (uops=2, eew=64, sew=16, vl=3, vstart=0) neg index value" in {
-        test(new SmartVectorLsuStoreTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            test_init_store(dut)
+        test(new SmartVectorLsuTestWrapper(false)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsuxei64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1), SrcBundleSt(vs2="hffff_ffff_ffff_fff0_ffff_ffff_ffff_fff8")),
-                (vsuxei64.copy(vl=3, uopIdx=1, uopEnd=true,  vsew=1), SrcBundleSt(vs2="h00020")),
+                (vsuxei64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1, isLoad=false), SrcBundleSt(vs2="hffff_ffff_ffff_fff0_ffff_ffff_ffff_fff8")),
+                (vsuxei64.copy(vl=3, uopIdx=1, uopEnd=true,  vsew=1, isLoad=false), SrcBundleSt(vs2="h00020")),
             )
-
-            next_is_store_and_step(dut)
 
             for ((c, s) <- stReqs) {
                 while (!dut.io.lsuReady.peekBoolean()) {
@@ -267,24 +249,21 @@ trait VLsuBehavior_st_idx {
             dut.io.lsuOut.valid.expect(true.B)
             dut.clock.step(1)
 
-            dut.io.memInfo(index0ff0).expect("h1413".U)
-            dut.io.memInfo(index0ff8).expect("h1211".U)
-            dut.io.memInfo(index1020).expect("h1615".U)
+            dut.io.memInfo(index0ff0).expect("h5678901234501413".U)
+            dut.io.memInfo(index0ff8).expect("heeeeeeeeeeee1211".U)
+            dut.io.memInfo(index1020).expect("h1234567890121615".U)
         }
         }
     }
 
     def vLsuTest6(): Unit = {
         it should "pass: indexed store (uops=2, eew=32, sew=16, vl=5, vstart=0) exception" in {
-        test(new SmartVectorLsuStoreTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            test_init_store(dut)
+        test(new SmartVectorLsuTestWrapper(false)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsuxei32.copy(vl=5, uopIdx=0, uopEnd=false, vsew=1), SrcBundleSt(vs2="h000000100000000000000008")),
-                (vsuxei32.copy(vl=5, uopIdx=1, uopEnd=true,  vsew=1), SrcBundleSt(vs2="h60")),
+                (vsuxei32.copy(vl=5, uopIdx=0, uopEnd=false, vsew=1, isLoad=false), SrcBundleSt(vs2="h000000100000000000000008")),
+                (vsuxei32.copy(vl=5, uopIdx=1, uopEnd=true,  vsew=1, isLoad=false), SrcBundleSt(vs2="h60")),
             )
-
-            next_is_store_and_step(dut)
 
             for ((c, s) <- stReqs) {
                 while (!dut.io.lsuReady.peekBoolean()) {
@@ -299,14 +278,12 @@ trait VLsuBehavior_st_idx {
                 dut.clock.step(1)
             }
             dut.io.lsuOut.valid.expect(true.B)
-            if(dut.io.xcpt.update_vl.peekBoolean()) {
-                dut.io.xcpt.update_vl.expect(true.B)
-                dut.io.xcpt.update_data.expect(4.U)
-            }
+            dut.io.xcpt.update_vl.expect(true.B)
+            dut.io.xcpt.update_data.expect(4.U)
             dut.clock.step(1)
 
-            dut.io.memInfo(index1008).expect("h1211".U)
-            dut.io.memInfo(index1010).expect("h1615".U)
+            dut.io.memInfo(index1008).expect("hffffffffffff1211".U)
+            dut.io.memInfo(index1010).expect("hf0f0f0f0f0f1615".U)
         }
         }
     }
