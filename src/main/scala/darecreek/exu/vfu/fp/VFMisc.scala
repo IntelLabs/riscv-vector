@@ -61,9 +61,13 @@ class VFCMP(val expWidth: Int, val precision: Int) extends Module {
 
   // difference comparing to cmp insts:
   // +0 == -0, but max insts should output +0
+//  val minmaxSelA = decode_b.isNaN ||
+//                   (!decode_a.isNaN && (lt ^ MAXOp)) ||
+//                   (bothZero && (fp_a.sign ^ MAXOp))
+
   val minmaxSelA = decode_b.isNaN ||
-                   (!decode_a.isNaN && (lt ^ MAXOp)) ||
-                   (bothZero && (fp_a.sign ^ MAXOp))
+                   Mux(bothZero, fp_a.sign ^ MAXOp,  (!decode_a.isNaN && (lt ^ MAXOp)))
+
   io.minmaxResult := Mux(
     bothNaN,
     FloatPoint.defaultNaNUInt(expWidth, precision),
