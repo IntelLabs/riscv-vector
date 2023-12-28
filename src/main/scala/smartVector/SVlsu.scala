@@ -115,15 +115,15 @@ class LSULdstCtrl extends Bundle {
     val vm              = Bool()
     val memwb           = UInt(8.W)
     val eewb            = UInt(8.W)
-    val log2Memwb       = UInt(8.W)
-    val log2Eewb        = UInt(8.W)
+    val log2Memwb       = UInt(log2Ceil(8).W)
+    val log2Eewb        = UInt(log2Ceil(8).W)
 
     val mlen            = UInt(vlenbWidth.W)
     val elen            = UInt(vlenbWidth.W)
     val minLen          = UInt(vlenbWidth.W)
-    val log2Mlen        = UInt(vlenbWidth.W)
-    val log2Elen        = UInt(vlenbWidth.W)
-    val log2MinLen      = UInt(vlenbWidth.W)
+    val log2Mlen        = UInt(log2Ceil(vlenbWidth).W)
+    val log2Elen        = UInt(log2Ceil(vlenbWidth).W)
+    val log2MinLen      = UInt(log2Ceil(vlenbWidth).W)
 }
 
 object LSULdstDecoder {
@@ -145,7 +145,7 @@ object LSULdstDecoder {
         ))
         ctrl.unitSMop := Mux((mop === "b00".U), unitStrdeMop, UnitStrideMop.not_unit_strde)
         // eew and sew in bytes calculation
-        val sewb   = MuxLookup(vsew, 1.U, Seq("b000".U -> 1.U, "b001".U -> 2.U, "b010".U -> 4.U, "b011".U -> 8.U))
+        val sewb   = 1.U << vsew
         ctrl.eewb := MuxLookup(Cat(funct6(2), funct3), 1.U, Seq("b0000".U -> 1.U, "b0101".U -> 2.U, "b0110".U -> 4.U, "b0111".U -> 8.U))
 
 
@@ -309,7 +309,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     val idxVal      = WireInit(0.U(XLEN.W))
     val idxMask     = WireInit(0.U(XLEN.W))
     val eew         = ldstCtrlReg.eewb << 3.U
-    val beginIdx    = (curVl - ((curVl >> ldstCtrlReg.log2Elen) << ldstCtrlReg.log2Elen)) << (ldstCtrlReg.log2Eewb + 3.U)
+    val beginIdx    = (curVl - ((curVl >> ldstCtrlReg.log2Elen) << ldstCtrlReg.log2Elen)) << (ldstCtrlReg.log2Eewb + 3.U) // 3.U: to bits
    
     idxMask := (("h1".asUInt(64.W) << eew) - 1.U)
     idxVal  := (mUopInfoReg.vs2 >> beginIdx) & idxMask
@@ -366,7 +366,7 @@ class SVlsu(implicit p: Parameters) extends Module {
             addrReg     := calcAddr
         }
     }
-    /*-----------------SPLIT STAGE END-----------------------*/
+    /*----------------------------SPLIT -- IDLE stage----------------------------*/
 
 
     /*********************************ISSUE START*********************************/
@@ -407,7 +407,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     /*********************************RESP START*********************************/
     val (respLdstPtr, respData) = (io.dataExchange.resp.bits.idx, io.dataExchange.resp.bits.data)
 
-    when(io.dataExchange.resp.valid && !mem_xcpt) {
+    when(io.dataExchange.resp.valid && !mem_xcpt && uopState =/= uop_idle) {
         val loadComplete  = ldstCtrlReg.isLoad && io.dataExchange.resp.bits.has_data
         val storeComplete = ldstCtrl.isStore
 
@@ -419,7 +419,7 @@ class SVlsu(implicit p: Parameters) extends Module {
             } 
         }
 
-         when(loadComplete) {
+        when(loadComplete) {
             (0 until vlenb).foreach { i =>
                 when(vregInfo(i).status === VRegSegmentStatus.notReady && vregInfo(i).idx === respLdstPtr) {
                     val offsetOH = UIntToOH(vregInfo(i).offset, 8)
@@ -452,7 +452,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     
     /*---------------------------------RESP END---------------------------------*/
 
-    /************************** Ldest data writeback to uopQueue********************/
+    /*****************************writeback to uopQueue*************************/
     val vregWbXcpt  = vregInfo.map(info => info.status === VRegSegmentStatus.xcpt).reduce(_ || _)
 
     val vregWbReady = WireInit(false.B)
