@@ -384,7 +384,7 @@ class SVlsu(implicit p: Parameters) extends Module {
         val storeMaskVec = VecInit(Seq.fill(8)(0.U(1.W)))
 
         (0 until vlenb).foreach { i =>
-            when(ldstCtrl.isStore && vregInfo(i).status === VRegSegmentStatus.notReady && vregInfo(i).idx === issueLdstPtr) {
+            when(ldstCtrlReg.isStore && vregInfo(i).status === VRegSegmentStatus.notReady && vregInfo(i).idx === issueLdstPtr) {
                 val offset = vregInfo(i).offset
                 storeDataVec(offset) := vregInfo(i).data
                 storeMaskVec(offset) := 1.U
