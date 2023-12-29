@@ -409,9 +409,9 @@ class SVlsu(implicit p: Parameters) extends Module {
 
     when(io.dataExchange.resp.valid && !mem_xcpt && uopState =/= uop_idle) {
         val loadComplete  = ldstCtrlReg.isLoad && io.dataExchange.resp.bits.has_data
-        val storeComplete = ldstCtrl.isStore
+        val storeComplete = ldstCtrlReg.isStore
 
-        ldstUopQueue(respLdstPtr).valid := !(loadComplete || storeComplete)
+        ldstUopQueue(respLdstPtr).valid := false.B
 
         (0 until vlenb).foreach { i =>
             when( vregInfo(i).status === VRegSegmentStatus.notReady && vregInfo(i).idx === respLdstPtr && (loadComplete || storeComplete)) {
