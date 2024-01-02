@@ -90,6 +90,7 @@ trait VLsuBehavior_st {
                 dut.io.mUop.bits.poke(genStInput(c, s))
                 dut.clock.step(1)
                 dut.io.mUop.valid.poke(false.B)
+                dut.io.mUop.bits.uop.ctrl_store.poke(false.B)
 
                 while (!dut.io.lsuOut.valid.peekBoolean()) {
                     dut.clock.step(1)

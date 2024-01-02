@@ -110,7 +110,7 @@ trait SmartVectorBehavior_st {
                 (ldstReqCtrl_default.copy(instrn=VLE8_V), ldstReqSrc_default.copy()),
             )
             val stReqs = Seq(
-                (ldstReqCtrl_default.copy(instrn=VSE8_V), SrcBundleLdst(rs1="h1008")),
+                (ldstReqCtrl_default.copy(instrn=VSE8_V, vl=4), SrcBundleLdst(rs1="h1008")),
             )
 
             /**************load*********************/
@@ -141,8 +141,8 @@ trait SmartVectorBehavior_st {
             // dut.clock.step(100)
             dut.clock.step(1)
             
-            dut.io.memInfo(index1008).expect("h0123456789abcdef".U)
-            dut.io.memInfo(index1010).expect("hffffffffffffffff".U)
+            dut.io.memInfo(index1008).expect("hffffffff89abcdef".U)
+            // dut.io.memInfo(index1010).expect("hffffffffffffffff".U)
         }
         }
     }

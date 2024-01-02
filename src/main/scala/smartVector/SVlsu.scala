@@ -414,7 +414,7 @@ class SVlsu(implicit p: Parameters) extends Module {
         ldstUopQueue(respLdstPtr).valid := false.B
 
         (0 until vlenb).foreach { i =>
-            when( vregInfo(i).status === VRegSegmentStatus.notReady && vregInfo(i).idx === respLdstPtr && (loadComplete || storeComplete)) {
+            when(vregInfo(i).status === VRegSegmentStatus.notReady && vregInfo(i).idx === respLdstPtr) {
                  vregInfo(i).status := VRegSegmentStatus.ready
             } 
         }
@@ -479,7 +479,7 @@ class SVlsu(implicit p: Parameters) extends Module {
         // Reset vreg info
         for (i <- 0 until vlenb) {
             vregInfo(i).status  := VRegSegmentStatus.invalid
-            vregInfo(i).idx     := DontCare
+            vregInfo(i).idx     := ldstUopQueueSize.U
             vregInfo(i).offset  := DontCare
             vregInfo(i).data    := DontCare
         }
