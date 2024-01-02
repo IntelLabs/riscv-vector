@@ -185,7 +185,13 @@ class SVlsu(implicit p: Parameters) extends Module {
     val ldstCtrlReg     = RegInit(0.U.asTypeOf(new LSULdstCtrl))
 
     // vreg seg info
-    val vregInfo        = RegInit(VecInit(Seq.fill(vlenb)(0.U.asTypeOf(new VRegSegmentInfo))))
+    val vregInitVal     = Wire(new VRegSegmentInfo)
+    vregInitVal.status := VRegSegmentStatus.invalid
+    vregInitVal.idx    := ldstUopQueueSize.U
+    vregInitVal.offset := DontCare
+    vregInitVal.data   := DontCare
+
+    val vregInfo        = RegInit(VecInit(Seq.fill(vlenb)(vregInitVal)))
 
     // Split info
     val splitCount      = RegInit(0.U(vlenbWidth.W))
@@ -284,7 +290,7 @@ class SVlsu(implicit p: Parameters) extends Module {
             when(vregClean) {
                 (0 until vlenb).foreach { i => 
                     val pos = i.U >> ldstCtrl.log2Memwb
-                    vregInfo(i).data := io.mUop.bits.uopRegInfo.old_vd(8 * i + 7, 8 * i)
+                    vregInfo(i).data   := io.mUop.bits.uopRegInfo.old_vd(8 * i + 7, 8 * i)
                     vregInfo(i).status := Mux(pos < memVl, VRegSegmentStatus.needLdst, VRegSegmentStatus.srcData)
                 }
             }
