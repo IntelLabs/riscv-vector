@@ -69,7 +69,7 @@ class VrgatherEngine(implicit p: Parameters) extends VFuModule {
   vmask_vl := vmask & vd_mask_vl
 
   val vs1_vsew = Mux(vrgather16, 1.U, vsew)
-  val vrgather_byte_sel = Wire(Vec(VLENB, UInt(64.W)))
+  val vrgather_byte_sel = Wire(Vec(VLENB, UInt(72.W)))
   val vrgather_vd = Wire(Vec(VLENB, UInt(8.W)))
 
   val rs1_bytes = VecInit(Seq.tabulate(8)(i => rs1((i + 1) * 8 - 1, i * 8)))
