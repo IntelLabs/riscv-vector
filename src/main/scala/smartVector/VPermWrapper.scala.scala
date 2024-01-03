@@ -15,9 +15,13 @@ class VPermWrapper (implicit p : Parameters) extends Module {
 
   val io = IO(new Bundle {
     val in = Input(new VPermInput)
+    val redirect = Input(ValidIO(new Redirect))
     val out = Output(new VPermOutput)
   })
 
   val vPerm = Module(new Permutation)
+  vPerm.io.in := io.in
+  vPerm.io.redirect := io.redirect
+  io.out := vPerm.io.out
 
 }

@@ -12,6 +12,7 @@ class subVRFReadPort(regLen: Int) extends Bundle {
   // override def cloneType: subVRFReadPort.this.type =
     // new subVRFReadPort(regLen).asInstanceOf[this.type]
 }
+
 class subVRFWritePort(regLen: Int) extends Bundle {
   val wen = Input(Bool())
   val addr = Input(UInt(VPRegIdxWidth.W))

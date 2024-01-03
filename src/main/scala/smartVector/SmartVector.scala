@@ -99,7 +99,7 @@ class SmartVector extends Module {
     regFile.io.in.writeIn <> merge.io.out.toRegFileWrite
 
     //perm read register file
-    regFile.io.in.permReadIn <> iex.SVPerm.io.out
+    regFile.io.in.permReadIn <> iex.io.permOut
     iex.io.permRegIn <> regFile.io.permReadOut
 
     //stall pipeline
