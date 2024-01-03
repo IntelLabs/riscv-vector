@@ -77,13 +77,13 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   SVDiv.io.in.valid   := io.in.valid && io.in.bits.uop.ctrl.div
   SVPerm.io.in.rvalid := io.in.valid && io.in.bits.uop.ctrl.perm
 
-  Seq(SValu.io.in.bits, SVMac.io.in.bits, SVMask.io.in.bits, SVReduc.io.in.bits, SVDiv.io.in.bits).foreach {fu =>
-    fu.uop   := io.in.bits.uop
-    fu.vs1   := io.in.bits.uopRegInfo.vs1
-    fu.vs2   := io.in.bits.uopRegInfo.vs2
-    fu.rs1   := io.in.bits.scalar_opnd_1
-    fu.oldVd := io.in.bits.uopRegInfo.old_vd
-    fu.mask  := io.in.bits.uopRegInfo.mask
+  Seq(SValu.io.in.bits, SVMac.io.in.bits, SVMask.io.in.bits, SVReduc.io.in.bits, SVDiv.io.in.bits).foreach {iex =>
+    iex.uop   := io.in.bits.uop
+    iex.vs1   := io.in.bits.uopRegInfo.vs1
+    iex.vs2   := io.in.bits.uopRegInfo.vs2
+    iex.rs1   := io.in.bits.scalar_opnd_1
+    iex.oldVd := io.in.bits.uopRegInfo.old_vd
+    iex.mask  := io.in.bits.uopRegInfo.mask
   }
 
   SVPerm.io.in.uop := io.in.bits.uop
