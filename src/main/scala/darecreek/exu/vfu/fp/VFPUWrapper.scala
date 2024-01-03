@@ -369,7 +369,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
     red_uop.ctrl.lsrc(1) := 0.U
     red_uop.ctrl.ldest := 0.U
     red_uop.ctrl.vm := true.B
-    red_uop.ctrl.widen := widen
+    red_uop.ctrl.widen := false.B
     red_uop.ctrl.widen2 := widen2
     red_uop.ctrl.narrow := narrow
     red_uop.ctrl.narrow_to_1 := narrow_to_1
