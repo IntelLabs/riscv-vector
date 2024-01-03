@@ -23,6 +23,8 @@ class MuopMergeAttr extends Bundle {
     val redu = Bool()
     val mask = Bool()
     val perm = Bool()
+    val permExpdLen = UInt(4.W)
+    val regDstIdx = UInt(5.W)
     
     //000:8bit
     //001:16bit
@@ -215,6 +217,7 @@ class Vsplit(implicit p : Parameters) extends Module {
         io.out.mUopMergeAttr.bits.regWriteMuopIdx  := 0.U       
     }
     
+    val vlmul = io.in.decodeIn.bits.vInfo.vlmul
     io.out.mUopMergeAttr.valid                 := io.out.mUop.valid
     io.out.mUopMergeAttr.bits.scalarRegWriteEn := ctrl.rdVal
     io.out.mUopMergeAttr.bits.ldest            := ctrl.ldest + ldest_inc
@@ -228,6 +231,8 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.out.mUopMergeAttr.bits.redu             := ctrl.redu
     io.out.mUopMergeAttr.bits.mask             := ctrl.mask
     io.out.mUopMergeAttr.bits.perm             := ctrl.perm
+    io.out.mUopMergeAttr.bits.permExpdLen      := (1.U << Mux(vlmul(2), 0.U, Cat(0.U(1.W), vlmul(1,0))) - 1.U)
+    io.out.mUopMergeAttr.bits.regDstIdx        := ctrl.ldest
 
     val vs1ReadEn = ctrl.lsrcVal(0)
     val vs2ReadEn = ctrl.lsrcVal(1)
@@ -285,6 +290,8 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.out.mUop.bits.uop.ctrl.redu        := ctrl.redu
     io.out.mUop.bits.uop.ctrl.mask        := ctrl.mask
     io.out.mUop.bits.uop.ctrl.perm        := ctrl.perm
+    io.out.mUop.bits.uop.ctrl.lsrc        := ctrl.lsrc
+    io.out.mUop.bits.uop.ctrl.ldest       := ctrl.ldest
 
     io.out.mUop.bits.uop.info.ma          := info.vma
     io.out.mUop.bits.uop.info.ta          := info.vta
@@ -329,13 +336,13 @@ class Vsplit(implicit p : Parameters) extends Module {
     val emulVd  = io.in.decodeIn.bits.eewEmulInfo.emulVd
     val emulVs1 = io.in.decodeIn.bits.eewEmulInfo.emulVs1
     val emulVs2 = io.in.decodeIn.bits.eewEmulInfo.emulVs2
-    val expdLenTmp = Mux(io.in.decodeIn.bits.vCtrl.perm, 1.U ,
+    val expdLenIn = Mux(io.in.decodeIn.bits.vCtrl.perm, 1.U ,
     Mux(emulVd >= emulVs1, Mux(emulVd >= emulVs2, emulVd, emulVs2), Mux(emulVs1 >= emulVs2, emulVs1, emulVs2)))
     
     when(instFirstIn){
-        expdLenReg := expdLenTmp
+        expdLenReg := expdLenIn
     }
-    expdLen := Mux(instFirstIn, expdLenTmp, expdLenReg)
+    expdLen := Mux(instFirstIn, expdLenIn, expdLenReg)
 
     switch(currentState){
         is(empty){

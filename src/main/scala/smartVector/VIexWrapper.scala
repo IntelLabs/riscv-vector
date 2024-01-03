@@ -10,7 +10,6 @@ import darecreek.exu.vfu.vmask._
 import darecreek.exu.vfu.VInstructions._
 import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import chipsalliance.rocketchip.config
-import xiangshan.backend.rob.RobPtr
 
 class IexOutput extends Bundle {
   val vd = UInt(128.W)
@@ -93,15 +92,17 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   }
 
   SVPerm.io.in.uop := io.in.bits.uop
-  SVPerm.io.in.rs1 := io.in.bits.scalar_opnd_1 || fudian
+  //TODO: when id fudian inst, the rs1 should read from fudian register file
+  SVPerm.io.in.rs1 := io.in.bits.scalar_opnd_1 // || fudian
   SVPerm.io.in.vs1_preg_idx := VecInit(Seq.tabulate(8)(i => io.in.bits.uop.ctrl.lsrc(0) + i.U))
   SVPerm.io.in.vs2_preg_idx := VecInit(Seq.tabulate(8)(i => io.in.bits.uop.ctrl.lsrc(1) + i.U))
   SVPerm.io.in.old_vd_preg_idx := VecInit(Seq.tabulate(8)(i => io.in.bits.uop.ctrl.ldest + i.U))
-  SVPerm.io.in.mask_preg_idx := 0.U cunyi
+  SVPerm.io.in.mask_preg_idx := 0.U
   SVPerm.io.in.uop_valid := io.in.valid & io.in.bits.uop.ctrl.perm
   SVPerm.io.in.rdata := io.permRegIn.rdata
   SVPerm.io.in.rvalid := io.permRegIn.rvalid
-
+  SVPerm.io.redirect.valid := false.B
+  SVPerm.io.redirect.bits := DontCare
 
   io.permOut := SVPerm.io.out
 

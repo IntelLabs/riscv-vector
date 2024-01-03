@@ -43,6 +43,8 @@ class VMerge (implicit p : Parameters) extends Module {
     val scalarRegWriteEn  = Reg(Bool())
     val scalarRegWriteIdx = Reg(UInt(5.W))
     val muopEnd           = Reg(Bool())
+    val permExpdLen       = Reg(UInt(4.W))
+    val regDstIdx         = Reg(UInt(5.W))
   
     rfWriteEn         := RegEnable(io.in.mergeInfo.bits.rfWriteEn, io.in.mergeInfo.valid)
     rfWriteIdx        := RegEnable(io.in.mergeInfo.bits.ldest, io.in.mergeInfo.valid)
@@ -51,6 +53,8 @@ class VMerge (implicit p : Parameters) extends Module {
     scalarRegWriteEn  := RegEnable(io.in.mergeInfo.bits.scalarRegWriteEn, io.in.mergeInfo.valid)
     scalarRegWriteIdx := RegEnable(io.in.mergeInfo.bits.ldest, io.in.mergeInfo.valid)
     muopEnd           := RegEnable(io.in.mergeInfo.bits.muopEnd, io.in.mergeInfo.valid)
+    permExpdLen       := RegEnable(io.in.mergeInfo.bits.permExpdLen, io.in.mergeInfo.valid)
+    regDstIdx         := RegEnable(io.in.mergeInfo.bits.regDstIdx, io.in.mergeInfo.valid)
          
     when(io.in.aluIn.valid && rfWriteEn){
         when(regBackWidth === "b111".U){
@@ -99,11 +103,11 @@ class VMerge (implicit p : Parameters) extends Module {
     val permWriteNum = RegInit(0.U(3.W))
     when(io.in.permIn.wb_vld){
         io.out.toRegFileWrite.rfWriteEn  := true.B
-        io.out.toRegFileWrite.rfWriteIdx := io.in.permIn.wr_idx
+        io.out.toRegFileWrite.rfWriteIdx := regDstIdx + permWriteNum
         io.out.toRegFileWrite.rfWriteData := io.in.permIn.wb_data
         permWriteNum := permWriteNum + 1.U
     }
-    when(permWriteNum === io.in.permIn.wb_num){
+    when(permWriteNum + 1.U === permExpdLen){
         permWriteNum := 0.U
     }
     
