@@ -356,14 +356,10 @@ class Permutation(implicit p: Parameters) extends VFuModule {
     vrgather_rd_preg_idx := mask_preg_idx_reg
   }.elsewhen(reg_vrgather && rd_vs_en) {
     when(vrgather_rd_cnt === 0.U) {
-      vrgather_rd_preg_idx := Mux(reg_vrgather16_sew8, old_vd_preg_idx_reg(vs_idx(2, 1)), old_vd_preg_idx_reg(vs_idx))
+      vrgather_rd_preg_idx := old_vd_preg_idx_reg(vs_idx)
     }.elsewhen(vrgather_rd_cnt === 1.U) {
       when(reg_vrgather_vxi) {
         vrgather_rd_preg_idx := vs2_preg_idx_reg(vs_idx)
-      }.elsewhen(reg_vrgather16_sew32) {
-        vrgather_rd_preg_idx := vs1_preg_idx_reg(vs_idx(2, 1))
-      }.elsewhen(reg_vrgather16_sew64) {
-        vrgather_rd_preg_idx := vs1_preg_idx_reg(vs_idx(2))
       }.otherwise {
         vrgather_rd_preg_idx := vs1_preg_idx_reg(vs_idx)
       }
