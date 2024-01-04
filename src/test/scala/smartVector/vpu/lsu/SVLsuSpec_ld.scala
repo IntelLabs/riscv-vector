@@ -416,7 +416,7 @@ trait VLsuBehavior_ld {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut => 
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vlse32.copy(vl=3, uopIdx=0, uopEnd=true), SrcBundleLd(scalar_opnd_2="hffffffff_ffffffff"), "h201f1e1deeeeeeeeeeeeeeee89abcdef".U),
+                (vlse32.copy(vl=3, uopIdx=0, uopEnd=true), SrcBundleLd(scalar_opnd_2="hffffffff_ffffffff"), "h201f1e1d1c1b1a191817161589abcdef".U),
             )
             
             for ((c, s, r) <- ldReqs) {
@@ -432,6 +432,9 @@ trait VLsuBehavior_ld {
                     dut.clock.step(1)
                 }
                 dut.io.lsuOut.valid.expect(true.B)
+
+                dut.io.xcpt.update_vl.expect(true.B)
+                dut.io.xcpt.update_data.expect(1.U)
                 dut.io.lsuOut.bits.data.expect(r)
                 dut.clock.step(4)
             }

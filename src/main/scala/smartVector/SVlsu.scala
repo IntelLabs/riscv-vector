@@ -50,10 +50,16 @@ object VMemCmd {
     val write = true.B
 }
 
+object LdstUopXcptCause {
+    val misalign = 1.U
+    val mem_xcpt = 2.U
+}
+
 class LdstUop extends Bundle {
-    val valid   = Bool()
-    val addr    = Output(UInt(64.W))
-    val pos     = Output(UInt(bVL.W)) // position in vl
+    val valid = Bool()
+    val addr  = UInt(64.W)
+    val pos   = UInt(bVL.W) // position in vl
+    val xcpt  = UInt(2.W)
 }
 
 class VRegSegmentInfo extends Bundle {
@@ -176,6 +182,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     val uopState        = RegInit(uop_idle)
     val nextUopState    = WireInit(uop_idle)
     val completeLdst    = WireInit(false.B)
+    val stopSplit       = WireInit(false.B)
 
     // address reg
     val addrReg         = RegInit(0.U(64.W))
@@ -210,7 +217,9 @@ class SVlsu(implicit p: Parameters) extends Module {
     // val hasXcptHappened
     // assertion
     // exception only once
-    val mem_xcpt        = io.dataExchange.xcpt.asUInt.orR
+    val addrMisalign    = WireInit(false.B)
+    val memXcpt        = io.dataExchange.xcpt.asUInt.orR
+    val hasXcpt         = RegInit(false.B)
 
     /****************************SPLIT STAGE*********************************/
     /*
@@ -221,8 +230,8 @@ class SVlsu(implicit p: Parameters) extends Module {
                     |-> |uop_idle|--------------|uop_split| <-|
                         +---+----+              +----+----+
                             |                        |
-                completeLdst|                        |splitIdx = splitCount-1
-                            |   +----------------+   |        || xcpt
+                completeLdst|                        |stopSplit
+                            |   +----------------+   |
                             |-> |uop_split_finish| <-|
                                 +----------------+
 
@@ -237,9 +246,7 @@ class SVlsu(implicit p: Parameters) extends Module {
             nextUopState := uop_idle
         }
     }.elsewhen(uopState === uop_split) {
-        when(splitCount === 0.U) {
-            nextUopState := uop_split_finish
-        }.elsewhen((splitCount - 1.U === curSplitIdx) || mem_xcpt) {
+        when(stopSplit) {
             nextUopState := uop_split_finish
         }.otherwise {
             nextUopState := uop_split
@@ -255,6 +262,10 @@ class SVlsu(implicit p: Parameters) extends Module {
     }
     // SPLIT FSM -- transition
     uopState := nextUopState
+
+    // if exception occurs or split finished, stop split
+    stopSplit := memXcpt || (uopState === uop_split && curSplitIdx < splitCount && addrMisalign) ||
+                (splitCount - 1.U === curSplitIdx) || (splitCount === 0.U)
 
     /*****************************SPLIT -- IDLE stage****************************************/
     val (vstart, vl)     = (io.mUop.bits.uop.info.vstart, io.mUop.bits.uop.info.vl)
@@ -279,7 +290,6 @@ class SVlsu(implicit p: Parameters) extends Module {
             mUopInfoReg  := mUopInfoSelecter(io.mUop.bits, io.mUopMergeAttr.bits, io.segmentIdx)
             ldstCtrlReg  := ldstCtrl
             addrReg      := Mux(io.mUop.bits.uop.uopIdx === 0.U, io.mUop.bits.scalar_opnd_1, addrReg)
-
             // Set split info
             ldstEnqPtr   := 0.U
             issueLdstPtr := 0.U
@@ -299,7 +309,6 @@ class SVlsu(implicit p: Parameters) extends Module {
 
     /*-----------------------------------------calc addr start-------------------------------------------------*/
     /*                                                                                                         */
-    val calcAddr    = WireInit(0.U(64.W))
     val addr        = WireInit(0.U(64.W))
     val addrMask    = WireInit(0.U(64.W))
     val alignedAddr = WireInit(0.U(64.W))
@@ -332,7 +341,7 @@ class SVlsu(implicit p: Parameters) extends Module {
         (Cat(false.B, addrReg).asSInt + (mUopInfoReg.rs2Val).asSInt).asUInt
     )
 
-    calcAddr := Mux1H(ldstCtrlReg.ldstType, Seq(
+    addr := Mux1H(ldstCtrlReg.ldstType, Seq(
         // unit stride
         curUnitStrideAddr,
         // index_unodered
@@ -343,49 +352,48 @@ class SVlsu(implicit p: Parameters) extends Module {
         ((mUopInfoReg.segIdx << ldstCtrlReg.log2Memwb) + (Cat(false.B, baseAddr).asSInt + idxVal.asSInt).asUInt)
     ))
 
-    addrMask    := ~(("h1".asUInt(64.W) << ldstCtrlReg.log2Memwb) - 1.U)
-    addr        := calcAddr & addrMask  // align calcAddr to memwb
-    alignedAddr := (addr >> 3.U) << 3.U // align addr to 64 bits
-    offset      := addr - alignedAddr 
+    addrMask     := (("h1".asUInt(64.W) << ldstCtrlReg.log2Memwb) - 1.U)
+    addrMisalign := (addr & addrMask).orR  // align addr to memwb ?
+    alignedAddr  := (addr >> 3.U) << 3.U // align addr to 64 bits
+    offset       := addr - alignedAddr 
     /*                                                                                                         */
     /*-----------------------------------------calc addr end---------------------------------------------------*/
 
-    when(uopState === uop_split && !mem_xcpt) {
-        when(curSplitIdx < splitCount) {
-            val maskCond = (ldstCtrlReg.vm || isNotMasked) && (curSplitIdx >= splitStart)
-            when(maskCond) {
-                ldstUopQueue(ldstEnqPtr).valid  := true.B
-                ldstUopQueue(ldstEnqPtr).addr   := alignedAddr
-                ldstUopQueue(ldstEnqPtr).pos    := curVl
-
-                ldstEnqPtr  := ldstEnqPtr  + 1.U
-            }
-
-            (0 until vlenb).foreach { i =>
-                when((i.U >> ldstCtrlReg.log2Memwb) === (baseSegIdx >> ldstCtrlReg.log2Memwb)) {
-                    vregInfo(i).status  := Mux(maskCond, VRegSegmentStatus.notReady, VRegSegmentStatus.srcData)
-                    vregInfo(i).idx     := Mux(maskCond, ldstEnqPtr, vregInfo(i).idx)
-                    vregInfo(i).offset  := Mux(maskCond, offset + (i.U - baseSegIdx), vregInfo(i).offset)
-                }
-            }
-            curSplitIdx := curSplitIdx + 1.U
-            addrReg     := calcAddr
+    when(uopState === uop_split && !memXcpt && curSplitIdx < splitCount) {
+        val maskCond = (ldstCtrlReg.vm || isNotMasked) && (curSplitIdx >= splitStart)
+        when(maskCond) {
+            ldstUopQueue(ldstEnqPtr).valid  := true.B
+            ldstUopQueue(ldstEnqPtr).addr   := alignedAddr
+            ldstUopQueue(ldstEnqPtr).pos    := curVl
+            ldstUopQueue(ldstEnqPtr).xcpt   := Mux(addrMisalign, LdstUopXcptCause.misalign, 0.U)
+            ldstEnqPtr  := ldstEnqPtr + 1.U
         }
+
+        (0 until vlenb).foreach { i =>
+            when((i.U >> ldstCtrlReg.log2Memwb) === (baseSegIdx >> ldstCtrlReg.log2Memwb)) {
+                vregInfo(i).status  := Mux(maskCond && !addrMisalign, VRegSegmentStatus.notReady, VRegSegmentStatus.srcData)
+                vregInfo(i).idx     := Mux(maskCond && !addrMisalign, ldstEnqPtr, vregInfo(i).idx)
+                vregInfo(i).offset  := Mux(maskCond && !addrMisalign, offset + (i.U - baseSegIdx), vregInfo(i).offset)
+            }
+        }
+        curSplitIdx := curSplitIdx + 1.U
+        addrReg     := addr
     }
     /*----------------------------SPLIT -- IDLE stage----------------------------*/
 
 
     /*********************************ISSUE START*********************************/
+    val isNoXcptUop = ldstUopQueue(issueLdstPtr).valid && (ldstUopQueue(issueLdstPtr).xcpt === 0.U)
     // update issueLdPtr
     // <= or < ?
     when(io.dataExchange.resp.bits.nack && io.dataExchange.resp.bits.idx <= issueLdstPtr) {
-        assert(!mem_xcpt)
         issueLdstPtr := io.dataExchange.resp.bits.idx
-    }.elsewhen(ldstUopQueue(issueLdstPtr).valid && io.dataExchange.req.ready) {
+    }.elsewhen(isNoXcptUop && io.dataExchange.req.ready) {
         issueLdstPtr := issueLdstPtr + 1.U
     }
 
-    when(ldstUopQueue(issueLdstPtr).valid) {
+
+    when(isNoXcptUop) {
         val storeDataVec = VecInit(Seq.fill(8)(0.U(8.W)))
         val storeMaskVec = VecInit(Seq.fill(8)(0.U(1.W)))
 
@@ -412,8 +420,10 @@ class SVlsu(implicit p: Parameters) extends Module {
 
     /*********************************RESP START*********************************/
     val (respLdstPtr, respData) = (io.dataExchange.resp.bits.idx, io.dataExchange.resp.bits.data)
+    val lastXcptInfo = RegInit(0.U.asTypeOf(new HellaCacheExceptions))
+    val lastXcptIdx  = RegInit(ldstUopQueueSize.U(ldstUopQueueWidth.W))
 
-    when(io.dataExchange.resp.valid && !mem_xcpt && uopState =/= uop_idle) {
+    when(io.dataExchange.resp.valid && uopState =/= uop_idle && respLdstPtr < lastXcptIdx) {
         val loadComplete  = ldstCtrlReg.isLoad && io.dataExchange.resp.bits.has_data
         val storeComplete = ldstCtrlReg.isStore
 
@@ -438,20 +448,36 @@ class SVlsu(implicit p: Parameters) extends Module {
             }
          }
 
-    }.elsewhen(mem_xcpt) { // exception handling
+    }
+    
+    val ldstMinValidIdx = PriorityEncoder(ldstUopQueue.map(uop => uop.valid))
+    val ldstMinXcptIdx  = PriorityEncoder(ldstUopQueue.map(uop => uop.valid & (uop.xcpt =/= 0.U)))
+
+    when(memXcpt && ldstUopQueue(respLdstPtr).valid && respLdstPtr < lastXcptIdx) { // exception handling
+        // 2. update xcpt info
+        ldstUopQueue(respLdstPtr).xcpt := LdstUopXcptCause.mem_xcpt
+        lastXcptIdx  := respLdstPtr
+        lastXcptInfo := io.dataExchange.xcpt
+    }
+    
+    val misalignXcpt    = Wire(new HellaCacheExceptions)
+    misalignXcpt.ma.ld := ldstCtrlReg.isLoad
+    misalignXcpt.ma.st := ldstCtrlReg.isStore
+    misalignXcpt.pf.ld := false.B
+    misalignXcpt.pf.st := false.B
+    misalignXcpt.gf.ld := false.B
+    misalignXcpt.gf.st := false.B
+    misalignXcpt.ae.ld := false.B
+    misalignXcpt.ae.st := false.B
+
+    when(ldstMinValidIdx === ldstMinXcptIdx && (ldstMinValidIdx =/= (ldstUopQueueSize - 1).U)) {
         // 1. clear ldstUopQueue
         ldstUopQueue.foreach(uop => uop.valid := false.B)
-
         // 2. update xcpt info
-        xcptVlReg       := ldstUopQueue(respLdstPtr).pos
-        hellaXcptReg    := io.dataExchange.xcpt
+        xcptVlReg       := ldstUopQueue(ldstMinValidIdx).pos
 
-        // 3. update vreg
-        for(i <- 0 until vlenb) {
-            when(vregInfo(i).status === VRegSegmentStatus.notReady && vregInfo(i).idx === respLdstPtr) {
-                vregInfo(i).status := VRegSegmentStatus.xcpt
-            }
-        }
+        hellaXcptReg       := Mux(ldstUopQueue(ldstMinValidIdx).xcpt === LdstUopXcptCause.misalign, misalignXcpt, lastXcptInfo)
+        hasXcpt            := true.B
     }
 
     completeLdst := ldstUopQueue.forall(uop => uop.valid === false.B) // ld completed or xcpt happened
@@ -459,8 +485,6 @@ class SVlsu(implicit p: Parameters) extends Module {
     /*---------------------------------RESP END---------------------------------*/
 
     /*****************************writeback to uopQueue*************************/
-    val vregWbXcpt  = vregInfo.map(info => info.status === VRegSegmentStatus.xcpt).reduce(_ || _)
-
     val vregWbReady = WireInit(false.B)
 
     val allSrcData = vregInfo.forall(info => info.status === VRegSegmentStatus.srcData)
@@ -468,14 +492,13 @@ class SVlsu(implicit p: Parameters) extends Module {
 
     when(splitCount === 0.U && allSrcData) {
         vregWbReady := RegNext(splitCount === 0.U && allSrcData) // RegNext for scoreboard clear & write contradiction
-    }.elsewhen(allReadyOrSrcData) {
+    }.elsewhen(allReadyOrSrcData && completeLdst) {
         vregWbReady := true.B
     }.otherwise {
         vregWbReady := false.B
     }
 
-
-    when(vregWbReady || vregWbXcpt) {
+    when(vregWbReady || hasXcpt) {
         io.lsuOut.valid             := true.B
         io.lsuOut.bits.data         := Mux(ldstCtrlReg.isLoad, Cat(vregInfo.reverseMap(entry => entry.data)), DontCare) // Concatenate data from all vregInfo elements)
         io.lsuOut.bits.muopEnd      := mUopInfoReg.muopEnd
@@ -495,7 +518,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     }
 
     // exception output
-    when(vregWbXcpt) {
+    when(hasXcpt) {
         when(ldstCtrlReg.unitSMop === UnitStrideMop.fault_only_first && xcptVlReg > 0.U) {
             io.xcpt.exception_vld   := false.B
             io.xcpt.xcpt_cause      := 0.U.asTypeOf(new HellaCacheExceptions)
@@ -505,6 +528,10 @@ class SVlsu(implicit p: Parameters) extends Module {
         }
         io.xcpt.update_vl           := true.B
         io.xcpt.update_data         := xcptVlReg
+
+        // reset xcpt
+        hasXcpt     := false.B
+        lastXcptIdx := ldstUopQueueSize.U
     }.otherwise {
         io.xcpt.exception_vld       := false.B
         io.xcpt.update_vl           := false.B
