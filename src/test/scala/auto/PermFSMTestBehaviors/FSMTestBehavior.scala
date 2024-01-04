@@ -412,7 +412,10 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
         }
 
         for(j <- 0 until vs1_n_inputs) {
-            val each_step = n_inputs / vs1_n_inputs
+            var each_step = 1
+            if (n_inputs > vs1_n_inputs) {
+                each_step = n_inputs / vs1_n_inputs
+            }
             // mapping vs1 index to value
             preg_to_value = preg_to_value + ((vs1base + j) -> vs1data(vs1_n_inputs - 1 - j))
             for (_ <- 0 until each_step) {
