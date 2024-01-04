@@ -118,7 +118,8 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   }.otherwise {
     stateLd := Mux(completeLd, s_idle_LD, s_complete_LD)
   }
-  readyLd := stateLd === s_idle_LD || stateLd === s_issueUops_LD
+  readyLd := (stateLd === s_idle_LD || stateLd === s_issueUops_LD) &&
+             (stateSt === s_idle_ST || completeSt)
 
   // Load Uop Table
   val ldUopTable = Reg(Vec(8, new Bundle {
@@ -422,7 +423,8 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   }
   val maxStCredit = 64.U(7.W)
   val cntStCredit = RegInit(0.U(7.W))
-  readySt := (stateSt === s_idle_ST || stateSt === s_issueUops_ST) && cntStCredit =/= maxStCredit
+  readySt := (stateSt === s_idle_ST || stateSt === s_issueUops_ST) && cntStCredit =/= maxStCredit &&
+             (stateLd === s_idle_LD || completeLd)
   io.ovi_store.valid := st.fire
   io.ovi_store.data := st.bits.vs3
   cntStCredit := Mux(io.ovi_store.credit === io.ovi_store.valid, cntStCredit,
@@ -434,6 +436,7 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
     val valid = Bool()
     val uop = new VExpdUOp
   }))
+  when (reset.asBool) { stUopTable.foreach(_.valid := false.B) }
   val stBufPtrEnq = RegInit(0.U(3.W))
   stBufPtrEnq := Mux(completeSt, 0.U, Mux(st.fire, stBufPtrEnq + 1.U, stBufPtrEnq))
   when (st.fire) {
