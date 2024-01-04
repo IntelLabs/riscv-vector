@@ -77,7 +77,7 @@ trait VLsuBehavior_st_idx {
             dut.clock.step(1)
             val stReqs = Seq(
                 (vsuxei8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1, isLoad=false), SrcBundleSt(vs2="h010004")),
-                (vsuxei8.copy(vl=16, uopIdx=1, uopEnd=true,  vsew=1, isLoad=false), SrcBundleSt(vs2="h010004")),
+                // (vsuxei8.copy(vl=16, uopIdx=1, uopEnd=true,  vsew=1, isLoad=false), SrcBundleSt(vs2="h010004")),
             )
 
             for ((c, s) <- stReqs) {
@@ -93,9 +93,11 @@ trait VLsuBehavior_st_idx {
                     dut.clock.step(1)
                 }
                 dut.io.lsuOut.valid.expect(true.B)
+                dut.io.xcpt.update_vl.expect(true.B)
+                dut.io.xcpt.update_data.expect(2.U)
                 dut.clock.step(1)
             }
-            dut.io.memInfo(index1000).expect("h123121189ab201f".U)
+            dut.io.memInfo(index1000).expect("h123121189ab1413".U)
         }
         }
     }

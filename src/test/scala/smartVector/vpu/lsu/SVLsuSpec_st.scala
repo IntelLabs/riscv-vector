@@ -90,6 +90,7 @@ trait VLsuBehavior_st {
                 dut.io.mUop.bits.poke(genStInput(c, s))
                 dut.clock.step(1)
                 dut.io.mUop.valid.poke(false.B)
+                dut.io.mUop.bits.uop.ctrl_store.poke(false.B)
 
                 while (!dut.io.lsuOut.valid.peekBoolean()) {
                     dut.clock.step(1)
@@ -362,11 +363,14 @@ trait VLsuBehavior_st {
                     dut.clock.step(1)
                 }
                 dut.io.lsuOut.valid.expect(true.B)
+                dut.io.xcpt.update_vl.expect(true.B)
+                dut.io.xcpt.update_data.expect(1.U)
                 dut.clock.step(1)
             }
 
             dut.io.memInfo(index1000).expect("h123456714131211".U)
-            dut.io.memInfo(index0ff8).expect("h18171615eeeeeeee".U)     }
+            dut.io.memInfo(index0ff8).expect("heeeeeeeeeeeeeeee".U)     
+        }
         }
     }
 

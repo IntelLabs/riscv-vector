@@ -233,13 +233,16 @@ trait SmartVectorBehavior_ld {
             dut.clock.step(1)
             dut.io.rvuIssue.valid.poke(false.B)
 
-            while (!dut.io.rvuCommit.commit_vld.peekBoolean()) {
+            while (!dut.io.rvuCommit.exception_vld.peekBoolean()) {
                 dut.clock.step(1)
             }
-            dut.io.rvuCommit.commit_vld.expect(true.B)
+
+            dut.io.rvuCommit.exception_vld.expect(true.B)
+            dut.io.rvuCommit.update_vl.expect(true.B)
+            dut.io.rvuCommit.update_vl_data.expect(1.U)
             dut.clock.step(1)
             // dut.clock.step(100)
-            dut.io.rfData(2).expect("h00000000eeeeeeeeeeeeeeee89abcdef".U)
+            dut.io.rfData(2).expect("h89abcdef".U)
         }
         }
     }
