@@ -31,8 +31,8 @@ trait VLsuBehavior_ld_idx {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vluxei8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1), SrcBundleLd(vs2="h010004"), "hcdefcdefcdefcdefcdefcdefcdef4567".U),
-                (vluxei8.copy(vl=16, uopIdx=1, uopEnd=true,  vsew=1), SrcBundleLd(vs2="h010004"), "hcdefcdefcdefcdefcdefcdefcdefcdef".U),
+                (vluxei8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1), SrcBundleLd(vs2="h010004"), "h201f1e1d1c1b1a1918171615cdef4567".U),
+                // (vluxei8.copy(vl=16, uopIdx=1, uopEnd=true,  vsew=1), SrcBundleLd(vs2="h010004"), "hcdefcdefcdefcdefcdefcdefcdefcdef".U),
             )
 
             for ((c, s, r) <- ldReqs) {
@@ -49,6 +49,8 @@ trait VLsuBehavior_ld_idx {
                 }
                 dut.io.lsuOut.valid.expect(true.B)
                 // dut.clock.step(100)
+                dut.io.xcpt.update_vl.expect(true.B)
+                dut.io.xcpt.update_data.expect(2.U)
                 dut.io.lsuOut.bits.data.expect(r)
                 dut.clock.step(4)
             }
