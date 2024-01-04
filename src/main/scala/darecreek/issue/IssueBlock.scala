@@ -188,7 +188,8 @@ class VIssueBlock extends Module {
   io.toLSU.ld.bits.rs2 := RegEnable(io.get_rs1.ls.data, fireLsIQout)
   // So far, the ready of io.toLSU is ld.ready && st.ready
   // Todo: support overlapping of load and store excution
-  val io_toLSU_ready = io.toLSU.ld.ready && io.toLSU.st.ready
+  val io_toLSU_ready = io.toLSU.ld.ready && io.toLSU.ld.bits.uop.ctrl.load ||
+                       io.toLSU.st.ready && io.toLSU.ld.bits.uop.ctrl.store
   // Pipeline of valid
   val validPipe_ls = RegInit(false.B)
   when (io.flush) {
