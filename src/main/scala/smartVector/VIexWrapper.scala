@@ -39,6 +39,12 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   val outValid = SValu.io.out.valid || SVMac.io.out.valid || SVMask.io.out.valid || 
                  SVReduc.io.out.valid || SVDiv.io.out.valid
 
+  val oneCycleLatIn = io.in.valid & (io.in.bits.uop.ctrl.alu || io.in.bits.uop.ctrl.mask)
+  val twoCycleLatIn = io.in.valid & (io.in.bits.uop.ctrl.mul || io.in.bits.uop.ctrl.redu)
+  val noFixLatIn    = io.in.valid & (io.in.bits.uop.ctrl.div || io.in.bits.uop.ctrl.perm)
+  val twoCycleReg = RegEnable(twoCycleLatIn, io.in.valid)
+  val fixLatVld   = SVDiv.io.out.valid || SVPerm.io.out.wb_vld
+
   switch(currentState){
     is(empty){
       when(io.in.valid && ~io.in.bits.uop.ctrl.alu && ~io.in.bits.uop.ctrl.isLdst && ~io.in.bits.uop.ctrl.mask){
@@ -48,7 +54,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
       }
     }
     is(ongoing){
-      when(outValid){
+      when(twoCycleReg || fixLatVld){
           currentStateNext := empty
       }.otherwise{
           currentStateNext := ongoing
