@@ -28,22 +28,22 @@ class RVUissue extends Bundle {
 
 class RVUMemoryReq extends Bundle {
     // ldst queue index
-    val idx     = UInt(4.W)
+    val idx     = UInt(ldstUopQueueWidth.W)
     // memop
-    val addr    = UInt(64.W)
+    val addr    = UInt(addrWidth.W)
     // 0 for load; 1 for store
     val cmd     = Bool()
     // store info
-    val data    = UInt(64.W)
-    val mask    = UInt(8.W)
+    val data    = UInt(dataWidth.W)
+    val mask    = UInt((dataWidth / 8).W)
 }
 
 class RVUMemoryResp extends Bundle {
     // ldst queue index
-    val idx      = UInt(4.W)
+    val idx      = UInt(ldstUopQueueWidth.W)
     // load result
-    val data     = UInt(64.W)
-    val mask     = UInt(8.W)
+    val data     = UInt(dataWidth.W)
+    val mask     = UInt((dataWidth / 8).W)
     // cache miss
     val nack     = Bool()
 
