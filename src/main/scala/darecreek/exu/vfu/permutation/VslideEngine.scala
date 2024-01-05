@@ -87,12 +87,8 @@ class VslideEngine(implicit p: Parameters) extends VFuModule {
   val vslide_ele = Mux(vslide1up || vslide1dn, 1.U, rs1)
   val vslide_bytes = vslide_ele << vsew
 
-  val vslide_bytes_plus = Wire(UInt(68.W))
-  vslide_bytes_plus := Mux(vslideup || vslide1up, Cat(0.U(1.W), vslide_bytes(70, 4)) + 1.U, Cat(0.U(65.W), vd_idx) + Cat(0.U(1.W), vslide_bytes(70, 4)))
-
-
-  val vslide_lo_valid = Mux(vslideup || vslide1up, vslide_bytes_plus <= vd_idx, (vslidedn || vslide1dn) && (vslide_bytes_plus <= rd_vlmul))
-  val vslide_hi_valid = Mux(vslideup || vslide1up, vslide_bytes(70, 4) <= vd_idx, (vslidedn || vslide1dn) && (vslide_bytes_plus + 1.U <= rd_vlmul))
+  val vslide_lo_valid = Mux(vslideup || vslide1up, vslide_bytes(70, 4) +& 1.U <= vd_idx, (vslidedn || vslide1dn) && (vd_idx +& vslide_bytes(70, 4) <= rd_vlmul))
+  val vslide_hi_valid = Mux(vslideup || vslide1up, vslide_bytes(70, 4) <= vd_idx, (vslidedn || vslide1dn) && (vd_idx +& vslide_bytes(70, 4) +& 1.U <= rd_vlmul))
 
   val rs1_bytes = VecInit(Seq.tabulate(VLENB)(i => Cat(0.U(64.W), rs1)((i + 1) * 8 - 1, i * 8)))
   val old_vd_bytes = VecInit(Seq.tabulate(VLENB)(i => old_vd((i + 1) * 8 - 1, i * 8)))
