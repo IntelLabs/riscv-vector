@@ -127,7 +127,7 @@ class VFCVTDataModule(implicit val p: Parameters) extends VFPUPipelineModule {
     Mux(uop.expdIdx(0), s2iX2.io.result, s2iX1.io.result),
     Cat(s2iX2.io.result.tail(32), s2iX1.io.result.tail(32))
   )
-  val f2iOut = Mux(isTypeSingle || f322x16 || f322x16u, s2iResult, d2i.io.result)
+  val f2iOut = Mux(isTypeSingle, s2iResult, d2i.io.result)
   val d2iNarrow32b = Mux(f322x16 || f322x16u, Cat(0.U(32.W), s2iX2_16.io.result(15, 0), s2iX1_16.io.result(15, 0)), d2i.io.result.tail(32))
   val s2ifflags = Seq(s2iX1, s2iX2).zipWithIndex.map(x => x._1.io.fflags & Fill(5, eleActives(x._2)))
   val s2ifflags16 = Seq(s2iX1_16, s2iX2_16).zipWithIndex.map(x => x._1.io.fflags & Mux(uop.expdIdx(0), Fill(5, eleActives16_1(x._2)), Fill(5, eleActives16_0(x._2))))
@@ -137,7 +137,7 @@ class VFCVTDataModule(implicit val p: Parameters) extends VFPUPipelineModule {
     Mux(uop.expdIdx(0), s2ifflags(1), s2ifflags(0)),
     s2ifflags.reduce(_ | _)
   )
-  val f2iFlagOut = Mux(isTypeSingle || f322x16 || f322x16u, s2iFlagResult, d2ifflags)
+  val f2iFlagOut = Mux(isTypeSingle, s2iFlagResult, d2ifflags)
   val d2iNarrowFlag = d2ifflags // narrowing: d2i flag not or-ed, but outputted directly
 
   // Int2FP
