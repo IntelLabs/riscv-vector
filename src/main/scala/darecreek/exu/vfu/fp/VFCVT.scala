@@ -60,7 +60,8 @@ class VFCVTDataModule(implicit val p: Parameters) extends VFPUPipelineModule {
   val isRod = ctrl.cvtRm(0)
   val isRtz = ctrl.cvtRm(1)
   val eleActives = S1Reg(VecInit(Seq(0, 4).map(isActive)))
-  val eleActives16 = S1Reg(VecInit(Seq(0, 2).map(isActive)))
+  val eleActives16_0 = S1Reg(VecInit(Seq(0, 2).map(isActive)))
+  val eleActives16_1 = S1Reg(VecInit(Seq(4, 6).map(isActive)))
 
   // widening FP2FP
   // only need one, since widening insts has 2 output cycles
@@ -129,7 +130,7 @@ class VFCVTDataModule(implicit val p: Parameters) extends VFPUPipelineModule {
   val f2iOut = Mux(isTypeSingle || f322x16 || f322x16u, s2iResult, d2i.io.result)
   val d2iNarrow32b = Mux(f322x16 || f322x16u, Cat(0.U(32.W), s2iX2_16.io.result(15, 0), s2iX1_16.io.result(15, 0)), d2i.io.result.tail(32))
   val s2ifflags = Seq(s2iX1, s2iX2).zipWithIndex.map(x => x._1.io.fflags & Fill(5, eleActives(x._2)))
-  val s2ifflags16 = Seq(s2iX1_16, s2iX2_16).zipWithIndex.map(x => x._1.io.fflags & Fill(5, eleActives16(x._2)))
+  val s2ifflags16 = Seq(s2iX1_16, s2iX2_16).zipWithIndex.map(x => x._1.io.fflags & Mux(uop.expdIdx(0), Fill(5, eleActives16_1(x._2)), Fill(5, eleActives16_0(x._2))))
   val d2ifflags = Mux(f322x16 || f322x16u, s2ifflags16.reduce(_ | _), d2i.io.fflags & Mux(uop.expdIdx(0), Fill(5, eleActives(1)), Fill(5, eleActives(0))))
   val s2iFlagResult = Mux(
     uop.ctrl.widen,
