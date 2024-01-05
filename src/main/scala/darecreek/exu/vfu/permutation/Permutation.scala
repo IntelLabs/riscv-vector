@@ -169,8 +169,9 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   val cmprs_update_vs_idx = Wire(Bool())
   val vslide_ele = Mux(reg_vslide1up || reg_vslide1dn, 1.U, rs1_reg)
   val vslide_bytes = vslide_ele << vsew_reg
-  val vslide_lo_valid = Mux(reg_vslideup || reg_vslide1up, vslide_bytes(65, 4) + 1.U <= vs_idx, (reg_vslidedn || reg_vslide1dn) && (vs_idx + vslide_bytes(65, 4) <= rd_vlmul))
-  val vslide_hi_valid = Mux(reg_vslideup || reg_vslide1up, vslide_bytes(65, 4) <= vs_idx, (reg_vslidedn || reg_vslide1dn) && (vs_idx + vslide_bytes(65, 4) + 1.U <= rd_vlmul))
+
+  val vslide_lo_valid = Mux(reg_vslideup || reg_vslide1up, vslide_bytes(70, 4) +& 1.U <= vs_idx, (reg_vslidedn || reg_vslide1dn) && (vs_idx +& vslide_bytes(70, 4) <= rd_vlmul))
+  val vslide_hi_valid = Mux(reg_vslideup || reg_vslide1up, vslide_bytes(70, 4) <= vs_idx, (reg_vslidedn || reg_vslide1dn) && (vs_idx +& vslide_bytes(70, 4) +& 1.U <= rd_vlmul))
   val vslide_cnt_max = Wire(UInt(2.W))
   val vslide_rd_cnt = RegInit(0.U(2.W))
   val rd_mask_en = RegInit(false.B)
