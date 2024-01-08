@@ -9,6 +9,7 @@ import chipsalliance.rocketchip.config
 import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import xiangshan.MicroOp
 import SmartParam._
+import darecreek.lsu.LdstDecoder
 
 class MuopMergeAttr extends Bundle {
     val scalarRegWriteEn = Bool()
@@ -23,8 +24,6 @@ class MuopMergeAttr extends Bundle {
     val redu = Bool()
     val mask = Bool()
     val perm = Bool()
-    val permExpdLen = UInt(4.W)
-    val regDstIdx = UInt(5.W)
     val permExpdLen = UInt(4.W)
     val regDstIdx = UInt(5.W)
     
@@ -69,6 +68,7 @@ class VUop(implicit p: Parameters) extends Bundle {
   val ctrl = new VUopCtrlW
   val info = new VUopInfo
   val uopIdx = UInt(3.W)
+  val segIndex = UInt(3.W)
   val uopEnd = Bool()
   // Temp: system uop
   val sysUop = new MicroOp
@@ -233,6 +233,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.out.mUopMergeAttr.bits.redu             := ctrl.redu
     io.out.mUopMergeAttr.bits.mask             := ctrl.mask
     io.out.mUopMergeAttr.bits.perm             := ctrl.perm
+    //Just for perm instruction
     io.out.mUopMergeAttr.bits.permExpdLen      := (1.U << Mux(vlmul(2), 0.U, Cat(0.U(1.W), vlmul(1,0))) - 1.U)
     io.out.mUopMergeAttr.bits.regDstIdx        := ctrl.ldest
 
@@ -269,8 +270,15 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     needStall := hasRegConf(0) || hasRegConf(1) || io.lsuStallSplit || io.iexNeedStall || 
                  io.in.decodeIn.bits.vCtrl.illegal || io.vLSUXcpt.exception_vld
+
+    val ldst = ctrl.load || ctrl.store
+    val ldstCtrl = LdstDecoder(ctrl.funct6, ctrl.lsrc(1))
+    val nfield = ctrl.funct6(5, 3) +& 1.U
+    val lmul = 1.U << Mux(vlmul(2), 0.U, Cat(0.U(1.W), vlmul(1,0))) - 1.U
+    val expdLenSeg = nfield * lmul
          
-    io.out.mUop.bits.uop.uopIdx := idx
+    io.out.mUop.bits.uop.uopIdx := Mux(ldst && ldstCtrl.segment, idx  % lmul, idx)
+    io.out.mUop.bits.uop.segIndex := idx % nfield
     io.out.mUop.bits.uop.uopEnd := (idx + 1.U === expdLen)
 
     io.out.mUop.bits.uop.ctrl.funct6      := ctrl.funct6
@@ -338,8 +346,9 @@ class Vsplit(implicit p : Parameters) extends Module {
     val emulVd  = Mux(io.in.decodeIn.bits.vCtrl.ldestVal,   io.in.decodeIn.bits.eewEmulInfo.emulVd,  0.U(4.W))
     val emulVs1 = Mux(io.in.decodeIn.bits.vCtrl.lsrcVal(0), io.in.decodeIn.bits.eewEmulInfo.emulVs1, 0.U(4.W))
     val emulVs2 = Mux(io.in.decodeIn.bits.vCtrl.lsrcVal(1), io.in.decodeIn.bits.eewEmulInfo.emulVs2, 0.U(4.W))
-    val expdLenIn = Mux(io.in.decodeIn.bits.vCtrl.perm, 1.U ,
-    Mux(emulVd >= emulVs1, Mux(emulVd >= emulVs2, emulVd, emulVs2), Mux(emulVs1 >= emulVs2, emulVs1, emulVs2)))
+
+    val expdLenIn = Mux(ldst && ldstCtrl.segment, expdLenSeg, Mux(io.in.decodeIn.bits.vCtrl.perm, 1.U ,
+    Mux(emulVd >= emulVs1, Mux(emulVd >= emulVs2, emulVd, emulVs2), Mux(emulVs1 >= emulVs2, emulVs1, emulVs2))))
     
     when(instFirstIn){
         expdLenReg := expdLenIn
