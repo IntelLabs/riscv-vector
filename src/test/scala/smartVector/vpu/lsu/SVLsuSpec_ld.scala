@@ -23,7 +23,7 @@ trait VLsuBehavior_ld {
     val vle16ff = CtrlBundle(VLE16FF_V)
     val vle32ff = CtrlBundle(VLE32FF_V)
     val vle64ff = CtrlBundle(VLE64FF_V)
-    val vl1re8  = CtrlBundle(VL1RE8_V)
+    val vl2re16 = CtrlBundle(VL2RE16_V)
 
     val vlse8   = CtrlBundle(VLSE8_V)
     val vlse16  = CtrlBundle(VLSE16_V)
@@ -538,6 +538,36 @@ trait VLsuBehavior_ld {
         }
         }
     }
+
+    def vLsuTest16(): Unit = {
+        it should "pass: unit-strde whole register load" in {
+        test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut => 
+            dut.clock.step(1)
+            val ldReqs = Seq(
+                (vl2re16.copy(vl=19, uopIdx=0, uopEnd=false, vstart=1), ldReqSrc_default, "hffffffffffffffff0123456789ab1211".U),
+                (vl2re16.copy(vl=8, uopIdx=1, uopEnd=true), ldReqSrc_default, "hfedcba98765432100f0f0f0f0f0f0f0f".U),
+            )
+
+             for ((c, s, r) <- ldReqs) {
+                while (!dut.io.lsuReady.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.mUop.valid.poke(true.B)
+                dut.io.mUop.bits.poke(genLdInput(c, s))
+                dut.clock.step(1)
+                dut.io.mUop.valid.poke(false.B)
+
+                while (!dut.io.lsuOut.valid.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.lsuOut.valid.expect(true.B)
+                // dut.clock.step(100)
+                dut.io.lsuOut.bits.data.expect(r)
+                dut.clock.step(4)
+            }
+        }
+        }
+    }
 }
 
 class VLsuSpec_ld extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VLsuBehavior_ld {
@@ -558,4 +588,5 @@ class VLsuSpec_ld extends AnyFlatSpec with ChiselScalatestTester with BundleGenH
     it should behave like vLsuTest13()  // strided load
     it should behave like vLsuTest14()  // strided load with mask enabled
     it should behave like vLsuTest15()  // unit-stride exception
+    it should behave like vLsuTest16()  // unit-stride whole register load
 }

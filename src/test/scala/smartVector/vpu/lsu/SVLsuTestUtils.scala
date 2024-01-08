@@ -296,6 +296,8 @@ class SmartVectorLsuTestWrapper(isLoad: Boolean) extends Module {
     vLsu.io.mUop.bits.uop.info.vstart       := io.mUop.bits.uop.info_vstart
     vLsu.io.mUop.bits.uop.info.vxrm         := DontCare
     vLsu.io.mUop.bits.uop.info.frm          := DontCare
+    vLsu.io.mUop.bits.uop.ctrl.ldest        := DontCare
+    vLsu.io.mUop.bits.uop.ctrl.lsrc         := DontCare
 
     vLsu.io.mUopMergeAttr.valid             := io.mUop.valid
     vLsu.io.mUopMergeAttr.bits.rfWriteEn    := isLoad.asBool
@@ -313,6 +315,8 @@ class SmartVectorLsuTestWrapper(isLoad: Boolean) extends Module {
     vLsu.io.mUopMergeAttr.bits.scalarRegWriteEn := false.B
     vLsu.io.mUopMergeAttr.bits.regBackWidth := 7.U
     vLsu.io.mUopMergeAttr.bits.regWriteMuopIdx := 0.U
+    vLsu.io.mUopMergeAttr.bits.permExpdLen := 0.U 
+    vLsu.io.mUopMergeAttr.bits.regDstIdx := 0.U
 
     io.lsuOut.valid                         := vLsu.io.lsuOut.valid
     io.lsuOut.bits.data                     := vLsu.io.lsuOut.bits.data

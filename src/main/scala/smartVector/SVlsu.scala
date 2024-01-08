@@ -276,8 +276,8 @@ class SVlsu(implicit p: Parameters) extends Module {
     // decide micro vl
     val actualVl    = Mux(ldstCtrl.unitSMop === UnitStrideMop.mask, (vl + 7.U) >> 3.U, vl) // ceil(vl/8)
     val doneLen     = uopIdx << ldstCtrl.log2MinLen
-    val leftLen     = Mux(actualVl > doneLen, actualVl - doneLen, 0.U)
-    val microVl     = Mux(ldstCtrl.unitSMop === UnitStrideMop.whole_register, ldstCtrl.mlen, ldstCtrl.minLen min leftLen)
+    val leftLen     = Mux(ldstCtrl.unitSMop === UnitStrideMop.whole_register, ldstCtrl.mlen, Mux(actualVl > doneLen, actualVl - doneLen, 0.U))
+    val microVl     = ldstCtrl.minLen min leftLen
     val microVstart = Mux(vstart < doneLen, 0.U, ldstCtrl.minLen min (vstart - doneLen))
 
     val memVl       = leftLen min ldstCtrl.mlen
