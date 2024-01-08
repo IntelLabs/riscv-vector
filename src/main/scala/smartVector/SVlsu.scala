@@ -23,7 +23,6 @@ class LdstIO(implicit p: Parameters) extends ParameterizedBundle()(p) {
     val xcpt            = Output(new VLSUXcpt)
     val dataExchange    = new RVUMemory()
     val lsuReady        = Output(Bool())
-    val segmentIdx      = Input(UInt(log2Ceil(8).W))
 }
 
 object VRegSegmentStatus {
@@ -91,12 +90,12 @@ class mUopInfo extends Bundle {
 }
 
 object mUopInfoSelecter {
-    def apply(mUop: Muop, mUopMergeAttr: MuopMergeAttr, segIdx: UInt): mUopInfo = {
+    def apply(mUop: Muop, mUopMergeAttr: MuopMergeAttr): mUopInfo = {
         val info        = Wire(new mUopInfo)
 
         info.uopIdx     := mUop.uop.uopIdx
         info.uopEnd     := mUop.uop.uopEnd
-        info.segIdx     := segIdx
+        info.segIdx     := mUop.uop.segIndex
 
         info.rs1Val     := mUop.scalar_opnd_1
         info.rs2Val     := mUop.scalar_opnd_2
@@ -287,7 +286,7 @@ class SVlsu(implicit p: Parameters) extends Module {
 
     when(uopState === uop_idle) {
         when(io.mUop.valid && io.mUop.bits.uop.ctrl.isLdst) {
-            mUopInfoReg  := mUopInfoSelecter(io.mUop.bits, io.mUopMergeAttr.bits, io.segmentIdx)
+            mUopInfoReg  := mUopInfoSelecter(io.mUop.bits, io.mUopMergeAttr.bits)
             ldstCtrlReg  := ldstCtrl
             addrReg      := Mux(io.mUop.bits.uop.uopIdx === 0.U, io.mUop.bits.scalar_opnd_1, addrReg)
             // Set split info

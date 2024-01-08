@@ -274,11 +274,11 @@ class Vsplit(implicit p : Parameters) extends Module {
     val ldst = ctrl.load || ctrl.store
     val ldstCtrl = LdstDecoder(ctrl.funct6, ctrl.lsrc(1))
     val nfield = ctrl.funct6(5, 3) +& 1.U
-    val lmul = 1.U << Mux(vlmul(2), 0.U, Cat(0.U(1.W), vlmul(1,0))) - 1.U
+    val lmul = 1.U << Mux(vlmul(2), 0.U, vlmul(1,0))
     val expdLenSeg = nfield * lmul
          
     io.out.mUop.bits.uop.uopIdx := Mux(ldst && ldstCtrl.segment, idx  % lmul, idx)
-    io.out.mUop.bits.uop.segIndex := idx % nfield
+    io.out.mUop.bits.uop.segIndex := idx / lmul
     io.out.mUop.bits.uop.uopEnd := (idx + 1.U === expdLen)
 
     io.out.mUop.bits.uop.ctrl.funct6      := ctrl.funct6

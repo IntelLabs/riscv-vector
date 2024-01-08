@@ -109,8 +109,6 @@ class SmartVector extends Module {
     //TODO: This is reserved for verification, delete it later
     io.rfData := regFile.io.rfData
 
-    svlsu.io.segmentIdx := 0.U
-
     io.rvuMemory.req.valid      := svlsu.io.dataExchange.req.valid
     io.rvuMemory.req.bits.idx   := svlsu.io.dataExchange.req.bits.idx
     io.rvuMemory.req.bits.addr  := svlsu.io.dataExchange.req.bits.addr

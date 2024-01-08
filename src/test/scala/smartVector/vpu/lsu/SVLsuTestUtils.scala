@@ -266,7 +266,7 @@ class SmartVectorLsuTestWrapper(isLoad: Boolean) extends Module {
     vLsu.io.mUop.bits.uop.sysUop            := DontCare
     vLsu.io.mUop.bits.uop.uopIdx            := io.mUop.bits.uop.splitUopIdx
     vLsu.io.mUop.bits.uop.uopEnd            := io.mUop.bits.uop.splitUopEnd
-    vLsu.io.segmentIdx                      := io.mUop.bits.uop.segIdx
+    vLsu.io.mUop.bits.uop.segIndex          := io.mUop.bits.uop.segIdx
 
     vLsu.io.mUop.bits.uop.ctrl.vs2          := io.mUop.bits.uop.ctrl_vs2
     vLsu.io.mUop.bits.uop.ctrl.funct6       := io.mUop.bits.uop.ctrl_funct6
