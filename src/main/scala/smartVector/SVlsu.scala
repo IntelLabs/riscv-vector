@@ -113,7 +113,7 @@ object mUopInfoSelecter {
 class LSULdstCtrl extends Bundle {
     val isLoad          = Bool()
     val isStore         = Bool()
-    val nfield          = UInt(3.W)
+    val nfield          = UInt(4.W) // 1~8
     val ldstType        = UInt(4.W)
     val unitSMop        = UInt(5.W)
 
