@@ -187,7 +187,6 @@ class Vsplit(implicit p : Parameters) extends Module {
     val emulVd  = Mux(io.in.decodeIn.bits.vCtrl.ldestVal,   io.in.decodeIn.bits.eewEmulInfo.emulVd,  0.U(4.W))
     val emulVs1 = Mux(io.in.decodeIn.bits.vCtrl.lsrcVal(0), io.in.decodeIn.bits.eewEmulInfo.emulVs1, 0.U(4.W))
     val emulVs2 = Mux(io.in.decodeIn.bits.vCtrl.lsrcVal(1), io.in.decodeIn.bits.eewEmulInfo.emulVs2, 0.U(4.W))
-    val expdLenSeg = Mux(ldstCtrl.indexed, nfield * (Mux(lmul > emulVs2, lmul, emulVs2)), nfield * lmul) 
     val idxVdInc = Wire(Bool())
     val idxVs2Inc = Wire(Bool())
 
@@ -382,8 +381,15 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     val expdLenReg = Reg(UInt(4.W))
 
-    val expdLenIn = Mux(ldst && ldstCtrl.segment, expdLenSeg, Mux(io.in.decodeIn.bits.vCtrl.perm, 1.U ,
-    Mux(emulVd >= emulVs1, Mux(emulVd >= emulVs2, emulVd, emulVs2), Mux(emulVs1 >= emulVs2, emulVs1, emulVs2))))
+    val ldStEmulVd  = io.in.decodeIn.bits.eewEmulInfo.emulVd
+    val ldStEmulVs1 = io.in.decodeIn.bits.eewEmulInfo.emulVs1
+    val ldStEmulVs2 = io.in.decodeIn.bits.eewEmulInfo.emulVs2
+    val expdLenSeg = Mux(ldstCtrl.indexed, nfield * (Mux(lmul > ldStEmulVs2, lmul, ldStEmulVs2)), nfield * lmul) 
+    val expdLenIdx = Mux(ldStEmulVd >= ldStEmulVs2, ldStEmulVd, ldStEmulVs2)
+    val expdLenLdSt = Mux(ldst && ldstCtrl.segment, expdLenSeg, Mux(ldst && ldstCtrl.indexed, expdLenIdx, ldStEmulVd))
+    val maxOfVs12Vd = Mux(emulVd >= emulVs1, Mux(emulVd >= emulVs2, emulVd, emulVs2), Mux(emulVs1 >= emulVs2, emulVs1, emulVs2))
+
+    val expdLenIn = Mux(ldst, expdLenLdSt, Mux(io.in.decodeIn.bits.vCtrl.perm, 1.U , maxOfVs12Vd))
     
     when(instFirstIn){
         expdLenReg := expdLenIn
