@@ -16,24 +16,24 @@ class VCrossLaneExu extends Module {
 
   val permutation = Module(new Permutation)
   val vmask = Module(new VMask)
-  val reduction = Module(new Reduction)
+  // val reduction = Module(new Reduction)
 
-  reduction.io.in.bits := io.in.bits
-  reduction.io.in.valid := io.in.valid && io.in.bits.uop.ctrl.redu
-  io.in.readys(0) := reduction.io.in.ready
+  // reduction.io.in.bits := io.in.bits
+  // reduction.io.in.valid := io.in.valid && io.in.bits.uop.ctrl.redu
+  io.in.readys(2) := true.B
  
   vmask.io.in.bits := io.in.bits
   vmask.io.in.valid := io.in.valid && io.in.bits.uop.ctrl.mask
-  io.in.readys(1) := vmask.io.in.ready
+  io.in.readys(0) := vmask.io.in.ready
  
   permutation.io.in.bits := io.in.bits
   permutation.io.in.valid := io.in.valid && io.in.bits.uop.ctrl.perm
-  io.in.readys(2) := permutation.io.in.ready
+  io.in.readys(1) := permutation.io.in.ready
 
-  val arb = Module(new Arbiter(new VCrossExuOut, 3))
-  arb.io.in(0) <> reduction.io.out
-  arb.io.in(1) <> vmask.io.out
-  arb.io.in(2) <> permutation.io.out
+  val arb = Module(new Arbiter(new VCrossExuOut, 2))
+  // arb.io.in(0) <> reduction.io.out
+  arb.io.in(0) <> vmask.io.out
+  arb.io.in(1) <> permutation.io.out
   io.out <> arb.io.out  
 }
 
