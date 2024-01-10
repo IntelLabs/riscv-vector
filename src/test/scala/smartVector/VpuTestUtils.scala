@@ -13,6 +13,7 @@ import xiangshan.XSCoreParameters
 import smartVector._
 import SmartParam._
 import smartVector.lsutest.LSUFakeDCache
+import smartVector.lsutest.DataTable
 
 case class CtrlBundle(instrn: String = "h0",
                       ma: Boolean = false,
@@ -76,7 +77,7 @@ class SmartVectorTestWrapper extends Module {
         val rvuIssue = Flipped(Decoupled(new VIssueTest))
         val rvuCommit = Output(new RVUCommit)
         val rfData = Output(Vec(NVPhyRegs, UInt(VLEN.W)))
-        val memInfo = Output(Vec(24, UInt(64.W)))
+        val memInfo = Output(Vec(DataTable.dataTable.length, UInt(64.W)))
     })
 
     val p = Parameters.empty.alterPartial({

@@ -131,44 +131,49 @@ class MuopTest extends Bundle {
     val mask          = UInt(VLEN.W)
 }
 
+object DataTable {
+  val dataTable = Seq(
+      // addr, data, exception
+      (0x0fd0.U, BigInt("4040404040404404", 16).U, false.B),
+      (0x0fd8.U, BigInt("3030303030303030", 16).U, false.B),
+      (0x0fe0.U, BigInt("2020202020202020", 16).U, false.B),
+      (0x0fe8.U, BigInt("1010101010101010", 16).U, false.B),
+      (0x0ff0.U, BigInt("5678901234503489", 16).U, false.B),
+      (0x0ff8.U, BigInt("eeeeeeeeeeeeeeee", 16).U, false.B),
+      (0x1000.U, BigInt("0123456789abcdef", 16).U, false.B),
+      (0x1008.U, BigInt("ffffffffffffffff", 16).U, false.B),
+      (0x1010.U, BigInt("0f0f0f0f0f0f0f0f", 16).U, false.B),
+      (0x1018.U, BigInt("fedcba9876543210", 16).U, false.B),
+      (0x1020.U, BigInt("1234567890123456", 16).U, false.B),
+      (0x1028.U, BigInt("0101010101010101", 16).U, false.B),
+      (0x1030.U, BigInt("2345678901234567", 16).U, false.B),
+      (0x1038.U, BigInt("1111111111111111", 16).U, false.B),
+      (0x1040.U, BigInt("2222222222222222", 16).U, false.B),
+      (0x1048.U, BigInt("3333333333333333", 16).U, false.B),
+      (0x1050.U, BigInt("4444444444444444", 16).U, false.B),
+      (0x1058.U, BigInt("5555555555555555", 16).U, false.B),
+      (0x1060.U, BigInt("6666666666666666", 16).U, true.B),
+      (0x1068.U, BigInt("0807060504030201", 16).U, false.B),
+      (0x1070.U, BigInt("1615141312111009", 16).U, false.B),
+      (0x1078.U, BigInt("081814100c1c0004", 16).U, false.B),
+      (0x1080.U, BigInt("00080000000c0004", 16).U, false.B),
+      (0x1088.U, BigInt("000000080004001c", 16).U, false.B),
+      (0x1090.U, BigInt("00080004000c0018", 16).U, false.B),
+      (0x1098.U, BigInt("00380004000c0020", 16).U, false.B),
+  )
+}
+
 class LSUFakeDCache extends Module {
     val io = IO(new Bundle {
       val dataExchange = Flipped(new RVUMemory)
-      val memInfo = Output(Vec(24, UInt(64.W)))
+      val memInfo = Output(Vec(DataTable.dataTable.length, UInt(64.W)))
     })
 
-    val dataTable = Seq(
-        // addr, data, exception
-        (0x0fd0.U, BigInt("4040404040404404", 16).U, false.B),
-        (0x0fd8.U, BigInt("3030303030303030", 16).U, false.B),
-        (0x0fe0.U, BigInt("2020202020202020", 16).U, false.B),
-        (0x0fe8.U, BigInt("1010101010101010", 16).U, false.B),
-        (0x0ff0.U, BigInt("5678901234503489", 16).U, false.B),
-        (0x0ff8.U, BigInt("eeeeeeeeeeeeeeee", 16).U, false.B),
-        (0x1000.U, BigInt("0123456789abcdef", 16).U, false.B),
-        (0x1008.U, BigInt("ffffffffffffffff", 16).U, false.B),
-        (0x1010.U, BigInt("0f0f0f0f0f0f0f0f", 16).U, false.B),
-        (0x1018.U, BigInt("fedcba9876543210", 16).U, false.B),
-        (0x1020.U, BigInt("1234567890123456", 16).U, false.B),
-        (0x1028.U, BigInt("0101010101010101", 16).U, false.B),
-        (0x1030.U, BigInt("2345678901234567", 16).U, false.B),
-        (0x1038.U, BigInt("1111111111111111", 16).U, false.B),
-        (0x1040.U, BigInt("2222222222222222", 16).U, false.B),
-        (0x1048.U, BigInt("3333333333333333", 16).U, false.B),
-        (0x1050.U, BigInt("4444444444444444", 16).U, false.B),
-        (0x1058.U, BigInt("5555555555555555", 16).U, false.B),
-        (0x1060.U, BigInt("6666666666666666", 16).U, true.B),
-        (0x1068.U, BigInt("0807060504030201", 16).U, false.B),
-        (0x1070.U, BigInt("1615141312111009", 16).U, false.B),
-        (0x1078.U, BigInt("081814100c1c0004", 16).U, false.B),
-        (0x1080.U, BigInt("00080000000c0004", 16).U, false.B),
-        (0x1088.U, BigInt("000000080004001c", 16).U, false.B),
-    )
-    val dataVec = RegInit(VecInit(dataTable.map(entry =>
+    val dataVec = RegInit(VecInit(DataTable.dataTable.map(entry =>
       VecInit(Seq.tabulate(8)(i => entry._2(i*8 + 7, i*8)))
     )))
 
-    for (i <- 0 until dataTable.length) {
+    for (i <- 0 until DataTable.dataTable.length) {
       val flattenedData = Cat(dataVec(i).reverse)
       io.memInfo(i) := flattenedData
     }
@@ -199,16 +204,16 @@ class LSUFakeDCache extends Module {
         val isXcpt = WireInit(false.B)
         val data = WireInit(0.U(64.W))
 
-        for(i <- 0 until dataTable.length) {
-            when(dataTable(i)._1 === s2_req.addr) {
-              isXcpt := dataTable(i)._3
+        for(i <- 0 until DataTable.dataTable.length) {
+            when(DataTable.dataTable(i)._1 === s2_req.addr) {
+              isXcpt := DataTable.dataTable(i)._3
               data   := Cat(dataVec(i).reverse)
             }
         }
 
-        for(i <- 0 until dataTable.length) {
-              when(dataTable(i)._1 === s2_req.addr) {
-                  isXcpt := dataTable(i)._3
+        for(i <- 0 until DataTable.dataTable.length) {
+              when(DataTable.dataTable(i)._1 === s2_req.addr) {
+                  isXcpt := DataTable.dataTable(i)._3
                   when(s2_req.cmd === VMemCmd.write && !miss && !isXcpt) {
                     for(j <- 0 until 8) {
                       when(s2_req.mask(j)) {
@@ -241,7 +246,7 @@ class SmartVectorLsuTestWrapper(isLoad: Boolean) extends Module {
         val lsuOut = ValidIO(new LsuOutput)
         val xcpt = Output(new VLSUXcpt)
         val lsuReady = Output(Bool())
-        val memInfo = Output(Vec(24, UInt(64.W)))
+        val memInfo = Output(Vec(DataTable.dataTable.length, UInt(64.W)))
     })
 
     val p = Parameters.empty.alterPartial({

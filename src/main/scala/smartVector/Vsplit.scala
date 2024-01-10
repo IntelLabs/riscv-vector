@@ -223,8 +223,8 @@ class Vsplit(implicit p : Parameters) extends Module {
               
     val lsrc1_inc = Wire(UInt(3.W))
     when (ldst && ldstCtrl.indexed){
-      val lsrc1_inc_tmp = Mux(idxVs2Inc, idx >> indexIncBase, idx)
-      lsrc1_inc := Mux(ldstCtrl.segment, lsrc1_inc_tmp % nfield, lsrc1_inc_tmp)
+      val lsrc1_inc_tmp = Mux(idxVs2Inc, (idx % (Mux(lmul > emulVs2, lmul, emulVs2))) >> indexIncBase, (idx % (Mux(lmul > emulVs2, lmul, emulVs2))))
+      lsrc1_inc := lsrc1_inc_tmp
     }.elsewhen(ctrl.widen || v_ext_out && ctrl.lsrc(0)(2,1) === 3.U) {
       lsrc1_inc := idx >> 1
     }.elsewhen (v_ext_out && ctrl.lsrc(0)(2,1) === 2.U) {
@@ -315,8 +315,8 @@ class Vsplit(implicit p : Parameters) extends Module {
     needStall := hasRegConf(0) || hasRegConf(1) || io.lsuStallSplit || io.iexNeedStall || 
                  io.in.decodeIn.bits.vCtrl.illegal || io.vLSUXcpt.exception_vld
          
-    io.out.mUop.bits.uop.uopIdx := Mux(ldst && ldstCtrl.segment, idx  % lmul, idx)
-    io.out.mUop.bits.uop.segIndex := idx % nfield
+    io.out.mUop.bits.uop.uopIdx := Mux(ldst && ldstCtrl.segment, idx  % (Mux(lmul > emulVs2, lmul, emulVs2)), idx)
+    io.out.mUop.bits.uop.segIndex := idx / (Mux(lmul > emulVs2, lmul, emulVs2))
     io.out.mUop.bits.uop.uopEnd := (idx + 1.U === expdLen)
 
     io.out.mUop.bits.uop.ctrl.funct6      := ctrl.funct6

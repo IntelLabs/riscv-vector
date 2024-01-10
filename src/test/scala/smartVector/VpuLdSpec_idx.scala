@@ -26,7 +26,6 @@ trait SmartVectorBehavior_ld_idx {
     // vle8 v2, 0(x1), 0x0
     def VLE8_V  = "b000_000_1_00000_00001_000_00010_0000111"
 
-
     def VLE16_V = "b000_000_1_00000_00001_101_00010_0000111"
 
     def VLE32_V = "b000_000_1_00000_00001_110_00010_0000111"
@@ -163,14 +162,53 @@ trait SmartVectorBehavior_ld_idx {
         }
         }
     }
+
+    def vLsuTest3(): Unit = {
+        it should "pass: indexed load (uops=4, sew=8, eew=16, vl=16, vstart=0)" in {
+        test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            dut.clock.setTimeout(1000)
+            dut.clock.step(1)
+            
+            val ldReqs = Seq(
+                (ldstReqCtrl_default.copy(instrn=VLE16_V, vl=16, vlmul=1), SrcBundleLdst(rs1="h1080")),
+                (ldstReqCtrl_default.copy(instrn=VLUXEI16_V, vl=16, vlmul=1, vsew=0), ldstReqSrc_default.copy()),
+            )
+
+            dut.io.rvuIssue.valid.poke(true.B)
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(0)._1, ldReqs(0)._2))
+            dut.clock.step(1)
+            dut.io.rvuIssue.valid.poke(false.B)
+
+            while (!dut.io.rvuCommit.commit_vld.peekBoolean()) {
+                dut.clock.step(1)
+            }
+            dut.io.rvuCommit.commit_vld.expect(true.B)
+            dut.clock.step(1)
+            dut.io.rfData(2).expect("h000000080004001c00080000000c0004".U)
+            dut.io.rfData(3).expect("h00380004000c002000080004000c0018".U)
+
+            dut.io.rvuIssue.valid.poke(true.B)
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(1)._1, ldReqs(1)._2))
+            dut.clock.step(1)
+            dut.io.rvuIssue.valid.poke(false.B)
+
+            while (!dut.io.rvuCommit.commit_vld.peekBoolean()) {
+                dut.clock.step(1)
+            }
+            dut.io.rvuCommit.commit_vld.expect(true.B)
+            dut.clock.step(1)
+            dut.io.rfData(6).expect("h1167ff56ff67ff10efff6798ffefff67".U)
+        }
+        }
+    }
 }
 
 class VPULdSpec_idx extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with SmartVectorBehavior_ld_idx {
   behavior of "SmartVector Load test"
-    it should behave like vLsuTest0()   //
+    // it should behave like vLsuTest0()   //
     // it should behave like vLsuTest1()   // bug remained
-    it should behave like vLsuTest2()   // 
-    // it should behave like vLsuTest3()   //
+    // it should behave like vLsuTest2()   // 
+    it should behave like vLsuTest3()   //
     // it should behave like vLsuTest4()   //
     // it should behave like vLsuTest5()   //
     // it should behave like vLsuTest6()   //
