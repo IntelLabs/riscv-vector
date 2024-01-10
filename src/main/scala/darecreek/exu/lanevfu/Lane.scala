@@ -16,10 +16,8 @@ package darecreek
 
 import chisel3._
 import chisel3.util._
-import darecreek.exu.fp._
 import darecreek.exu.lanevfu.alu._
 import darecreek.exu.lanevfu.mac._
-import darecreek.exu.fu.div._
 import chipsalliance.rocketchip.config._
 import darecreek.exu.vfu.{VFuParamsKey, VFuParameters}
 
