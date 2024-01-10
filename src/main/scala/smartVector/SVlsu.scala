@@ -23,7 +23,6 @@ class LdstIO(implicit p: Parameters) extends ParameterizedBundle()(p) {
     val xcpt            = Output(new VLSUXcpt)
     val dataExchange    = new RVUMemory()
     val lsuReady        = Output(Bool())
-    val segmentIdx      = Input(UInt(log2Ceil(8).W))
 }
 
 object VRegSegmentStatus {
@@ -91,12 +90,12 @@ class mUopInfo extends Bundle {
 }
 
 object mUopInfoSelecter {
-    def apply(mUop: Muop, mUopMergeAttr: MuopMergeAttr, segIdx: UInt): mUopInfo = {
+    def apply(mUop: Muop, mUopMergeAttr: MuopMergeAttr): mUopInfo = {
         val info        = Wire(new mUopInfo)
 
         info.uopIdx     := mUop.uop.uopIdx
         info.uopEnd     := mUop.uop.uopEnd
-        info.segIdx     := segIdx
+        info.segIdx     := mUop.uop.segIndex
 
         info.rs1Val     := mUop.scalar_opnd_1
         info.rs2Val     := mUop.scalar_opnd_2
@@ -114,7 +113,7 @@ object mUopInfoSelecter {
 class LSULdstCtrl extends Bundle {
     val isLoad          = Bool()
     val isStore         = Bool()
-    val nfield          = UInt(3.W)
+    val nfield          = UInt(4.W) // 1~8
     val ldstType        = UInt(4.W)
     val unitSMop        = UInt(5.W)
 
@@ -276,8 +275,8 @@ class SVlsu(implicit p: Parameters) extends Module {
     // decide micro vl
     val actualVl    = Mux(ldstCtrl.unitSMop === UnitStrideMop.mask, (vl + 7.U) >> 3.U, vl) // ceil(vl/8)
     val doneLen     = uopIdx << ldstCtrl.log2MinLen
-    val leftLen     = Mux(actualVl > doneLen, actualVl - doneLen, 0.U)
-    val microVl     = Mux(ldstCtrl.unitSMop === UnitStrideMop.whole_register, ldstCtrl.mlen, ldstCtrl.minLen min leftLen)
+    val leftLen     = Mux(ldstCtrl.unitSMop === UnitStrideMop.whole_register, ldstCtrl.mlen, Mux(actualVl > doneLen, actualVl - doneLen, 0.U))
+    val microVl     = ldstCtrl.minLen min leftLen
     val microVstart = Mux(vstart < doneLen, 0.U, ldstCtrl.minLen min (vstart - doneLen))
 
     val memVl       = leftLen min ldstCtrl.mlen
@@ -287,7 +286,7 @@ class SVlsu(implicit p: Parameters) extends Module {
 
     when(uopState === uop_idle) {
         when(io.mUop.valid && io.mUop.bits.uop.ctrl.isLdst) {
-            mUopInfoReg  := mUopInfoSelecter(io.mUop.bits, io.mUopMergeAttr.bits, io.segmentIdx)
+            mUopInfoReg  := mUopInfoSelecter(io.mUop.bits, io.mUopMergeAttr.bits)
             ldstCtrlReg  := ldstCtrl
             addrReg      := Mux(io.mUop.bits.uop.uopIdx === 0.U, io.mUop.bits.scalar_opnd_1, addrReg)
             // Set split info
