@@ -5,7 +5,7 @@ import chisel3.util._
 // import darecreek.{BundleHelper, LaneFUInput, LaneFUOutput, VExpdUOp}
 import darecreek.exu.vfucore.{BundleHelper, LaneFUInput, LaneFUOutput, VExpdUOp}
 import freechips.rocketchip.config.Parameters
-import xiangshan.Redirect
+import darecreek.Redirect
 
 class VFPUCtrlSigs extends Bundle {
 
@@ -112,7 +112,7 @@ class LaneFloatFUOut(implicit p: Parameters) extends LaneFUWithMaskOut {
 class LaneFloatFUIO(implicit p: Parameters) extends Bundle {
   val in = Flipped(DecoupledIO(new LaneFloatFUIn))
   val out = DecoupledIO(new LaneFloatFUOut)
-  val redirect = Flipped(ValidIO(new Redirect))
+  val redirect = Input(new Redirect)
 }
 
 class LaneFloatDivFUIO(implicit p: Parameters) extends Bundle {

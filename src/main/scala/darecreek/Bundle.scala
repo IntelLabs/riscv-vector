@@ -252,6 +252,11 @@ class VRobCommitIO extends Bundle {
   val info = Vec(VCommitWidth, Output(new VRobCommitInfo))
 }
 
+class Redirect extends Bundle {
+  val valid = Bool()
+  def needFlush = valid
+}
+
 /**
   *  Debug signals
   */
