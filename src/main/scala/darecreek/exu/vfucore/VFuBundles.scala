@@ -14,9 +14,8 @@ package darecreek.exu.vfucore
 
 import chisel3._
 import chisel3.util._
-// import darecreek.exu.vfucore.VFUParam._
 import chipsalliance.rocketchip.config.Parameters
-import xiangshan.{MicroOp, Redirect}
+import darecreek.Redirect
 
 // Temporary. Will replaced by system Uop class.
 class VUopCtrl extends Bundle {
@@ -48,7 +47,7 @@ class VUop(implicit p: Parameters) extends Bundle with ConnectFromLaneUop {
   val uopIdx = UInt(3.W)
   val uopEnd = Bool()
   // Temp: system uop
-  val sysUop = new MicroOp
+  // val sysUop = new MicroOp
 }
 
 class SewOH extends Bundle {  // 0   1   2   3
@@ -188,7 +187,7 @@ class VExpdUOp(implicit p: Parameters) extends VCtrlInfo with ConnectFromVUop {
   // val psrcVal = Vec(4, Bool())      // Valid of four vector source operands (the 4th is mask)
   val pdestVal = Bool()             // Valid of vector dest operand
   // Temp: system uop
-  val sysUop = new MicroOp
+  // val sysUop = new MicroOp
 }
 
 // Input of the lane FU
@@ -236,7 +235,7 @@ trait ConnectFromLaneUop { this: VUop =>
     this.ctrl.vs1_imm := laneUop.ctrl.lsrc(0)
     this.uopIdx := laneUop.expdIdx
     this.uopEnd := laneUop.expdEnd
-    this.sysUop := laneUop.sysUop
+    // this.sysUop := laneUop.sysUop
   }
 }
 
@@ -265,6 +264,6 @@ trait ConnectFromVUop { this: VExpdUOp =>
     this.ctrl.lsrc(1) := DontCare
     this.ctrl.ldest := DontCare
     this.pdestVal := DontCare
-    this.sysUop := vUop.sysUop
+    // this.sysUop := vUop.sysUop
   }
 }

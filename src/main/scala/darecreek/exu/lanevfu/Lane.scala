@@ -22,7 +22,6 @@ import chipsalliance.rocketchip.config._
 import darecreek.exu.vfucore.{VFuParamsKey, VFuParameters}
 import darecreek.exu.vfucore.fp._
 import darecreek._
-import xiangshan._
 
 class DummyLaneFU extends Module {
   val io = IO(new Bundle {
@@ -49,10 +48,8 @@ class VLane extends Module{
     val out = Vec(2, Decoupled(new LaneFUOutput))
   })
 
-  // val p = Parameters.empty.alterPartial({
-  //                    case VFuParamsKey => VFuParameters(VLEN = 256)})
-  implicit val p = Parameters.empty.alterPartial({case VFuParamsKey => VFuParameters()
-                                                  case XSCoreParamsKey => XSCoreParameters()})
+  implicit val p = Parameters.empty.alterPartial({
+                     case VFuParamsKey => VFuParameters(VLEN = 256)})
   // ALU
   // val valu = Module(new LaneVAlu()(p))
   val valu = Module(new DummyLaneFU)
@@ -75,10 +72,9 @@ class VLane extends Module{
   vmac.io.in.valid := io.in.valids(1)
   io.in.readys(1) := vmac.io.in.ready
   // Input of FP
-  vfp.io.in.bits := LaneConnectFP.laneInputFromCtrlToFu(io.in.data, 0.U.asTypeOf(new MicroOp))
+  vfp.io.in.bits := LaneConnectFP.laneInputFromCtrlToFu(io.in.data)
   vfp.io.in.valid := io.in.valids(2)
-  vfp.io.redirect.valid := false.B
-  vfp.io.redirect.bits := 0.U.asTypeOf(new Redirect)
+  vfp.io.redirect := 0.U.asTypeOf(new Redirect)  // !!!! flush
   io.in.readys(2) := vfp.io.in.ready
   // Input of div
   vdiv.io.in.bits := io.in.data

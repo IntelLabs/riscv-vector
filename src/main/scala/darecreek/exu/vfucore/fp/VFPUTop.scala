@@ -3,16 +3,14 @@ package darecreek.exu.vfucore.fp
 import chipsalliance.rocketchip.config.Parameters
 import chisel3.{util, _}
 import chisel3.util._
-// import darecreek.exu.vfucore.{LaneFUInput, LaneFUOutput}
 import darecreek.exu.vfucore._
-// import darecreek.exu.vfucore.MaskTailData
-import xiangshan.Redirect
+import darecreek.Redirect
 
 class VFPUTop(implicit val p: Parameters)
   extends VFPUBaseModule {
   val io = IO(new Bundle() {
     val in = Flipped(DecoupledIO(new LaneFUInput))
-    val redirect = Input(ValidIO(new Redirect))
+    val redirect = Input(new Redirect)
     val out = DecoupledIO(new LaneFUOutput)
     val maskKeep = Output(UInt(64.W))
     val maskOff = Output(UInt(64.W))
@@ -54,7 +52,8 @@ class VFPUTop(implicit val p: Parameters)
   val validVec = outArbiter.io.out.valid +: Array.fill(latency)(RegInit(false.B))
   val rdyVec = Array.fill(latency)(Wire(Bool())) :+ io.out.ready
   val uopVec = fpu_out_w.uop +: Array.fill(latency)(Reg(new VExpdUOp))
-  val flushVec = validVec.zip(uopVec).map(x => x._1 && x._2.sysUop.robIdx.needFlush(io.redirect))
+  // val flushVec = validVec.zip(uopVec).map(x => x._1 && x._2.sysUop.robIdx.needFlush(io.redirect))
+  val flushVec = validVec.map(x => x && io.redirect.needFlush)
 
   def regEnable(i: Int): Bool = validVec(i - 1) && rdyVec(i - 1) && !flushVec(i - 1)
 
@@ -188,7 +187,7 @@ class VFInputGen(implicit val p: Parameters) extends VFPUBaseModule {
 class VFInputGenFP(implicit val p: Parameters) extends VFPUBaseModule {
   val io = IO(new Bundle() {
     val in = Flipped(DecoupledIO(new LaneFUInput))
-    val redirect = Input(ValidIO(new Redirect))
+    val redirect = Input(new Redirect)
     val out = DecoupledIO(new LaneFloatFUIn)
   })
 
@@ -214,7 +213,8 @@ class VFInputGenFP(implicit val p: Parameters) extends VFPUBaseModule {
   val validVec = io.in.valid +: Array.fill(latency)(RegInit(false.B))
   val rdyVec = Array.fill(latency)(Wire(Bool())) :+ io.out.ready
   val uopVec = io.in.bits.uop +: Array.fill(latency)(Reg(new VExpdUOp))
-  val flushVec = validVec.zip(uopVec).map(x => x._1 && x._2.sysUop.robIdx.needFlush(io.redirect))
+  // val flushVec = validVec.zip(uopVec).map(x => x._1 && x._2.sysUop.robIdx.needFlush(io.redirect))
+  val flushVec = validVec.map(x => x && io.redirect.needFlush)
 
   def regEnable(i: Int): Bool = validVec(i - 1) && rdyVec(i - 1) && !flushVec(i - 1)
 
@@ -231,7 +231,8 @@ class VFInputGenFP(implicit val p: Parameters) extends VFPUBaseModule {
     }
   }
 
-  io.out.valid := validVec.last & !io.out.bits.uop.sysUop.robIdx.needFlush(io.redirect)
+  // io.out.valid := validVec.last & !io.out.bits.uop.sysUop.robIdx.needFlush(io.redirect)
+  io.out.valid := validVec.last & !io.redirect.needFlush
   io.in.ready := rdyVec(0)
 
   //---- vstart >= vl ----

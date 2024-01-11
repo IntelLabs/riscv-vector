@@ -19,7 +19,7 @@ import chipsalliance.rocketchip.config.Parameters
 import xiangshan._
 
 object LaneConnectFP {
-  def uopInputFromCtrlToFu(fromUop: darecreek.VExpdUOp, sysUop: MicroOp)(implicit p: Parameters) = {
+  def uopInputFromCtrlToFu(fromUop: darecreek.VExpdUOp)(implicit p: Parameters) = {
     val toUop = Wire(new VExpdUOp)
     toUop.elements.foreach {case (name, data) =>
       if (name != "sysUop") {
@@ -36,13 +36,13 @@ object LaneConnectFP {
     toUop.expdIdx := fromUop.expdIdx
     toUop.expdEnd := fromUop.expdEnd
     toUop.pdestVal := fromUop.pdestVal
-    toUop.sysUop := sysUop
+    // toUop.sysUop := sysUop
     toUop
   }
 
-  def laneInputFromCtrlToFu(fromLane: darecreek.LaneFUInput, sysUop: MicroOp)(implicit p: Parameters) = {
+  def laneInputFromCtrlToFu(fromLane: darecreek.LaneFUInput)(implicit p: Parameters) = {
     val toLane = Wire(new LaneFUInput)
-    toLane.uop := uopInputFromCtrlToFu(fromLane.uop, sysUop)
+    toLane.uop := uopInputFromCtrlToFu(fromLane.uop)
     toLane.elements.foreach { case (name, data) => 
       if (name != "uop") {
         data := fromLane.elements(name)
