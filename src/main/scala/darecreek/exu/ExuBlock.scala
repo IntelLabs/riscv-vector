@@ -18,6 +18,7 @@ package darecreek
 
 import chisel3._
 import chisel3.util._
+import darecreek.exu.lanevfu._
 
 class VExuBlock extends Module {
   val io = IO(new Bundle {

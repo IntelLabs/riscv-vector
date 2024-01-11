@@ -18,10 +18,11 @@
  *  Output mask rearrange for compare/add-with-carry
  */
 
-package darecreek
+package darecreek.exu.lanevfu
 
 import chisel3._
 import chisel3.util._
+import darecreek._
 
 class VLaneExu extends Module {
   val io = IO(new Bundle {

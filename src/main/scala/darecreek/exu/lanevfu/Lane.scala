@@ -12,14 +12,17 @@
 
 /** Vector Lane: 64-bit data-path of FUs
   */
-package darecreek
+package darecreek.exu.lanevfu
 
 import chisel3._
 import chisel3.util._
 import darecreek.exu.lanevfu.alu._
 import darecreek.exu.lanevfu.mac._
 import chipsalliance.rocketchip.config._
-import darecreek.exu.vfu.{VFuParamsKey, VFuParameters}
+import darecreek.exu.vfucore.{VFuParamsKey, VFuParameters}
+import darecreek.exu.vfucore.fp._
+import darecreek._
+import xiangshan._
 
 class DummyLaneFU extends Module {
   val io = IO(new Bundle {
@@ -46,17 +49,19 @@ class VLane extends Module{
     val out = Vec(2, Decoupled(new LaneFUOutput))
   })
 
-  val p = Parameters.empty.alterPartial({
-                     case VFuParamsKey => VFuParameters(VLEN = 256)})
+  // val p = Parameters.empty.alterPartial({
+  //                    case VFuParamsKey => VFuParameters(VLEN = 256)})
+  implicit val p = Parameters.empty.alterPartial({case VFuParamsKey => VFuParameters()
+                                                  case XSCoreParamsKey => XSCoreParameters()})
   // ALU
-  val valu = Module(new LaneVAlu()(p))
-  // val valu = Module(new DummyLaneFU)
+  // val valu = Module(new LaneVAlu()(p))
+  val valu = Module(new DummyLaneFU)
   // MUL
-  val vmac = Module(new LaneVMac)
-  // val vmac = Module(new DummyLaneFU)
+  // val vmac = Module(new LaneVMac)
+  val vmac = Module(new DummyLaneFU)
   // FP
-  // val vfp = Module(new VFPUTop)
-  val vfp = Module(new DummyLaneFU)
+  val vfp = Module(new VFPUTop)
+  // val vfp = Module(new DummyLaneFU)
   // fake div
   // val vdiv = Module(new DivTop)
   val vdiv = Module(new DummyLaneFU)
@@ -70,8 +75,10 @@ class VLane extends Module{
   vmac.io.in.valid := io.in.valids(1)
   io.in.readys(1) := vmac.io.in.ready
   // Input of FP
-  vfp.io.in.bits := io.in.data
+  vfp.io.in.bits := LaneConnectFP.laneInputFromCtrlToFu(io.in.data, 0.U.asTypeOf(new MicroOp))
   vfp.io.in.valid := io.in.valids(2)
+  vfp.io.redirect.valid := false.B
+  vfp.io.redirect.bits := 0.U.asTypeOf(new Redirect)
   io.in.readys(2) := vfp.io.in.ready
   // Input of div
   vdiv.io.in.bits := io.in.data
@@ -82,9 +89,12 @@ class VLane extends Module{
     * Outputs (two write-back ports)
     */
   io.out(0) <> valu.io.out
+
   val arb = Module(new Arbiter(new LaneFUOutput, 3))
   arb.io.in(0) <> vdiv.io.out
-  arb.io.in(1) <> vfp.io.out
+  vfp.io.out.ready := arb.io.in(1).ready
+  arb.io.in(1).valid := vfp.io.out.valid
+  arb.io.in(1).bits := LaneConnectFP.laneOutputFromFuToCtrl(vfp.io.out.bits)
   arb.io.in(2) <> vmac.io.out
   io.out(1) <> arb.io.out  
 }
