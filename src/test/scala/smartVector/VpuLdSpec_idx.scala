@@ -205,14 +205,8 @@ trait SmartVectorBehavior_ld_idx {
 
 class VPULdSpec_idx extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with SmartVectorBehavior_ld_idx {
   behavior of "SmartVector Load test"
-    // it should behave like vLsuTest0()   //
-    // it should behave like vLsuTest1()   // bug remained
-    // it should behave like vLsuTest2()   // 
+    it should behave like vLsuTest0()   //
+    it should behave like vLsuTest1()   // 
+    it should behave like vLsuTest2()   // 
     it should behave like vLsuTest3()   //
-    // it should behave like vLsuTest4()   //
-    // it should behave like vLsuTest5()   //
-    // it should behave like vLsuTest6()   //
-    // it should behave like vLsuTest7()   //
-    // it should behave like vLsuTest8()   //
-    // it should behave like vLsuTest9()   //
 }
