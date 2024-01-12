@@ -39,8 +39,14 @@ import chisel3.util._
 import chisel3.util.experimental.decode._
 import darecreek.{LaneFUInput, LaneFUOutput, SewOH, VExpdUOp, UIntSplit, MaskReorg}
 import chipsalliance.rocketchip.config._
-import darecreek.exu.vfu.alu._
-import darecreek.exu.vfu.{VFuModule, VFuParamsKey, VFuParameters}
+import darecreek.exu.vfucore.alu._
+import darecreek.exu.vfucore.{VFuModule, VFuParamsKey, VFuParameters}
+
+class VIntFixpDecode extends Bundle {
+  val sub = Bool()
+  val misc = Bool()
+  val fixp = Bool()
+}
 
 // finalResult = result & maskKeep | maskOff
 class MaskTailDataVAlu extends Module {

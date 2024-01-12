@@ -16,7 +16,7 @@ import chisel3._
 import chisel3.util._
 import darecreek.{LaneFUInput, LaneFUOutput, SewOH, VExpdUOp, UIntSplit, MaskReorg}
 import darecreek.DarecreekParam._
-import darecreek.exu.vfu.mac.VMac64b
+import darecreek.exu.vfucore.mac.VMac64b
 
 // finalResult = result & maskKeep | maskOff
 class MaskTailDataVMac extends Module {
