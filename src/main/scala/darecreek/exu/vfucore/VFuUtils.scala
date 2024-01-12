@@ -17,6 +17,7 @@ import chisel3.util._
 import chipsalliance.rocketchip.config.Parameters
 import darecreek.exu.vfucore.fp.fudian.FloatPoint
 import darecreek.exu.vfucore.fp.VFPU
+import darecreek.VExpdUOp
 
 object UIntSplit {
   //Split into elements, e.g., if sew=8, UInt(64.W) => Seq(UInt(8.W) * 8)

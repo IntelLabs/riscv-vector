@@ -2,10 +2,10 @@ package darecreek.exu.vfucore.fp
 
 import chisel3._
 import chisel3.util._
-// import darecreek.{BundleHelper, LaneFUInput, LaneFUOutput, VExpdUOp}
-import darecreek.exu.vfucore.{BundleHelper, LaneFUInput, LaneFUOutput, VExpdUOp}
+import darecreek.exu.vfucore.{BundleHelper}
 import freechips.rocketchip.config.Parameters
 import darecreek.Redirect
+import darecreek.{LaneFUInput, LaneFUOutput, VExpdUOp}
 
 class VFPUCtrlSigs extends Bundle {
 
