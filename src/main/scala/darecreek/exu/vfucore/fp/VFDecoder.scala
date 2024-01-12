@@ -2,8 +2,6 @@ package darecreek.exu.vfucore.fp
 
 import chisel3._
 import chisel3.util._
-// import darecreek.LaneFUInput
-import darecreek.exu.vfucore.LaneFUInput
 import VFInsts._
 import freechips.rocketchip.config.Parameters
 import freechips.rocketchip.rocket.DecodeLogic

@@ -2,8 +2,6 @@ package darecreek.exu.vfucore.fp
 
 import chisel3._
 import chisel3.util._
-// import darecreek.{LaneFUInput, LaneFUOutput}
-import darecreek.exu.vfucore.{LaneFUInput, LaneFUOutput}
 import freechips.rocketchip.config.Parameters
 import darecreek.exu.vfucore._
 import darecreek.Redirect

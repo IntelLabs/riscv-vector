@@ -3,8 +3,9 @@ package darecreek.exu.vfucore.fp
 import chipsalliance.rocketchip.config.Parameters
 import chisel3.{util, _}
 import chisel3.util._
-import darecreek.exu.vfucore._
+import darecreek.exu.vfucore.MaskTailData
 import darecreek.Redirect
+import darecreek.{LaneFUInput, LaneFUOutput, VExpdUOp}
 
 class VFPUTop(implicit val p: Parameters)
   extends VFPUBaseModule {

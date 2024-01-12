@@ -37,6 +37,21 @@ class DummyLaneFU extends Module {
   io.in.ready := io.out.ready
 }
 
+class DummyLaneFURedirect extends Module {
+  val io = IO(new Bundle {
+    val in = Flipped(Decoupled(new LaneFUInput))
+    val redirect = Input(new Redirect)
+    val out = Decoupled(new LaneFUOutput)
+  })
+
+  io.out.bits.uop := io.in.bits.uop
+  io.out.bits.vd := 0.U
+  io.out.valid := false.B
+  io.out.bits.fflags := 0.U 
+  io.out.bits.vxsat := false.B
+  io.in.ready := io.out.ready
+}
+
 class VLane extends Module{
   val io = IO(new Bundle {
     val idx = Input(UInt(LaneIdxWidth.W))
@@ -51,14 +66,14 @@ class VLane extends Module{
   implicit val p = Parameters.empty.alterPartial({
                      case VFuParamsKey => VFuParameters(VLEN = 256)})
   // ALU
-  // val valu = Module(new LaneVAlu()(p))
+  // val valu = Module(new LaneVAlu)
   val valu = Module(new DummyLaneFU)
   // MUL
   // val vmac = Module(new LaneVMac)
   val vmac = Module(new DummyLaneFU)
   // FP
   val vfp = Module(new VFPUTop)
-  // val vfp = Module(new DummyLaneFU)
+  // val vfp = Module(new DummyLaneFURedirect)
   // fake div
   // val vdiv = Module(new DivTop)
   val vdiv = Module(new DummyLaneFU)
@@ -72,7 +87,7 @@ class VLane extends Module{
   vmac.io.in.valid := io.in.valids(1)
   io.in.readys(1) := vmac.io.in.ready
   // Input of FP
-  vfp.io.in.bits := LaneConnectFP.laneInputFromCtrlToFu(io.in.data)
+  vfp.io.in.bits := io.in.data
   vfp.io.in.valid := io.in.valids(2)
   vfp.io.redirect := 0.U.asTypeOf(new Redirect)  // !!!! flush
   io.in.readys(2) := vfp.io.in.ready
@@ -88,9 +103,7 @@ class VLane extends Module{
 
   val arb = Module(new Arbiter(new LaneFUOutput, 3))
   arb.io.in(0) <> vdiv.io.out
-  vfp.io.out.ready := arb.io.in(1).ready
-  arb.io.in(1).valid := vfp.io.out.valid
-  arb.io.in(1).bits := LaneConnectFP.laneOutputFromFuToCtrl(vfp.io.out.bits)
+  arb.io.in(1) <> vfp.io.out
   arb.io.in(2) <> vmac.io.out
   io.out(1) <> arb.io.out  
 }
