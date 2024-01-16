@@ -608,7 +608,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   val red_en = RegInit(false.B)
   val flush_fpu_cycle = RegInit(0.U(4.W))
 
-  when(flush || (fpu_red && fire)) {
+  when(flush || (fpu_red && fire) || !io.in.valid) {
     flush_fpu_cycle := 0.U
   }.elsewhen(fpu_red && io.in.valid && io.out.ready && !red_uop_busy) {
     when(flush_fpu_cycle === 9.U) {
@@ -620,7 +620,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
 
   when(flush) {
     red_en := false.B
-  }.elsewhen((flush_fpu_cycle === 9.U) && io.out.ready) {
+  }.elsewhen((flush_fpu_cycle === 9.U) && io.in.valid && io.out.ready) {
     red_en := true.B
   }.elsewhen(fpu_red && fire) {
     red_en := false.B
