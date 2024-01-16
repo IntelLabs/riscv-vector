@@ -63,9 +63,15 @@ class VMerge (implicit p : Parameters) extends Module {
             io.out.toRegFileWrite.rfWriteData := io.in.aluIn.bits.vd
         }.elsewhen(regBackWidth === "b11".U){
             when(regWriteMuopIdx === 0.U){
-                io.out.toRegFileWrite.rfWriteEn  := false.B
-                regDataBuffer := io.in.aluIn.bits.vd
-                io.out.toRegFileWrite := 0.U.asTypeOf(new regWriteIn)
+                when(muopEnd){
+                    io.out.toRegFileWrite.rfWriteEn  := true.B
+                    io.out.toRegFileWrite.rfWriteIdx := rfWriteIdx
+                    io.out.toRegFileWrite.rfWriteData := io.in.aluIn.bits.vd
+                }.otherwise{
+                    io.out.toRegFileWrite.rfWriteEn  := false.B
+                    regDataBuffer := io.in.aluIn.bits.vd
+                    io.out.toRegFileWrite := 0.U.asTypeOf(new regWriteIn)
+                }               
             }.otherwise{
                 io.out.toRegFileWrite.rfWriteEn  := true.B
                 io.out.toRegFileWrite.rfWriteIdx := rfWriteIdx

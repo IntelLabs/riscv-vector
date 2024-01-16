@@ -42,6 +42,7 @@ class VUopInfo(implicit p: Parameters) extends VFuBundle {
   val vxrm = UInt(2.W)
   val frm = UInt(3.W)
 }
+
 class VUop(implicit p: Parameters) extends Bundle with ConnectFromLaneUop {
   val ctrl = new VUopCtrl
   val info = new VUopInfo
