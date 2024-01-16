@@ -16,7 +16,7 @@ import darecreek._
 import darecreek.lsu._
 
 
-trait VLsuBehavior_ld_seg {
+trait VLsuBehavior_ld_seg_mata {
   this: AnyFlatSpec with ChiselScalatestTester with BundleGenHelper =>
 
     val ldReqSrc_default = SrcBundleLd()
@@ -100,9 +100,9 @@ trait VLsuBehavior_ld_seg {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vlseg3e16.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1, segIdx=0), ldReqSrc_default, "h201f1e1d1c1b1a191817ffff0123cdef".U),
-                (vlseg3e16.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1, segIdx=1), ldReqSrc_default, "h201f1e1d1c1b1a191817ffffffff89ab".U),
-                (vlseg3e16.copy(vl=3, uopIdx=0, uopEnd=true,  vsew=1, segIdx=2), ldReqSrc_default, "h201f1e1d1c1b1a1918170f0fffff4567".U),
+                (vlseg3e16.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1, segIdx=0), ldReqSrc_default, "hffffffffffffffffffffffff0123cdef".U),
+                (vlseg3e16.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1, segIdx=1), ldReqSrc_default, "hffffffffffffffffffffffffffff89ab".U),
+                (vlseg3e16.copy(vl=3, uopIdx=0, uopEnd=true,  vsew=1, segIdx=2), ldReqSrc_default, "hffffffffffffffffffff0f0fffff4567".U),
             )
 
             for ((c, s, r) <- ldReqs) {
@@ -132,9 +132,9 @@ trait VLsuBehavior_ld_seg {
             dut.clock.step(1)
             val ldReqs = Seq(
                 (vlseg2e64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1, segIdx=0), ldReqSrc_default, "h0f0f0f0f0f0f0f0f0123456789abcdef".U),
-                (vlseg2e64.copy(vl=3, uopIdx=1, uopEnd=false, vsew=1, segIdx=0), ldReqSrc_default, "h201f1e1d1c1b1a191234567890123456".U),
+                (vlseg2e64.copy(vl=3, uopIdx=1, uopEnd=false, vsew=1, segIdx=0), ldReqSrc_default, "hffffffffffffffff1234567890123456".U),
                 (vlseg2e64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1, segIdx=1), ldReqSrc_default, "hfedcba9876543210ffffffffffffffff".U),
-                (vlseg2e64.copy(vl=3, uopIdx=1, uopEnd=true,  vsew=1, segIdx=1), ldReqSrc_default, "h201f1e1d1c1b1a190101010101010101".U),
+                (vlseg2e64.copy(vl=3, uopIdx=1, uopEnd=true,  vsew=1, segIdx=1), ldReqSrc_default, "hffffffffffffffff0101010101010101".U),
             )
 
             for ((c, s, r) <- ldReqs) {
@@ -163,8 +163,8 @@ trait VLsuBehavior_ld_seg {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vlsseg2e8.copy(vl=4, uopIdx=0, uopEnd=false, vsew=1, segIdx=0), SrcBundleLd(scalar_opnd_2="hffffffff_fffffffb"), "h201f1e1d1c1b1a19181716153478eeef".U),
-                (vlsseg2e8.copy(vl=4, uopIdx=0, uopEnd=true,  vsew=1, segIdx=1), SrcBundleLd(scalar_opnd_2="hffffffff_fffffffb"), "h201f1e1d1c1b1a19181716155056eecd".U),
+                (vlsseg2e8.copy(vl=4, uopIdx=0, uopEnd=false, vsew=1, segIdx=0), SrcBundleLd(scalar_opnd_2="hffffffff_fffffffb"), "hffffffffffffffffffffffff3478eeef".U),
+                (vlsseg2e8.copy(vl=4, uopIdx=0, uopEnd=true,  vsew=1, segIdx=1), SrcBundleLd(scalar_opnd_2="hffffffff_fffffffb"), "hffffffffffffffffffffffff5056eecd".U),
             )
 
             for ((c, s, r) <- ldReqs) {
@@ -224,9 +224,9 @@ trait VLsuBehavior_ld_seg {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vlsseg3e16.copy(vl=2, uopIdx=0, uopEnd=false, vsew=1, segIdx=0), SrcBundleLd(scalar_opnd_2="h04"), "h201f1e1d1c1b1a19181716154567cdef".U),
-                (vlsseg3e16.copy(vl=2, uopIdx=0, uopEnd=false, vsew=1, segIdx=1), SrcBundleLd(scalar_opnd_2="h04"), "h201f1e1d1c1b1a1918171615012389ab".U),
-                (vlsseg3e16.copy(vl=2, uopIdx=0, uopEnd=true,  vsew=1, segIdx=2), SrcBundleLd(scalar_opnd_2="h04"), "h201f1e1d1c1b1a1918171615ffff4567".U),
+                (vlsseg3e16.copy(vl=2, uopIdx=0, uopEnd=false, vsew=1, segIdx=0), SrcBundleLd(scalar_opnd_2="h04"), "hffffffffffffffffffffffff4567cdef".U),
+                (vlsseg3e16.copy(vl=2, uopIdx=0, uopEnd=false, vsew=1, segIdx=1), SrcBundleLd(scalar_opnd_2="h04"), "hffffffffffffffffffffffff012389ab".U),
+                (vlsseg3e16.copy(vl=2, uopIdx=0, uopEnd=true,  vsew=1, segIdx=2), SrcBundleLd(scalar_opnd_2="h04"), "hffffffffffffffffffffffffffff4567".U),
             )
 
             for ((c, s, r) <- ldReqs) {
@@ -250,7 +250,7 @@ trait VLsuBehavior_ld_seg {
     }
 }
 
-class VLsuSpec_ld_seg extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VLsuBehavior_ld_seg {
+class VLsuSpec_ld_seg_mata extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VLsuBehavior_ld_seg_mata {
   behavior of "LSU test"
     it should behave like vLsuTest0() 
     it should behave like vLsuTest1() 

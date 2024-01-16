@@ -175,6 +175,8 @@ object LSULdstDecoder {
 class SVlsu(implicit p: Parameters) extends Module {
     val io = IO(new LdstIO())
 
+    val mata = WireInit(true.B)
+
     // split fsm states
     val uop_idle :: uop_split :: uop_split_finish :: Nil = Enum(3)
     val uopState        = RegInit(uop_idle)
@@ -199,6 +201,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     val vregInfo        = RegInit(VecInit(Seq.fill(vlenb)(vregInitVal)))
 
     // Split info
+    val vstartGeVl      = RegInit(false.B)
     val splitCount      = RegInit(0.U(vlenbWidth.W))
     val curSplitIdx     = RegInit(0.U(vlenbWidth.W))
     val splitStart      = RegInit(0.U(vlenbWidth.W))
@@ -295,6 +298,7 @@ class SVlsu(implicit p: Parameters) extends Module {
             curSplitIdx  := 0.U
             splitCount   := microVl  
             splitStart   := microVstart
+            vstartGeVl   := vstart > actualVl
             // set vreg
             when(vregClean) {
                 (0 until vlenb).foreach { i => 
@@ -537,10 +541,18 @@ class SVlsu(implicit p: Parameters) extends Module {
 
     when(vregWbReady || hasXcpt) {
         io.lsuOut.valid             := true.B
-        io.lsuOut.bits.data         := Mux(ldstCtrlReg.isLoad, Cat(vregInfo.reverseMap(entry => entry.data)), DontCare) // Concatenate data from all vregInfo elements)
         io.lsuOut.bits.muopEnd      := mUopInfoReg.muopEnd
         io.lsuOut.bits.rfWriteEn    := mUopInfoReg.rfWriteEn
         io.lsuOut.bits.rfWriteIdx   := mUopInfoReg.ldest
+
+        io.lsuOut.bits.data         := Mux(ldstCtrlReg.isLoad, 
+            Mux(mata && !vstartGeVl, 
+                Cat(vregInfo.reverseMap(
+                    entry => Mux(entry.status === VRegSegmentStatus.ready, entry.data, "hff".U(8.W)))),
+                Cat(vregInfo.reverseMap(entry => entry.data))// Concatenate data from all vregInfo elements)
+            ),
+            DontCare
+        )
 
         // Reset vreg info
         for (i <- 0 until vlenb) {

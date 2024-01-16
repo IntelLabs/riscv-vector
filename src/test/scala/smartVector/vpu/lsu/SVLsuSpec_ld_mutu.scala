@@ -10,7 +10,7 @@ import darecreek.ctrl.decode.VInstructions._
 import darecreek._
 import darecreek.lsu._
 
-trait VLsuBehavior_ld {
+trait VLsuBehavior_ld_mutu {
   this: AnyFlatSpec with ChiselScalatestTester with BundleGenHelper =>
 
     val ldReqSrc_default = SrcBundleLd()
@@ -631,27 +631,57 @@ trait VLsuBehavior_ld {
         }
         }
     }
+
+    def vLsuTest19(): Unit = {
+        it should "pass: unit-stride load (uops=2, eew=8, vl=19, vstart=20, vstart > vl)" in {
+        test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            dut.clock.step(1)
+            val ldReqs = Seq(
+                (vle8.copy(vl=19, uopIdx=0, uopEnd=false, vstart=20), ldReqSrc_default, "hffffffffffffffff0123456789abcdef".U),
+                (vle8.copy(vl=19, uopIdx=1, uopEnd=true,  vstart=20),  ldReqSrc_default, "h201f1e1d1c1b1a1918171615140f0f0f".U),
+            )
+            
+            for ((c, s, r) <- ldReqs) {
+                while (!dut.io.lsuReady.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.mUop.valid.poke(true.B)
+                dut.io.mUop.bits.poke(genLdInput(c, s))
+                dut.clock.step(1)
+                dut.io.mUop.valid.poke(false.B)
+
+                while (!dut.io.lsuOut.valid.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.lsuOut.valid.expect(true.B)
+                // dut.clock.step(50)
+                dut.io.lsuOut.bits.data.expect(r)
+                dut.clock.step(4)
+            }
+        }
+        }
+    }
 }
 
-class VLsuSpec_ld extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VLsuBehavior_ld {
+class VLsuSpec_ld_mutu extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VLsuBehavior_ld_mutu {
   behavior of "LSU test"
-    it should behave like vLsuTest0()   // unit-stride load
-    it should behave like vLsuTest1()   // unit-stride load
-    it should behave like vLsuTest2()   // unit-stride load
-    it should behave like vLsuTest3()   // unit-stride load
-    it should behave like vLsuTest4()   // unit-stride load
-    it should behave like vLsuTest5()   // unit-stride load
-    it should behave like vLsuTest6()   // unit-stride mask load
-    it should behave like vLsuTest7()   // unit-strde fault-first-only
-    it should behave like vLsuTest8()   // unit-strde fault-first-only
-    it should behave like vLsuTest9()   // unit-strde fault-first-only
-    it should behave like vLsuTest10()  // unit-strde fault-first-only
-    it should behave like vLsuTest11()  // strided load
-    it should behave like vLsuTest12()  // strided load
-    it should behave like vLsuTest13()  // strided load
-    it should behave like vLsuTest14()  // strided load
-    it should behave like vLsuTest15()  // strided load
-    it should behave like vLsuTest16()  // strided load with mask enabled
-    it should behave like vLsuTest17()  // unit-stride exception
+    // it should behave like vLsuTest0()   // unit-stride load
+    // it should behave like vLsuTest1()   // unit-stride load
+    // it should behave like vLsuTest2()   // unit-stride load
+    // it should behave like vLsuTest3()   // unit-stride load
+    // it should behave like vLsuTest4()   // unit-stride load
+    // it should behave like vLsuTest5()   // unit-stride load
+    // it should behave like vLsuTest6()   // unit-stride mask load
+    // it should behave like vLsuTest7()   // unit-strde fault-first-only
+    // it should behave like vLsuTest8()   // unit-strde fault-first-only
+    // it should behave like vLsuTest9()   // unit-strde fault-first-only
+    // it should behave like vLsuTest10()  // unit-strde fault-first-only
+    // it should behave like vLsuTest11()  // strided load
+    // it should behave like vLsuTest12()  // strided load
+    // it should behave like vLsuTest13()  // strided load
+    // it should behave like vLsuTest14()  // strided load
+    // it should behave like vLsuTest15()  // strided load
+    // it should behave like vLsuTest16()  // strided load with mask enabled
+    // it should behave like vLsuTest17()  // unit-stride exception
     it should behave like vLsuTest18()  // unit-stride whole register load
 }

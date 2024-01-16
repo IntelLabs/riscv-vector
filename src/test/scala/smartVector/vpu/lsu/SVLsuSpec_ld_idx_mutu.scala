@@ -16,7 +16,7 @@ import darecreek._
 import darecreek.lsu._
 
 
-trait VLsuBehavior_ld_idx {
+trait VLsuBehavior_ld_idx_mutu {
   this: AnyFlatSpec with ChiselScalatestTester with BundleGenHelper =>
 
     val ldReqSrc_default = SrcBundleLd()
@@ -271,7 +271,7 @@ trait VLsuBehavior_ld_idx {
     }
 }
 
-class VLsuSpec_ld_idx extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VLsuBehavior_ld_idx {
+class VLsuSpec_ld_idx_mutu extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VLsuBehavior_ld_idx_mutu {
   behavior of "LSU test"
     it should behave like vLsuTest0() 
     it should behave like vLsuTest1() 
