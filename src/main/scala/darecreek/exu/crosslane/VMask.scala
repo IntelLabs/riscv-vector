@@ -30,6 +30,7 @@ class VMask extends Module {
   val vsew = uop.info.vsew
   val ma = uop.info.ma
   val ta = uop.info.ta
+
   val vstartRemain = io.in.bits.vstartRemain
   // val vstartRemainBytes = vstartRemain << vsew;
   val vlRemain = io.in.bits.vlRemain
@@ -92,7 +93,7 @@ class VMask extends Module {
   val vlRemainBytes = vlRemain << vsew
   val all_one = (~0.U(VLEN.W))
 
-  val vmfirst = Wire(UInt(XLEN.W))
+  val vmfirst = Wire(SInt(XLEN.W))
   val vmsbf = Wire(UInt(VLEN.W))
   val vmsif = Cat(vmsbf(VLEN - 2, 0), 1.U)
   val vmsof = Wire(UInt(VLEN.W))
@@ -141,8 +142,11 @@ class VMask extends Module {
 
   vmsof := ~vmsbf & vmsif
   vmsbf := sbf(Cat(vs2m.reverse))
-  vmfirst := BitsExtend(vfirst(Cat(vs2m.reverse)), XLEN, true.B)
-
+  when(!Cat(vs2m.reverse).orR) {
+    vmfirst := (-1.S(XLEN.W))
+  }.otherwise {
+    vmfirst := vfirst(Cat(vs2m.reverse)).asSInt
+  }
 
   // viota/vid/vcpop
   val vs2m_uop = MaskExtract(Cat(vs2m.reverse), expdIdx, eew)
@@ -338,7 +342,7 @@ class VMask extends Module {
   tail_vd := vstart_vd | old_vd_vl_mask | (mask_vd & vd_vl_mask & vstart_mask)
 
   vd_out := vd_reg
-  when(vstart_reg >= vl_reg) {
+  when((vstart_reg >= vl_reg) && !reg_vfirst_m && !reg_vcpop_m) {
     vd_out := old_vd_reg
   }.elsewhen(reg_vm_logical || reg_vmsbf_m || reg_vmsif_m || reg_vmsof_m) {
     vd_out := tail_vd
