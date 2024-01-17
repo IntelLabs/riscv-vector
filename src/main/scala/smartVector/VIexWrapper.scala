@@ -38,19 +38,20 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   val SVReduc = Module(new VReducWrapper()(p))
   val SVDiv   = Module(new VDivWrapper()(p))
   val SVPerm  = Module(new VPermWrapper()(p))
+  val SVFpu   = Module(new VSFPUWrapper()(p))
 
   val empty :: ongoing :: Nil = Enum(2)
   val currentState = RegInit(empty)
   val currentStateNext = WireDefault(empty) 
 
   val outValid = SValu.io.out.valid || SVMac.io.out.valid || SVMask.io.out.valid || 
-                 SVReduc.io.out.valid || SVDiv.io.out.valid || SVPerm.io.out.wb_vld
+                 SVReduc.io.out.valid || SVDiv.io.out.valid || SVPerm.io.out.wb_vld || SVFpu.io.out.valid
 
   val oneCycleLatIn = io.in.valid & (io.in.bits.uop.ctrl.alu || io.in.bits.uop.ctrl.mask)
   val twoCycleLatIn = io.in.valid & (io.in.bits.uop.ctrl.mul || io.in.bits.uop.ctrl.redu)
-  val noFixLatIn    = io.in.valid & (io.in.bits.uop.ctrl.div || io.in.bits.uop.ctrl.perm)
+  val noFixLatIn    = io.in.valid & (io.in.bits.uop.ctrl.div || io.in.bits.uop.ctrl.perm || io.in.bits.uop.ctrl.fp)
   val twoCycleReg = RegEnable(twoCycleLatIn, io.in.valid)
-  val fixLatVld   = SVDiv.io.out.valid || SVPerm.io.out.wb_vld
+  val fixLatVld   = SVDiv.io.out.valid || SVPerm.io.out.wb_vld || SVFpu.io.out.valid
 
   switch(currentState){
     is(empty){
@@ -81,8 +82,9 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   SVReduc.io.in.valid := io.in.valid && io.in.bits.uop.ctrl.redu
   SVDiv.io.in.valid   := io.in.valid && io.in.bits.uop.ctrl.div
   SVPerm.io.in.rvalid := io.in.valid && io.in.bits.uop.ctrl.perm
+  SVFpu.io.in.valid   := io.in.valid && io.in.bits.uop.ctrl.fp
 
-  Seq(SValu.io.in.bits, SVMac.io.in.bits, SVMask.io.in.bits, SVReduc.io.in.bits, SVDiv.io.in.bits).foreach {iex =>
+  Seq(SValu.io.in.bits, SVMac.io.in.bits, SVMask.io.in.bits, SVReduc.io.in.bits, SVDiv.io.in.bits, SVFpu.io.in.bits).foreach {iex =>
     iex.uop   := io.in.bits.uop
     iex.vs1   := io.in.bits.uopRegInfo.vs1
     iex.vs2   := io.in.bits.uopRegInfo.vs2
@@ -126,13 +128,16 @@ class VIexWrapper(implicit p : Parameters) extends Module {
     io.out.bits.fflags := SVDiv.io.out.bits.fflags
     io.out.bits.vd     := SVDiv.io.out.bits.vd
     io.out.bits.vxsat  := false.B
-  }.otherwise{
+  }.elsewhen(SVFpu.io.out.valid){
+    io.out.bits.fflags := SVFpu.io.out.bits.fflags
+    io.out.bits.vd     := SVFpu.io.out.bits.vd
+    io.out.bits.vxsat  := false.B
+  }otherwise{
     io.out.bits.fflags := false.B
     io.out.bits.vd     := 0.U
     io.out.bits.vxsat  := false.B
   }
   io.out.valid := outValid
-
 }
 
 

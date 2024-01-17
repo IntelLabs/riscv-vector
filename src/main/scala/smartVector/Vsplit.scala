@@ -151,10 +151,13 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     val instFirstIn = (currentState === empty && io.in.decodeIn.valid)
 
+    val scalar_fudian_opnd_1 = Mux(io.in.decodeIn.bits.vCtrl.funct3 === "b101".U, 
+                               io.in.decodeIn.bits.fudian_opnd_1, io.in.decodeIn.bits.scalar_opnd_1)
+
     when (instFirstIn){       
         vCtrl(0)            := io.in.decodeIn.bits.vCtrl
         vInfo(0)            := io.in.decodeIn.bits.vInfo
-        scalar_opnd_1(0)    := io.in.decodeIn.bits.scalar_opnd_1
+        scalar_opnd_1(0)    := scalar_fudian_opnd_1
         scalar_opnd_2(0)    := io.in.decodeIn.bits.scalar_opnd_2
         uopRegInfo(0).vxsat := false.B
     }
@@ -168,7 +171,7 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     val ctrl = Mux(instFirstIn,io.in.decodeIn.bits.vCtrl,vCtrl(0))
     val info = Mux(instFirstIn,io.in.decodeIn.bits.vInfo,vInfo(0))
-    val scalarOpnd1 = Mux(instFirstIn,io.in.decodeIn.bits.scalar_opnd_1,scalar_opnd_1(0))
+    val scalarOpnd1 = Mux(instFirstIn,scalar_fudian_opnd_1,scalar_opnd_1(0))
     val scalarOpnd2 = Mux(instFirstIn,io.in.decodeIn.bits.scalar_opnd_2,scalar_opnd_2(0))
 
     //Because the register file do not always read the register file when instFirstIn

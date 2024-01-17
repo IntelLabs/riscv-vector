@@ -21,6 +21,7 @@ class VInfo extends Bundle {
 
 class RVUissue extends Bundle {
     val inst   = UInt(32.W)
+    val frs1   = UInt(64.W) //fudian register data
     val rs1    = UInt(64.W)
     val rs2    = UInt(64.W)
     val vInfo  = new VInfo
