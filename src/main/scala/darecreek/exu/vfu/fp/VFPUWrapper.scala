@@ -262,7 +262,13 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   val ele64 = Wire(UInt(64.W))
   ele64 := 0.U
   when(fire) {
-    when(vfredmax_vs || vfredmin_vs) {
+    when(vfredosum_vs || vfredusum_vs || vfwredosum_vs || vfwredusum_vs) {
+      when(eew.is32) {
+        ele64 := Cat(~0.U(33.W), 0.U(31.W))
+      }.otherwise {
+        ele64 := Cat(1.U(1.W), 0.U(63.W))
+      }
+    }.elsewhen(vfredmax_vs || vfredmin_vs) {
       when(eew.is32) {
         ele64 := Cat(0.U(32.W), FloatPoint.defaultNaNUInt(VFPU.f32.expWidth, VFPU.f32.precision))
       }.otherwise {
@@ -583,7 +589,7 @@ class VFPUWrapper(implicit p: Parameters) extends VFuModule {
   val cmp_fflag = Wire(UInt(5.W))
   val old_cmp_fflag = RegInit(0.U(5.W))
 
-  when(flush) {
+  when(flush || vs1_zero_bypass) {
     red_fflag := 0.U
   }.elsewhen(output_en && io.out.valid && io.out.ready && (io.out.bits.uop.sysUop.robIdx === currentRobIdx)) {
     red_fflag := 0.U
