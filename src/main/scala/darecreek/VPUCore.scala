@@ -77,6 +77,10 @@ class VPUCore extends Module {
   rvfiBlock.io.commits := ctrlBlock.io.commits
   rvfiBlock.io.sb_id := ctrlBlock.io.rvfi_sb_id
   rvfiBlock.io.commitEnd := ctrlBlock.io.commitEnd
+  rvfiBlock.io.ovi_issue_valid := io.ovi_issue.valid
+  rvfiBlock.io.ovi_issue_sb_id := io.ovi_issue.sb_id
+  rvfiBlock.io.ovi_issue_inst := io.ovi_issue.inst
+  rvfiBlock.io.ovi_completed := ctrlBlock.io.ovi_completed
   rvfiBlock.io.rfRd <> issueBlock.io.rfRdRvfi
   if (debug) {
     io.rvfi := rvfiBlock.io.rvfi
