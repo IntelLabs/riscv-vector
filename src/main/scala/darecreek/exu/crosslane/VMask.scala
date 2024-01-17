@@ -358,15 +358,25 @@ class VMask extends Module {
     out_valid := false.B
   }
 
+  val rd = RegInit(0.U(xLen.W))
+
+  when(vcpop_m && fire) {
+    rd := one_cnt(ele_cnt)
+  }.elsewhen(vfirst_m && fire) {
+    rd := vmfirst.asUInt
+  }
+
   //--------- Ready & valid ---------
   io.in.ready := (!io.in.valid || io.out.ready)
   io.out.valid := out_valid
   io.out.bits.vd := VecInit(Seq.tabulate(NLanes)(i => (vd_out) ((i + 1) * LaneWidth - 1, i * LaneWidth)))
+  when(io.out.bits.uop.ctrl.rdVal) {
+    io.out.bits.vd(0) := rd
+  }
 
   io.out.bits.uop := RegEnable(uop, fire)
 
   io.out.bits.fflags := 0.U
-
 
   //   /////////////////////////////
   //
