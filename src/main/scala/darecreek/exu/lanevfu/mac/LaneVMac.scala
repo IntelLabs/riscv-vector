@@ -14,9 +14,12 @@ package darecreek.exu.lanevfu.mac
 
 import chisel3._
 import chisel3.util._
-import darecreek.{LaneFUInput, LaneFUOutput, SewOH, VExpdUOp, UIntSplit, MaskReorg}
+import chipsalliance.rocketchip.config._
+import darecreek.{SewOH, UIntSplit, MaskReorg}
 import darecreek.DarecreekParam._
 import darecreek.exu.vfucore.mac.VMac64b
+import darecreek.exu.vfucore.{LaneFUInput, LaneFUOutput}
+import darecreek.exu.vfucoreconfig.VUop
 
 // finalResult = result & maskKeep | maskOff
 class MaskTailDataVMac extends Module {
@@ -24,7 +27,7 @@ class MaskTailDataVMac extends Module {
     val mask = Input(UInt(8.W))
     val tail = Input(UInt(8.W))
     val oldVd = Input(UInt(64.W))
-    val uop = Input(new VExpdUOp)
+    val uop = Input(new VUop)
     val maskKeep = Output(UInt(64.W))  // keep: 11..1  off: 00..0
     val maskOff = Output(UInt(64.W))   // keep: 00..0  off: old_vd or 1.U
   })
@@ -45,7 +48,7 @@ class MaskTailDataVMac extends Module {
                         Mux(!x(1), 0.U(8.W), Mux(x(0), ~0.U(8.W), UIntSplit(oldVd, 8)(i)))}).reverse)
 }
 
-class LaneVMac extends Module {
+class LaneVMac(implicit p: Parameters) extends Module {
   val io = IO(new Bundle {
     val in = Flipped(Decoupled(new LaneFUInput))
     val out = Decoupled(new LaneFUOutput)

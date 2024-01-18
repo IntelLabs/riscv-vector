@@ -4,8 +4,9 @@ import chisel3._
 import chisel3.util._
 import darecreek.exu.vfucore.{BundleHelper}
 import freechips.rocketchip.config.Parameters
-import darecreek.Redirect
-import darecreek.{LaneFUInput, LaneFUOutput, VExpdUOp}
+import darecreek.exu.vfucoreconfig.Redirect
+import darecreek.exu.vfucore.{LaneFUInput, LaneFUOutput}
+import darecreek.exu.vfucoreconfig.VUop
 
 class VFPUCtrlSigs extends Bundle {
 
@@ -52,7 +53,7 @@ trait HasFPCtrl {
   val fWidenEnd = Bool() // is the second widen inst, for inactive element control
 }
 
-class VExpdWithMaskUOp(implicit p: Parameters) extends VExpdUOp with HasMaskSigs
+class VExpdWithMaskUOp(implicit p: Parameters) extends VUop with HasMaskSigs
 class VFPUOp(implicit p: Parameters) extends VExpdWithMaskUOp with HasFPCtrl
 
 class LaneFUWithMaskIn(implicit p: Parameters) extends LaneFUInput {
