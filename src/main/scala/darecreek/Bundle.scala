@@ -100,6 +100,7 @@ class VCtrl extends Bundle {
   def fuSel = Seq(alu, mul, fp, div, redu, mask, perm)
   def laneExu = arith && !crossLane
   def isLdst = load || store
+  def vs1_imm = lsrc(0)
 }
 
 class VExcptInfo extends Bundle {

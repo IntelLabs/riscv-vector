@@ -23,7 +23,7 @@ import freechips.rocketchip.config._
 import fudian._
 import fudian.utils.Multiplier
 import darecreek.exu.vfucore._
-import darecreek.Redirect
+import darecreek.exu.vfucoreconfig.Redirect
 
 /*
  * for widening insts and various fma ops

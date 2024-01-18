@@ -4,7 +4,8 @@ import chisel3._
 import chisel3.util._
 import freechips.rocketchip.config.Parameters
 import darecreek.exu.vfucore._
-import darecreek.Redirect
+import darecreek.exu.vfucoreconfig.VUop
+import darecreek.exu.vfucoreconfig.Redirect
 
 abstract class VFPUBaseModule(implicit p: Parameters) extends Module with HasVFuParameters
 
