@@ -15,7 +15,7 @@ class VCrossLaneExu extends Module {
   })
 
   val permutation = Module(new Permutation)
-  val vmask = Module(new VMask)
+  val vmask = Module(new VMaskDC)
   // val reduction = Module(new Reduction)
 
   // reduction.io.in.bits := io.in.bits

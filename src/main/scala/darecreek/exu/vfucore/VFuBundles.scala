@@ -47,6 +47,11 @@ class VAluOutput(implicit p: Parameters) extends VFuBundle {
   val vd = UInt(VLEN.W)
   val vxsat = Bool()
 }
+// Output of VMASK
+class VMaskOutput(implicit p: Parameters) extends VFuBundle {
+  val uop = new VUop
+  val vd = UInt(VLEN.W)
+}
 
 // Output of FPU
 class VFpuOutput(implicit p: Parameters) extends VFuBundle {
