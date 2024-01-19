@@ -281,7 +281,7 @@ class VRob extends Module with HasCircularQueuePtrHelper {
   }
 
   for (i <- 0 until VCommitWidth) {
-    commitInfo.info(i).pdestVal := rhb((deqPtrRhb + i.U).value).pdestVal
+    commitInfo.info(i).pdestVal := rhb((deqPtrRhb + i.U).value).pdestVal && ldestVal(deqPtr.value)
     commitInfo.info(i).ldest := rhb((deqPtrRhb + i.U).value).ldest
     commitInfo.info(i).pdest := rhb((deqPtrRhb + i.U).value).pdest
     commitInfo.info(i).old_pdest := rhb((deqPtrRhb + i.U).value).old_pdest
