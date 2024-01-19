@@ -15,7 +15,7 @@ package darecreek.exu.vfucore.alu
 import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.decode._
-import darecreek.exu.vfucore.VInstructions._
+import darecreek.ctrl.decode.VInstructions._
 
 object VAluFunct6 {
   //                                  OPI (OPIVV/X/I)
