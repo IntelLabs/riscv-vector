@@ -2,6 +2,7 @@ package darecreek
 
 import chisel3._
 import chisel3.util._
+import darecreek.exu.crosslane.vmask._
 
 class VCrossLaneExu extends Module {
 

@@ -1,4 +1,4 @@
-package darecreek
+package darecreek.exu.crosslane.vmask
 
 import chisel3._
 import chisel3.util._
@@ -6,6 +6,7 @@ import scala.language.postfixOps
 import chipsalliance.rocketchip.config._
 import darecreek.exu.vfucore.vmask._
 import darecreek.exu.vfucore.{VFuModule, VFuParamsKey, VFuParameters}
+import darecreek._
 
 class VMaskDC extends Module {
   val io = IO(new Bundle {
