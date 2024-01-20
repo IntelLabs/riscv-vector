@@ -8,15 +8,12 @@ import darecreek.exu.vfucore.vmask._
 import darecreek.exu.vfucore.{VFuModule, VFuParamsKey, VFuParameters}
 import darecreek._
 
-class VMaskDC extends Module {
+class VMaskDC(implicit p: Parameters)  extends Module {
   val io = IO(new Bundle {
     val in = Flipped(Decoupled(new VExuInput))
     val out = Decoupled(new VCrossExuOut)
   })
 
-  implicit val p = Parameters.empty.alterPartial({
-    case VFuParamsKey => VFuParameters(VLEN = 256)
-  })
   val vmask = Module(new VMask()(p))
 
   vmask.io.in.bits.uop := io.in.bits.uop
@@ -36,8 +33,12 @@ class VMaskDC extends Module {
 
 }
 
-object VerilogMaskDC extends App {
-  println("Generating the VPU Mask hardware")
-  emitVerilog(new VMaskDC(), Array("--target-dir", "generated"))
+object VerilogVMaskDC extends App {
+  println("Generating hardware")
+  val p = Parameters.empty
+  emitVerilog(new VMaskDC()(p.alterPartial({case VFuParamsKey =>
+              VFuParameters(VLEN = 256)})), Array("--target-dir", "generated",
+              "--emission-options=disableMemRandomization,disableRegisterRandomization"))
 }
+
 

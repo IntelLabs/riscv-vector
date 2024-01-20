@@ -423,14 +423,14 @@ class VecDecode5 extends VecDecode {
     VREDAND_VS        -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  0000"),
     VREDOR_VS         -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  0000"),
     VREDXOR_VS        -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  0000"),
-    VWREDSUMU_VS      -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  0000"),
-    VWREDSUM_VS       -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  0000"),
+    VWREDSUMU_VS      -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  1000"),
+    VWREDSUM_VS       -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  1000"),
     VFREDOSUM_VS      -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  0000"),
     VFREDUSUM_VS      -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  0000"),
     VFREDMIN_VS       -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  0000"),
     VFREDMAX_VS       -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  0000"),
-    VFWREDUSUM_VS     -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  0000"),
-    VFWREDOSUM_VS     -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  0000"),
+    VFWREDUSUM_VS     -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  1000"),
+    VFWREDOSUM_VS     -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  1000"),
 
     // Vector mask instructions
     VMAND_MM          -> BitPat("b1 011 10   00    11   0 0 0 0 0 0 1 0  0000"),
