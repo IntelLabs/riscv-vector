@@ -120,10 +120,8 @@ class VIssueBlock extends Module {
   // Pipeline of valid
   when (io.flush) {
     validPipe_arith := false.B
-  }.elsewhen (fireArithIQout) {
-    validPipe_arith := true.B
-  }.elsewhen (toExuReady) {
-    validPipe_arith := false.B
+  }.elsewhen (arithIQ.io.out.ready) {
+    validPipe_arith := arithIQ.io.out.valid
   }
   io.toExu.valid := validPipe_arith
   // VL remain
@@ -194,10 +192,8 @@ class VIssueBlock extends Module {
   val validPipe_ls = RegInit(false.B)
   when (io.flush) {
     validPipe_ls := false.B
-  }.elsewhen (fireLsIQout) {
-    validPipe_ls := true.B
-  }.elsewhen (io_toLSU_ready) {
-    validPipe_ls := false.B
+  }.elsewhen (lsIQ.io.out.ready) {
+    validPipe_ls := lsIQ.io.out.valid
   }
   io.toLSU.ld.valid := validPipe_ls && io.toLSU.ld.bits.uop.ctrl.load
   // Ready
