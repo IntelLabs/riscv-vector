@@ -155,7 +155,7 @@ trait VDivBehavior {
           genVFpuOutput(vfdiv.copy(vsew=2, vl=4), "h4000000040000000c0000000c0000000"), // vfdiv
           genVFpuOutput(vfdiv.copy(vsew=2, vl=4, vstart=1, frm=1), "h5d61c6307fc000007f7fffff0fdca593", 5), // vfdiv
           // vfrdiv
-          genVFpuOutput(vfrdiv.copy(vsew=2, vl=4), "h3d8000003d8000003e8000003e800000"), // vfrdiv
+          genVFpuOutput(vfrdiv.copy(vsew=2, vl=4), "h7fc000007fc000007fc000007fc00000"), // vfrdiv
           // vfsqrt
           genVFpuOutput(vfsqrt.copy(vsew=2, vl=4), "h3fb504f33fb504f34000000040000000", fflags=1), // vfsqrt
         )

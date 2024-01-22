@@ -53,12 +53,15 @@ class VFCVTDataModule(implicit val p: Parameters) extends VFPUPipelineModule {
   // buffer input to reduce fan-out
   val src = S1Reg(io.in.bits.vs2)
   val uop = uopVec(1)
+  val sew = uop.info.vsew
   val ctrl = uop.vfpCtrl
   val rm1 = uop.info.frm
   val isTypeSingle = uop.typeTag === VFPU.S
   val isRod = ctrl.cvtRm(0)
   val isRtz = ctrl.cvtRm(1)
   val eleActives = S1Reg(VecInit(Seq(0, 4).map(isActive)))
+  val eleActives16_0 = S1Reg(VecInit(Seq(0, 2).map(isActive)))
+  val eleActives16_1 = S1Reg(VecInit(Seq(4, 6).map(isActive)))
 
   // widening FP2FP
   // only need one, since widening insts has 2 output cycles
@@ -83,7 +86,10 @@ class VFCVTDataModule(implicit val p: Parameters) extends VFPUPipelineModule {
   val d2sNarrowFlag = Mux(Mux(uop.expdIdx(0), eleActives(1), eleActives(0)), d2s.io.fflags, empty_fflags)
 
   // FP2Int
-  // s2i deals with fp32->int32, fp32->int64(widen)
+  // s2i deals with fp32->int16, fp32->int32, fp32->int64(widen)
+  val f322x16 = ctrl.cvtSigned && ctrl.cvtCmd(1) && uop.ctrl.narrow && (sew === 1.U)
+  val f322x16u = !ctrl.cvtSigned && ctrl.cvtCmd(1) && uop.ctrl.narrow && (sew === 1.U)
+
   val s2iX1 = Module(new fudian.FPToInt(VFPU.f32.expWidth, VFPU.f32.precision)) // !!! output is 64b
   val s2iX2 = Module(new fudian.FPToInt(VFPU.f32.expWidth, VFPU.f32.precision)) // !!! output is 64b
   // d2i deals with fp64->int64, fp64->int32(narrow)
@@ -103,15 +109,29 @@ class VFCVTDataModule(implicit val p: Parameters) extends VFPUPipelineModule {
     !uop.ctrl.narrow,
     ctrl.cvtSigned
   )
+
+  val s2iX1_16 = Module(new fudian.FPToInt16(VFPU.f32.expWidth, VFPU.f32.precision)) // !!! output is 64b
+  val s2iX2_16 = Module(new fudian.FPToInt16(VFPU.f32.expWidth, VFPU.f32.precision)) // !!! output is 64b
+  s2iX1_16.io.a := src.tail(32)
+  s2iX2_16.io.a := src.head(32)
+  for (f2i_16 <- Seq(s2iX1_16, s2iX2_16)) {
+    f2i_16.io.rm := Mux(isRtz, "b001".asUInt, rm1)
+    f2i_16.io.op := Cat(
+      uop.ctrl.widen,
+      ctrl.cvtSigned,
+    )
+  }
+
   val s2iResult = Mux(
     uop.ctrl.widen,
     Mux(uop.expdIdx(0), s2iX2.io.result, s2iX1.io.result),
     Cat(s2iX2.io.result.tail(32), s2iX1.io.result.tail(32))
   )
   val f2iOut = Mux(isTypeSingle, s2iResult, d2i.io.result)
-  val d2iNarrow32b = d2i.io.result.tail(32)
+  val d2iNarrow32b = Mux(f322x16 || f322x16u, Cat(0.U(32.W), s2iX2_16.io.result(15, 0), s2iX1_16.io.result(15, 0)), d2i.io.result.tail(32))
   val s2ifflags = Seq(s2iX1, s2iX2).zipWithIndex.map(x => x._1.io.fflags & Fill(5, eleActives(x._2)))
-  val d2ifflags = d2i.io.fflags & Mux(uop.expdIdx(0), Fill(5, eleActives(1)), Fill(5, eleActives(0)))
+  val s2ifflags16 = Seq(s2iX1_16, s2iX2_16).zipWithIndex.map(x => x._1.io.fflags & Mux(uop.expdIdx(0), Fill(5, eleActives16_1(x._2)), Fill(5, eleActives16_0(x._2))))
+  val d2ifflags = Mux(f322x16 || f322x16u, s2ifflags16.reduce(_ | _), d2i.io.fflags & Mux(uop.expdIdx(0), Fill(5, eleActives(1)), Fill(5, eleActives(0))))
   val s2iFlagResult = Mux(
     uop.ctrl.widen,
     Mux(uop.expdIdx(0), s2ifflags(1), s2ifflags(0)),
@@ -122,12 +142,27 @@ class VFCVTDataModule(implicit val p: Parameters) extends VFPUPipelineModule {
 
   // Int2FP
   // i2s deals with int32->fp32 and int64->fp32(narrow)(i2sX1)
-  val i2sX1 = Module(new fudian.IntToFP(VFPU.f32.expWidth, VFPU.f32.precision)) //  !!! output is 32b, input64b
-  val i2sX2 = Module(new fudian.IntToFP(VFPU.f32.expWidth, VFPU.f32.precision)) // !!! output is 32b, input64b
+  // int16->fp32
+  val i2sX1 = Module(new fudian.IntToFP(VFPU.f32.expWidth, VFPU.f32.precision)) //  !!! output is 32b, input16/32/64b
+  val i2sX2 = Module(new fudian.IntToFP(VFPU.f32.expWidth, VFPU.f32.precision)) // !!! output is 32b, input16/32/64b
   // i2d deals with int64->fp64 and int32->fp64(widen), int32 input is sign-extended
   val i2d = Module(new fudian.IntToFP(VFPU.f64.expWidth, VFPU.f64.precision)) // !!! output is 64b
-  i2sX1.io.int := Mux(uop.ctrl.narrow, src, src.tail(32)) // narrowing included, since IntToFP module extract tail32 in that case
-  i2sX2.io.int := zeroExt(src.head(32), 64)
+
+  val x162f = ctrl.cvtSigned && ctrl.cvtCmd(2) && uop.ctrl.widen && (sew === 1.U)
+  val xu162f = !ctrl.cvtSigned && ctrl.cvtCmd(2) && uop.ctrl.widen && (sew === 1.U)
+  val x162f_in = Wire(Vec(2, UInt(64.W)))
+  x162f_in(0) := 0.U
+  x162f_in(1) := 0.U
+  when(uop.expdIdx(0)) {
+    x162f_in(0) := Cat(Fill(48, Mux(x162f, src(47), 0.U(1.W))), src(47, 32))
+    x162f_in(1) := Cat(Fill(48, Mux(x162f, src(63), 0.U(1.W))), src(63, 48))
+  }.otherwise {
+    x162f_in(0) := Cat(Fill(48, Mux(x162f, src(15), 0.U(1.W))), src(15, 0))
+    x162f_in(1) := Cat(Fill(48, Mux(x162f, src(31), 0.U(1.W))), src(31, 16))
+  }
+
+  i2sX1.io.int := Mux(x162f || xu162f, x162f_in(0), Mux(uop.ctrl.narrow, src, src.tail(32))) // narrowing included, since IntToFP module extract tail32 in that case
+  i2sX2.io.int := Mux(x162f || xu162f, x162f_in(1), zeroExt(src.head(32), 64))
   for (i2f <- Seq(i2sX1, i2sX2)) {
     i2f.io.sign := ctrl.cvtSigned
     i2f.io.long := uop.ctrl.narrow // input is int64
@@ -144,11 +179,11 @@ class VFCVTDataModule(implicit val p: Parameters) extends VFPUPipelineModule {
   i2d.io.long := !uop.ctrl.widen
   val i2sResult = Cat(i2sX2.io.result, i2sX1.io.result)
   val i2sNarrow32b = i2sX1.io.result
-  val i2fOut = Mux(isTypeSingle && !uop.ctrl.widen, i2sResult, i2d.io.result)
+  val i2fOut = Mux((isTypeSingle && !uop.ctrl.widen) || (x162f || xu162f), i2sResult, i2d.io.result)
   val i2sfflags = Seq(i2sX1, i2sX2).zipWithIndex.map(x => x._1.io.fflags & Fill(5, eleActives(x._2))) // X1tail, X2head
   val i2dfflags = i2d.io.fflags & Mux(uop.expdIdx(0), Fill(5, eleActives(1)), Fill(5, eleActives(0)))
   val i2sNarrowFlag = i2sX1.io.fflags & Mux(uop.expdIdx(0), Fill(5, eleActives(1)), Fill(5, eleActives(0)))
-  val i2fFlagOut = Mux(isTypeSingle && !uop.ctrl.widen, i2sfflags.reduce(_ | _), i2dfflags)
+  val i2fFlagOut = Mux((isTypeSingle && !uop.ctrl.widen) || (x162f || xu162f), i2sfflags.reduce(_ | _), i2dfflags)
 
   // narrowing output handling
   val narrowBuf = Reg(Vec(2, UInt(32.W)))

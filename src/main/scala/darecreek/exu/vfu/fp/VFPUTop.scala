@@ -147,9 +147,11 @@ class VFInputGen(implicit val p: Parameters) extends VFPUBaseModule {
   val typeTag = VFPU.getTypeTagFromVSEW(io.in.uop.info.vsew)
   val vfpCtrl = VFDecoder(instCat).io.fpCtrl
   // src expand
+  val rs1_unbox = Wire(UInt(32.W))
+  rs1_unbox := VFPU.unbox(io.in.rs1, VFPU.S)
   val rs1Expd = Mux(
     ctrl.vx && typeTag === VFPU.S,
-    Cat(Seq.fill(2)(io.in.rs1.tail(VFPU.f32.len))),
+    Cat(Seq.fill(2)(rs1_unbox)),
     Mux(ctrl.vx && typeTag === VFPU.D,
       io.in.rs1,
       io.in.vs1)
@@ -192,6 +194,7 @@ class VFInputGenFP(implicit val p: Parameters) extends VFPUBaseModule {
 
   val fire = io.in.fire
   val ctrl = io.in.bits.uop.ctrl
+  val narrow_to_1 = ctrl.narrow_to_1
   val instCat = Cat(ctrl.funct6, ctrl.vm, ctrl.lsrc(1), ctrl.lsrc(0), ctrl.funct3, ctrl.ldest)
   val typeTag = VFPU.getTypeTagFromVSEW(io.in.bits.uop.info.vsew)
   val vfpCtrl = VFDecoder(instCat).io.fpCtrl
@@ -254,13 +257,9 @@ class VFInputGenFP(implicit val p: Parameters) extends VFPUBaseModule {
   io.out.bits.uop.vfpCtrl := RegEnable(vfpCtrl, regEnable(1))
   io.out.bits.uop.fWidenEnd := false.B // default false
   io.out.bits.vs1 := RegEnable(rs1Expd, regEnable(1))
-  io.out.bits.uop.maskKeep := RegEnable(Mux(isCmp & !vstart_gte_vl, maskGen.io.maskKeep_cmp, maskGen.io.maskKeep), regEnable(1))
-  io.out.bits.uop.maskOff := RegEnable(Mux(isCmp & !vstart_gte_vl, maskGen.io.maskOff_cmp, maskGen.io.maskOff), regEnable(1))
+  io.out.bits.uop.maskKeep := RegEnable(Mux(narrow_to_1 & !vstart_gte_vl, maskGen.io.maskKeep_cmp, maskGen.io.maskKeep), regEnable(1))
+  io.out.bits.uop.maskOff := RegEnable(Mux(narrow_to_1 & !vstart_gte_vl, maskGen.io.maskOff_cmp, maskGen.io.maskOff), regEnable(1))
 
-
-  def isCmp: Bool = {
-    io.in.bits.uop.ctrl.funct6(5, 3) === "b011".U
-  }
 }
 
 

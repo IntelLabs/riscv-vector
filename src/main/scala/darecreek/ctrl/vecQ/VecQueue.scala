@@ -110,7 +110,5 @@ class VecQueue extends Module with HasCircularQueuePtrHelper {
 
   // rs1 read requests from issue queues
   io.get_rs1.exu.data := sop(io.get_rs1.exu.addr.value)
-  io.get_rs1.ld.data := sop(io.get_rs1.ld.addr.value)
-  io.get_rs1.st.data := sop(io.get_rs1.st.addr.value)
-
+  io.get_rs1.ls.data := sop(io.get_rs1.ls.addr.value)
 }

@@ -12,20 +12,35 @@
 
 /** Vector Lane: 64-bit data-path of FUs
   */
-package darecreek
+package darecreek.exu.lanevfu
 
 import chisel3._
 import chisel3.util._
-import darecreek.exu.fp._
 import darecreek.exu.lanevfu.alu._
 import darecreek.exu.lanevfu.mac._
-import darecreek.exu.fu.div._
 import chipsalliance.rocketchip.config._
-import darecreek.exu.vfu.{VFuParamsKey, VFuParameters}
+import darecreek.exu.vfucore.{VFuParamsKey, VFuParameters}
+import darecreek.exu.vfucore.fp._
+import darecreek._
 
 class DummyLaneFU extends Module {
   val io = IO(new Bundle {
     val in = Flipped(Decoupled(new LaneFUInput))
+    val out = Decoupled(new LaneFUOutput)
+  })
+
+  io.out.bits.uop := io.in.bits.uop
+  io.out.bits.vd := 0.U
+  io.out.valid := false.B
+  io.out.bits.fflags := 0.U 
+  io.out.bits.vxsat := false.B
+  io.in.ready := io.out.ready
+}
+
+class DummyLaneFURedirect extends Module {
+  val io = IO(new Bundle {
+    val in = Flipped(Decoupled(new LaneFUInput))
+    val redirect = Input(new Redirect)
     val out = Decoupled(new LaneFUOutput)
   })
 
@@ -45,20 +60,20 @@ class VLane extends Module{
       val valids = Input(Vec(NLaneExuFUs, Bool()))
       val readys = Output(Vec(NLaneExuFUs, Bool()))
     }
-    val out = Decoupled(new LaneFUOutput)
+    val out = Vec(2, Decoupled(new LaneFUOutput))
   })
 
-  val p = Parameters.empty.alterPartial({
+  implicit val p = Parameters.empty.alterPartial({
                      case VFuParamsKey => VFuParameters(VLEN = 256)})
   // ALU
-  val valu = Module(new LaneVAlu()(p))
+  val valu = Module(new LaneVAlu)
   // val valu = Module(new DummyLaneFU)
   // MUL
   val vmac = Module(new LaneVMac)
   // val vmac = Module(new DummyLaneFU)
   // FP
-  // val vfp = Module(new VFPUTop)
-  val vfp = Module(new DummyLaneFU)
+  val vfp = Module(new VFPUTop)
+  // val vfp = Module(new DummyLaneFURedirect)
   // fake div
   // val vdiv = Module(new DivTop)
   val vdiv = Module(new DummyLaneFU)
@@ -74,6 +89,7 @@ class VLane extends Module{
   // Input of FP
   vfp.io.in.bits := io.in.data
   vfp.io.in.valid := io.in.valids(2)
+  vfp.io.redirect := 0.U.asTypeOf(new Redirect)  // !!!! flush
   io.in.readys(2) := vfp.io.in.ready
   // Input of div
   vdiv.io.in.bits := io.in.data
@@ -81,12 +97,13 @@ class VLane extends Module{
   io.in.readys(3) := vdiv.io.in.ready
 
   /**
-    * Output arbiter
+    * Outputs (two write-back ports)
     */
-  val arb = Module(new Arbiter(new LaneFUOutput, 4))
-  arb.io.in(0) <> valu.io.out
-  arb.io.in(1) <> vmac.io.out
-  arb.io.in(2) <> vfp.io.out
-  arb.io.in(3) <> vdiv.io.out
-  io.out <> arb.io.out  
+  io.out(0) <> valu.io.out
+
+  val arb = Module(new Arbiter(new LaneFUOutput, 3))
+  arb.io.in(0) <> vdiv.io.out
+  arb.io.in(1) <> vfp.io.out
+  arb.io.in(2) <> vmac.io.out
+  io.out(1) <> arb.io.out  
 }

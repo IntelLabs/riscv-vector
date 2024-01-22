@@ -10,6 +10,7 @@ import java.nio.file.{Paths, Files}
 import scala.reflect.io.File
 import scala.reflect.runtime.universe._
 import scala.collection.mutable.Map
+import scala.collection.mutable.LinkedList
 
 import darecreek.exu.vfu._
 import darecreek.exu.vfu.alu._
@@ -25,8 +26,13 @@ import chipsalliance.rocketchip.config.Parameters
 
 abstract class TestBehavior(filename : String, val ctrl : CtrlBundle, sign : String, val instid : String) extends BundleGenHelper {
 
-    var inputMaps : Seq[Map[String, String]] = Seq()
+    // var inputMaps : LinkedList[Map[String, String]] = LinkedList()
     var inputMapCurIx = 0
+    var totalInputs = 0
+
+    var key : Array[String] = Array()
+    var each_input_n_lines: Int = 0
+    var fileLineIx = 0
 
     var testResult = true
 
@@ -46,13 +52,13 @@ abstract class TestBehavior(filename : String, val ctrl : CtrlBundle, sign : Str
     def recordFail() = {this.testResult = false}
     def recordSuccess() = {this.testResult = true}
     def isFinished() : Boolean = {
-        return mapLoaded && (this.inputMapCurIx >= this.inputMaps.length)
+        return mapLoaded && (this.inputMapCurIx >= this.totalInputs)
     }
 
     // change depending on test behavior =================================
     def getTargetTestEngine(): Int = TestEngine.ALU_TEST_ENGINE
     def isOrdered(): Boolean = {
-        println(s"!!!!!!!! $instid not specified isOrdered")
+        // println(s"!!!!!!!! $instid not specified isOrdered")
         false
     }
     // ====================================================================
@@ -93,6 +99,15 @@ abstract class TestBehavior(filename : String, val ctrl : CtrlBundle, sign : Str
         Dump.dump(simi, instid, dut_out, golden_vd, fault_wb=fault_wb)
     }
 
+    def _readNextMapItem() : Map[String, String] = {
+        val nextInputMap = ReadTxt.readOneInput(
+            key.slice(fileLineIx, fileLineIx + each_input_n_lines)
+        )
+        fileLineIx += each_input_n_lines
+
+        nextInputMap
+    }
+
     def _readInputsToMap() = {
         val dataSplitIx = sys.props.getOrElse("dataSplitIx", "0").toInt
         val dataSplitN = sys.props.getOrElse("dataSplitN", "1").toInt
@@ -103,10 +118,10 @@ abstract class TestBehavior(filename : String, val ctrl : CtrlBundle, sign : Str
         val inst = this.getCtrlBundle()
 
         if (Files.exists(Paths.get(test_file))) {
-            val key = ReadTxt.readFromTxtByline(test_file)
+            key = ReadTxt.readFromTxtByline(test_file)
             val hasvstart1 = ReadTxt.hasVstart(key)
 
-            var each_input_n_lines = ReadTxt.getEachInputNLines(key)
+            each_input_n_lines = ReadTxt.getEachInputNLines(key)
             println(s"Each input has $each_input_n_lines lines")
 
             var dataN = 1
@@ -121,9 +136,11 @@ abstract class TestBehavior(filename : String, val ctrl : CtrlBundle, sign : Str
             if (startingIndex < key.length) {
                 println(s"Data Split $j / $dataN: $startingIndex + $each_asisgned_lines, total ${key.length}")
                 
-                val keymap = ReadTxt.KeyFileUtil(key.slice(startingIndex, startingIndex + each_asisgned_lines))
+                key = key.slice(startingIndex, startingIndex + each_asisgned_lines)
 
-                this.inputMaps = keymap
+                // this.inputMaps = keymap
+                this.totalInputs = (key.length) / each_input_n_lines
+                println(s"Total inputs: ${this.totalInputs}")
             }
         } else {
             println(s"Data file does not exist for instruction: ${getInstid()} , skipping")
@@ -134,11 +151,14 @@ abstract class TestBehavior(filename : String, val ctrl : CtrlBundle, sign : Str
     }
 
     def getNextTestCase() : TestCase = {
-        if (this.inputMaps.length == 0) {
+        if (!this.mapLoaded) {
             this._readInputsToMap()
         }
 
-        val testCase = this._getNextTestCase(this.inputMaps(this.inputMapCurIx))
+        val testCase = this._getNextTestCase(
+            this._readNextMapItem()
+        )
+        // this.inputMaps = this.inputMaps.tail
         this.inputMapCurIx += 1
 
         // println(s"Adding ${this.instid}, number ${this.inputMapCurIx - 1} input to pool")
@@ -146,4 +166,8 @@ abstract class TestBehavior(filename : String, val ctrl : CtrlBundle, sign : Str
     }
 
     def _getNextTestCase(simi : Map[String, String]) : TestCase
+
+    def destory() = {
+        // this.inputMaps = null
+    }
 }

@@ -29,7 +29,7 @@ package darecreek.exu.vfu.alu
 import chisel3._
 import chisel3.util._
 import darecreek.exu.vfu._
-// import darecreek.exu.vfu.VFUParam._
+import darecreek.exu.vfu.fp.VFPU
 import chipsalliance.rocketchip.config.Parameters
 
 class VIntMisc64b(implicit p: Parameters) extends VFuModule {
@@ -45,6 +45,7 @@ class VIntMisc64b(implicit p: Parameters) extends VFuModule {
     val vs1 = Input(UInt(64.W))
     val vs2 = Input(UInt(64.W))
     val vmask = Input(UInt(8.W))
+    val fs1 = Input(UInt(FLEN.W)) // for vfmv.s.f
 
     val vd = Output(UInt(64.W))
     val narrowVd = Output(UInt(32.W))
@@ -208,7 +209,8 @@ class VIntMisc64b(implicit p: Parameters) extends VFuModule {
   val perm_vmv = Wire(UInt(64.W))
   perm_vmv := Mux1H(Seq(
     (funct3 === "b110".U) -> Mux1H(sew.oneHot, Seq(8, 16, 32, 64).map(k => vs1(k-1, 0))),
-    (funct3 === "b101".U) -> Mux1H(sew.oneHot(3,2), Seq(32, 64).map(k => vs1(k-1, 0)))
+    // (funct3 === "b101".U) -> Mux1H(sew.oneHot(3,2), Seq(32, 64).map(k => vs1(k-1, 0)))
+    (funct3 === "b101".U) -> Mux(sew.oneHot(3), io.fs1, VFPU.unbox(io.fs1, VFPU.S))
   ))
 
   // Output arbiter                      // vmv<nr>r

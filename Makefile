@@ -9,6 +9,7 @@ test_div:
 
 # test_amd: test_alu, test_mac, test_div
 test_amd: test_alu test_mac test_div
+test_ldst: test_load test_load_idxSeg test_store
 
 verilog:
 	sbt "runMain smartVector.Main" -mem 4096

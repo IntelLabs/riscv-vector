@@ -18,6 +18,7 @@ package darecreek
 
 import chisel3._
 import chisel3.util._
+import darecreek.exu.lanevfu._
 
 class VExuBlock extends Module {
   val io = IO(new Bundle {
@@ -27,7 +28,11 @@ class VExuBlock extends Module {
       val valid = Input(Bool())
       val readys = Output(Vec(NArithFUs, Bool()))
     }
-  val out = ValidIO(new VExuOutput)
+    val out = new Bundle {
+      val laneAlu = ValidIO(new VLaneExuOut)
+      val laneMulFp = ValidIO(new VLaneExuOut)
+      val cross = ValidIO(new VCrossExuOut)
+    }
   })
 
   val laneExu = Module(new VLaneExu)
@@ -46,11 +51,12 @@ class VExuBlock extends Module {
     io.in.readys(i + NLaneExuFUs) := crossLExu.io.in.readys(i)
   }
 
-  // Output arbiter
-  val arb = Module(new Arbiter(new VExuOutput, 2))
-  arb.io.in(0) <> laneExu.io.out
-  arb.io.in(1) <> crossLExu.io.out
-  io.out.valid := arb.io.out.valid && !io.flush
-  io.out.bits := arb.io.out.bits
-  arb.io.out.ready := true.B
+  for ((exuOut, i) <- Seq(io.out.laneAlu, io.out.laneMulFp).zipWithIndex) {
+    exuOut.valid := laneExu.io.out(i).valid
+    exuOut.bits := laneExu.io.out(i).bits
+    laneExu.io.out(i).ready := true.B
+  }
+  io.out.cross.valid := crossLExu.io.out.valid
+  io.out.cross.bits := crossLExu.io.out.bits
+  crossLExu.io.out.ready := true.B
 }

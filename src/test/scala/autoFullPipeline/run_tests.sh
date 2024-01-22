@@ -1,6 +1,6 @@
 #!/bin/bash
 
-N_PROCESSES=8
+N_PROCESSES=6
 
 if [ -z "$1" ]; then
     echo "Usage: $0 <file of instruction names>"

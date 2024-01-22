@@ -79,7 +79,6 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
       val ld = ValidIO(new VLdOutput)
       val st = ValidIO(new VStOutput)
     }
-    val stateIsStore = Output(Bool())
     // OVI interfaces
     val ovi_memop = new OVImemop
     val ovi_load = new OVIload
@@ -89,39 +88,18 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
 
   val ld = io.fromIQ.ld
   val st = io.fromIQ.st
-  val s_idle :: s_load :: s_store :: Nil = Enum(3)
   val s_idle_LD :: s_issueUops_LD :: s_busy_LD :: s_complete_LD :: Nil = Enum(4)
   val s_idle_ST :: s_issueUops_ST :: s_busy_ST :: s_complete_ST :: Nil = Enum(4)
 
-  val state = RegInit(s_idle)
   val stateLd = RegInit(s_idle_LD)
   val stateSt = RegInit(s_idle_ST)
   val completeLd = RegInit(false.B)
   val completeSt = RegInit(false.B)
 
-  // Top FSM
-  when (state === s_idle) {
-    when (ld.bits.iqEmpty && st.bits.iqEmpty) {
-      state := s_idle
-    }.elsewhen (st.bits.iqEmpty) {
-      state := s_load
-    }.elsewhen (ld.bits.iqEmpty) {
-      state := s_store
-    }.otherwise {
-      state := Mux(isBefore(ld.bits.nextVRobIdx, st.bits.nextVRobIdx), s_load, s_store)
-    }
-  }.elsewhen (state === s_load) {
-    state := Mux(completeLd && stateLd === s_complete_LD, s_idle, s_load)
-  }.elsewhen (state === s_store) {
-    state := Mux(completeSt && stateSt === s_complete_ST, s_idle, s_store)
-  }.otherwise {
-    state := s_idle
-  }
-
   val readyLd = Wire(Bool())
   val readySt = Wire(Bool())
-  ld.ready := (!ld.valid || readyLd) && state === s_load
-  st.ready := (!st.valid || readySt) && state === s_store
+  ld.ready := readyLd
+  st.ready := readySt
   val firstLdFire = ld.fire && ld.bits.uop.expdIdx === 0.U
   val firstStFire = st.fire && st.bits.uop.expdIdx === 0.U
   io.ovi_memop.sync_start := ld.fire && ld.bits.uop.expdEnd || firstStFire
@@ -140,7 +118,8 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   }.otherwise {
     stateLd := Mux(completeLd, s_idle_LD, s_complete_LD)
   }
-  readyLd := stateLd === s_idle_LD || stateLd === s_issueUops_LD
+  readyLd := (stateLd === s_idle_LD || stateLd === s_issueUops_LD) &&
+             (stateSt === s_idle_ST || completeSt)
 
   // Load Uop Table
   val ldUopTable = Reg(Vec(8, new Bundle {
@@ -311,7 +290,7 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   val seg_wdata = Reg(Vec(8, Vec(8, UInt(8.W))))
   val seg_wen = Reg(Vec(8, UInt(8.W)))
   val cntSeg = Reg(UInt((vlenbWidth + 3).W))
-  cntSeg := Mux(stateLd === s_idle, 0.U, Mux(ldValid, cntSeg +
+  cntSeg := Mux(stateLd === s_idle_LD, 0.U, Mux(ldValid, cntSeg +
                                   Mux1H(destEewOH_ld.oneHot, Seq(1.U, 2.U, 4.U, 8.U)), cntSeg))
   // If emul > 1, each filed will take multiple registers, idxRf -> idxRf/emul
   // Note: for segment instrn, emul <= 4
@@ -444,7 +423,8 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   }
   val maxStCredit = 64.U(7.W)
   val cntStCredit = RegInit(0.U(7.W))
-  readySt := (stateSt === s_idle_ST || stateSt === s_issueUops_ST) && cntStCredit =/= maxStCredit
+  readySt := (stateSt === s_idle_ST || stateSt === s_issueUops_ST) && cntStCredit =/= maxStCredit &&
+             (stateLd === s_idle_LD || completeLd)
   io.ovi_store.valid := st.fire
   io.ovi_store.data := st.bits.vs3
   cntStCredit := Mux(io.ovi_store.credit === io.ovi_store.valid, cntStCredit,
@@ -456,6 +436,7 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
     val valid = Bool()
     val uop = new VExpdUOp
   }))
+  when (reset.asBool) { stUopTable.foreach(_.valid := false.B) }
   val stBufPtrEnq = RegInit(0.U(3.W))
   stBufPtrEnq := Mux(completeSt, 0.U, Mux(st.fire, stBufPtrEnq + 1.U, stBufPtrEnq))
   when (st.fire) {
@@ -488,25 +469,29 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   /**
     * Mask_idx generation: shared by load and store
     */
-  val stateIsSTORE = state === s_store
-  io.stateIsStore := stateIsSTORE
+  val stateIsSTORE = Reg(Bool())
+  stateIsSTORE := Mux(ld.fire, false.B, Mux(st.fire, true.B, stateIsSTORE))
+  // io.stateIsStore := stateIsSTORE
   //---- Some ctrl signals shared by load and store
   val vl_ldst = Mux(stateIsSTORE, vl_st, vl_ld)
   val vstart_ldst = Mux(stateIsSTORE, vstart_st, vstart_ld)
   val ctrl_ldst = Mux(stateIsSTORE, ctrl_st, ctrl_ld)
   val ctrl_ldst_wire = Mux(stateIsSTORE, ctrl_st_wire, ctrl_ld_wire)
-  val vm_ldst = Mux(stateIsSTORE, st.bits.uop.ctrl.vm, ld.bits.uop.ctrl.vm)
+  // val vm_ldst = Mux(stateIsSTORE, st.bits.uop.ctrl.vm, ld.bits.uop.ctrl.vm)
+  val vm_ldst = ld.bits.uop.ctrl.vm
   val eew_ldst = Mux(stateIsSTORE, eew_st, eew_ld)
   //--- Mask Buffer: shared by load and store
   val vmask_shift = Wire(UInt(VLEN.W))
-  vmask_shift := Mux(vm_ldst, ~0.U(VLEN.W),
-                 Mux(stateIsSTORE, st.bits.vmask, ld.bits.vmask) >>
-                 Mux(stateIsSTORE, st.bits.uop.info.vstart, ld.bits.uop.info.vstart))
+  // vmask_shift := Mux(vm_ldst, ~0.U(VLEN.W),
+  //                Mux(stateIsSTORE, st.bits.vmask, ld.bits.vmask) >>
+  //                Mux(stateIsSTORE, st.bits.uop.info.vstart, ld.bits.uop.info.vstart))
+  vmask_shift := Mux(vm_ldst, ~0.U(VLEN.W), ld.bits.vmask >> ld.bits.uop.info.vstart)
   val maskBuf = RegEnable(vmask_shift, firstLdFire || firstStFire)
   //---- Index Buffer (for vector indexed instrn): shared by load and store
   val idxBuf = Reg(Vec(8, Vec(vlenb, UInt(8.W))))
   val bufPtrEnq = Mux(stateIsSTORE, stBufPtrEnq, ldBufPtrEnq)
-  when (ld.fire || st.fire) {idxBuf(bufPtrEnq) := UIntSplit(Mux(stateIsSTORE, st.bits.vs2, ld.bits.vs2), 8)}
+  // when (ld.fire || st.fire) {idxBuf(bufPtrEnq) := UIntSplit(Mux(stateIsSTORE, st.bits.vs2, ld.bits.vs2), 8)}
+  when (ld.fire || st.fire) {idxBuf(bufPtrEnq) := UIntSplit(ld.bits.vs2, 8)}
 
   //---- Begin generate mask_idx
   val cntMaskIdxCredit = RegInit(0.U(2.W))

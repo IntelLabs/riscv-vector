@@ -37,10 +37,18 @@ package darecreek.exu.lanevfu.alu
 import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.decode._
-import darecreek.{LaneFUInput, LaneFUOutput, SewOH, VExpdUOp, UIntSplit, MaskReorg}
+import darecreek.{SewOH, UIntSplit, MaskReorg}
 import chipsalliance.rocketchip.config._
-import darecreek.exu.vfu.alu._
-import darecreek.exu.vfu.{VFuModule, VFuParamsKey, VFuParameters}
+import darecreek.exu.vfucore.alu._
+import darecreek.exu.vfucore.{VFuModule, VFuParamsKey, VFuParameters}
+import darecreek.exu.vfucore.{LaneFUInput, LaneFUOutput}
+import darecreek.exu.vfucoreconfig.VUop
+
+class VIntFixpDecode extends Bundle {
+  val sub = Bool()
+  val misc = Bool()
+  val fixp = Bool()
+}
 
 // finalResult = result & maskKeep | maskOff
 class MaskTailDataVAlu extends Module {
@@ -48,7 +56,7 @@ class MaskTailDataVAlu extends Module {
     val mask = Input(UInt(8.W))
     val tail = Input(UInt(8.W))
     val oldVd = Input(UInt(64.W))
-    val uop = Input(new VExpdUOp)
+    val uop = Input(new VUop)
     val opi = Input(Bool())
     val maskKeep = Output(UInt(64.W))  // keep: 11..1  off: 00..0
     val maskOff = Output(UInt(64.W))   // keep: 00..0  off: old_vd or 1.U
@@ -144,7 +152,7 @@ class LaneVAlu(implicit p: Parameters) extends VFuModule {
   vIntMisc.io.vs1 := vs1_rs1_imm
   vIntMisc.io.vs2 := io.in.bits.vs2
   vIntMisc.io.vmask := io.in.bits.mask
-
+  vIntMisc.io.fs1:= io.in.bits.rs1(FLEN-1, 0)
 
   //------------------------------------
   //-------- Mask/Tail data gen --------

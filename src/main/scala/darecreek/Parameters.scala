@@ -30,7 +30,7 @@ trait DarecreekParameters {
   val bVstart = bVL - 1
 
   // Vector Queue
-  val VQSize = 32
+  val VQSize = 16
   // Decode
   val VDecodeWidth = 1
   // Rename
@@ -44,18 +44,18 @@ trait DarecreekParameters {
   // Issue Queue
   val NArithIQs = 1
   val ArithIQSize = 40
-  val LsIQSize = 20
-  val LdIQSize = 20
-  val StaIQSize = 20
-  val StdIQSize = 20
+  val LsIQSize = 40
+  // val LdIQSize = 20
+  // val StaIQSize = 20
+  // val StdIQSize = 20
   val NLaneExuFUs = 4
   val NArithFUs = NLaneExuFUs + 3 // Number of FUs in EXU
 
-  val NVPhyRegs: Int = 80  // Vector PRF
+  val NVPhyRegs: Int = 64  // Vector PRF
   val SPRegIdxWidth = log2Up(NPhyRegs) // Scalar
   val VPRegIdxWidth = log2Up(NVPhyRegs) // Vector
 
-  val nVRFWritePorts = NArithIQs + 1
+  val nVRFWritePorts = 3 + 1  //Arith:3 LSU:1
 
   val LaneWidth = 64  // constant
   val NLanes = VLEN / LaneWidth  // must be power of 2

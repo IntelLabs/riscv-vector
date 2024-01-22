@@ -26,73 +26,6 @@ import scala.collection.mutable.Map
 import scala.collection.convert.decorateAsScala._
 import java.util.concurrent.ConcurrentHashMap
 
-object ReadTxt {
-  //parsing a txt file
-  def readFromTxtByline(file:String) = {
-    import scala.io.Source
-    val source = Source.fromFile(file,"UTF-8")
-    val lines = source.getLines().toArray
-    source.close()
-    lines
-  }
-
-  def hasVstart(lines : Array[String]) : Boolean = {
-    var i : Int = 0
-    for (line <- lines) {
-      if (i >= 15) return false
-      if (line.contains("VSTART")) {
-        return true
-      }
-      i += 1
-    }
-    return false
-  }
-
-  def getEachInputNLines(lines : Array[String]) : Int = {
-    val INVALID = -1
-    var i : Int = 0
-    for (line <- lines) {
-      if (i >= 30) return INVALID
-      if (line.contains("------")) {
-        return i + 1
-      }
-      i += 1
-    }
-    return INVALID
-  }
-
-  def getNEachAssignedLines(n_lines : Int, self_idx : Int, n : Int, 
-                      each_input_n_lines : Int) : Int = {
-    var n_inputs = n_lines / each_input_n_lines
-    var each_n_inputs = n_inputs / n
-    if(n_inputs % n > 0) {
-      each_n_inputs += 1
-    }
-    return each_n_inputs * each_input_n_lines
-  }
-
-  def KeyFileUtil(array:Array[String]) = {
-    var keyMapList = Map[String, String]()
-    var keyMapList2 = Seq[Map[String,String]]()
-    // var number = 0
-    for (i <- 0 until array.length) {
-      val lineArray = array(i).trim.split("=")
-      if(lineArray.size==2){
-        keyMapList += (lineArray(0).trim -> lineArray(1))
-      }
-
-      if(lineArray.size != 2 || lineArray(0).equals("--------------------------test_cnt")) {
-        keyMapList2 :+= keyMapList
-        keyMapList = Map[String, String]()
-      }
-      // keyMapList2 = keyMapList2 ++ Map(number -> keyMapList)
-      /*if(lineArray(0).equals("--------------------------test_cnt")) {
-        number = number + 1
-      }*/
-    }
-    keyMapList2
-  }
-}
 
 trait VAluBehavior {
   this: AnyFlatSpec with ChiselScalatestTester with BundleGenHelper =>
@@ -240,7 +173,8 @@ object Datapath {
   // val testdataRoot = "/home/maoting/nanhu/testdata/10_10/unittest/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/10_13/unittest/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/11_22/unittest/"
-  val testdataRoot = "/home/maoting/nanhu/testdata/11_28/unittest/"
+  // val testdataRoot = "/home/maoting/nanhu/testdata/12_14/unittest/"
+  val testdataRoot = "/home/maoting/nanhu/testdata/12_15/unittest/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/11_27/2023_11_27_14_36_data/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/debug/"
   //val testdataRoot = "C:\\kou\\XS_Vector_Unit\\src\\test\\scala\\unittest\\"
@@ -258,7 +192,9 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
 
   var tbs : Seq[TestBehavior] = Seq(
 
-    // new VmadcvvTestBehavior,
+    new VaddvvTestBehavior,
+
+    new VmadcvvTestBehavior,
     // new VfmvfsTestBehavior,
 
     // new VredsumvsTestBehavior,

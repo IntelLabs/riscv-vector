@@ -44,11 +44,12 @@ class VPUCore extends Module {
 
   for (i <- 0 until VRenameWidth) {
     issueBlock.io.in.toArithIQ(i) <> ctrlBlock.io.out.toArithIQ(i) 
-    issueBlock.io.in.toLsIQ(0)(i) <> ctrlBlock.io.out.toLdIQ(i)
-    issueBlock.io.in.toLsIQ(1)(i) <> ctrlBlock.io.out.toStaIQ(i)
+    issueBlock.io.in.toLsIQ(i) <> ctrlBlock.io.out.toLsIQ(i)
   }
   issueBlock.io.fromBusyTable := ctrlBlock.io.readBusyTable
-  ctrlBlock.io.wbArith := issueBlock.io.wbArith
+  ctrlBlock.io.wbArith_laneAlu := issueBlock.io.wbArith_laneAlu
+  ctrlBlock.io.wbArith_laneMulFp := issueBlock.io.wbArith_laneMulFp
+  ctrlBlock.io.wbArith_cross := issueBlock.io.wbArith_cross
   ctrlBlock.io.wbLSU := issueBlock.io.wbLSU
   issueBlock.io.flush := ctrlBlock.io.flush
   issueBlock.io.get_rs1 <> ctrlBlock.io.get_rs1
@@ -63,7 +64,6 @@ class VPUCore extends Module {
   lsu.io.fromIQ.st <> issueBlock.io.toLSU.st
   issueBlock.io.fromLSU.ld := lsu.io.wb.ld
   issueBlock.io.fromLSU.st := lsu.io.wb.st
-  issueBlock.io.fromLSU.stateIsStore := lsu.io.stateIsStore
 
   lsu.io.ovi_memop <> io.ovi_memop
   lsu.io.ovi_load := io.ovi_load
@@ -77,6 +77,10 @@ class VPUCore extends Module {
   rvfiBlock.io.commits := ctrlBlock.io.commits
   rvfiBlock.io.sb_id := ctrlBlock.io.rvfi_sb_id
   rvfiBlock.io.commitEnd := ctrlBlock.io.commitEnd
+  rvfiBlock.io.ovi_issue_valid := io.ovi_issue.valid
+  rvfiBlock.io.ovi_issue_sb_id := io.ovi_issue.sb_id
+  rvfiBlock.io.ovi_issue_inst := io.ovi_issue.inst
+  rvfiBlock.io.ovi_completed := ctrlBlock.io.ovi_completed
   rvfiBlock.io.rfRd <> issueBlock.io.rfRdRvfi
   if (debug) {
     io.rvfi := rvfiBlock.io.rvfi

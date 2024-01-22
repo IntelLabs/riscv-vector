@@ -398,15 +398,29 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
 
             // mapping old_vd index to value
             preg_to_value = preg_to_value + ((oldvdbase + j) -> oldvddata(n_inputs - 1 - j))
-            old_vd_preg_idx :+= (oldvdbase + j)
+            var old_vd_each_step = 1
+            if (vs1_n_inputs > n_inputs) {
+                // vsew=8
+                old_vd_each_step = vs1_n_inputs / n_inputs
+            }
+
+            for (_ <- 0 until old_vd_each_step) {
+                old_vd_preg_idx :+= (oldvdbase + j)
+            }
 
             // println(s"${vs1base + j} ${vs2base + j} ${oldvdbase + j}")
         }
 
         for(j <- 0 until vs1_n_inputs) {
+            var each_step = 1
+            if (n_inputs > vs1_n_inputs) {
+                each_step = n_inputs / vs1_n_inputs
+            }
             // mapping vs1 index to value
             preg_to_value = preg_to_value + ((vs1base + j) -> vs1data(vs1_n_inputs - 1 - j))
-            vs1_preg_idx :+= (vs1base + j)
+            for (_ <- 0 until each_step) {
+                vs1_preg_idx :+= (vs1base + j)
+            }
 
             println(s"vsew ${simi.get("vsew").get.toInt}, ${vs1_n_inputs}, ${n_inputs}")
             println(s"vs1base + j: ${vs1base + j}, ${vs1data(vs1_n_inputs - 1 - j)}")
