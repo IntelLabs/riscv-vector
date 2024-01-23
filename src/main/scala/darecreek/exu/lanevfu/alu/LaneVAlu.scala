@@ -222,9 +222,13 @@ class LaneVAlu(implicit p: Parameters) extends VFuModule {
   //--------- Ready/valid of S1Int ---------
   val readyS1Int = Wire(Bool())
   val readyS1FixP = Wire(Bool())
-  io.in.ready := !io.in.valid || (readyS1Int && readyS1FixP) //S1: pipeline stage 1
   val validS1Int = RegInit(false.B)
-  validS1Int := Mux(fire && !uop.ctrl.fixP, true.B, Mux(readyS1Int, false.B, validS1Int))
+  when (fire && !uop.ctrl.fixP) { 
+    validS1Int := true.B
+  }.elsewhen (readyS1Int) {
+    validS1Int := false.B
+  }
+  // validS1Int := Mux(fire && !uop.ctrl.fixP, true.B, Mux(readyS1Int, false.B, validS1Int))
   val uopS1 = RegEnable(uop, fire)
   val validS1IntFinal = Mux(uopS1.ctrl.narrow_to_1, aluCmpValid && validS1Int, 
                         Mux(uopS1.ctrl.narrow, aluNarrowValid && validS1Int, validS1Int))
@@ -242,10 +246,16 @@ class LaneVAlu(implicit p: Parameters) extends VFuModule {
   //--------- Ready/valid of S1FixP (S1: pipeline stage 1) ---------
   val validS1FixP = RegInit(false.B)
   val readyS2FixP = Wire(Bool())
-  readyS1FixP := !validS1FixP || readyS2FixP
-  validS1FixP := Mux(fire && uop.ctrl.fixP, true.B, Mux(readyS1FixP, false.B, validS1FixP))
+  readyS1FixP := readyS2FixP
+  when (fire && uop.ctrl.fixP) { 
+    validS1FixP := true.B
+  }.elsewhen (readyS1FixP) {
+    validS1FixP := false.B
+  }
+  // validS1FixP := Mux(fire && uop.ctrl.fixP, true.B, Mux(readyS1FixP, false.B, validS1FixP))
   val fireS1FixP = validS1FixP && readyS1FixP
 
+  io.in.ready := (readyS1Int || !validS1Int) && (readyS1FixP || !validS1FixP) //S1: pipeline stage 1
 
   /**
     *  ---- Pipeline-stage 2 (fixed-point instructions) ----
@@ -276,7 +286,12 @@ class LaneVAlu(implicit p: Parameters) extends VFuModule {
   val vxsatS2 = RegEnable(vAluFixP.io.vxsat, fireS1FixP)
 
   val validS2FixP = RegInit(false.B)
-  validS2FixP := Mux(fireS1FixP, true.B, Mux(readyS2FixP, false.B, validS2FixP))
+  when (fireS1FixP) {
+    validS2FixP := true.B
+  }.elsewhen (readyS2FixP) {
+    validS2FixP := false.B
+  }
+  // validS2FixP := Mux(fireS1FixP, true.B, Mux(readyS2FixP, false.B, validS2FixP))
 
 
   /**
