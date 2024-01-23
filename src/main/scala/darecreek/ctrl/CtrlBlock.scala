@@ -86,13 +86,13 @@ class VCtrlBlock extends Module {
   vq.io.flush := rob.io.flush
   vq.io.get_rs1 <> io.get_rs1
 
-  PipelineConnect(vq.io.out, expander.io.in(0), expander.io.in(0).ready, isFlush = flush)
+  DecoupledConnect(vq.io.out, expander.io.in(0), flush)
   // Temp: disable the second input of expander
   expander.io.in(1).valid := false.B
   expander.io.in(1).bits := 0.U.asTypeOf(new VMicroOp)
   for (i <- 0 until VRenameWidth) {
-    PipelineConnect(expander.io.out(i), rename.io.in(i), rename.io.in(i).ready, isFlush = flush)
-    PipelineConnect(rename.io.out(i), dispatch.io.in(i), dispatch.io.in(i).ready, isFlush = flush)
+    DecoupledConnect(expander.io.out(i), rename.io.in(i), flush)
+    DecoupledConnect(rename.io.out(i), dispatch.io.in(i), flush)
   }
 
   // Rename Table

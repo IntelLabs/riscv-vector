@@ -59,7 +59,7 @@ object PipelineConnect {
 object DecoupledConnect {
   def apply[T <: Data](in: DecoupledIO[T], out: DecoupledIO[T], flush: Bool = false.B) = {
     val validPipe = RegInit(false.B)
-    in.ready := !validPipe || out.ready
+    in.ready := out.ready
     when (flush) {
       validPipe := false.B
     }.elsewhen (in.ready) {
