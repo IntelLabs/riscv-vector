@@ -84,20 +84,25 @@ class LaneVMac(implicit p: Parameters) extends Module {
   //---- ready-valid S1
   val validS1 = RegInit(false.B)
   val readyS1 = Wire(Bool())
-  io.in.ready := !io.in.valid || readyS1
-  validS1 := Mux(io.in.fire, true.B, Mux(readyS1, false.B, validS1))
+  io.in.ready := !validS1 || readyS1
+  when (io.in.ready) { validS1 := io.in.valid } 
+  // io.in.ready := !io.in.valid || readyS1
+  // validS1 := Mux(io.in.fire, true.B, Mux(readyS1, false.B, validS1))
   //---- ready-valid S2
   val validS2 = RegInit(false.B)
   val readyS2 = Wire(Bool())
-  readyS1 := !validS1 || readyS2
   val fireS1 = validS1 && readyS1
-  validS2 := Mux(fireS1, true.B, Mux(readyS2, false.B, validS2))
-  // io.out.valid := validS2
+  readyS1 := !validS2 || readyS2
+  when (readyS1) { validS2 := validS1 }
+  // readyS1 := !validS1 || readyS2
+  // validS2 := Mux(fireS1, true.B, Mux(readyS2, false.B, validS2))
   //---- ready-valid S3
   val validS3 = RegInit(false.B)
-  readyS2 := !validS2 || io.out.ready
   val fireS2 = validS2 && readyS2
-  validS3 := Mux(fireS2, true.B, Mux(io.out.ready, false.B, validS3))
+  readyS2 := !validS3 || io.out.ready
+  when (readyS2) { validS3 := validS2 }
+  // readyS2 := !validS2 || io.out.ready
+  // validS3 := Mux(fireS2, true.B, Mux(io.out.ready, false.B, validS3))
   io.out.valid := validS3
 
   val uopS1 = RegEnable(io.in.bits.uop, io.in.fire)
