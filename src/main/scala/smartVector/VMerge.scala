@@ -41,6 +41,7 @@ class VMerge (implicit p : Parameters) extends Module {
     val regBackWidth      = Reg(UInt(3.W))
     val regWriteMuopIdx   = Reg(UInt(4.W))
     val scalarRegWriteEn  = Reg(Bool())
+    val fudianRegWriteEn  = Reg(Bool())
     val scalarRegWriteIdx = Reg(UInt(5.W))
     val muopEnd           = Reg(Bool())
     val permExpdLen       = Reg(UInt(4.W))
@@ -51,6 +52,7 @@ class VMerge (implicit p : Parameters) extends Module {
     regBackWidth      := RegEnable(io.in.mergeInfo.bits.regBackWidth, io.in.mergeInfo.valid)
     regWriteMuopIdx   := RegEnable(io.in.mergeInfo.bits.regWriteMuopIdx, io.in.mergeInfo.valid)
     scalarRegWriteEn  := RegEnable(io.in.mergeInfo.bits.scalarRegWriteEn, io.in.mergeInfo.valid)
+    fudianRegWriteEn  := RegEnable(io.in.mergeInfo.bits.fudianRegWriteEn, io.in.mergeInfo.valid)
     scalarRegWriteIdx := RegEnable(io.in.mergeInfo.bits.ldest, io.in.mergeInfo.valid)
     muopEnd           := RegEnable(io.in.mergeInfo.bits.muopEnd, io.in.mergeInfo.valid)
     permExpdLen       := RegEnable(io.in.mergeInfo.bits.permExpdLen, io.in.mergeInfo.valid)
@@ -93,11 +95,13 @@ class VMerge (implicit p : Parameters) extends Module {
     when(io.in.aluIn.valid && muopEnd){
         io.out.commitInfo.valid := true.B
         io.out.commitInfo.bits.scalarRegWriteEn := scalarRegWriteEn
+        io.out.commitInfo.bits.fudianRegWriteEn := fudianRegWriteEn
         io.out.commitInfo.bits.ldest            := scalarRegWriteIdx
         io.out.commitInfo.bits.data             := io.in.aluIn.bits.vd
     }.elsewhen(io.in.lsuIn.valid && io.in.lsuIn.bits.muopEnd){
         io.out.commitInfo.valid := true.B
         io.out.commitInfo.bits.scalarRegWriteEn := false.B
+        io.out.commitInfo.bits.fudianRegWriteEn := false.B
         io.out.commitInfo.bits.ldest            := DontCare
         io.out.commitInfo.bits.data             := io.in.lsuIn.bits.data
     }otherwise{

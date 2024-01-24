@@ -14,6 +14,7 @@ import darecreek.Vlmul_to_lmul
 
 class MuopMergeAttr extends Bundle {
     val scalarRegWriteEn = Bool()
+    val fudianRegWriteEn = Bool()
     val rfWriteEn = Bool()
     val ldest = UInt(5.W)
     val muopEnd = Bool()
@@ -151,8 +152,9 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     val instFirstIn = (currentState === empty && io.in.decodeIn.valid)
 
-    val scalar_fudian_opnd_1 = Mux(io.in.decodeIn.bits.vCtrl.funct3 === "b101".U && !io.in.decodeIn.bits.vCtrl.isLdst, 
-                               io.in.decodeIn.bits.fudian_opnd_1, io.in.decodeIn.bits.scalar_opnd_1)
+    val isFudian = io.in.decodeIn.bits.vCtrl.funct3 === "b101".U && !io.in.decodeIn.bits.vCtrl.isLdst
+    val scalar_fudian_opnd_1 = Mux(isFudian, io.in.decodeIn.bits.fudian_opnd_1, 
+                                   io.in.decodeIn.bits.scalar_opnd_1)
 
     when (instFirstIn){       
         vCtrl(0)            := io.in.decodeIn.bits.vCtrl
@@ -265,7 +267,8 @@ class Vsplit(implicit p : Parameters) extends Module {
     }
     
     io.out.mUopMergeAttr.valid                 := io.out.mUop.valid
-    io.out.mUopMergeAttr.bits.scalarRegWriteEn := ctrl.rdVal
+    io.out.mUopMergeAttr.bits.scalarRegWriteEn := ctrl.rdVal && !isFudian && !ctrl.isLdst  
+    io.out.mUopMergeAttr.bits.fudianRegWriteEn := ctrl.rdVal && isFudian
     io.out.mUopMergeAttr.bits.ldest            := ctrl.ldest + ldest_inc
     io.out.mUopMergeAttr.bits.rfWriteEn        := ctrl.ldestVal
     io.out.mUopMergeAttr.bits.muopEnd          := io.out.mUop.bits.uop.uopEnd

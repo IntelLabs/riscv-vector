@@ -69,15 +69,16 @@ class RVUMemory extends Bundle {
 }
 
 class RVUCommit extends Bundle {
-    val commit_vld      = Output(Bool())
-    val return_data_vld = Output(Bool()) // need to update scalar rf
-    val return_data     = Output(UInt(64.W))
-    val return_reg_idx  = Output(UInt(5.W))
-    val exception_vld   = Output(Bool())
-    val illegal_inst    = Output(Bool())
-    val update_vl       = Output(Bool())
-    val update_vl_data  = Output(UInt(5.W))
-    val xcpt_cause      = Output(new HellaCacheExceptions)
+    val commit_vld             = Output(Bool())
+    val return_data_vld        = Output(Bool()) // need to update scalar register file
+    val return_data_fudian_vld = Output(Bool()) // need to update fudian register file
+    val return_data            = Output(UInt(64.W))
+    val return_reg_idx         = Output(UInt(5.W))
+    val exception_vld          = Output(Bool())
+    val illegal_inst           = Output(Bool())
+    val update_vl              = Output(Bool())
+    val update_vl_data         = Output(UInt(5.W))
+    val xcpt_cause             = Output(new HellaCacheExceptions)
 }
 
 class RVUExtra extends Bundle {
