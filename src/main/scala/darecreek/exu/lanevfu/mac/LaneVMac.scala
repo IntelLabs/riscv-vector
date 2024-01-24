@@ -19,7 +19,7 @@ import darecreek.{SewOH, UIntSplit, MaskReorg}
 import darecreek.DarecreekParam._
 import darecreek.exu.vfucore.mac.VMac64b
 import darecreek.exu.vfucore.{LaneFUInput, LaneFUOutput}
-import darecreek.exu.vfucoreconfig.VUop
+import darecreek.exu.vfucoreconfig.{VUop, Redirect}
 
 // finalResult = result & maskKeep | maskOff
 class MaskTailDataVMac extends Module {
@@ -51,6 +51,7 @@ class MaskTailDataVMac extends Module {
 class LaneVMac(implicit p: Parameters) extends Module {
   val io = IO(new Bundle {
     val in = Flipped(Decoupled(new LaneFUInput))
+    val redirect = Input(new Redirect)
     val out = Decoupled(new LaneFUOutput)
   })
 
@@ -81,46 +82,60 @@ class LaneVMac(implicit p: Parameters) extends Module {
   vMac64b.io.widen := funct6(4,3) === "b11".U
   vMac64b.io.isFixP := uop.ctrl.fixP
   
-  //---- ready-valid S1
-  val validS1 = RegInit(false.B)
-  val readyS1 = Wire(Bool())
-  io.in.ready := !validS1 || readyS1
-  when (io.in.ready) { validS1 := io.in.valid } 
-  // io.in.ready := !io.in.valid || readyS1
-  // validS1 := Mux(io.in.fire, true.B, Mux(readyS1, false.B, validS1))
-  //---- ready-valid S2
-  val validS2 = RegInit(false.B)
-  val readyS2 = Wire(Bool())
-  val fireS1 = validS1 && readyS1
-  readyS1 := !validS2 || readyS2
-  when (readyS1) { validS2 := validS1 }
-  // readyS1 := !validS1 || readyS2
-  // validS2 := Mux(fireS1, true.B, Mux(readyS2, false.B, validS2))
-  //---- ready-valid S3
-  val validS3 = RegInit(false.B)
-  val fireS2 = validS2 && readyS2
-  readyS2 := !validS3 || io.out.ready
-  when (readyS2) { validS3 := validS2 }
-  // readyS2 := !validS2 || io.out.ready
-  // validS3 := Mux(fireS2, true.B, Mux(io.out.ready, false.B, validS3))
-  io.out.valid := validS3
+  val validVec = io.in.valid +: Seq.fill(3)(RegInit(false.B))
+  val readyVec = Seq.fill(3)(Wire(Bool())) :+ io.out.ready
+  val uopVec = io.in.bits.uop +: Seq.fill(3)(Reg(new VUop))
+  val flushVec = validVec.zip(uopVec).map(x => x._1 && io.redirect.needFlush(x._2.robIdx))
+  def regEnable(i: Int) = validVec(i - 1) && readyVec(i - 1) && !flushVec(i - 1)
+  for (i <- 0 until 3) {
+    readyVec(i) := readyVec(i + 1) || !validVec(i + 1)
+  }
+  for (i <- 1 to 3) {
+    when (regEnable(i)) {
+      validVec(i) := true.B
+      uopVec(i) := uopVec(i - 1)
+    }.elsewhen (readyVec(i) || flushVec(i)) {
+      validVec(i) := false.B
+    }
+  }
+  io.in.ready := readyVec(0)
+  io.out.valid := validVec(3)
+  io.out.bits.uop := uopVec(3)
 
-  val uopS1 = RegEnable(io.in.bits.uop, io.in.fire)
-  val uopS2 = RegEnable(uopS1, fireS1)
-  val uopS3 = RegEnable(uopS2, fireS2)
-  io.out.bits.uop := uopS3
+  // //---- ready-valid S1
+  // val validS1 = RegInit(false.B)
+  // val readyS1 = Wire(Bool())
+  // io.in.ready := !validS1 || readyS1
+  // when (io.in.ready) { validS1 := io.in.valid } 
+  // //---- ready-valid S2
+  // val validS2 = RegInit(false.B)
+  // val readyS2 = Wire(Bool())
+  // val fireS1 = validS1 && readyS1
+  // readyS1 := !validS2 || readyS2
+  // when (readyS1) { validS2 := validS1 }
+  // //---- ready-valid S3
+  // val validS3 = RegInit(false.B)
+  // val fireS2 = validS2 && readyS2
+  // readyS2 := !validS3 || io.out.ready
+  // when (readyS2) { validS3 := validS2 }
+  // io.out.valid := validS3
+
+  // val uopS1 = RegEnable(io.in.bits.uop, io.in.fire)
+  // val uopS2 = RegEnable(uopS1, fireS1)
+  // val uopS3 = RegEnable(uopS2, fireS2)
+  // io.out.bits.uop := uopS3
 
   //------------------------------------
   //-------- Mask/Tail data gen --------
   //------------------------------------
-  val maskS1 = RegEnable(io.in.bits.mask, io.in.fire)
-  val tailS1 = RegEnable(io.in.bits.tail, io.in.fire)
-  val oldVdS1 = RegEnable(io.in.bits.old_vd, io.in.fire)
-  val eewVdS1 = RegEnable(eewVd, io.in.fire)
-  val maskS2 = RegEnable(maskS1, fireS1)
-  val tailS2 = RegEnable(tailS1, fireS1)
-  val oldVdS2 = RegEnable(oldVdS1, fireS1)
-  val eewVdS2 = RegEnable(eewVdS1, fireS1)
+  val maskS1 = RegEnable(io.in.bits.mask, regEnable(1)) // io.in.fire)
+  val tailS1 = RegEnable(io.in.bits.tail, regEnable(1)) // io.in.fire)
+  val oldVdS1 = RegEnable(io.in.bits.old_vd, regEnable(1)) // io.in.fire)
+  val eewVdS1 = RegEnable(eewVd, regEnable(1)) // io.in.fire)
+  val maskS2 = RegEnable(maskS1, regEnable(2)) // fireS1)
+  val tailS2 = RegEnable(tailS1, regEnable(2)) // fireS1)
+  val oldVdS2 = RegEnable(oldVdS1, regEnable(2)) // fireS1)
+  val eewVdS2 = RegEnable(eewVdS1, regEnable(2)) // fireS1)
 
   val maskSplash = MaskReorg.splash(maskS2, eewVdS2)
   val tailSplash = MaskReorg.splash(tailS2, eewVdS2)
@@ -128,12 +143,12 @@ class LaneVMac(implicit p: Parameters) extends Module {
   maskTailData.io.mask := maskSplash
   maskTailData.io.tail := tailSplash
   maskTailData.io.oldVd := oldVdS2
-  maskTailData.io.uop := uopS2
+  maskTailData.io.uop := uopVec(2) // uopS2
 
-  io.out.bits.vd := RegEnable(vMac64b.io.vd & maskTailData.io.maskKeep | maskTailData.io.maskOff, fireS2)
-  io.out.bits.vxsat := RegEnable(vMac64b.io.vxsat, fireS2)
+  io.out.bits.vd := RegEnable(vMac64b.io.vd & maskTailData.io.maskKeep | maskTailData.io.maskOff, regEnable(3)) // fireS2)
+  io.out.bits.vxsat := RegEnable(vMac64b.io.vxsat, regEnable(3)) // fireS2)
   io.out.bits.fflags := 0.U
 
-  vMac64b.io.fireIn := io.in.fire
-  vMac64b.io.fireS1 := fireS1
+  vMac64b.io.fireIn := regEnable(1) // io.in.fire
+  vMac64b.io.fireS1 := regEnable(2) // fireS1
 }

@@ -4,9 +4,9 @@ import chisel3._
 import chisel3.util._
 import chipsalliance.rocketchip.config._
 import darecreek.exu.vfucore.reduction._
-import darecreek.exu.vfucoreconfig.{VUop, Redirect}
 import darecreek.exu.vfucore.{VFuModule, VFuParamsKey, VFuParameters}
 import darecreek._
+import darecreek.exu.vfucoreconfig.{VUop, Redirect}
 
 class Reduction(implicit p: Parameters) extends Module {
   val io = IO(new Bundle {
@@ -22,7 +22,8 @@ class Reduction(implicit p: Parameters) extends Module {
   val uopVec = io.in.bits.uop +: Array.fill(latency)(Reg(new VExpdUOp))
   // val flushVec = Array.fill(latency + 1)(WireInit(false.B)) // FIXME: implement flush logic
   // val flushVec = validVec.zip(uopVec).map(x => x._1 && x._2.vRobIdx.needFlush(io.redirect))  //XS
-  val flushVec = validVec.map(x => x && io.redirect.needFlush)
+  val flushVec = validVec.zip(uopVec).map(x => x._1 && io.redirect.needFlush(
+                   x._2.asTypeOf(new darecreek.exu.vfucoreconfig.VUop).robIdx))
 
   for (i <- 0 until latency) {
     rdyVec(i) := !validVec(i + 1) || rdyVec(i + 1)
