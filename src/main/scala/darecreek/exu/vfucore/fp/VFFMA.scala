@@ -66,7 +66,7 @@ class VFMASrcPreprocessPipe(implicit val p: Parameters) extends VFPUBaseModule {
   val rdyVec = Array.fill(latency)(Wire(Bool())) :+ io.out.ready
   val uopVec = io.in.bits.uop +: Array.fill(latency)(Reg(new VFPUOp))
   // val flushVec = validVec.zip(uopVec).map(x => x._1 && x._2.sysUop.robIdx.needFlush(io.redirect))
-  val flushVec = validVec.map(x => x && io.redirect.needFlush)
+  val flushVec = validVec.zip(uopVec).map(x => x._1 && io.redirect.needFlush(x._2.robIdx))
 
   def regEnable(i: Int): Bool = validVec(i - 1) && rdyVec(i - 1) && !flushVec(i - 1)
 
@@ -84,7 +84,7 @@ class VFMASrcPreprocessPipe(implicit val p: Parameters) extends VFPUBaseModule {
   }
 
   // io.out.valid := validVec.last && !io.out.bits.uop.sysUop.robIdx.needFlush(io.redirect)
-  io.out.valid := validVec.last && !io.redirect.needFlush
+  io.out.valid := validVec.last && !io.redirect.needFlush(io.out.bits.uop.robIdx)
   io.in.ready := rdyVec(0)
 
 

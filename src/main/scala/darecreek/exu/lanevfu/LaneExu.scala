@@ -31,6 +31,7 @@ class VLaneExu extends Module {
       val valid = Input(Bool())
       val readys = Output(Vec(NLaneExuFUs, Bool()))
     }
+    val flush = Input(Bool())
     val out = Vec(2, Decoupled(new VLaneExuOut))
   })
 
@@ -50,6 +51,7 @@ class VLaneExu extends Module {
     lanes(i).io.in.data.uop := uop
     lanes(i).io.in.data.rs1 := io.in.bits.rs1
     lanes(i).io.in.data.prestart := 0.U  // So far, set vstart = 0 for all arithmetic instructions
+    lanes(i).io.redirect.valid := io.flush
     lanes(i).io.out(0).ready := io.out(0).ready
     lanes(i).io.out(1).ready := io.out(1).ready
   }

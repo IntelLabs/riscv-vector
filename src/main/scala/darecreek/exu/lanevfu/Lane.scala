@@ -23,6 +23,13 @@ import darecreek.exu.vfucore.{VFuParamsKey, VFuParameters}
 import darecreek.exu.vfucore.fp._
 import darecreek._
 
+object RedirectConvert {
+  def apply(in: Redirect) = {
+    val out = in.valid.asTypeOf(new darecreek.exu.vfucoreconfig.Redirect_darecreek)
+    out
+  }
+}
+
 class DummyLaneFU extends Module {
   val io = IO(new Bundle {
     val in = Flipped(Decoupled(new LaneFUInput))
@@ -60,6 +67,7 @@ class VLane extends Module{
       val valids = Input(Vec(NLaneExuFUs, Bool()))
       val readys = Output(Vec(NLaneExuFUs, Bool()))
     }
+    val redirect = Input(new Redirect)
     val out = Vec(2, Decoupled(new LaneFUOutput))
   })
 
@@ -85,6 +93,7 @@ class VLane extends Module{
   // Input of MUL
   vmac.io.in.bits := io.in.data
   vmac.io.in.valid := io.in.valids(1)
+  vmac.io.redirect := RedirectConvert(io.redirect)
   io.in.readys(1) := vmac.io.in.ready
   // Input of FP
   vfp.io.in.bits := io.in.data

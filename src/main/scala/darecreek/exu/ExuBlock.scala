@@ -41,6 +41,7 @@ class VExuBlock extends Module {
   // LaneExu input
   laneExu.io.in.bits := io.in.bits
   laneExu.io.in.valid := io.in.valid && io.in.bits.uop.ctrl.laneExu
+  laneExu.io.flush := io.flush
   for (i <- 0 until NLaneExuFUs) {
     io.in.readys(i) := laneExu.io.in.readys(i)
   }

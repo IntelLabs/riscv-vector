@@ -255,7 +255,6 @@ class VRobCommitIO extends Bundle {
 
 class Redirect extends Bundle {
   val valid = Bool()
-  def needFlush = valid
 }
 
 /**
