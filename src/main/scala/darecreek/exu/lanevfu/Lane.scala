@@ -33,20 +33,6 @@ object RedirectConvert {
 class DummyLaneFU extends Module {
   val io = IO(new Bundle {
     val in = Flipped(Decoupled(new LaneFUInput))
-    val out = Decoupled(new LaneFUOutput)
-  })
-
-  io.out.bits.uop := io.in.bits.uop
-  io.out.bits.vd := 0.U
-  io.out.valid := false.B
-  io.out.bits.fflags := 0.U 
-  io.out.bits.vxsat := false.B
-  io.in.ready := io.out.ready
-}
-
-class DummyLaneFURedirect extends Module {
-  val io = IO(new Bundle {
-    val in = Flipped(Decoupled(new LaneFUInput))
     val redirect = Input(new Redirect)
     val out = Decoupled(new LaneFUOutput)
   })
@@ -81,7 +67,7 @@ class VLane extends Module{
   // val vmac = Module(new DummyLaneFU)
   // FP
   val vfp = Module(new VFPUTop)
-  // val vfp = Module(new DummyLaneFURedirect)
+  // val vfp = Module(new DummyLaneFU)
   // fake div
   // val vdiv = Module(new DivTop)
   val vdiv = Module(new DummyLaneFU)
@@ -89,6 +75,7 @@ class VLane extends Module{
   // Input of ALU
   valu.io.in.bits := io.in.data
   valu.io.in.valid := io.in.valids(0)
+  valu.io.redirect := RedirectConvert(io.redirect)
   io.in.readys(0) := valu.io.in.ready
   // Input of MUL
   vmac.io.in.bits := io.in.data
@@ -98,11 +85,12 @@ class VLane extends Module{
   // Input of FP
   vfp.io.in.bits := io.in.data
   vfp.io.in.valid := io.in.valids(2)
-  vfp.io.redirect := 0.U.asTypeOf(new Redirect)  // !!!! flush
+  vfp.io.redirect := 0.U.asTypeOf(new Redirect)
   io.in.readys(2) := vfp.io.in.ready
   // Input of div
   vdiv.io.in.bits := io.in.data
   vdiv.io.in.valid := io.in.valids(3)
+  vdiv.io.redirect := 0.U.asTypeOf(new Redirect)
   io.in.readys(3) := vdiv.io.in.ready
 
   /**
@@ -110,7 +98,7 @@ class VLane extends Module{
     */
   io.out(0) <> valu.io.out
 
-  val arb = Module(new Arbiter(new LaneFUOutput, 3))
+  val arb = Module(new Arbiter(new LaneFUOutput, NLaneExuFUs - 1))
   arb.io.in(0) <> vdiv.io.out
   arb.io.in(1) <> vfp.io.out
   arb.io.in(2) <> vmac.io.out
