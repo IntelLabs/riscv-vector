@@ -267,7 +267,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     }
     
     io.out.mUopMergeAttr.valid                 := io.out.mUop.valid
-    io.out.mUopMergeAttr.bits.scalarRegWriteEn := ctrl.rdVal && !isFudian && !ctrl.isLdst  
+    io.out.mUopMergeAttr.bits.scalarRegWriteEn := ctrl.rdVal && !isFudian  
     io.out.mUopMergeAttr.bits.fudianRegWriteEn := ctrl.rdVal && isFudian
     io.out.mUopMergeAttr.bits.ldest            := ctrl.ldest + ldest_inc
     io.out.mUopMergeAttr.bits.rfWriteEn        := ctrl.ldestVal
