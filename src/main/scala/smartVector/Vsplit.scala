@@ -151,7 +151,7 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     val instFirstIn = (currentState === empty && io.in.decodeIn.valid)
 
-    val scalar_fudian_opnd_1 = Mux(io.in.decodeIn.bits.vCtrl.funct3 === "b101".U, 
+    val scalar_fudian_opnd_1 = Mux(io.in.decodeIn.bits.vCtrl.funct3 === "b101".U && !io.in.decodeIn.bits.vCtrl.isLdst, 
                                io.in.decodeIn.bits.fudian_opnd_1, io.in.decodeIn.bits.scalar_opnd_1)
 
     when (instFirstIn){       
