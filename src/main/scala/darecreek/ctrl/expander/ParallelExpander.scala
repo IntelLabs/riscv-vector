@@ -88,9 +88,12 @@ class ParallelExpander extends Module {
     val expdLen_seg = Mux(expdLen_segVd > expdLen_segVs2, expdLen_segVd, expdLen_segVs2)
     // For ld/st indexed and segment-indexed instrns, the pdestVal should stop at expd_len of vd
     expdLen_indexVd(i) := Mux(ldstCtrl(i).segment, expdLen_segVd, emulVd(i))
-    val perm_vmv_vfmv = ctrl(i).perm && ctrl(i).funct6 === "b010000".U
+    val perm_vmv_vfmv = ctrl(i).alu && !ctrl(i).opi && ctrl(i).funct6 === "b010000".U
                                                  // 15.1     or      //15.4/5/6: vmsb(o/i)f
-    val mask_onlyOneReg = ctrl(i).mask && (ctrl(i).funct6(3) || ctrl(i).funct6(2) && !ctrl(i).lsrc(0)(4))
+    // val mask_onlyOneReg = ctrl(i).mask && (ctrl(i).funct6(3) || ctrl(i).funct6(2) && !ctrl(i).lsrc(0)(4))
+                                                //  vcpop/vfirst         or      15.4/5/6: vmsb(o/i)f
+    val mask_onlyOneReg = ctrl(i).mask && (ctrl(i).funct6(3, 2) === 0.U || ctrl(i).funct6(2) && !ctrl(i).lsrc(0)(4)) ||
+                          ctrl(i).alu && ctrl(i).opm && ctrl(i).funct6(5, 3) === "b011".U  // 15.1
     //---- expdLen ----
     when (ctrl(i).isLdst && !ldstCtrl(i).mask) {
       expdLen(i) := Mux(ldstCtrl(i).segment, expdLen_seg, expdLen_ldst) 

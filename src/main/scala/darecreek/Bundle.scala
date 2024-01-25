@@ -101,6 +101,9 @@ class VCtrl extends Bundle {
   def laneExu = arith && !crossLane
   def isLdst = load || store
   def vs1_imm = lsrc(0)
+  def opi = funct3(0) === funct3(1) // OPIVV/X/I
+  def opm = funct3(1, 0) === 2.U //OPMVV/X
+  def opf = funct3(1, 0) === 1.U // OPFVV/F
 }
 
 class VExcptInfo extends Bundle {
