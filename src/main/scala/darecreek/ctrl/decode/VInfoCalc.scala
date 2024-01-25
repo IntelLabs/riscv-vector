@@ -84,12 +84,15 @@ class VInfoCalc extends Module {
   vnreg := Mux(nreg === 8.U, 3.U, nreg >> 1)
   // EMUL of Vd
   val vemulVd = Wire(UInt(3.W))
-                                         // 15.1     or      //15.4/5/6: vmsb(o/i)f
-  val mask_onlyOneReg = ctrl.mask && (ctrl.funct6(3) || ctrl.funct6(2) && !ctrl.lsrc(0)(4))
+  val perm_vmv_vfmv = ctrl.alu && !ctrl.opi && ctrl.funct6 === "b010000".U
+                                             //  vcpop/vfirst         or      15.4/5/6: vmsb(o/i)f
+  val mask_onlyOneReg = ctrl.mask && (ctrl.funct6(3, 2) === 0.U || ctrl.funct6(2) && !ctrl.lsrc(0)(4)) ||
+                        ctrl.alu && ctrl.opm && ctrl.funct6(5, 3) === "b011".U  // 15.1
+
   when (ldst) {
     vemulVd := Mux(ldstCtrl.wholeReg, vnfield, Mux(ldstCtrl.mask, 0.U,
                Mux(ldstCtrl.indexed, vlmul, vemul_ldst.asUInt)))
-  }.elsewhen (ctrl.narrow_to_1 || mask_onlyOneReg || ctrl.redu) {
+  }.elsewhen (ctrl.narrow_to_1 || mask_onlyOneReg || perm_vmv_vfmv || ctrl.redu) {
     vemulVd := 0.U
   }.elsewhen (ctrl.widen || ctrl.widen2) {
     vemulVd := vlmul + 1.U 
@@ -114,7 +117,7 @@ class VInfoCalc extends Module {
     vemulVs2 := vlmul + 1.U
   }.elsewhen (ext) {
     vemulVs2 := vlmul - Mux1H(Seq(ext2, ext4, ext8), Seq(1.U, 2.U, 3.U))
-  }.elsewhen (ctrl.mask) {
+  }.elsewhen (ctrl.mask || mask_onlyOneReg || perm_vmv_vfmv) {
     vemulVs2 := 0.U
   }.elsewhen (wholeRegMv) {//Whole register move
     vemulVs2 := vnreg
