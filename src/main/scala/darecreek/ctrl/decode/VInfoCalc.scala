@@ -85,9 +85,7 @@ class VInfoCalc extends Module {
   // EMUL of Vd
   val vemulVd = Wire(UInt(3.W))
   val perm_vmv_vfmv = ctrl.alu && !ctrl.opi && ctrl.funct6 === "b010000".U
-                                             //  vcpop/vfirst         or      15.4/5/6: vmsb(o/i)f
-  val mask_onlyOneReg = ctrl.mask && (ctrl.funct6(3, 2) === 0.U || ctrl.funct6(2) && !ctrl.lsrc(0)(4)) ||
-                        ctrl.alu && ctrl.opm && ctrl.funct6(5, 3) === "b011".U  // 15.1
+  val mask_onlyOneReg = ctrl.mask && !(ctrl.funct6(3, 2) === "b01".U && ctrl.lsrc(0)(4))
 
   when (ldst) {
     vemulVd := Mux(ldstCtrl.wholeReg, vnfield, Mux(ldstCtrl.mask, 0.U,
