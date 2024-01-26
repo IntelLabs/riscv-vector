@@ -18,9 +18,10 @@ import chisel3._
 import chisel3.util._
 import darecreek.exu.lanevfu.alu._
 import darecreek.exu.lanevfu.mac._
+import darecreek.exu.lanevfu.fp._
+// import darecreek.exu.vfucore.fp._
 import chipsalliance.rocketchip.config._
 import darecreek.exu.vfucore.{VFuParamsKey, VFuParameters}
-import darecreek.exu.vfucore.fp._
 import darecreek._
 
 object RedirectConvert {
@@ -66,8 +67,9 @@ class VLane extends Module{
   val vmac = Module(new LaneVMac)
   // val vmac = Module(new DummyLaneFU)
   // FP
-  val vfp = Module(new VFPUTop)
-  // val vfp = Module(new DummyLaneFU)
+  val vfp = Module(new LaneFP)
+  // val vfp = Module(new VFPUTop)
+  // val vfp = Module(new DummyLaneFURedirect)
   // fake div
   // val vdiv = Module(new DivTop)
   val vdiv = Module(new DummyLaneFU)

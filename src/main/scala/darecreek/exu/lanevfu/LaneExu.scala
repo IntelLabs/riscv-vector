@@ -62,8 +62,8 @@ class VLaneExu extends Module {
   val tail = TailGen(uop.info.vl, expdIdx, destEew, narrow)
   // Tail of each lane. It occupies the lowest bits of lane mask_input.
   val laneTail = Wire(Vec(NLanes, UInt(NByteLane.W)))
-  // Lane index:        3       2       1       0
-  // sew=32 laneTail:  76      54      32      10
+  // Lane index:        3       2       1       01
+  // sew=32 laneTail:  76      54      32       10
   for (i <- 0 until NLanes) {
     laneTail(i) :=  Mux1H(destEew.oneHot, Seq(1,2,4,8).map(bytes => UIntSplit(tail, NByteLane/bytes)(i)))
   }
