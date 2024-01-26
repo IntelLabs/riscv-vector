@@ -74,7 +74,9 @@ class VCtrlBlock extends Module {
   infoCalc.io.csr := decoder.io.out.bits.csr
   val partialVInfo_reg = Reg(ValidIO(new PartialVInfo))
   when (decoder.io.out.valid) {
-    partialVInfo_reg.bits.destEew := infoCalc.io.infoAll.veewVd
+    // For narrow-to-1, set destEew = veewVs2 to facilitate tail/mask generation 
+    partialVInfo_reg.bits.destEew := Mux(decoder.io.out.bits.ctrl.narrow_to_1,
+                      infoCalc.io.infoAll.veewVs2, infoCalc.io.infoAll.veewVd)
     partialVInfo_reg.bits.emulVd := infoCalc.io.infoAll.emulVd
     partialVInfo_reg.bits.emulVs2 := infoCalc.io.infoAll.emulVs2
     partialVInfo_reg.bits.vRobPtr := vq.io.enqPtrOut
