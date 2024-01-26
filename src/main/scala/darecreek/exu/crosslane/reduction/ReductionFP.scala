@@ -5,12 +5,11 @@ import chisel3.util._
 import chisel3.util.experimental.decode._
 import chipsalliance.rocketchip.config._
 import darecreek.exu.vfucore.fp._
-import darecreek.exu.vfucoreconfig.{VUop, Redirect}
 import darecreek.exu.vfucore.{VFuModule, VFuParamsKey, VFuParameters}
 import darecreek._
 import darecreek.exu.vfucore.fp.VFPU
 import darecreek.exu.vfucore.fp.fudian._
-
+import darecreek.exu.vfucoreconfig.{VUop, Redirect}
 
 class ReductionFP(implicit p: Parameters) extends VFuModule {
   val io = IO(new Bundle {
@@ -90,11 +89,12 @@ class ReductionFP(implicit p: Parameters) extends VFuModule {
   //  val currentRobIdx = RegEnable(in_robIdx, fpu_red && fire)
   // val output_red = red_uop_busy && (fpu(0).io.out.bits.uop.sysUop.robIdx === currentRobIdx)
   val output_red = red_uop_busy
+  val flush_in = io.redirect.needFlush(uop.asTypeOf(new darecreek.exu.vfucoreconfig.VUop).robIdx)
 
   when(fpu_red && fire) {
-    flush := io.redirect.needFlush
+    flush := flush_in
   }.otherwise {
-    flush := (flush || io.redirect.needFlush) && red_busy
+    flush := (flush || flush_in) && red_busy
   }
 
   val idle :: calc_vs2 :: calc_vs1 :: Nil = Enum(3)
@@ -446,28 +446,28 @@ class ReductionFP(implicit p: Parameters) extends VFuModule {
   for (i <- 0 until NLanes / 2) {
     fpu(i).io.in.valid := red_in_valid
     fpu(i).io.in.bits.uop := red_in(i).uop
-  //   fpu(i).io.in.bits.uop.ctrl.lsrc(0) := red_in(i).uop.ctrl.lsrc(0)
-  //   fpu(i).io.in.bits.uop.ctrl.lsrc(1) := red_in(i).uop.ctrl.lsrc(1)
-  //   fpu(i).io.in.bits.uop.ctrl.ldest := red_in(i).uop.ctrl.ldest
-  //   fpu(i).io.in.bits.uop.ctrl.vm := red_in(i).uop.ctrl.vm
-  //   fpu(i).io.in.bits.uop.ctrl.funct6 := red_in(i).uop.ctrl.funct6
-  //   fpu(i).io.in.bits.uop.ctrl.funct3 := red_in(i).uop.ctrl.funct3
-  //   fpu(i).io.in.bits.uop.ctrl.widen := red_in(i).uop.ctrl.widen
-  //   fpu(i).io.in.bits.uop.ctrl.widen2 := red_in(i).uop.ctrl.widen2
-  //   fpu(i).io.in.bits.uop.ctrl.narrow := red_in(i).uop.ctrl.narrow
-  //   fpu(i).io.in.bits.uop.ctrl.narrow_to_1 := red_in(i).uop.ctrl.narrow_to_1
-  //   fpu(i).io.in.bits.uop.info.vstart := red_in(i).uop.info.vstart
-  //   fpu(i).io.in.bits.uop.info.vl := red_in(i).uop.info.vl
-  //   fpu(i).io.in.bits.uop.info.vxrm := red_in(i).uop.info.vxrm
-  //   fpu(i).io.in.bits.uop.info.frm := red_in(i).uop.info.frm
-  //   fpu(i).io.in.bits.uop.info.vlmul := red_in(i).uop.info.vlmul
-  //   fpu(i).io.in.bits.uop.info.vsew := red_in(i).uop.info.vsew
-  //   fpu(i).io.in.bits.uop.info.ma := red_in(i).uop.info.ma
-  //   fpu(i).io.in.bits.uop.info.ta := red_in(i).uop.info.ta
-  //   fpu(i).io.in.bits.uop.info.destEew := red_in(i).uop.info.destEew
-  //   fpu(i).io.in.bits.uop.expdIdx := red_in(i).uop.expdIdx
-  //   fpu(i).io.in.bits.uop.expdEnd := red_in(i).uop.expdEnd
-  //   fpu(i).io.in.bits.uop.pdestVal := false.B
+    //   fpu(i).io.in.bits.uop.ctrl.lsrc(0) := red_in(i).uop.ctrl.lsrc(0)
+    //   fpu(i).io.in.bits.uop.ctrl.lsrc(1) := red_in(i).uop.ctrl.lsrc(1)
+    //   fpu(i).io.in.bits.uop.ctrl.ldest := red_in(i).uop.ctrl.ldest
+    //   fpu(i).io.in.bits.uop.ctrl.vm := red_in(i).uop.ctrl.vm
+    //   fpu(i).io.in.bits.uop.ctrl.funct6 := red_in(i).uop.ctrl.funct6
+    //   fpu(i).io.in.bits.uop.ctrl.funct3 := red_in(i).uop.ctrl.funct3
+    //   fpu(i).io.in.bits.uop.ctrl.widen := red_in(i).uop.ctrl.widen
+    //   fpu(i).io.in.bits.uop.ctrl.widen2 := red_in(i).uop.ctrl.widen2
+    //   fpu(i).io.in.bits.uop.ctrl.narrow := red_in(i).uop.ctrl.narrow
+    //   fpu(i).io.in.bits.uop.ctrl.narrow_to_1 := red_in(i).uop.ctrl.narrow_to_1
+    //   fpu(i).io.in.bits.uop.info.vstart := red_in(i).uop.info.vstart
+    //   fpu(i).io.in.bits.uop.info.vl := red_in(i).uop.info.vl
+    //   fpu(i).io.in.bits.uop.info.vxrm := red_in(i).uop.info.vxrm
+    //   fpu(i).io.in.bits.uop.info.frm := red_in(i).uop.info.frm
+    //   fpu(i).io.in.bits.uop.info.vlmul := red_in(i).uop.info.vlmul
+    //   fpu(i).io.in.bits.uop.info.vsew := red_in(i).uop.info.vsew
+    //   fpu(i).io.in.bits.uop.info.ma := red_in(i).uop.info.ma
+    //   fpu(i).io.in.bits.uop.info.ta := red_in(i).uop.info.ta
+    //   fpu(i).io.in.bits.uop.info.destEew := red_in(i).uop.info.destEew
+    //   fpu(i).io.in.bits.uop.expdIdx := red_in(i).uop.expdIdx
+    //   fpu(i).io.in.bits.uop.expdEnd := red_in(i).uop.expdEnd
+    //   fpu(i).io.in.bits.uop.pdestVal := false.B
     //    fpu(i).io.in.bits.uop.sysUop := Mux(red_in_valid, red_in(i).uop.sysUop, sysUop)
     fpu(i).io.in.bits.vs1 := red_in(i).vs1
     fpu(i).io.in.bits.vs2 := red_in(i).vs2
