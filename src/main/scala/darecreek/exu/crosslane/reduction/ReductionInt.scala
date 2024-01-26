@@ -8,7 +8,7 @@ import darecreek.exu.vfucore.{VFuModule, VFuParamsKey, VFuParameters}
 import darecreek._
 import darecreek.exu.vfucoreconfig.{VUop, Redirect}
 
-class Reduction(implicit p: Parameters) extends Module {
+class ReductionInt(implicit p: Parameters) extends Module {
   val io = IO(new Bundle {
     val in = Flipped(Decoupled(new VExuInput))
     val redirect = Input(new Redirect)
@@ -440,7 +440,7 @@ object MaskExtract {
 //   // }
 // }
 
-object VerilogRed extends App {
+object VerilogRedInt extends App {
   println("Generating hardware")
   val p = Parameters.empty
   emitVerilog(new Reduction()(p.alterPartial({ case VFuParamsKey =>
