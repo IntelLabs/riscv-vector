@@ -129,7 +129,7 @@ class ReductionInt(implicit p: Parameters) extends Module {
   val vl_reg = RegEnable(vl, 0.U, fire)
   vd_mask_vl := vd_mask >> (VLEN.U - vl)
   vmask_vl := vmask & vd_mask_vl
-  vlRemainBytes := Mux((vl << vsew) >= Cat(uopIdx, 0.U(4.W)), (vl << vsew) - Cat(uopIdx, 0.U(4.W)), 0.U)
+  vlRemainBytes := Mux((vl << vsew) >= Cat(uopIdx, 0.U((log2Up(VLEN)-3).W)), (vl << vsew) - Cat(uopIdx, 0.U((log2Up(VLEN)-3).W)), 0.U)
   val reg_fire = RegNext(fire)
   val reg2_fire = RegNext(reg_fire)
   val reg_widen = RegEnable(widen, false.B, fire)

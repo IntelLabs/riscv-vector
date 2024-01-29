@@ -5,6 +5,7 @@ import chisel3.util._
 import chisel3.util.experimental.decode._
 import chipsalliance.rocketchip.config._
 import darecreek.exu.vfucore.fp._
+import darecreek.exu.vfucore.reduction._
 import darecreek.exu.vfucore.{VFuModule, VFuParamsKey, VFuParameters}
 import darecreek._
 import darecreek.exu.vfucore.fp.VFPU
@@ -51,7 +52,8 @@ class ReductionFP(implicit p: Parameters) extends VFuModule {
 
   val fire = io.in.fire
 
-  val fpu = Seq.fill(NLanes / 2)(Module(new VFPUTop()(p)))
+  val fpu = Seq.fill(NLanes / 2)(Module(new VRedFPU()(p)))
+  // val fpu = Seq.fill(NLanes / 2)(Module(new VFPUTop()(p)))
 
   val vfredosum_vs = ((funct6 === "b000011".U) && (funct3 === "b001".U)) || ((funct6 === "b000001".U) && (funct3 === "b001".U))
   // val vfredusum_vs = (funct6 === "b000001".U) && (funct3 === "b001".U)
@@ -83,6 +85,11 @@ class ReductionFP(implicit p: Parameters) extends VFuModule {
   val red_busy = RegInit(false.B)
   val red_uop_busy = RegInit(false.B)
 
+  val outUopReg = Reg(new VUop)
+  when(fire && fpu_red) {
+    outUopReg := io.in.bits.uop
+  }
+
   // fp reduction redirect handling
   val flush = RegInit(false.B)
   //  val in_robIdx = sysUop.robIdx
@@ -90,11 +97,12 @@ class ReductionFP(implicit p: Parameters) extends VFuModule {
   // val output_red = red_uop_busy && (fpu(0).io.out.bits.uop.sysUop.robIdx === currentRobIdx)
   val output_red = red_uop_busy
   val flush_in = io.redirect.needFlush(uop.asTypeOf(new darecreek.exu.vfucoreconfig.VUop).robIdx)
+  val flush_in_reg = io.redirect.needFlush(outUopReg.asTypeOf(new darecreek.exu.vfucoreconfig.VUop).robIdx)
 
   when(fpu_red && fire) {
     flush := flush_in
   }.otherwise {
-    flush := (flush || flush_in) && red_busy
+    flush := (flush || flush_in_reg) && red_busy
   }
 
   val idle :: calc_vs2 :: calc_vs1 :: Nil = Enum(3)
@@ -124,9 +132,7 @@ class ReductionFP(implicit p: Parameters) extends VFuModule {
   }
 
   val red_out_valid = Wire(Bool())
-  val red_out_ready = Wire(Bool())
-  // red_out_ready := true.B
-  red_out_ready := red_uop_busy
+  val red_out_ready = true.B
   val fpu_valid = RegInit(false.B)
   val red_in_valid = Wire(Bool())
   val red_in_ready = Wire(Bool())
@@ -299,7 +305,7 @@ class ReductionFP(implicit p: Parameters) extends VFuModule {
   val vs2m_bytes = Wire(Vec(vlenb, UInt(8.W)))
   val vs2m_bits = RegEnable(Cat(vs2m_bytes.reverse), 0.U, fire)
   val vlRemainBytes = Wire(UInt(8.W))
-  vlRemainBytes := Mux((vl << vsew) >= Cat(uopIdx, 0.U(4.W)), (vl << vsew) - Cat(uopIdx, 0.U(4.W)), 0.U)
+  vlRemainBytes := Mux((vl << vsew) >= Cat(uopIdx, 0.U((log2Up(VLEN)-3).W)), (vl << vsew) - Cat(uopIdx, 0.U((log2Up(VLEN)-3).W)), 0.U)
 
   val vl_vmask = Wire(UInt(VLEN.W))
   val vmask_vl = Wire(UInt(VLEN.W))
@@ -370,10 +376,8 @@ class ReductionFP(implicit p: Parameters) extends VFuModule {
     }
   }
 
-
-  red_uop := uop
-
   when(fire) {
+    red_uop := uop
     red_uop.ctrl.funct6 := red_uop.ctrl.funct6
     red_uop.ctrl.funct3 := red_uop.ctrl.funct3
     red_uop.info.vsew := red_uop.info.vsew
@@ -446,29 +450,6 @@ class ReductionFP(implicit p: Parameters) extends VFuModule {
   for (i <- 0 until NLanes / 2) {
     fpu(i).io.in.valid := red_in_valid
     fpu(i).io.in.bits.uop := red_in(i).uop
-    //   fpu(i).io.in.bits.uop.ctrl.lsrc(0) := red_in(i).uop.ctrl.lsrc(0)
-    //   fpu(i).io.in.bits.uop.ctrl.lsrc(1) := red_in(i).uop.ctrl.lsrc(1)
-    //   fpu(i).io.in.bits.uop.ctrl.ldest := red_in(i).uop.ctrl.ldest
-    //   fpu(i).io.in.bits.uop.ctrl.vm := red_in(i).uop.ctrl.vm
-    //   fpu(i).io.in.bits.uop.ctrl.funct6 := red_in(i).uop.ctrl.funct6
-    //   fpu(i).io.in.bits.uop.ctrl.funct3 := red_in(i).uop.ctrl.funct3
-    //   fpu(i).io.in.bits.uop.ctrl.widen := red_in(i).uop.ctrl.widen
-    //   fpu(i).io.in.bits.uop.ctrl.widen2 := red_in(i).uop.ctrl.widen2
-    //   fpu(i).io.in.bits.uop.ctrl.narrow := red_in(i).uop.ctrl.narrow
-    //   fpu(i).io.in.bits.uop.ctrl.narrow_to_1 := red_in(i).uop.ctrl.narrow_to_1
-    //   fpu(i).io.in.bits.uop.info.vstart := red_in(i).uop.info.vstart
-    //   fpu(i).io.in.bits.uop.info.vl := red_in(i).uop.info.vl
-    //   fpu(i).io.in.bits.uop.info.vxrm := red_in(i).uop.info.vxrm
-    //   fpu(i).io.in.bits.uop.info.frm := red_in(i).uop.info.frm
-    //   fpu(i).io.in.bits.uop.info.vlmul := red_in(i).uop.info.vlmul
-    //   fpu(i).io.in.bits.uop.info.vsew := red_in(i).uop.info.vsew
-    //   fpu(i).io.in.bits.uop.info.ma := red_in(i).uop.info.ma
-    //   fpu(i).io.in.bits.uop.info.ta := red_in(i).uop.info.ta
-    //   fpu(i).io.in.bits.uop.info.destEew := red_in(i).uop.info.destEew
-    //   fpu(i).io.in.bits.uop.expdIdx := red_in(i).uop.expdIdx
-    //   fpu(i).io.in.bits.uop.expdEnd := red_in(i).uop.expdEnd
-    //   fpu(i).io.in.bits.uop.pdestVal := false.B
-    //    fpu(i).io.in.bits.uop.sysUop := Mux(red_in_valid, red_in(i).uop.sysUop, sysUop)
     fpu(i).io.in.bits.vs1 := red_in(i).vs1
     fpu(i).io.in.bits.vs2 := red_in(i).vs2
     fpu(i).io.in.bits.old_vd := red_in(i).old_vd
@@ -476,16 +457,9 @@ class ReductionFP(implicit p: Parameters) extends VFuModule {
     fpu(i).io.in.bits.prestart := red_in(i).prestart
     fpu(i).io.in.bits.mask := red_in(i).mask
     fpu(i).io.in.bits.tail := red_in(i).tail
-    fpu(i).io.out.ready := io.out.ready || red_out_ready
+    fpu(i).io.out.ready := red_out_ready
     fpu(i).io.redirect := io.redirect
     red_out(i) := fpu(i).io.out.bits
-  }
-
-
-  val outUopReg = Reg(new VUop)
-
-  when(fire && fpu_red) {
-    outUopReg := io.in.bits.uop
   }
 
   io.out.bits.uop := outUopReg
@@ -502,7 +476,6 @@ class ReductionFP(implicit p: Parameters) extends VFuModule {
   }.elsewhen(red_out_valid && red_out_ready) {
     red_fflag := red_fflag | fpu(0).io.out.bits.fflags
   }
-
 
   io.out.bits.vd := VecInit(Seq.tabulate(NLanes)(i => (output_data) ((i + 1) * LaneWidth - 1, i * LaneWidth)))
   io.in.ready := fpu(0).io.in.ready & fpu(1).io.in.ready & !red_uop_busy

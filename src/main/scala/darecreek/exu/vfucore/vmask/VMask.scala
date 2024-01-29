@@ -80,12 +80,12 @@ class VMask(implicit p: Parameters) extends VFuModule {
   vmxnor := ~vmxor
 
   val eew = SewOH(vsew)
-  val vsew_plus1 = Wire(UInt(3.W))
-  vsew_plus1 := Cat(0.U(1.W), ~vsew(1, 0)) + 1.U
+  val vsew_plus1 = Wire(UInt(7.W))
+  vsew_plus1 := Cat(0.U(1.W), ~vsew(1, 0)) + (log2Up(VLEN) - 6).U
   val vsew_bytes = Mux1H(eew.oneHot, Seq(1.U(4.W), 2.U(4.W), 4.U(4.W), 8.U(4.W)))
   val vsew_bits = Mux1H(eew.oneHot, Seq(8.U(7.W), 16.U(7.W), 32.U(7.W), 64.U(7.W)))
   val ele_cnt = Mux1H(eew.oneHot, Seq((VLEN / 8).U, (VLEN / 16).U, (VLEN / 32).U, (VLEN / 64).U))
-  val vlRemain = Wire(UInt(8.W))
+  val vlRemain = Wire(UInt(bVL.W))
   val vlRemainBytes = vlRemain << vsew
   val all_one = (~0.U(VLEN.W))
 
@@ -206,11 +206,11 @@ class VMask(implicit p: Parameters) extends VFuModule {
     vd_reg := one_cnt(ele_cnt)
   }
 
-  val vstartRemain = Wire(UInt(7.W))
+  val vstartRemain = Wire(UInt(bVL.W))
   vstartRemain := Mux(vid_v, Mux(vstart >= (uopIdx << vsew_plus1), (vstart - (uopIdx << vsew_plus1)), 0.U), 0.U)
 
-  val vl_reg = RegEnable(vlRemain, 0.U, fire)
-  val vstart_reg = RegEnable(vstartRemain, 0.U, fire)
+  val vl_reg = RegEnable(vl, 0.U, fire)
+  val vstart_reg = RegEnable(vstart, 0.U, fire)
   val vm_reg = RegEnable(vm, false.B, fire)
   val ma_reg = RegEnable(ma, false.B, fire)
   val ta_reg = RegEnable(ta, false.B, fire)
@@ -361,8 +361,10 @@ class VMask(implicit p: Parameters) extends VFuModule {
   io.out.bits.uop := RegEnable(uop, fire)
 
 }
+
 object MaskExtract {
- def VLEN =256
+  def VLEN = 256
+
   def apply(vmask: UInt, uopIdx: UInt, sew: SewOH) = {
     val extracted = Wire(UInt((VLEN / 8).W))
     extracted := Mux1H(Seq.tabulate(8)(uopIdx === _.U),
@@ -373,10 +375,12 @@ object MaskExtract {
 }
 
 import xiangshan._
+
 object VerilogVMask extends App {
   println("Generating hardware")
   val p = Parameters.empty
-  emitVerilog(new VMask()(p.alterPartial({case VFuParamsKey =>
-              VFuParameters(VLEN = 256)})), Array("--target-dir", "generated",
-              "--emission-options=disableMemRandomization,disableRegisterRandomization"))
+  emitVerilog(new VMask()(p.alterPartial({ case VFuParamsKey =>
+    VFuParameters(VLEN = 256)
+  })), Array("--target-dir", "generated",
+    "--emission-options=disableMemRandomization,disableRegisterRandomization"))
 }
