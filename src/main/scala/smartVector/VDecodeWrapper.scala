@@ -9,6 +9,7 @@ import chipsalliance.rocketchip.config
 import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import darecreek.VInfoCalc
 import darecreek.VInfoAll
+import darecreek.VCtrl
 
 class VDecodeOutput(implicit p: Parameters) extends Bundle{
   val vCtrl         = new darecreek.VCtrl
@@ -33,7 +34,18 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   val decode = Module(new VDecode)
   decode.io.in := io.in.bits.inst
 
-  io.out.bits.vCtrl         := RegEnable(decode.io.out, io.in.valid)
+  val isFloatRedu =  decode.io.out.redu === true.B && decode.io.out.funct3 === "b001".U
+  
+  val decodeOut = Wire(new VCtrl)
+  when(isFloatRedu){
+    decodeOut := decode.io.out
+    decodeOut.fp := true.B
+    decodeOut.redu := false.B
+  }.otherwise{
+    decodeOut := decode.io.out
+  }
+
+  io.out.bits.vCtrl         := RegEnable(decodeOut, io.in.valid)
   io.out.bits.scalar_opnd_1 := RegEnable(io.in.bits.rs1, io.in.valid)
   io.out.bits.scalar_opnd_2 := RegEnable(io.in.bits.rs2, io.in.valid)
   io.out.bits.fudian_opnd_1 := RegEnable(io.in.bits.frs1, io.in.valid)
