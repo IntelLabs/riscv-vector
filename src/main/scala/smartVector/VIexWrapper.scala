@@ -45,7 +45,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   val currentStateNext = WireDefault(empty) 
 
   val outValid = SValu.io.out.valid || SVMac.io.out.valid || SVMask.io.out.valid || 
-                 SVReduc.io.out.valid || SVDiv.io.out.valid || SVPerm.io.out.wb_vld || SVFpu.io.out.valid
+                 SVReduc.io.out.valid || SVDiv.io.out.valid || SVFpu.io.out.valid
 
   val oneCycleLatIn = io.in.valid & (io.in.bits.uop.ctrl.alu || io.in.bits.uop.ctrl.mask)
   val twoCycleLatIn = io.in.valid & (io.in.bits.uop.ctrl.mul || io.in.bits.uop.ctrl.redu)
@@ -94,8 +94,8 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   }
 
   SVPerm.io.in.uop := io.in.bits.uop
-  //TODO: when id fudian inst, the rs1 should read from fudian register file
-  SVPerm.io.in.rs1 := io.in.bits.scalar_opnd_1 // || fudian
+  //TODO: when id float inst, the rs1 should read from float register file
+  SVPerm.io.in.rs1 := io.in.bits.scalar_opnd_1 // || float
   SVPerm.io.in.vs1_preg_idx := VecInit(Seq.tabulate(8)(i => io.in.bits.uop.ctrl.lsrc(0) + i.U))
   SVPerm.io.in.vs2_preg_idx := VecInit(Seq.tabulate(8)(i => io.in.bits.uop.ctrl.lsrc(1) + i.U))
   SVPerm.io.in.old_vd_preg_idx := VecInit(Seq.tabulate(8)(i => io.in.bits.uop.ctrl.ldest + i.U))

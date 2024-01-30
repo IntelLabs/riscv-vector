@@ -41,7 +41,7 @@ class ScoreboardReadIO extends Bundle {
 
 class CommitInfo extends Bundle{
     val scalarRegWriteEn = Bool()
-    val fudianRegWriteEn = Bool()
+    val floatRegWriteEn = Bool()
     val ldest = UInt(5.W)
     val data = UInt(64.W)
 }

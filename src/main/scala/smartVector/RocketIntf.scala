@@ -21,7 +21,7 @@ class VInfo extends Bundle {
 
 class RVUissue extends Bundle {
     val inst   = UInt(32.W)
-    val frs1   = UInt(64.W) //fudian register data
+    val frs1   = UInt(64.W) //float register data
     val rs1    = UInt(64.W)
     val rs2    = UInt(64.W)
     val vInfo  = new VInfo
@@ -71,7 +71,7 @@ class RVUMemory extends Bundle {
 class RVUCommit extends Bundle {
     val commit_vld             = Output(Bool())
     val return_data_vld        = Output(Bool()) // need to update scalar register file
-    val return_data_fudian_vld = Output(Bool()) // need to update fudian register file
+    val return_data_float_vld = Output(Bool()) // need to update float register file
     val return_data            = Output(UInt(64.W))
     val return_reg_idx         = Output(UInt(5.W))
     val exception_vld          = Output(Bool())

@@ -15,7 +15,7 @@ class VDecodeOutput(implicit p: Parameters) extends Bundle{
   val vCtrl         = new darecreek.VCtrl
   val scalar_opnd_1 = UInt(64.W)
   val scalar_opnd_2 = UInt(64.W)
-  val fudian_opnd_1 = UInt(64.W)
+  val float_opnd_1 = UInt(64.W)
   val vInfo         = new VInfo
   val eewEmulInfo   = new VInfoAll
 
@@ -48,7 +48,7 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   io.out.bits.vCtrl         := RegEnable(decodeOut, io.in.valid)
   io.out.bits.scalar_opnd_1 := RegEnable(io.in.bits.rs1, io.in.valid)
   io.out.bits.scalar_opnd_2 := RegEnable(io.in.bits.rs2, io.in.valid)
-  io.out.bits.fudian_opnd_1 := RegEnable(io.in.bits.frs1, io.in.valid)
+  io.out.bits.float_opnd_1 := RegEnable(io.in.bits.frs1, io.in.valid)
 
   //val validTmp = Reg(Bool())
   //when (RegNext(io.in.valid) & (~io.out.ready || io.iexNeedStall)){

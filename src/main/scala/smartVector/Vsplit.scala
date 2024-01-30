@@ -14,7 +14,7 @@ import darecreek.Vlmul_to_lmul
 
 class MuopMergeAttr extends Bundle {
     val scalarRegWriteEn = Bool()
-    val fudianRegWriteEn = Bool()
+    val floatRegWriteEn = Bool()
     val rfWriteEn = Bool()
     val ldest = UInt(5.W)
     val muopEnd = Bool()
@@ -152,14 +152,14 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     val instFirstIn = (currentState === empty && io.in.decodeIn.valid)
 
-    val isFudian = io.in.decodeIn.bits.vCtrl.funct3 === "b101".U && !io.in.decodeIn.bits.vCtrl.isLdst
-    val scalar_fudian_opnd_1 = Mux(isFudian, io.in.decodeIn.bits.fudian_opnd_1, 
+    val isfloat = io.in.decodeIn.bits.vCtrl.funct3 === "b101".U && !io.in.decodeIn.bits.vCtrl.isLdst
+    val scalar_float_opnd_1 = Mux(isfloat, io.in.decodeIn.bits.float_opnd_1, 
                                    io.in.decodeIn.bits.scalar_opnd_1)
 
     when (instFirstIn){       
         vCtrl(0)            := io.in.decodeIn.bits.vCtrl
         vInfo(0)            := io.in.decodeIn.bits.vInfo
-        scalar_opnd_1(0)    := scalar_fudian_opnd_1
+        scalar_opnd_1(0)    := scalar_float_opnd_1
         scalar_opnd_2(0)    := io.in.decodeIn.bits.scalar_opnd_2
         uopRegInfo(0).vxsat := false.B
     }
@@ -173,7 +173,7 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     val ctrl = Mux(instFirstIn,io.in.decodeIn.bits.vCtrl,vCtrl(0))
     val info = Mux(instFirstIn,io.in.decodeIn.bits.vInfo,vInfo(0))
-    val scalarOpnd1 = Mux(instFirstIn,scalar_fudian_opnd_1,scalar_opnd_1(0))
+    val scalarOpnd1 = Mux(instFirstIn,scalar_float_opnd_1,scalar_opnd_1(0))
     val scalarOpnd2 = Mux(instFirstIn,io.in.decodeIn.bits.scalar_opnd_2,scalar_opnd_2(0))
 
     //Because the register file do not always read the register file when instFirstIn
@@ -267,8 +267,8 @@ class Vsplit(implicit p : Parameters) extends Module {
     }
     
     io.out.mUopMergeAttr.valid                 := io.out.mUop.valid
-    io.out.mUopMergeAttr.bits.scalarRegWriteEn := ctrl.rdVal && !isFudian  
-    io.out.mUopMergeAttr.bits.fudianRegWriteEn := ctrl.rdVal && isFudian
+    io.out.mUopMergeAttr.bits.scalarRegWriteEn := ctrl.rdVal && !isfloat  
+    io.out.mUopMergeAttr.bits.floatRegWriteEn := ctrl.rdVal && isfloat
     io.out.mUopMergeAttr.bits.ldest            := ctrl.ldest + ldest_inc
     io.out.mUopMergeAttr.bits.rfWriteEn        := ctrl.ldestVal
     io.out.mUopMergeAttr.bits.muopEnd          := io.out.mUop.bits.uop.uopEnd
