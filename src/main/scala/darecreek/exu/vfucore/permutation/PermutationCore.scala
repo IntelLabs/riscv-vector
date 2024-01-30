@@ -646,7 +646,7 @@ class PermutationCore(implicit p: Parameters) extends VFuModule {
   vrgather_vd := vrgatherEngine.io.vrgather_vd
 
   vsew_bytes := 1.U << vsew_reg
-  vsew_shift := Cat(0.U(1.W), ~vsew_reg(1, 0)) + 1.U
+  vsew_shift := Cat(0.U(1.W), ~vsew_reg(1, 0)) + (log2Up(VLEN) - 6).U
   when(flush) {
     vlRemain := 0.U
   }.elsewhen(uop_valid) {

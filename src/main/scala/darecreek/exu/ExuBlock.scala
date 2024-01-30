@@ -53,8 +53,6 @@ class VExuBlock extends Module {
   // Cross-lane Exu input
   crossLExu.io.in.bits := io.in.bits
   crossLExu.io.in.valid := io.in.valid && io.in.bits.uop.ctrl.crossLane
-  crossLExu.io.perm.rdata := 0.U
-  crossLExu.io.perm.rvalid := false.B
   crossLExu.io.redirect := 0.U.asTypeOf(new Redirect)
   for (i <- 0 until (NArithFUs - NLaneExuFUs)) {
     io.in.readys(i + NLaneExuFUs) := crossLExu.io.in.readys(i)
