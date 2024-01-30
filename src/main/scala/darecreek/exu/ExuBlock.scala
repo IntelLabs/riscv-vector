@@ -1,14 +1,14 @@
-/***************************************************************************************
-*Copyright (c) 2023-2024 Intel Corporation
-*Vector Acceleration IP core for RISC-V* is licensed under Mulan PSL v2.
-*You can use this software according to the terms and conditions of the Mulan PSL v2.
-*You may obtain a copy of Mulan PSL v2 at:
-*        http://license.coscl.org.cn/MulanPSL2
-*THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
-*EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
-*MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
-*See the Mulan PSL v2 for more details.
-***************************************************************************************/
+/** *************************************************************************************
+  * Copyright (c) 2023-2024 Intel Corporation
+  * Vector Acceleration IP core for RISC-V* is licensed under Mulan PSL v2.
+  * You can use this software according to the terms and conditions of the Mulan PSL v2.
+  * You may obtain a copy of Mulan PSL v2 at:
+  * http://license.coscl.org.cn/MulanPSL2
+  * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+  * EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+  * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+  * See the Mulan PSL v2 for more details.
+  * ************************************************************************************* */
 
 /**
   * ExuBlock: arithmetic functional units
@@ -36,8 +36,8 @@ class VExuBlock extends Module {
   })
 
   val laneExu = Module(new VLaneExu)
-  val crossLExu = Module(new VCrossLaneExu) 
-  
+  val crossLExu = Module(new VCrossLaneExu)
+
   // LaneExu input
   laneExu.io.in.bits := io.in.bits
   laneExu.io.in.valid := io.in.valid && io.in.bits.uop.ctrl.laneExu
@@ -48,6 +48,9 @@ class VExuBlock extends Module {
   // Cross-lane Exu input
   crossLExu.io.in.bits := io.in.bits
   crossLExu.io.in.valid := io.in.valid && io.in.bits.uop.ctrl.crossLane
+  crossLExu.io.perm.rdata := 0.U
+  crossLExu.io.perm.rvalid := false.B
+  crossLExu.io.redirect := 0.U.asTypeOf(new Redirect)
   for (i <- 0 until (NArithFUs - NLaneExuFUs)) {
     io.in.readys(i + NLaneExuFUs) := crossLExu.io.in.readys(i)
   }

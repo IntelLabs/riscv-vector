@@ -2,6 +2,7 @@ package darecreek
 
 import chisel3._
 import chisel3.util._
+import darecreek.exu.crosslane.perm._
 import darecreek.exu.crosslane.vmask._
 import darecreek.exu.crosslane.reduction._
 import chipsalliance.rocketchip.config._
@@ -15,9 +16,16 @@ class VCrossLaneExu extends Module {
       val valid = Input(Bool())
       val readys = Output(Vec(3, Bool()))
     }
-
-
     val out = Decoupled(new VCrossExuOut)
+
+    val redirect = Input(new Redirect)
+    // For permutation read register file
+    val perm = new Bundle {
+      val rd_en = Output(Bool())
+      val rd_preg_idx = Output(UInt(8.W))
+      val rdata = Input(UInt(VLEN.W))
+      val rvalid = Input(Bool())
+    }
   })
 
   implicit val p = Parameters.empty.alterPartial({
@@ -30,7 +38,7 @@ class VCrossLaneExu extends Module {
 
   reduction.io.in.bits := io.in.bits
   reduction.io.in.valid := io.in.valid && io.in.bits.uop.ctrl.redu
-  reduction.io.redirect := 0.U.asTypeOf(new Redirect)  // !!!! flush
+  reduction.io.redirect := io.redirect
   io.in.readys(0) := reduction.io.in.ready
 
   vmask.io.in.bits := io.in.bits
@@ -39,12 +47,17 @@ class VCrossLaneExu extends Module {
 
   permutation.io.in.bits := io.in.bits
   permutation.io.in.valid := io.in.valid && io.in.bits.uop.ctrl.perm
+  permutation.io.redirect := io.redirect
   io.in.readys(2) := permutation.io.in.ready
+  permutation.io.perm.rdata := io.perm.rdata
+  permutation.io.perm.rvalid := io.perm.rvalid
+  io.perm.rd_en := permutation.io.perm.rd_en
+  io.perm.rd_preg_idx := permutation.io.perm.rd_preg_idx
 
   val arb = Module(new Arbiter(new VCrossExuOut, 3))
-  arb.io.in(0) <> reduction.io.out
-  arb.io.in(1) <> vmask.io.out
-  arb.io.in(2) <> permutation.io.out
+  arb.io.in(0) <> permutation.io.out
+  arb.io.in(1) <> reduction.io.out
+  arb.io.in(2) <> vmask.io.out
   io.out <> arb.io.out
 }
 
