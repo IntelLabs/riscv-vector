@@ -14,11 +14,14 @@
   * ExuBlock: arithmetic functional units
   */
 
-package darecreek
+package darecreek.exu
 
 import chisel3._
 import chisel3.util._
 import darecreek.exu.lanevfu._
+import darecreek.exu.crosslane._
+import darecreek._
+import darecreek.exu.crosslane.PermRdRF
 
 class VExuBlock extends Module {
   val io = IO(new Bundle {
@@ -33,6 +36,8 @@ class VExuBlock extends Module {
       val laneMulFp = ValidIO(new VLaneExuOut)
       val cross = ValidIO(new VCrossExuOut)
     }
+    // For permutation read register file
+    val perm = new PermRdRF
   })
 
   val laneExu = Module(new VLaneExu)
@@ -63,4 +68,5 @@ class VExuBlock extends Module {
   io.out.cross.valid := crossLExu.io.out.valid
   io.out.cross.bits := crossLExu.io.out.bits
   crossLExu.io.out.ready := true.B
+  io.perm <> crossLExu.io.perm
 }

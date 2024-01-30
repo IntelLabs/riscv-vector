@@ -15,6 +15,7 @@ package darecreek
 import chisel3._
 import chisel3.util._
 import darecreek.lsu._
+import darecreek.exu._
 
 class VPUCore extends Module {
   val io = IO(new Bundle {
@@ -55,10 +56,10 @@ class VPUCore extends Module {
   issueBlock.io.get_rs1 <> ctrlBlock.io.get_rs1
 
   exuBlock.io.in <> issueBlock.io.toExu
+  exuBlock.io.perm <> issueBlock.io.perm
   exuBlock.io.flush := ctrlBlock.io.flush
   issueBlock.io.toExu.readys := exuBlock.io.in.readys
   issueBlock.io.fromExu := exuBlock.io.out
-
 
   lsu.io.fromIQ.ld <> issueBlock.io.toLSU.ld
   lsu.io.fromIQ.st <> issueBlock.io.toLSU.st

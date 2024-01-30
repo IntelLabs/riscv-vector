@@ -1,4 +1,4 @@
-package darecreek
+package darecreek.exu.crosslane
 
 import chisel3._
 import chisel3.util._
@@ -7,25 +7,26 @@ import darecreek.exu.crosslane.vmask._
 import darecreek.exu.crosslane.reduction._
 import chipsalliance.rocketchip.config._
 import darecreek.exu.vfucore.{VFuModule, VFuParamsKey, VFuParameters}
+import darecreek._
+
+// For permutation read register file
+class PermRdRF extends Bundle {
+  val rd_en = Output(Bool())
+  val rd_preg_idx = Output(UInt(VPRegIdxWidth.W))
+  val rdata = Input(UInt(VLEN.W))
+  val rvalid = Input(Bool())
+}
 
 class VCrossLaneExu extends Module {
-
   val io = IO(new Bundle {
     val in = new Bundle {
       val bits = Input(new VExuInput)
       val valid = Input(Bool())
       val readys = Output(Vec(3, Bool()))
     }
-    val out = Decoupled(new VCrossExuOut)
-
     val redirect = Input(new Redirect)
-    // For permutation read register file
-    val perm = new Bundle {
-      val rd_en = Output(Bool())
-      val rd_preg_idx = Output(UInt(8.W))
-      val rdata = Input(UInt(VLEN.W))
-      val rvalid = Input(Bool())
-    }
+    val out = Decoupled(new VCrossExuOut)
+    val perm = new PermRdRF
   })
 
   implicit val p = Parameters.empty.alterPartial({
