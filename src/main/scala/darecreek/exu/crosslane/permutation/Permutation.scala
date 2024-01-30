@@ -7,6 +7,7 @@ import darecreek.exu.vfucore.perm._
 import chipsalliance.rocketchip.config._
 import darecreek.exu.vfucore.fp.VFPU
 import darecreek.exu.vfucoreconfig.{VUop, Redirect}
+import darecreek.exu.crosslane.PermRdRF
 import darecreek._
 
 class Permutation(implicit p: Parameters) extends VFuModule {
@@ -14,13 +15,7 @@ class Permutation(implicit p: Parameters) extends VFuModule {
     val in = Flipped(Decoupled(new VExuInput))
     val redirect = Input(new Redirect)
     val out = Decoupled(new VCrossExuOut)
-    // For permutation read register file
-    val perm = new Bundle {
-      val rd_en = Output(Bool())
-      val rd_preg_idx = Output(UInt(8.W))
-      val rdata = Input(UInt(VLEN.W))
-      val rvalid = Input(Bool())
-    }
+    val perm = new PermRdRF
   })
 
   val uop = io.in.bits.uop
@@ -39,13 +34,6 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   val uop_reg = Reg(new VUop)
   val rs1_reg = Reg(UInt(XLEN.W))
 
-  val use_perm_ready = RegInit(false.B)
-  when(uop.expdEnd) {
-    use_perm_ready := true.B
-  }.elsewhen(!perm_busy) {
-    use_perm_ready := false.B
-  }
-
   when(fire) {
     uop_reg := uop
     rs1_reg := io.in.bits.rs1
@@ -56,7 +44,7 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   }
 
   uop_valid := false.B
-  when(uop.expdEnd) {
+  when(fire && uop.expdEnd) {
     uop_valid := true.B
   }
 
@@ -78,7 +66,7 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   io.out.bits.vd := VecInit(Seq.tabulate(NLanes)(i => (perm.io.out.wb_data) ((i + 1) * LaneWidth - 1, i * LaneWidth)))
   io.out.bits.fflags := 0.U
 
-  io.in.ready := Mux(use_perm_ready, !perm_busy & !uop_valid, true.B)
+  io.in.ready := !(uop_valid | perm_busy)
 }
 
 object VerilogPerm extends App {

@@ -50,10 +50,7 @@ class VCrossLaneExu extends Module {
   permutation.io.in.valid := io.in.valid && io.in.bits.uop.ctrl.perm
   permutation.io.redirect := io.redirect
   io.in.readys(2) := permutation.io.in.ready
-  permutation.io.perm.rdata := io.perm.rdata
-  permutation.io.perm.rvalid := io.perm.rvalid
-  io.perm.rd_en := permutation.io.perm.rd_en
-  io.perm.rd_preg_idx := permutation.io.perm.rd_preg_idx
+  io.perm <> permutation.io.perm
 
   val arb = Module(new Arbiter(new VCrossExuOut, 3))
   arb.io.in(0) <> permutation.io.out
