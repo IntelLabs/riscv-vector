@@ -3,7 +3,7 @@ package darecreek
 import chisel3._
 import chisel3.util._
 
-class Permutation extends Module {
+class Permutation1 extends Module {
   val io = IO(new Bundle {
     val in = Flipped(Decoupled(new VExuInput))   
     val out = Decoupled(new VCrossExuOut)
@@ -571,7 +571,7 @@ io.out.bits.fflags := 0.U
 
 object VerilogPer extends App {
   println("Generating the VPU CrossLane hardware")
-  emitVerilog(new Permutation(), Array("--target-dir", "generated"))
+  emitVerilog(new Permutation1(), Array("--target-dir", "generated"))
 }
 
 
