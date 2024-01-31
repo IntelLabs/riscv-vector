@@ -110,7 +110,7 @@ class VMerge (implicit p : Parameters) extends Module {
     }
 
     //Perm is not same as others, need to deal seperately
-    val permWriteNum = RegInit(0.U(3.W))
+    val permWriteNum = RegInit(0.U(4.W))
     when(io.in.permIn.wb_vld){
         io.out.toRegFileWrite.rfWriteEn  := true.B
         io.out.toRegFileWrite.rfWriteIdx := regDstIdx + permWriteNum
