@@ -48,8 +48,9 @@ trait DarecreekParameters {
   // val LdIQSize = 20
   // val StaIQSize = 20
   // val StdIQSize = 20
-  val NLaneExuFUs = 4
-  val NArithFUs = NLaneExuFUs + 3 // Number of FUs in EXU
+  val NLaneExuFUs = 3
+  val NCrossLaneFUs = 4
+  val NArithFUs = NLaneExuFUs + NCrossLaneFUs // Number of FUs in EXU
 
   val NVPhyRegs: Int = 64  // Vector PRF
   val SPRegIdxWidth = log2Up(NPhyRegs) // Scalar

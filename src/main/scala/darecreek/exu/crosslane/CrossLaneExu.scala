@@ -5,9 +5,11 @@ import chisel3.util._
 import darecreek.exu.crosslane.perm._
 import darecreek.exu.crosslane.vmask._
 import darecreek.exu.crosslane.reduction._
+import darecreek.exu.crosslane.div._
 import chipsalliance.rocketchip.config._
 import darecreek.exu.vfucore.{VFuModule, VFuParamsKey, VFuParameters}
 import darecreek._
+import darecreek.exu.lanevfu.RedirectConvert
 
 // For permutation read register file
 class PermRdRF extends Bundle {
@@ -22,7 +24,7 @@ class VCrossLaneExu extends Module {
     val in = new Bundle {
       val bits = Input(new VExuInput)
       val valid = Input(Bool())
-      val readys = Output(Vec(3, Bool()))
+      val readys = Output(Vec(NCrossLaneFUs, Bool()))
     }
     val redirect = Input(new Redirect)
     val out = Decoupled(new VCrossExuOut)
@@ -30,12 +32,13 @@ class VCrossLaneExu extends Module {
   })
 
   implicit val p = Parameters.empty.alterPartial({
-    case VFuParamsKey => VFuParameters(VLEN = 256)
+    case VFuParamsKey => VFuParameters(VLEN = VLEN)
   })
 
   val permutation = Module(new Permutation)
-  val vmask = Module(new VMaskDC()(p))
-  val reduction = Module(new Reduction()(p))
+  val vmask = Module(new VMaskDC)
+  val reduction = Module(new Reduction)
+  val div = Module(new VDiv)
 
   reduction.io.in.bits := io.in.bits
   reduction.io.in.valid := io.in.valid && io.in.bits.uop.ctrl.redu
@@ -52,10 +55,26 @@ class VCrossLaneExu extends Module {
   io.in.readys(2) := permutation.io.in.ready
   io.perm <> permutation.io.perm
 
-  val arb = Module(new Arbiter(new VCrossExuOut, 3))
+  div.io.in.valid := io.in.valid && io.in.bits.uop.ctrl.div
+  div.io.in.bits.uop := io.in.bits.uop
+  div.io.in.bits.rs1 := io.in.bits.rs1
+  div.io.in.bits.vs1 := io.in.bits.vSrc(0).asUInt
+  div.io.in.bits.vs2 := io.in.bits.vSrc(1).asUInt
+  div.io.in.bits.oldVd := io.in.bits.vSrc(2).asUInt
+  div.io.in.bits.mask := io.in.bits.vSrc(3).asUInt
+  div.io.redirect := RedirectConvert(io.redirect)
+  io.in.readys(3) := div.io.in.ready
+
+  val arb = Module(new Arbiter(new VCrossExuOut, NCrossLaneFUs))
   arb.io.in(0) <> permutation.io.out
   arb.io.in(1) <> reduction.io.out
   arb.io.in(2) <> vmask.io.out
+  arb.io.in(3).valid := div.io.out.valid
+  arb.io.in(3).bits.uop := div.io.out.bits.uop
+  arb.io.in(3).bits.vd := VecInit(UIntSplit(div.io.out.bits.vd))
+  arb.io.in(3).bits.fflags := div.io.out.bits.fflags
+  div.io.out.ready := arb.io.in(3).ready
+
   io.out <> arb.io.out
 }
 

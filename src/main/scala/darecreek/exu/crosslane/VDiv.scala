@@ -1,10 +1,11 @@
-package darecreek.exu.vfucore.div
+package darecreek.exu.crosslane.div
 
 import chisel3._
 import chisel3.util._
 import chipsalliance.rocketchip.config._
 import darecreek.exu.vfucore.{VFuModule, VFuParamsKey, VFuParameters}
 import darecreek.exu.vfucore.{LaneFUInput, LaneFUOutput, VFuInput, VFpuOutput}
+import darecreek.exu.vfucore.div.DivTop
 import darecreek._
 import darecreek.exu.vfucoreconfig.{VUop, Redirect}
 
@@ -50,12 +51,9 @@ class VDiv(implicit p: Parameters) extends VFuModule { //with RequireAsyncReset 
     divTops(i).io.in.bits.vs2 := UIntSplit(io.in.bits.vs2, 64)(i)
     divTops(i).io.in.bits.old_vd := UIntSplit(io.in.bits.oldVd, 64)(i)
     divTops(i).io.in.bits.rs1 := io.in.bits.rs1
-    val prestartSplash = MaskReorg.splash(lanePrestart(i), eewVd)
-    divTops(i).io.in.bits.prestart := UIntSplit(prestartSplash, 8)(i)
-    val maskSplash = MaskReorg.splash(laneMask(i), eewVd)
-    divTops(i).io.in.bits.mask := UIntSplit(maskSplash, 8)(i)
-    val tailSplash = MaskReorg.splash(laneTail(i), eewVd)
-    divTops(i).io.in.bits.tail := UIntSplit(tailSplash, 8)(i)
+    divTops(i).io.in.bits.prestart := MaskReorg.splash(lanePrestart(i), eewVd)
+    divTops(i).io.in.bits.mask := MaskReorg.splash(laneMask(i), eewVd)
+    divTops(i).io.in.bits.tail := MaskReorg.splash(laneTail(i), eewVd)
   }
   
   /** Flush gen */
