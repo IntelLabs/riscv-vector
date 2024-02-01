@@ -47,7 +47,6 @@ class VLaneExu extends Module {
     lanes(i).io.in.valids(0) := io.in.valid && uop.ctrl.alu
     lanes(i).io.in.valids(1) := io.in.valid && uop.ctrl.mul
     lanes(i).io.in.valids(2) := io.in.valid && uop.ctrl.fp
-    lanes(i).io.in.valids(3) := io.in.valid && uop.ctrl.div
     lanes(i).io.in.data.uop := uop
     lanes(i).io.in.data.rs1 := io.in.bits.rs1
     lanes(i).io.in.data.prestart := 0.U  // So far, set vstart = 0 for all arithmetic instructions

@@ -68,11 +68,6 @@ class VLane extends Module{
   // val vmac = Module(new DummyLaneFU)
   // FP
   val vfp = Module(new LaneFP)
-  // val vfp = Module(new VFPUTop)
-  // val vfp = Module(new DummyLaneFURedirect)
-  // fake div
-  // val vdiv = Module(new DivTop)
-  val vdiv = Module(new DummyLaneFU)
 
   // Input of ALU
   valu.io.in.bits := io.in.data
@@ -87,13 +82,8 @@ class VLane extends Module{
   // Input of FP
   vfp.io.in.bits := io.in.data
   vfp.io.in.valid := io.in.valids(2)
-  vfp.io.redirect := 0.U.asTypeOf(new Redirect)
+  vfp.io.redirect := RedirectConvert(io.redirect)
   io.in.readys(2) := vfp.io.in.ready
-  // Input of div
-  vdiv.io.in.bits := io.in.data
-  vdiv.io.in.valid := io.in.valids(3)
-  vdiv.io.redirect := 0.U.asTypeOf(new Redirect)
-  io.in.readys(3) := vdiv.io.in.ready
 
   /**
     * Outputs (two write-back ports)
@@ -101,8 +91,7 @@ class VLane extends Module{
   io.out(0) <> valu.io.out
 
   val arb = Module(new Arbiter(new LaneFUOutput, NLaneExuFUs - 1))
-  arb.io.in(0) <> vdiv.io.out
-  arb.io.in(1) <> vfp.io.out
-  arb.io.in(2) <> vmac.io.out
+  arb.io.in(0) <> vfp.io.out
+  arb.io.in(1) <> vmac.io.out
   io.out(1) <> arb.io.out  
 }

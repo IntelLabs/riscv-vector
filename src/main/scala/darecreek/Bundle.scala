@@ -97,7 +97,7 @@ class VCtrl extends Bundle {
   def vv = !funct3(2) && !(funct3(1) && funct3(0))
   def vx = funct3(2) 
   def vi = !funct3(2) && funct3(1) && funct3(0) 
-  def fuSel = Seq(alu, mul, fp, div, redu, mask, perm)
+  def fuSel = Seq(alu, mul, fp, redu, mask, perm, div)
   def laneExu = arith && !crossLane
   def isLdst = load || store
   def vs1_imm = lsrc(0)
