@@ -59,7 +59,7 @@ class VLane extends Module{
   })
 
   implicit val p = Parameters.empty.alterPartial({
-                     case VFuParamsKey => VFuParameters(VLEN = 256)})
+                     case VFuParamsKey => VFuParameters(VLEN = VLEN)})
   // ALU
   val valu = Module(new LaneVAlu)
   // val valu = Module(new DummyLaneFU)

@@ -11,6 +11,7 @@ build/
 .vscode/
 project/.bloop/
 project/metals.sbt
+.scalafmt.conf
 
 src/test/scala/auto/IncorrectInputs/*/
 src/test/scala/auto/IncorrectInputs/*.txt

@@ -320,12 +320,3 @@ class LaneVAlu(implicit p: Parameters) extends VFuModule {
 
   io.out <> arb.io.out
 }
-
-import xiangshan._
-object Main extends App {
-  println("Generating hardware")
-  val p = Parameters.empty
-  emitVerilog(new LaneVAlu()(p.alterPartial({case VFuParamsKey => 
-              VFuParameters(VLEN = 256)})), Array("--target-dir", "generated",
-              "--emission-options=disableMemRandomization,disableRegisterRandomization"))
-}
