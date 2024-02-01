@@ -48,7 +48,7 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   io.out.bits.vCtrl         := RegEnable(decodeOut, io.in.valid)
   io.out.bits.scalar_opnd_1 := RegEnable(io.in.bits.rs1, io.in.valid)
   io.out.bits.scalar_opnd_2 := RegEnable(io.in.bits.rs2, io.in.valid)
-  io.out.bits.float_opnd_1 := RegEnable(io.in.bits.frs1, io.in.valid)
+  io.out.bits.float_opnd_1  := RegEnable(io.in.bits.frs1, io.in.valid)
 
   //val validTmp = Reg(Bool())
   //when (RegNext(io.in.valid) & (~io.out.ready || io.iexNeedStall)){

@@ -11,6 +11,7 @@ import xiangshan.MicroOp
 import SmartParam._
 import darecreek.lsu.LdstDecoder
 import darecreek.Vlmul_to_lmul
+import darecreek.VInfoAll
 
 class MuopMergeAttr extends Bundle {
     val scalarRegWriteEn = Bool()
@@ -122,7 +123,9 @@ class Vsplit(implicit p : Parameters) extends Module {
     val vInfo         = Reg(Vec(1, new VInfo))
     val scalar_opnd_1 = Reg(Vec(1, UInt(64.W)))
     val scalar_opnd_2 = Reg(Vec(1, UInt(64.W)))
+    val float_opnd_1  = Reg(Vec(1, UInt(64.W)))
     val uopRegInfo    = Reg(Vec(1, new UopRegInfo))
+    val eewEmulInfo   = Reg(Vec(1, new VInfoAll))
     val idx           = RegInit(UInt(5.W), 0.U)
 
     //vCtrl(0).illegal     := RegInit(false.B)
@@ -152,15 +155,13 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     val instFirstIn = (currentState === empty && io.in.decodeIn.valid)
 
-    val isfloat = io.in.decodeIn.bits.vCtrl.funct3 === "b101".U && !io.in.decodeIn.bits.vCtrl.isLdst
-    val scalar_float_opnd_1 = Mux(isfloat, io.in.decodeIn.bits.float_opnd_1, 
-                                   io.in.decodeIn.bits.scalar_opnd_1)
-
     when (instFirstIn){       
         vCtrl(0)            := io.in.decodeIn.bits.vCtrl
         vInfo(0)            := io.in.decodeIn.bits.vInfo
-        scalar_opnd_1(0)    := scalar_float_opnd_1
+        scalar_opnd_1(0)    := io.in.decodeIn.bits.float_opnd_1
         scalar_opnd_2(0)    := io.in.decodeIn.bits.scalar_opnd_2
+        float_opnd_1(0)     := io.in.decodeIn.bits.float_opnd_1
+        eewEmulInfo(0)      := io.in.decodeIn.bits.eewEmulInfo
         uopRegInfo(0).vxsat := false.B
     }
 
@@ -171,10 +172,12 @@ class Vsplit(implicit p : Parameters) extends Module {
     uopRegInfo(0).mask      := Mux(io.in.regFileIn.readVld(2), io.in.regFileIn.readData(2), uopRegInfo(0).mask)
     uopRegInfo(0).old_vd    := Mux(io.in.regFileIn.readVld(3), io.in.regFileIn.readData(3), uopRegInfo(0).old_vd)
 
-    val ctrl = Mux(instFirstIn,io.in.decodeIn.bits.vCtrl,vCtrl(0))
-    val info = Mux(instFirstIn,io.in.decodeIn.bits.vInfo,vInfo(0))
-    val scalarOpnd1 = Mux(instFirstIn,scalar_float_opnd_1,scalar_opnd_1(0))
-    val scalarOpnd2 = Mux(instFirstIn,io.in.decodeIn.bits.scalar_opnd_2,scalar_opnd_2(0))
+    val ctrl = Mux(instFirstIn, io.in.decodeIn.bits.vCtrl,vCtrl(0))
+    val info = Mux(instFirstIn, io.in.decodeIn.bits.vInfo,vInfo(0))
+    val scalarOpnd1  = Mux(instFirstIn, io.in.decodeIn.bits.scalar_opnd_1,scalar_opnd_1(0))
+    val scalarOpnd2  = Mux(instFirstIn, io.in.decodeIn.bits.scalar_opnd_2,scalar_opnd_2(0))
+    val floatOpnd1   = Mux(instFirstIn, io.in.decodeIn.bits.float_opnd_1,float_opnd_1(0))
+    val eewEmulInfo1 = Mux(instFirstIn, io.in.decodeIn.bits.eewEmulInfo, eewEmulInfo(0))
 
     //Because the register file do not always read the register file when instFirstIn
     val vs1     = Mux(io.in.regFileIn.readVld(0), io.in.regFileIn.readData(0), uopRegInfo(0).vs1)
@@ -182,16 +185,18 @@ class Vsplit(implicit p : Parameters) extends Module {
     val mask    = Mux(io.in.regFileIn.readVld(2), io.in.regFileIn.readData(2), uopRegInfo(0).mask)
     val old_vd  = Mux(io.in.regFileIn.readVld(3), io.in.regFileIn.readData(3), uopRegInfo(0).old_vd)
     val v_ext_out = ctrl.alu && ctrl.funct3 === "b010".U && ctrl.funct6 === "b010010".U 
-
+  
+    val isfloat = ctrl.funct3 === "b101".U && !ctrl.isLdst
+    val scalar_float_opnd_1 = Mux(isfloat, floatOpnd1, scalarOpnd1)
     val ldst = ctrl.load || ctrl.store
     val ldstCtrl = LdstDecoder(ctrl.funct6, ctrl.lsrc(1))
     val nfield = ctrl.funct6(5, 3) +& 1.U
-    val vlmul = io.in.decodeIn.bits.vInfo.vlmul
+    val vlmul = info.vlmul
     val lmul = Vlmul_to_lmul(vlmul)
     val indexIncBase = Wire(UInt(3.W)) 
-    val emulVd  = Mux(io.in.decodeIn.bits.vCtrl.ldestVal,   io.in.decodeIn.bits.eewEmulInfo.emulVd,  0.U(4.W))
-    val emulVs1 = Mux(io.in.decodeIn.bits.vCtrl.lsrcVal(0), io.in.decodeIn.bits.eewEmulInfo.emulVs1, 0.U(4.W))
-    val emulVs2 = Mux(io.in.decodeIn.bits.vCtrl.lsrcVal(1), io.in.decodeIn.bits.eewEmulInfo.emulVs2, 0.U(4.W))
+    val emulVd  = Mux(ctrl.ldestVal,   eewEmulInfo1.emulVd,  0.U(4.W))
+    val emulVs1 = Mux(ctrl.lsrcVal(0), eewEmulInfo1.emulVs1, 0.U(4.W))
+    val emulVs2 = Mux(ctrl.lsrcVal(1), eewEmulInfo1.emulVs2, 0.U(4.W))
     val idxVdInc = Wire(Bool())
     val idxVs2Inc = Wire(Bool())
     val indexExpdLen = Mux(lmul > emulVs2, lmul, emulVs2)
@@ -268,7 +273,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     
     io.out.mUopMergeAttr.valid                 := io.out.mUop.valid
     io.out.mUopMergeAttr.bits.scalarRegWriteEn := ctrl.rdVal && !isfloat  
-    io.out.mUopMergeAttr.bits.floatRegWriteEn := ctrl.rdVal && isfloat
+    io.out.mUopMergeAttr.bits.floatRegWriteEn  := ctrl.rdVal && isfloat
     io.out.mUopMergeAttr.bits.ldest            := ctrl.ldest + ldest_inc
     io.out.mUopMergeAttr.bits.rfWriteEn        := ctrl.ldestVal
     io.out.mUopMergeAttr.bits.muopEnd          := io.out.mUop.bits.uop.uopEnd
@@ -284,17 +289,18 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.out.mUopMergeAttr.bits.permExpdLen      := lmul
     io.out.mUopMergeAttr.bits.regDstIdx        := ctrl.ldest
 
-    val vs1ReadEn = ctrl.lsrcVal(0)
-    val vs2ReadEn = ctrl.lsrcVal(1)
-    val vs1Idx = ctrl.lsrc(0) + lsrc0_inc
-    val vs2Idx = ctrl.lsrc(1) + lsrc1_inc
+    val vs1ReadEn  = ctrl.lsrcVal(0)
+    val vs2ReadEn  = ctrl.lsrcVal(1)
+    val vs1Idx     = ctrl.lsrc(0) + lsrc0_inc
+    val vs2Idx     = ctrl.lsrc(1) + lsrc1_inc
     val needStall  = Wire(Bool())
     val hasRegConf = Wire(Vec(2,Bool()))
-    val expdLen = Wire(UInt(4.W))
+    val expdLen    = Wire(UInt(4.W))
     
     io.scoreBoardReadIO.readAddr1 := vs1Idx
     io.scoreBoardReadIO.readAddr2 := vs2Idx
     io.scoreBoardReadIO.readNum   := expdLen
+
     when(!vs1ReadEn){
         hasRegConf(0) := false.B
     }.elsewhen(ctrl.perm){
@@ -315,12 +321,12 @@ class Vsplit(implicit p : Parameters) extends Module {
         hasRegConf(1) := true.B
     }
 
-    needStall := hasRegConf(0) || hasRegConf(1) || io.lsuStallSplit || io.iexNeedStall || 
-                 io.in.decodeIn.bits.vCtrl.illegal || io.vLSUXcpt.exception_vld
+    needStall := hasRegConf(0) || hasRegConf(1) || io.lsuStallSplit || 
+                 ctrl.illegal || io.vLSUXcpt.exception_vld
          
-    io.out.mUop.bits.uop.uopIdx := Mux(ldst && ldstCtrl.segment, idx  % indexExpdLen, idx)
+    io.out.mUop.bits.uop.uopIdx   := Mux(ldst && ldstCtrl.segment, idx  % indexExpdLen, idx)
     io.out.mUop.bits.uop.segIndex := idx / indexExpdLen
-    io.out.mUop.bits.uop.uopEnd := (idx + 1.U === expdLen)
+    io.out.mUop.bits.uop.uopEnd   := (idx + 1.U === expdLen)
 
     io.out.mUop.bits.uop.ctrl.funct6      := ctrl.funct6
     io.out.mUop.bits.uop.ctrl.funct3      := ctrl.funct3
@@ -363,38 +369,55 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.out.mUop.bits.uopRegInfo.old_vd    := old_vd
     io.out.mUop.bits.uopRegInfo.mask      := mask
 
-    io.out.toRegFileRead.rfReadEn(0)          := io.out.mUop.valid && ctrl.lsrcVal(0)
-    io.out.toRegFileRead.rfReadEn(1)          := io.out.mUop.valid && ctrl.lsrcVal(1)
-    io.out.toRegFileRead.rfReadEn(2)          := io.out.mUop.valid && ~ctrl.vm
-    io.out.toRegFileRead.rfReadEn(3)          := io.out.mUop.valid && (ctrl.ldestVal || ctrl.store)
-    io.out.toRegFileRead.rfReadIdx(0)         := ctrl.lsrc(0) + lsrc0_inc
-    io.out.toRegFileRead.rfReadIdx(1)         := ctrl.lsrc(1) + lsrc1_inc
-    io.out.toRegFileRead.rfReadIdx(2)         := 0.U
-    io.out.toRegFileRead.rfReadIdx(3)         := ctrl.ldest + ldest_inc
+    io.out.toRegFileRead.rfReadEn(0)      := io.out.mUop.valid && ctrl.lsrcVal(0)
+    io.out.toRegFileRead.rfReadEn(1)      := io.out.mUop.valid && ctrl.lsrcVal(1)
+    io.out.toRegFileRead.rfReadEn(2)      := io.out.mUop.valid && ~ctrl.vm
+    io.out.toRegFileRead.rfReadEn(3)      := io.out.mUop.valid && (ctrl.ldestVal || ctrl.store)
+    io.out.toRegFileRead.rfReadIdx(0)     := ctrl.lsrc(0) + lsrc0_inc
+    io.out.toRegFileRead.rfReadIdx(1)     := ctrl.lsrc(1) + lsrc1_inc
+    io.out.toRegFileRead.rfReadIdx(2)     := 0.U
+    io.out.toRegFileRead.rfReadIdx(3)     := ctrl.ldest + ldest_inc
 
     io.scoreBoardSetIO.setEn      := RegNext(io.out.mUop.valid && ctrl.ldestVal && ~ctrl.perm)
     io.scoreBoardSetIO.setMultiEn := RegNext(io.out.mUop.valid && ctrl.ldestVal && ctrl.perm)
     io.scoreBoardSetIO.setAddr    := RegNext(io.out.mUopMergeAttr.bits.ldest)
 
-    when ((instFirstIn || currentState === ongoing) & ~needStall){
-        io.out.mUop.valid := true.B
-        idx := idx + 1.U
+    val validPre = Wire(Bool())
+    when((instFirstIn || currentState === ongoing) & ~needStall){
+        validPre := true.B
     }.otherwise{
-        io.out.mUop.valid := false.B
+        validPre := false.B
+    }
+
+    val validReg = RegInit(false.B)
+
+    when(validPre & io.iexNeedStall){
+        validReg := true.B
+    }
+    
+    when(validReg & ~io.iexNeedStall){
+        validReg := false.B
+    }
+
+    io.out.mUop.valid := validPre || validReg
+
+    //stall logic: when iex is not ready, the output should keep unchanged
+    when((instFirstIn || currentState === ongoing) & ~needStall & ~io.iexNeedStall){
+        idx := idx + 1.U
     }
 
     val expdLenReg = Reg(UInt(4.W))
 
-    val ldStEmulVd  = io.in.decodeIn.bits.eewEmulInfo.emulVd
-    val ldStEmulVs1 = io.in.decodeIn.bits.eewEmulInfo.emulVs1
-    val ldStEmulVs2 = io.in.decodeIn.bits.eewEmulInfo.emulVs2
-    val expdLenSeg = Mux(ldstCtrl.indexed, nfield * (Mux(lmul > ldStEmulVs2, lmul, ldStEmulVs2)), nfield * lmul) 
-    val expdLenIdx = Mux(ldStEmulVd >= ldStEmulVs2, ldStEmulVd, ldStEmulVs2)
+    val ldStEmulVd  = eewEmulInfo1.emulVd
+    val ldStEmulVs1 = eewEmulInfo1.emulVs1
+    val ldStEmulVs2 = eewEmulInfo1.emulVs2
+    val expdLenSeg  = Mux(ldstCtrl.indexed, nfield * (Mux(lmul > ldStEmulVs2, lmul, ldStEmulVs2)), nfield * lmul) 
+    val expdLenIdx  = Mux(ldStEmulVd >= ldStEmulVs2, ldStEmulVd, ldStEmulVs2)
     val expdLenLdSt = Mux(ldst && ldstCtrl.segment, expdLenSeg, Mux(ldst && ldstCtrl.indexed, expdLenIdx, ldStEmulVd))
     val maxOfVs12Vd = Mux(emulVd >= emulVs1, Mux(emulVd >= emulVs2, emulVd, emulVs2), Mux(emulVs1 >= emulVs2, emulVs1, emulVs2))
     val vmv_vfmv = ctrl.alu && ctrl.funct6 === "b010000".U
 
-    val expdLenIn = Mux(ldst, expdLenLdSt, Mux(io.in.decodeIn.bits.vCtrl.perm || vmv_vfmv, 1.U , maxOfVs12Vd))
+    val expdLenIn = Mux(ldst, expdLenLdSt, Mux(ctrl.perm || vmv_vfmv, 1.U , maxOfVs12Vd))
     
     when(instFirstIn){
         expdLenReg := expdLenIn
@@ -432,14 +455,14 @@ class Vsplit(implicit p : Parameters) extends Module {
     
     //assert(io.in.valid && currentState === ongoing, "when has ongoing inst, can not accept a new one")
 
-    when(io.in.decodeIn.bits.vCtrl.illegal || io.vLSUXcpt.exception_vld){
+    when(ctrl.illegal || io.vLSUXcpt.exception_vld){
         currentStateNext := empty
         idx := 0.U
         io.in.decodeIn.ready := true.B
     }
 
-    io.excpInfo.exception_vld := io.vLSUXcpt.exception_vld || io.in.decodeIn.bits.vCtrl.illegal
-    io.excpInfo.illegalInst   := io.in.decodeIn.bits.vCtrl.illegal
+    io.excpInfo.exception_vld := io.vLSUXcpt.exception_vld || ctrl.illegal
+    io.excpInfo.illegalInst   := ctrl.illegal
     io.excpInfo.update_vl     := io.vLSUXcpt.update_vl
     io.excpInfo.update_data   := io.vLSUXcpt.update_data
     io.excpInfo.xcpt_cause    := io.vLSUXcpt.xcpt_cause

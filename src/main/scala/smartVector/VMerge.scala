@@ -47,16 +47,16 @@ class VMerge (implicit p : Parameters) extends Module {
     val permExpdLen       = Reg(UInt(4.W))
     val regDstIdx         = Reg(UInt(5.W))
   
-    rfWriteEn         := RegEnable(io.in.mergeInfo.bits.rfWriteEn, io.in.mergeInfo.valid)
-    rfWriteIdx        := RegEnable(io.in.mergeInfo.bits.ldest, io.in.mergeInfo.valid)
-    regBackWidth      := RegEnable(io.in.mergeInfo.bits.regBackWidth, io.in.mergeInfo.valid)
-    regWriteMuopIdx   := RegEnable(io.in.mergeInfo.bits.regWriteMuopIdx, io.in.mergeInfo.valid)
+    rfWriteEn         := RegEnable(io.in.mergeInfo.bits.rfWriteEn,        io.in.mergeInfo.valid)
+    rfWriteIdx        := RegEnable(io.in.mergeInfo.bits.ldest,            io.in.mergeInfo.valid)
+    regBackWidth      := RegEnable(io.in.mergeInfo.bits.regBackWidth,     io.in.mergeInfo.valid)
+    regWriteMuopIdx   := RegEnable(io.in.mergeInfo.bits.regWriteMuopIdx,  io.in.mergeInfo.valid)
     scalarRegWriteEn  := RegEnable(io.in.mergeInfo.bits.scalarRegWriteEn, io.in.mergeInfo.valid)
-    floatRegWriteEn  := RegEnable(io.in.mergeInfo.bits.floatRegWriteEn, io.in.mergeInfo.valid)
-    scalarRegWriteIdx := RegEnable(io.in.mergeInfo.bits.ldest, io.in.mergeInfo.valid)
-    muopEnd           := RegEnable(io.in.mergeInfo.bits.muopEnd, io.in.mergeInfo.valid)
-    permExpdLen       := RegEnable(io.in.mergeInfo.bits.permExpdLen, io.in.mergeInfo.valid)
-    regDstIdx         := RegEnable(io.in.mergeInfo.bits.regDstIdx, io.in.mergeInfo.valid)
+    floatRegWriteEn   := RegEnable(io.in.mergeInfo.bits.floatRegWriteEn,  io.in.mergeInfo.valid)
+    scalarRegWriteIdx := RegEnable(io.in.mergeInfo.bits.ldest,            io.in.mergeInfo.valid)
+    muopEnd           := RegEnable(io.in.mergeInfo.bits.muopEnd,          io.in.mergeInfo.valid)
+    permExpdLen       := RegEnable(io.in.mergeInfo.bits.permExpdLen,      io.in.mergeInfo.valid)
+    regDstIdx         := RegEnable(io.in.mergeInfo.bits.regDstIdx,        io.in.mergeInfo.valid)
          
     when(io.in.aluIn.valid && rfWriteEn){
         when(regBackWidth === "b111".U){
