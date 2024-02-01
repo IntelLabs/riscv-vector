@@ -10,6 +10,7 @@ import darecreek.exu.vfu.vmask._
 import darecreek.exu.vfu.VInstructions._
 import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import chipsalliance.rocketchip.config
+import darecreek.Vlmul_to_lmul
 
 class IexOutput extends Bundle {
   val vd = UInt(128.W)
@@ -61,11 +62,22 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   val outValid = SValu.io.out.valid || SVMac.io.out.valid || SVMask.io.out.valid || 
                  SVReduc.io.out.valid || SVDiv.io.out.valid || SVFpu.io.out.valid
 
+  val permDone = Wire(Bool())
+  val permWriteNum = RegInit(0.U(4.W))
+    when(SVPerm.io.out.wb_vld){
+        permWriteNum := permWriteNum + 1.U
+    }
+
+    when(SVPerm.io.out.wb_vld && (permWriteNum + 1.U === Vlmul_to_lmul(SVPerm.io.out.uop.info.vlmul))){
+        permWriteNum := 0.U
+        permDone := true.B
+    }
+
   val oneCycleLatIn = validReg & (bitsReg.uop.ctrl.alu || bitsReg.uop.ctrl.mask)
   val twoCycleLatIn = validReg & (bitsReg.uop.ctrl.mul || bitsReg.uop.ctrl.redu)
   val noFixLatIn    = validReg & (bitsReg.uop.ctrl.div || bitsReg.uop.ctrl.perm || bitsReg.uop.ctrl.fp)
   val twoCycleReg = RegEnable(twoCycleLatIn, validReg)
-  val fixLatVld   = SVDiv.io.out.valid || SVPerm.io.out.wb_vld || SVFpu.io.out.valid
+  val fixLatVld   = SVDiv.io.out.valid || permDone || SVFpu.io.out.valid
 
   switch(currentState){
     is(empty){
