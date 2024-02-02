@@ -321,7 +321,7 @@ class Vsplit(implicit p : Parameters) extends Module {
         hasRegConf(1) := true.B
     }
 
-    needStall := hasRegConf(0) || hasRegConf(1) || io.lsuStallSplit || 
+    needStall := hasRegConf(0) || hasRegConf(1) || io.lsuStallSplit || io.iexNeedStall
                  ctrl.illegal || io.vLSUXcpt.exception_vld
          
     io.out.mUop.bits.uop.uopIdx   := Mux(ldst && ldstCtrl.segment, idx  % indexExpdLen, idx)
@@ -382,28 +382,11 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.scoreBoardSetIO.setMultiEn := RegNext(io.out.mUop.valid && ctrl.ldestVal && ctrl.perm)
     io.scoreBoardSetIO.setAddr    := RegNext(io.out.mUopMergeAttr.bits.ldest)
 
-    val validPre = Wire(Bool())
     when((instFirstIn || currentState === ongoing) & ~needStall){
-        validPre := true.B
-    }.otherwise{
-        validPre := false.B
-    }
-
-    val validReg = RegInit(false.B)
-
-    when(validPre & io.iexNeedStall){
-        validReg := true.B
-    }
-    
-    when(validReg & ~io.iexNeedStall){
-        validReg := false.B
-    }
-
-    io.out.mUop.valid := validPre || validReg
-
-    //stall logic: when iex is not ready, the output should keep unchanged
-    when((instFirstIn || currentState === ongoing) & ~needStall & ~io.iexNeedStall){
+        io.out.mUop.valid := true.B
         idx := idx + 1.U
+    }.otherwise{
+        io.out.mUop.valid := false.B
     }
 
     val expdLenReg = Reg(UInt(4.W))
