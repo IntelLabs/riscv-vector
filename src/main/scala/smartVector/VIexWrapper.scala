@@ -102,7 +102,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   } 
 
   currentState := currentStateNext
-  io.iexNeedStall := (currentStateNext === ongoing) || notReady
+  io.iexNeedStall := (currentState === ongoing) || notReady
   //assert(!(currentState === ongoing && validFinal), "when current state is ongoing, should not has new inst in")
   //assert(!(!SVDiv.io.in.ready && validFinal), "when div is not ready, should not has new inst in")
   //assert(!(SVPerm.io.out.perm_busy && validFinal), "when perm is busy, should not has new inst in")
@@ -111,9 +111,9 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   SVMac.io.in.valid   := validFinal && bitsReg.uop.ctrl.mul
   SVMask.io.in.valid  := validFinal && bitsReg.uop.ctrl.mask
   SVReduc.io.in.valid := validFinal && bitsReg.uop.ctrl.redu
-  SVDiv.io.in.valid   := validFinal && bitsReg.uop.ctrl.div
+  SVDiv.io.in.valid   := validReg && bitsReg.uop.ctrl.div
   SVPerm.io.in.rvalid := validFinal && bitsReg.uop.ctrl.perm
-  SVFpu.io.in.valid   := validFinal && bitsReg.uop.ctrl.fp
+  SVFpu.io.in.valid   := validReg && bitsReg.uop.ctrl.fp
 
   Seq(SValu.io.in.bits, SVMac.io.in.bits, SVMask.io.in.bits, SVReduc.io.in.bits, SVDiv.io.in.bits, SVFpu.io.in.bits).foreach {iex =>
     iex.uop   := bitsReg.uop
