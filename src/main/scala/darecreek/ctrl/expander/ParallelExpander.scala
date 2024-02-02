@@ -91,6 +91,7 @@ class ParallelExpander extends Module {
     val perm_vmv_vfmv = ctrl(i).alu && !ctrl(i).opi && ctrl(i).funct6 === "b010000".U
                                                 // mask   excludes viota/vid
     val mask_onlyOneReg = ctrl(i).mask && !(ctrl(i).funct6(3, 2) === "b01".U && ctrl(i).lsrc(0)(4))
+    val gather16 = ctrl(i).funct6 === "b001110".U && ctrl(i).funct3 === 0.U
     //---- expdLen ----
     when (ctrl(i).isLdst && !ldstCtrl(i).mask) {
       expdLen(i) := Mux(ldstCtrl(i).segment, expdLen_seg, expdLen_ldst) 
@@ -100,6 +101,8 @@ class ParallelExpander extends Module {
       expdLen(i) := Mux(info(i).vlmul(2), 1.U, lmul(i) << 1)  // If lmul < 1, expdLen = 1 for widen/narrow
     }.elsewhen (ctrl(i).funct6 === "b100111".U && ctrl(i).funct3 === "b011".U) {//Whole register move
       expdLen(i) := ctrl(i).lsrc(0)(2, 0) +& 1.U
+    }.elsewhen (gather16 && info(i).vsew === 0.U) {
+      expdLen(i) := lmul(i) << 1
     }.otherwise {
       expdLen(i) := lmul(i)
     }
@@ -177,6 +180,8 @@ class ParallelExpander extends Module {
     io.out(i).valid := state === BUSY && expdOutValid(i)
     val ctrl = expdOut(i).ctrl
     val info = expdOut(i).info
+    val sew = SewOH(info.vsew)
+    val gather16 = ctrl.funct6 === "b001110".U && ctrl.funct3 === 0.U
     
     // out lsrc(1), which is vs2
     val lsrc1_inc = Wire(UInt(3.W))
@@ -198,13 +203,13 @@ class ParallelExpander extends Module {
     // out lsrc(0), which is vs1
     io.out(i).bits.lsrcExpd(0) := ctrl.lsrc(0) +            //vcompress
               Mux(ctrl.redu || (ctrl.funct6 === "b010111".U && ctrl.funct3 === 2.U), 0.U, 
-              Mux(ctrl.widen || ctrl.widen2 || ctrl.narrow, expdIdx(i) >> 1, expdIdx(i)))
+              Mux(ctrl.widen || ctrl.widen2 || ctrl.narrow || gather16 && sew.is32, expdIdx(i) >> 1, 
+              Mux(gather16 && sew.is64, expdIdx(i) >> 2, expdIdx(i))))
     // out lsrc(0) valid
     io.out(i).bits.lsrcValExpd(0) := ctrl.lsrcVal(0)
 
     //------ Need_old_value ----------
     val vlMax = Wire(UInt(bVL.W))
-    val sew = SewOH(info.vsew)
     val lmul = Vlmul_to_lmul(info.vlmul)
     vlMax := Mux1H(Seq(
       sew.is8  -> Cat(lmul, 0.U((log2Up(vlenb)).W)),
