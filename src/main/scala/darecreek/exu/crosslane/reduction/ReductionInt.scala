@@ -137,7 +137,7 @@ class ReductionInt(implicit p: Parameters) extends Module {
   val reg_vd_vsew = RegEnable(vd_vsew, 0.U, fire)
   val reg_eew = SewOH(reg_vsew)
   val reg_eewVd = SewOH(reg_vd_vsew)
-  val vd_reg = RegInit(0.U(128.W))
+  val vd_reg = RegInit(0.U(VLEN.W))
   val vs1_reg = RegEnable(vs1, 0.U, fire)
   val vl_reg2 = RegEnable(vl_reg, 0.U, reg_fire)
   val vl_reg3 = RegEnable(vl_reg2, 0.U, reg2_fire)
@@ -223,7 +223,7 @@ class ReductionInt(implicit p: Parameters) extends Module {
     rs(i).io.funct6 := uopVec(1).ctrl.funct6
     rs(i).io.funct3 := uopVec(1).ctrl.funct3
     rs(i).io.vsew := uopVec(1).info.vsew
-    rs(i).io.vs2 := Mux(widen, vs2m_bits_widen((i + 1) * VLEN - 1, i * VLEN), Cat(0.U((VLEN / 2).W), vs2m_bits_widen((i + 1) * VLEN / 2 - 1, i * VLEN / 2)))
+    rs(i).io.vs2 := Mux(uopVec(1).ctrl.widen, vs2m_bits_widen((i + 1) * VLEN - 1, i * VLEN), Cat(0.U((VLEN / 2).W), vs2m_bits_widen((i + 1) * VLEN / 2 - 1, i * VLEN / 2)))
     rs_vd(i) := rs(i).io.vd
   }
 
