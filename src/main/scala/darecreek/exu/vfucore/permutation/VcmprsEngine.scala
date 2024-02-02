@@ -15,7 +15,7 @@ class VcmprsEngine(implicit p: Parameters) extends VFuModule {
     val ta = Input(Bool())
     val vsew = Input(UInt(3.W))
     val vlmul = Input(UInt(3.W))
-    val vl = Input(UInt(8.W))
+    val vl = Input(UInt(bVL.W))
     val vs_idx = Input(UInt(3.W))
     val vd_idx = Input(UInt(3.W))
     val vs2 = Input(UInt(VLEN.W))
@@ -63,14 +63,14 @@ class VcmprsEngine(implicit p: Parameters) extends VFuModule {
   val old_vd_bytes = VecInit(Seq.tabulate(VLENB)(i => old_vd_reg((i + 1) * 8 - 1, i * 8)))
   val vs2_bytes = VecInit(Seq.tabulate(VLENB)(i => vs2_reg((i + 1) * 8 - 1, i * 8)))
 
-  val base = Wire(UInt((3+log2Up(VLEN/8)).W))
+  val base = Wire(UInt((3 + log2Up(VLEN / 8)).W))
   val vmask_uop = MaskExtract(vmask, vs_idx, eew)
   val vmask_16b = Mux(cmprs_rd_old_vd, 0.U, MaskReorg.splash(vmask_uop, eew))
-  val vmask_16b_reg = RegInit(0.U((VLEN/8).W))
-  val current_vs_ones_sum = Wire(UInt(5.W))
-  val current_ones_sum = Wire(Vec(VLENB, UInt(9.W)))
-  val current_ones_sum_reg = RegInit(VecInit(Seq.fill(VLENB)(0.U(8.W))))
-  val ones_sum = RegInit(0.U(8.W))
+  val vmask_16b_reg = RegInit(0.U((VLEN / 8).W))
+  val current_vs_ones_sum = Wire(UInt((log2Up(VLENB) + 1).W))
+  val current_ones_sum = Wire(Vec(VLENB, UInt((log2Up(VLEN) + 1).W)))
+  val current_ones_sum_reg = RegInit(VecInit(Seq.fill(VLENB)(0.U((log2Up(VLEN) + 1).W))))
+  val ones_sum = RegInit(0.U((log2Up(VLEN) + 1).W))
   val cmprs_vd = Wire(Vec(VLENB, UInt(8.W)))
   val res_idx = Wire(Vec(VLENB, UInt(8.W)))
   val res_valid = Wire(Vec(VLENB, Bool()))
@@ -83,7 +83,7 @@ class VcmprsEngine(implicit p: Parameters) extends VFuModule {
     cmprs_rd_old_vd_reg := 0.U
     old_vd_reg := 0.U
     vs2_reg := 0.U
-    current_ones_sum_reg := VecInit(Seq.fill(VLENB)(0.U(8.W)))
+    current_ones_sum_reg := VecInit(Seq.fill(VLENB)(0.U((log2Up(VLEN) + 1).W)))
     vmask_16b_reg := 0.U
   }.otherwise {
     vd_idx_reg := io.vd_idx
@@ -106,7 +106,7 @@ class VcmprsEngine(implicit p: Parameters) extends VFuModule {
     ones_sum := ones_sum + current_vs_ones_sum
   }
 
-  base := Cat(vd_idx_reg, 0.U(log2Up(VLEN/8).W))
+  base := Cat(vd_idx_reg, 0.U(log2Up(VLEN / 8).W))
 
   for (i <- 0 until VLENB) {
     current_ones_sum(i) := ones_sum
@@ -124,7 +124,7 @@ class VcmprsEngine(implicit p: Parameters) extends VFuModule {
   for (i <- 0 until VLENB) {
     when(cmprs_read) {
       when(cmprs_rd_old_vd_reg) {
-        when(i.U >= ones_sum(3, 0)) {
+        when(i.U >= ones_sum((log2Up(VLEN) - 4), 0)) {
           cmprs_vd(i) := Mux(ta, "hff".U, old_vd_bytes(i))
         }
       }.otherwise {
