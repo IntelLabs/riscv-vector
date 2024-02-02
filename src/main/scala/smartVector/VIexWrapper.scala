@@ -55,6 +55,8 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   when(validReg && iexReady){
     bitsReg := io.in.bits
   }
+
+  val validFinal = validReg & iexReady
   
   val empty :: ongoing :: Nil = Enum(2)
   val currentState = RegInit(empty)
@@ -76,15 +78,15 @@ class VIexWrapper(implicit p : Parameters) extends Module {
         permDone := false.B
     }
 
-  val oneCycleLatIn = validReg & (bitsReg.uop.ctrl.alu || bitsReg.uop.ctrl.mask)
-  val twoCycleLatIn = validReg & (bitsReg.uop.ctrl.mul || bitsReg.uop.ctrl.redu)
-  val noFixLatIn    = validReg & (bitsReg.uop.ctrl.div || bitsReg.uop.ctrl.perm || bitsReg.uop.ctrl.fp)
-  val twoCycleReg = RegEnable(twoCycleLatIn, validReg)
+  val oneCycleLatIn = validFinal & (bitsReg.uop.ctrl.alu || bitsReg.uop.ctrl.mask)
+  val twoCycleLatIn = validFinal & (bitsReg.uop.ctrl.mul || bitsReg.uop.ctrl.redu)
+  val noFixLatIn    = validFinal & (bitsReg.uop.ctrl.div || bitsReg.uop.ctrl.perm || bitsReg.uop.ctrl.fp)
+  val twoCycleReg = RegEnable(twoCycleLatIn, validFinal)
   val fixLatVld   = SVDiv.io.out.valid || permDone || SVFpu.io.out.valid
 
   switch(currentState){
     is(empty){
-      when(validReg && ~bitsReg.uop.ctrl.alu && ~bitsReg.uop.ctrl.isLdst && ~bitsReg.uop.ctrl.mask){
+      when(validFinal && ~bitsReg.uop.ctrl.alu && ~bitsReg.uop.ctrl.isLdst && ~bitsReg.uop.ctrl.mask){
         currentStateNext := ongoing
       }.otherwise{
         currentStateNext := empty
@@ -101,17 +103,17 @@ class VIexWrapper(implicit p : Parameters) extends Module {
 
   currentState := currentStateNext
   io.iexNeedStall := (currentStateNext === ongoing) || notReady
-  //assert(!(currentState === ongoing && validReg), "when current state is ongoing, should not has new inst in")
-  //assert(!(!SVDiv.io.in.ready && validReg), "when div is not ready, should not has new inst in")
-  //assert(!(SVPerm.io.out.perm_busy && validReg), "when perm is busy, should not has new inst in")
+  //assert(!(currentState === ongoing && validFinal), "when current state is ongoing, should not has new inst in")
+  //assert(!(!SVDiv.io.in.ready && validFinal), "when div is not ready, should not has new inst in")
+  //assert(!(SVPerm.io.out.perm_busy && validFinal), "when perm is busy, should not has new inst in")
   
-  SValu.io.in.valid   := validReg && bitsReg.uop.ctrl.alu
-  SVMac.io.in.valid   := validReg && bitsReg.uop.ctrl.mul
-  SVMask.io.in.valid  := validReg && bitsReg.uop.ctrl.mask
-  SVReduc.io.in.valid := validReg && bitsReg.uop.ctrl.redu
-  SVDiv.io.in.valid   := validReg && bitsReg.uop.ctrl.div
-  SVPerm.io.in.rvalid := validReg && bitsReg.uop.ctrl.perm
-  SVFpu.io.in.valid   := validReg && bitsReg.uop.ctrl.fp
+  SValu.io.in.valid   := validFinal && bitsReg.uop.ctrl.alu
+  SVMac.io.in.valid   := validFinal && bitsReg.uop.ctrl.mul
+  SVMask.io.in.valid  := validFinal && bitsReg.uop.ctrl.mask
+  SVReduc.io.in.valid := validFinal && bitsReg.uop.ctrl.redu
+  SVDiv.io.in.valid   := validFinal && bitsReg.uop.ctrl.div
+  SVPerm.io.in.rvalid := validFinal && bitsReg.uop.ctrl.perm
+  SVFpu.io.in.valid   := validFinal && bitsReg.uop.ctrl.fp
 
   Seq(SValu.io.in.bits, SVMac.io.in.bits, SVMask.io.in.bits, SVReduc.io.in.bits, SVDiv.io.in.bits, SVFpu.io.in.bits).foreach {iex =>
     iex.uop   := bitsReg.uop
@@ -129,7 +131,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   SVPerm.io.in.vs2_preg_idx := VecInit(Seq.tabulate(8)(i => bitsReg.uop.ctrl.lsrc(1) + i.U))
   SVPerm.io.in.old_vd_preg_idx := VecInit(Seq.tabulate(8)(i => bitsReg.uop.ctrl.ldest + i.U))
   SVPerm.io.in.mask_preg_idx := 0.U
-  SVPerm.io.in.uop_valid := validReg & bitsReg.uop.ctrl.perm
+  SVPerm.io.in.uop_valid := validFinal & bitsReg.uop.ctrl.perm
   SVPerm.io.in.rdata := io.permRegIn.rdata
   SVPerm.io.in.rvalid := io.permRegIn.rvalid
   SVPerm.io.redirect.valid := false.B
