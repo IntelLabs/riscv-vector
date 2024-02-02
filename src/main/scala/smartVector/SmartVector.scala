@@ -75,7 +75,7 @@ class SmartVector extends Module {
     val svlsu   = Module(new SVlsu()(p))
 
     decoder.io.in.bits  := io.in.bits
-    decoder.io.in.valid := io.in.valid
+    decoder.io.in.valid := io.in.valid & io.in.ready
     split.io.in.decodeIn <> decoder.io.out
     split.io.in.regFileIn <> regFile.io.out
     iex.io.in <> split.io.out.mUop

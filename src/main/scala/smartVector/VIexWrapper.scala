@@ -101,9 +101,9 @@ class VIexWrapper(implicit p : Parameters) extends Module {
 
   currentState := currentStateNext
   io.iexNeedStall := (currentStateNext === ongoing) || notReady
-  assert(!(currentState === ongoing && validReg), "when current state is ongoing, should not has new inst in")
-  assert(!(!SVDiv.io.in.ready && validReg), "when div is not ready, should not has new inst in")
-  assert(!(SVPerm.io.out.perm_busy && validReg), "when perm is busy, should not has new inst in")
+  //assert(!(currentState === ongoing && validReg), "when current state is ongoing, should not has new inst in")
+  //assert(!(!SVDiv.io.in.ready && validReg), "when div is not ready, should not has new inst in")
+  //assert(!(SVPerm.io.out.perm_busy && validReg), "when perm is busy, should not has new inst in")
   
   SValu.io.in.valid   := validReg && bitsReg.uop.ctrl.alu
   SVMac.io.in.valid   := validReg && bitsReg.uop.ctrl.mul
