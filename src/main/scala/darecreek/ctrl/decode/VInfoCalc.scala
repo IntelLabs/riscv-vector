@@ -75,18 +75,19 @@ class VInfoCalc extends Module {
   val wholeRegMv = ctrl.funct6 === "b100111".U && ctrl.funct3 === "b011".U //Whole register move
   val nreg = ctrl.lsrc(0)(2, 0) +& 1.U  //for whole register move
 
-  /**
-   * Register Number
-   */
+  /** vnfiled, vnreg */
   val vnfield = Wire(UInt(3.W))
   vnfield := Mux(nfield === 8.U, 3.U, nfield >> 1)
   val vnreg = Wire(UInt(3.W))
   vnreg := Mux(nreg === 8.U, 3.U, nreg >> 1)
-  // EMUL of Vd
-  val vemulVd = Wire(UInt(3.W))
+
+  /** Some flags */
   val perm_vmv_vfmv = ctrl.alu && !ctrl.opi && ctrl.funct6 === "b010000".U
   val mask_onlyOneReg = ctrl.mask && !(ctrl.funct6(3, 2) === "b01".U && ctrl.lsrc(0)(4))
-
+  val gather16 = ctrl.funct6 === "b001110".U && ctrl.funct3 === 0.U
+  
+  // EMUL of Vd
+  val vemulVd = Wire(UInt(3.W))
   when (ldst) {
     vemulVd := Mux(ldstCtrl.wholeReg, vnfield, Mux(ldstCtrl.mask, 0.U,
                Mux(ldstCtrl.indexed, vlmul, vemul_ldst.asUInt)))
@@ -104,6 +105,8 @@ class VInfoCalc extends Module {
   //           15.1 mask-logical          16.5 vcompress
   when (ctrl.mask && ctrl.funct6(3) || ctrl.perm && ctrl.funct6 === "b010111".U) {
     vemulVs1 := 0.U
+  }.elsewhen(gather16) {
+    vemulVs1 := 1.U(3.W) - vsew + vlmul
   }.otherwise {
     vemulVs1 := vlmul
   }
@@ -143,6 +146,8 @@ class VInfoCalc extends Module {
   //           15.1 mask-logical          16.5 vcompress
   when (ctrl.mask && ctrl.funct6(3) || ctrl.perm && ctrl.funct6 === "b010111".U) {
     veewVs1 := 7.U
+  }.elsewhen (gather16) {
+    veewVs1 := 1.U
   }.otherwise {
     veewVs1 := vsew
   }
