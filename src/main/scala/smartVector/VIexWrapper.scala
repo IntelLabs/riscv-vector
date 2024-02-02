@@ -45,7 +45,8 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   val bitsReg  = RegInit(0.U.asTypeOf(new Muop))
   val divNotReady = bitsReg.uop.ctrl.div & ~SVDiv.io.in.ready
   val fpuNotReady = bitsReg.uop.ctrl.fp  & ~SVFpu.io.in.ready
-  val iexReady    = ~divNotReady & ~fpuNotReady & ~io.iexNeedStall
+  val notReady    = divNotReady || fpuNotReady
+  val iexReady    = ~io.iexNeedStall
 
   when(!validReg || iexReady){
     validReg := io.in.valid
@@ -71,6 +72,8 @@ class VIexWrapper(implicit p : Parameters) extends Module {
     when(SVPerm.io.out.wb_vld && (permWriteNum + 1.U === Vlmul_to_lmul(SVPerm.io.out.uop.info.vlmul))){
         permWriteNum := 0.U
         permDone := true.B
+    }.otherwise{
+        permDone := false.B
     }
 
   val oneCycleLatIn = validReg & (bitsReg.uop.ctrl.alu || bitsReg.uop.ctrl.mask)
@@ -97,7 +100,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   } 
 
   currentState := currentStateNext
-  io.iexNeedStall := (currentStateNext === ongoing) || ~iexReady
+  io.iexNeedStall := (currentStateNext === ongoing) || ~notReady
   assert(!(currentState === ongoing && validReg), "when current state is ongoing, should not has new inst in")
   assert(!(!SVDiv.io.in.ready && validReg), "when div is not ready, should not has new inst in")
   assert(!(SVPerm.io.out.perm_busy && validReg), "when perm is busy, should not has new inst in")

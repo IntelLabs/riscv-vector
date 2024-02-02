@@ -147,6 +147,7 @@ class SmartVector extends Module {
 }
 
 object Main extends App {
+    
   println("Generating the VPU Core hardware")
   emitVerilog(new SmartVector(), Array("--target-dir", "generated"))
 }
