@@ -80,8 +80,8 @@ class PermutationCore(implicit p: Parameters) extends VFuModule {
   val vm_reg = RegInit(false.B)
   val ta_reg = RegInit(false.B)
   val ma_reg = RegInit(false.B)
-  val vstart_reg = RegInit(0.U(7.W))
-  val vl_reg = RegInit(0.U(8.W))
+  val vstart_reg = RegInit(0.U(bVSTART.W))
+  val vl_reg = RegInit(0.U(bVL.W))
   val rd_vlmul = RegInit(0.U(3.W))
   val vlmul_reg = RegInit(0.U(3.W))
 
@@ -136,12 +136,12 @@ class PermutationCore(implicit p: Parameters) extends VFuModule {
   val wb_vld = Wire(Bool())
   val wb_idx = RegInit(0.U(3.W))
 
-  val vlRemain = RegInit(0.U(8.W))
+  val vlRemain = RegInit(0.U(bVL.W))
   val vlRemainBytes = vlRemain << vsew_reg
   val vd_mask = Wire(UInt(VLEN.W))
   vd_mask := (~0.U(VLEN.W))
 
-  val vlRemain_reg = RegInit(0.U(8.W))
+  val vlRemain_reg = RegInit(0.U(bVL.W))
   when(flush) {
     vlRemain_reg := 0.U
   }.otherwise {
@@ -181,8 +181,8 @@ class PermutationCore(implicit p: Parameters) extends VFuModule {
   val vslide_ele = Mux(reg_vslide1up || reg_vslide1dn, 1.U, rs1_reg)
   val vslide_bytes = vslide_ele << vsew_reg
 
-  val vslide_lo_valid = Mux(reg_vslideup || reg_vslide1up, vslide_bytes(70, 4) +& 1.U <= vs_idx, (reg_vslidedn || reg_vslide1dn) && (vs_idx +& vslide_bytes(70, 4) <= rd_vlmul))
-  val vslide_hi_valid = Mux(reg_vslideup || reg_vslide1up, vslide_bytes(70, 4) <= vs_idx, (reg_vslidedn || reg_vslide1dn) && (vs_idx +& vslide_bytes(70, 4) +& 1.U <= rd_vlmul))
+  val vslide_lo_valid = Mux(reg_vslideup || reg_vslide1up, vslide_bytes(70, (log2Up(VLEN) - 3)) +& 1.U <= vs_idx, (reg_vslidedn || reg_vslide1dn) && (vs_idx +& vslide_bytes(70, (log2Up(VLEN) - 3)) <= rd_vlmul))
+  val vslide_hi_valid = Mux(reg_vslideup || reg_vslide1up, vslide_bytes(70, (log2Up(VLEN) - 3)) <= vs_idx, (reg_vslidedn || reg_vslide1dn) && (vs_idx +& vslide_bytes(70, (log2Up(VLEN) - 3)) +& 1.U <= rd_vlmul))
   val vslide_cnt_max = Wire(UInt(2.W))
   val vslide_rd_cnt = RegInit(0.U(2.W))
   val rd_mask_en = RegInit(false.B)
@@ -257,11 +257,11 @@ class PermutationCore(implicit p: Parameters) extends VFuModule {
   rd_idx_lo := 0.U
   rd_idx_hi := 0.U
   when(reg_vslideup || reg_vslide1up) {
-    rd_idx_lo := vs_idx - vslide_bytes(6, 4) - 1.U
-    rd_idx_hi := vs_idx - vslide_bytes(6, 4)
+    rd_idx_lo := vs_idx - vslide_bytes(log2Up(VLEN)-1, log2Up(VLEN)-3) - 1.U
+    rd_idx_hi := vs_idx - vslide_bytes(log2Up(VLEN)-1, log2Up(VLEN)-3)
   }.elsewhen(reg_vslidedn || reg_vslide1dn) {
-    rd_idx_lo := vs_idx + vslide_bytes(6, 4)
-    rd_idx_hi := vs_idx + vslide_bytes(6, 4) + 1.U
+    rd_idx_lo := vs_idx + vslide_bytes(log2Up(VLEN)-1, log2Up(VLEN)-3)
+    rd_idx_hi := vs_idx + vslide_bytes(log2Up(VLEN)-1, log2Up(VLEN)-3) + 1.U
   }
 
   vslide_rd_preg_idx := 0.U
@@ -284,9 +284,9 @@ class PermutationCore(implicit p: Parameters) extends VFuModule {
   val vmask_vl = RegInit(0.U(VLEN.W))
   val vmask_uop = MaskExtract(vmask_vl, vs_idx, eew)
   val vmask_16b = Mux(rd_vs_en, MaskReorg.splash(vmask_uop, eew), 0.U)
-  val current_rd_vs_ones_sum = Wire(UInt(5.W))
-  val rd_ones_sum = RegInit(0.U(8.W))
-  val ones_sum = Wire(UInt(8.W))
+  val current_rd_vs_ones_sum = Wire(UInt((log2Up(VLENB) + 1).W))
+  val rd_ones_sum = RegInit(0.U((log2Up(VLEN) + 1).W))
+  val ones_sum = Wire(UInt((log2Up(VLEN) + 1).W))
   val cmprs_rd_wb = Wire(Bool())
   val cmprs_rd_resent_en = Wire(Bool())
   val cmprs_rd_old_vd = RegInit(false.B)
@@ -303,8 +303,8 @@ class PermutationCore(implicit p: Parameters) extends VFuModule {
     vmask_vl := mask & vd_mask_vl
   }
 
-  cmprs_rd_wb := reg_vcompress && ((rd_ones_sum + current_rd_vs_ones_sum) >= Cat(wb_idx_plus1, 0.U(4.W)))
-  cmprs_rd_resent_en := reg_vcompress && ((rd_ones_sum + current_rd_vs_ones_sum) > Cat(wb_idx_plus1, 0.U(4.W)))
+  cmprs_rd_wb := reg_vcompress && ((rd_ones_sum + current_rd_vs_ones_sum) >= Cat(wb_idx_plus1, 0.U((log2Up(VLEN) - 3).W)))
+  cmprs_rd_resent_en := reg_vcompress && ((rd_ones_sum + current_rd_vs_ones_sum) > Cat(wb_idx_plus1, 0.U((log2Up(VLEN) - 3).W)))
 
   when(rd_done || flush || cmprs_rd_old_vd) {
     rd_ones_sum := 0.U
@@ -319,7 +319,7 @@ class PermutationCore(implicit p: Parameters) extends VFuModule {
   }
 
   ones_sum := rd_ones_sum + current_rd_vs_ones_sum
-  cmprs_rd_old_vd_idx := ones_sum(7, 4)
+  cmprs_rd_old_vd_idx := ones_sum(log2Up(VLEN), log2Up(VLEN) - 3)
   when(flush) {
     cmprs_rd_old_vd_idx := 0.U
   }.elsewhen(cmprs_rd_old_vd) {

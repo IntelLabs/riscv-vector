@@ -15,7 +15,7 @@ class VrgatherEngine(implicit p: Parameters) extends VFuModule {
     val ta = Input(Bool())
     val vsew = Input(UInt(3.W))
     val vlmul = Input(UInt(3.W))
-    val vl = Input(UInt(8.W))
+    val vl = Input(UInt(bVL.W))
     val first = Input(Bool())
     val update_vs2 = Input(Bool())
     val vs2_cnt = Input(UInt(3.W))
@@ -79,7 +79,7 @@ class VrgatherEngine(implicit p: Parameters) extends VFuModule {
   val vd_reg_bytes = VecInit(Seq.tabulate(VLENB)(i => vd_reg((i + 1) * 8 - 1, i * 8)))
 
   val vs2_cnt_plus1 = Wire(UInt(4.W))
-  val vlmax_bytes = Wire(UInt(5.W))
+  val vlmax_bytes = Wire(UInt((vlenbWidth + 1).W))
   vs2_cnt_plus1 := Cat(0.U(1.W), vs2_cnt) + 1.U
 
   vlmax_bytes := VLENB.U
@@ -91,8 +91,8 @@ class VrgatherEngine(implicit p: Parameters) extends VFuModule {
     vlmax_bytes := (VLENB / 2).U
   }
 
-  val vs2_min = Mux(update_vs2, Cat(vs2_cnt, 0.U(4.W)), "hff".U)
-  val vs2_max = Mux(update_vs2, Mux(vlmul > 3.U, vlmax_bytes, Cat(vs2_cnt_plus1, 0.U(4.W))), "hff".U)
+  val vs2_min = Mux(update_vs2, Cat(vs2_cnt, 0.U((log2Up(VLEN)-3).W)), "hff".U)
+  val vs2_max = Mux(update_vs2, Mux(vlmul > 3.U, vlmax_bytes, Cat(vs2_cnt_plus1, 0.U((log2Up(VLEN)-3).W))), "hff".U)
 
   for (i <- 0 until VLENB) {
     vrgather_byte_sel(i) := 0.U

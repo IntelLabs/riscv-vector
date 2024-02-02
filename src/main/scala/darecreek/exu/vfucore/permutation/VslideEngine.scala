@@ -14,7 +14,7 @@ class VslideEngine(implicit p: Parameters) extends VFuModule {
     val ma = Input(Bool())
     val vsew = Input(UInt(3.W))
     val vlmul = Input(UInt(3.W))
-    val vl = Input(UInt(8.W))
+    val vl = Input(UInt(bVL.W))
     val vd_idx = Input(UInt(3.W))
     val rs1 = Input(UInt(XLEN.W))
     val vs2_hi = Input(UInt(VLEN.W))
@@ -57,12 +57,11 @@ class VslideEngine(implicit p: Parameters) extends VFuModule {
   val vslide = vslideup || vslidedn || vslide1up || vslide1dn
 
   val rd_vlmul = Wire(UInt(3.W))
-  val vlmax_bytes = Wire(UInt(5.W))
-  val vl_bytes = Wire(UInt(8.W))
+  val vlmax_bytes = Wire(UInt((vlenbWidth + 1).W))
+  val vl_bytes = vl << vsew
   val vl_idx = Wire(UInt(3.W))
   rd_vlmul := (1.U << Mux(vlmul(2), 0.U, Cat(0.U(1.W), vlmul(1, 0)))) - 1.U
-  vl_bytes := vl << vsew
-  vl_idx := vl_bytes(7, 4) + vl_bytes(3, 0).orR - 1.U
+  vl_idx := vl_bytes(bVL + 6, log2Up(VLEN) - 3) + vl_bytes(log2Up(VLEN) - 4, 0).orR - 1.U
 
   vlmax_bytes := VLENB.U
   when(vlmul === 5.U) {
@@ -78,25 +77,23 @@ class VslideEngine(implicit p: Parameters) extends VFuModule {
   val vslide1up_vd = Wire(Vec(VLENB, UInt(8.W)))
   val vslide1dn_vd = Wire(Vec(VLENB, UInt(8.W)))
   val vsew_bytes = Wire(UInt(4.W))
-  val vsew_shift = Wire(UInt(3.W))
   val vmask_byte_strb = Wire(Vec(VLENB, UInt(1.W)))
 
   vsew_bytes := 1.U << vsew(1, 0)
-  vsew_shift := Cat(0.U(1.W), ~vsew(1, 0)) + 1.U
 
   val vslide_ele = Mux(vslide1up || vslide1dn, 1.U, rs1)
   val vslide_bytes = vslide_ele << vsew
 
-  val vslide_lo_valid = Mux(vslideup || vslide1up, vslide_bytes(70, 4) +& 1.U <= vd_idx, (vslidedn || vslide1dn) && (vd_idx +& vslide_bytes(70, 4) <= rd_vlmul))
-  val vslide_hi_valid = Mux(vslideup || vslide1up, vslide_bytes(70, 4) <= vd_idx, (vslidedn || vslide1dn) && (vd_idx +& vslide_bytes(70, 4) +& 1.U <= rd_vlmul))
+  val vslide_lo_valid = Mux(vslideup || vslide1up, vslide_bytes(70, (log2Up(VLEN) - 3)) +& 1.U <= vd_idx, (vslidedn || vslide1dn) && (vd_idx +& vslide_bytes(70, (log2Up(VLEN) - 3)) <= rd_vlmul))
+  val vslide_hi_valid = Mux(vslideup || vslide1up, vslide_bytes(70, (log2Up(VLEN) - 3)) <= vd_idx, (vslidedn || vslide1dn) && (vd_idx +& vslide_bytes(70, (log2Up(VLEN) - 3)) +& 1.U <= rd_vlmul))
 
-  val rs1_bytes = VecInit(Seq.tabulate(VLENB)(i => Cat(0.U((VLEN-64).W), rs1)((i + 1) * 8 - 1, i * 8)))
+  val rs1_bytes = VecInit(Seq.tabulate(VLENB)(i => Cat(0.U((VLEN - 64).W), rs1)((i + 1) * 8 - 1, i * 8)))
   val old_vd_bytes = VecInit(Seq.tabulate(VLENB)(i => old_vd((i + 1) * 8 - 1, i * 8)))
   val vs2_hi_bytes = VecInit(Seq.tabulate(VLENB)(i => vs2_hi((i + 1) * 8 - 1, i * 8)))
   val vs2_lo_bytes = VecInit(Seq.tabulate(VLENB)(i => vs2_lo((i + 1) * 8 - 1, i * 8)))
 
   val eew = SewOH(vsew)
-  val vlRemainBytes = Mux((vl << vsew) >= Cat(vd_idx, 0.U(4.W)), (vl << vsew) - Cat(vd_idx, 0.U(4.W)), 0.U)
+  val vlRemainBytes = Mux((vl << vsew) >= Cat(vd_idx, 0.U((log2Up(VLEN) - 3).W)), (vl << vsew) - Cat(vd_idx, 0.U((log2Up(VLEN) - 3).W)), 0.U)
 
   val mask16b = MaskExtract(vmask, vd_idx, eew)
 
@@ -120,7 +117,7 @@ class VslideEngine(implicit p: Parameters) extends VFuModule {
   }
 
   // vslide
-  val vslide_offset = vslide_bytes(3, 0)
+  val vslide_offset = vslide_bytes(log2Up(VLEN) - 4, 0)
   // slideoffset, unchange, old_vd
   when(!vslide_hi_valid && !vslide_lo_valid) {
     for (i <- 0 until VLENB) {
@@ -155,9 +152,9 @@ class VslideEngine(implicit p: Parameters) extends VFuModule {
   for (i <- 0 until VLENB) {
     when(vmask_byte_strb(i).asBool) {
       when((i.U < (VLENB.U - vslide_offset)) && vslide_lo_valid && ((i.U + vslide_offset) < vlmax_bytes)) {
-        vslidedn_vd(i) := vs2_lo_bytes(i.U + vslide_offset)
+        vslidedn_vd(i) := vs2_lo_bytes(i.U +& vslide_offset)
       }.elsewhen((i.U >= (VLENB.U - vslide_offset)) && vslide_hi_valid) {
-        vslidedn_vd(i) := vs2_hi_bytes(i.U + vslide_offset - VLENB.U)
+        vslidedn_vd(i) := vs2_hi_bytes(i.U +& vslide_offset - VLENB.U)
       }.otherwise(
         vslidedn_vd(i) := 0.U
       )
@@ -194,12 +191,6 @@ class VslideEngine(implicit p: Parameters) extends VFuModule {
   io.vslide1dn_vd := Cat(vslide1dn_vd.reverse)
 }
 
-// object VerilogVslide extends App {
-//   println("Generating the VPU Vslide hardware")
-//   emitVerilog(new VslideEngine(), Array("--target-dir", "build/vifu"))
-// }
-
-
 object MaskExtract {
   def VLEN = 256
 
@@ -215,7 +206,8 @@ object MaskExtract {
 object MaskReorg {
   // sew = 8: unchanged, sew = 16: 00000000abcdefgh -> aabbccddeeffgghh, ...
 
-  def vlenb = 256/8
+  def vlenb = 256 / 8
+
   def splash(bits: UInt, sew: SewOH): UInt = {
     Mux1H(sew.oneHot, Seq(1, 2, 4, 8).map(k => Cat(bits(vlenb / k - 1, 0).asBools.map(Fill(k, _)).reverse)))
   }
