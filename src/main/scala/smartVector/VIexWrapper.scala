@@ -56,11 +56,11 @@ class VIexWrapper(implicit p : Parameters) extends Module {
     bitsReg := io.in.bits
   }
 
-  val validFinal = validReg & iexReady
   
   val empty :: ongoing :: Nil = Enum(2)
   val currentState = RegInit(empty)
   val currentStateNext = WireDefault(empty) 
+  val validFinal = validReg & ~(currentState === ongoing)
 
   val outValid = SValu.io.out.valid || SVMac.io.out.valid || SVMask.io.out.valid || 
                  SVReduc.io.out.valid || SVDiv.io.out.valid || SVFpu.io.out.valid
@@ -111,9 +111,9 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   SVMac.io.in.valid   := validFinal && bitsReg.uop.ctrl.mul
   SVMask.io.in.valid  := validFinal && bitsReg.uop.ctrl.mask
   SVReduc.io.in.valid := validFinal && bitsReg.uop.ctrl.redu
-  SVDiv.io.in.valid   := validReg && bitsReg.uop.ctrl.div
+  SVDiv.io.in.valid   := validFinal && bitsReg.uop.ctrl.div
   SVPerm.io.in.rvalid := validFinal && bitsReg.uop.ctrl.perm
-  SVFpu.io.in.valid   := validReg && bitsReg.uop.ctrl.fp
+  SVFpu.io.in.valid   := validFinal && bitsReg.uop.ctrl.fp
 
   Seq(SValu.io.in.bits, SVMac.io.in.bits, SVMask.io.in.bits, SVReduc.io.in.bits, SVDiv.io.in.bits, SVFpu.io.in.bits).foreach {iex =>
     iex.uop   := bitsReg.uop
