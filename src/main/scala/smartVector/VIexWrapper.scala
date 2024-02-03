@@ -48,8 +48,8 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   val ready    = ~(divNotReady || fpuNotReady)
 
   when(!validReg || ready){
-    validReg := io.in.valid
-  }
+    validReg := io.in.valid && !io.in.bits.uop.ctrl.isLdst
+    }
 
   when(validReg && ready){
     bitsReg := io.in.bits
