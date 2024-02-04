@@ -49,13 +49,12 @@ class VIexWrapper(implicit p : Parameters) extends Module {
 
   when(!validReg || ready){
     validReg := io.in.valid && !io.in.bits.uop.ctrl.isLdst
-    }
+  }
 
   //when(validReg && ready){
-  //  bitsReg := io.in.bits
+    bitsReg := io.in.bits
   //}
 
-  
   val empty :: ongoing :: Nil = Enum(2)
   val currentState = RegInit(empty)
   val currentStateNext = WireDefault(empty) 
