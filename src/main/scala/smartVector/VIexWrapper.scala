@@ -51,9 +51,9 @@ class VIexWrapper(implicit p : Parameters) extends Module {
     validReg := io.in.valid && !io.in.bits.uop.ctrl.isLdst
     }
 
-  when(validReg && ready){
-    bitsReg := io.in.bits
-  }
+  //when(validReg && ready){
+  //  bitsReg := io.in.bits
+  //}
 
   
   val empty :: ongoing :: Nil = Enum(2)
