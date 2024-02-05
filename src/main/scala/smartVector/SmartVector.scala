@@ -103,7 +103,7 @@ class SmartVector extends Module {
 
     //stall pipeline
     split.io.iexNeedStall := iex.io.iexNeedStall
-    decoder.io.iexNeedStall := iex.io.iexNeedStall
+    //decoder.io.iexNeedStall := iex.io.iexNeedStall
 
     //TODO: This is reserved for verification, delete it later
     io.rfData := regFile.io.rfData

@@ -51,9 +51,9 @@ class VIexWrapper(implicit p : Parameters) extends Module {
     validReg := io.in.valid && !io.in.bits.uop.ctrl.isLdst
   }
 
-  //when(validReg && ready){
+  when(io.in.valid){
     bitsReg := io.in.bits
-  //}
+  }
 
   val empty :: ongoing :: Nil = Enum(2)
   val currentState = RegInit(empty)
@@ -99,7 +99,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   } 
 
   currentState := currentStateNext
-  io.iexNeedStall := (currentStateNext === ongoing)
+  io.iexNeedStall := (currentStateNext === ongoing) || ~ready
   //assert(!(currentState === ongoing && validFinal), "when current state is ongoing, should not has new inst in")
   //assert(!(!SVDiv.io.in.ready && validFinal), "when div is not ready, should not has new inst in")
   //assert(!(SVPerm.io.out.perm_busy && validFinal), "when perm is busy, should not has new inst in")

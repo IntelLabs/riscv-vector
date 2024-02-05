@@ -28,7 +28,7 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
     val in  = Flipped(Decoupled(new RVUissue))
     val out = Decoupled(new VDecodeOutput)
     //val decode_ready = Output(Bool())
-    val iexNeedStall = Input(Bool())
+    //val iexNeedStall = Input(Bool())
   })
 
   val decode = Module(new VDecode)
@@ -45,7 +45,7 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
     decodeOut := decode.io.out
   }
 
-  io.out.bits.vCtrl         := RegEnable(decodeOut, io.in.valid)
+  io.out.bits.vCtrl         := RegEnable(decodeOut, io.in.valid & io.in.ready)
   io.out.bits.scalar_opnd_1 := RegEnable(io.in.bits.rs1, io.in.valid)
   io.out.bits.scalar_opnd_2 := RegEnable(io.in.bits.rs2, io.in.valid)
   io.out.bits.float_opnd_1  := RegEnable(io.in.bits.frs1, io.in.valid)
@@ -83,6 +83,6 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
 
   io.out.bits.eewEmulInfo := RegEnable(infoCalc.io.infoAll, io.in.valid)
 
-  io.in.ready := io.out.ready && ~io.iexNeedStall
+  io.in.ready := io.out.ready
 }
 
