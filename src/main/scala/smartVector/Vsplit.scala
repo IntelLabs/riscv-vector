@@ -60,6 +60,10 @@ class VUopCtrlW extends Bundle {
   val mask        = Bool()
   val perm        = Bool()
   val floatRed    = Bool()
+  val vGatherEi16EEW8  = Bool()
+  val vGatherEi16EEW16 = Bool()
+  val vGatherEi16EEW32 = Bool()
+  val vGatherEi16EEW64 = Bool()
   val lsrc = Vec(2, UInt(5.W)) //0: vs1/imm5   1: vs2
   val ldest = UInt(5.W)
   def vv = !funct3(2) && !(funct3(1) && funct3(0))
@@ -190,7 +194,12 @@ class Vsplit(implicit p : Parameters) extends Module {
     val old_vd  = Mux(io.in.regFileIn.readVld(3), io.in.regFileIn.readData(3), uopRegInfo(0).old_vd)
     val v_ext_out = ctrl.alu && ctrl.funct3 === "b010".U && ctrl.funct6 === "b010010".U 
   
-    val isfloat = ctrl.funct3 === "b101".U && !ctrl.isLdst
+    val isfloat = !ctrl.isLdst && ctrl.funct3 === "b101".U
+    val vGatherEi16 = ctrl.perm && ctrl.funct6 === "b001110".U
+    val vGatherEi16EEW8  = vGatherEi16 && eewEmulInfo1.veewVd === "b000".U
+    val vGatherEi16EEW16 = vGatherEi16 && eewEmulInfo1.veewVd === "b001".U
+    val vGatherEi16EEW32 = vGatherEi16 && eewEmulInfo1.veewVd === "b010".U
+    val vGatherEi16EEW64 = vGatherEi16 && eewEmulInfo1.veewVd === "b011".U
     val scalar_float_opnd_1 = Mux(isfloat, floatOpnd1, scalarOpnd1)
     val ldst = ctrl.load || ctrl.store
     val ldstCtrl = LdstDecoder(ctrl.funct6, ctrl.lsrc(1))
@@ -354,6 +363,10 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.out.mUop.bits.uop.ctrl.lsrc        := ctrl.lsrc
     io.out.mUop.bits.uop.ctrl.ldest       := ctrl.ldest
     io.out.mUop.bits.uop.ctrl.floatRed    := floatRed
+    io.out.mUop.bits.uop.ctrl.vGatherEi16EEW8  := vGatherEi16EEW8
+    io.out.mUop.bits.uop.ctrl.vGatherEi16EEW16 := vGatherEi16EEW16
+    io.out.mUop.bits.uop.ctrl.vGatherEi16EEW32 := vGatherEi16EEW32
+    io.out.mUop.bits.uop.ctrl.vGatherEi16EEW64 := vGatherEi16EEW64
 
     io.out.mUop.bits.uop.info.ma          := info.vma
     io.out.mUop.bits.uop.info.ta          := info.vta
