@@ -232,7 +232,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     }
 
     val lsrc0_inc =             //vcompress
-          Mux(ctrl.redu || (ctrl.funct6 === "b010111".U && ctrl.funct3 === 2.U), 0.U, 
+          Mux(ctrl.redu || floatRed || (ctrl.funct6 === "b010111".U && ctrl.funct3 === 2.U), 0.U, 
           Mux(ctrl.widen || ctrl.widen2 || ctrl.narrow, idx >> 1, idx))
               
     val lsrc1_inc = Wire(UInt(3.W))
@@ -259,7 +259,7 @@ class Vsplit(implicit p : Parameters) extends Module {
       ldest_inc := Mux(idxVdInc, idx >> indexIncBase, idx)
     }.elsewhen(ctrl.narrow) {
       ldest_inc := idx >> 1
-    }.elsewhen (ctrl.redu || ctrl.narrow_to_1) {
+    }.elsewhen (ctrl.redu  || floatRed|| ctrl.narrow_to_1) {
       ldest_inc := 0.U
     }.otherwise {
       ldest_inc := idx
