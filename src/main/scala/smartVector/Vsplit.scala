@@ -59,6 +59,7 @@ class VUopCtrlW extends Bundle {
   val redu        = Bool()
   val mask        = Bool()
   val perm        = Bool()
+  val floatRed    = Bool()
   val lsrc = Vec(2, UInt(5.W)) //0: vs1/imm5   1: vs2
   val ldest = UInt(5.W)
   def vv = !funct3(2) && !(funct3(1) && funct3(0))
@@ -127,6 +128,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     val uopRegInfo    = Reg(Vec(1, new UopRegInfo))
     val eewEmulInfo   = Reg(Vec(1, new VInfoAll))
     val idx           = RegInit(UInt(5.W), 0.U)
+    val floatRedReg   = Reg(Vec(1, Bool()))
 
     //vCtrl(0).illegal     := RegInit(false.B)
     //vCtrl(0).lsrcVal     := RegInit(VecInit(Seq.fill(3)(false.B)))
@@ -163,6 +165,7 @@ class Vsplit(implicit p : Parameters) extends Module {
         float_opnd_1(0)     := io.in.decodeIn.bits.float_opnd_1
         eewEmulInfo(0)      := io.in.decodeIn.bits.eewEmulInfo
         uopRegInfo(0).vxsat := false.B
+        floatRedReg(0)      := io.in.decodeIn.bits.floatRed
     }
 
     //To save power, when do not need to update the vs1, keep it unchanged. 
@@ -177,6 +180,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     val scalarOpnd1  = Mux(instFirstIn, io.in.decodeIn.bits.scalar_opnd_1,scalar_opnd_1(0))
     val scalarOpnd2  = Mux(instFirstIn, io.in.decodeIn.bits.scalar_opnd_2,scalar_opnd_2(0))
     val floatOpnd1   = Mux(instFirstIn, io.in.decodeIn.bits.float_opnd_1,float_opnd_1(0))
+    val floatRed     = Mux(instFirstIn, io.in.decodeIn.bits.floatRed, floatRedReg(0))
     val eewEmulInfo1 = Mux(instFirstIn, io.in.decodeIn.bits.eewEmulInfo, eewEmulInfo(0))
 
     //Because the register file do not always read the register file when instFirstIn
@@ -349,6 +353,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.out.mUop.bits.uop.ctrl.perm        := ctrl.perm
     io.out.mUop.bits.uop.ctrl.lsrc        := ctrl.lsrc
     io.out.mUop.bits.uop.ctrl.ldest       := ctrl.ldest
+    io.out.mUop.bits.uop.ctrl.floatRed    := floatRed
 
     io.out.mUop.bits.uop.info.ma          := info.vma
     io.out.mUop.bits.uop.info.ta          := info.vta
