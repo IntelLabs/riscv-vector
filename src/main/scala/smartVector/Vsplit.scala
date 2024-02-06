@@ -158,7 +158,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     when (instFirstIn){       
         vCtrl(0)            := io.in.decodeIn.bits.vCtrl
         vInfo(0)            := io.in.decodeIn.bits.vInfo
-        scalar_opnd_1(0)    := io.in.decodeIn.bits.float_opnd_1
+        scalar_opnd_1(0)    := io.in.decodeIn.bits.scalar_opnd_1
         scalar_opnd_2(0)    := io.in.decodeIn.bits.scalar_opnd_2
         float_opnd_1(0)     := io.in.decodeIn.bits.float_opnd_1
         eewEmulInfo(0)      := io.in.decodeIn.bits.eewEmulInfo
@@ -360,7 +360,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.out.mUop.bits.uop.info.frm         := info.frm
     io.out.mUop.bits.uop.sysUop           := 0.U.asTypeOf(new MicroOp)
 
-    io.out.mUop.bits.scalar_opnd_1        := scalarOpnd1
+    io.out.mUop.bits.scalar_opnd_1        := scalar_float_opnd_1
     io.out.mUop.bits.scalar_opnd_2        := scalarOpnd2
 
     io.out.mUop.bits.uopRegInfo.vxsat     := false.B          
