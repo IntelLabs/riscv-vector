@@ -36,6 +36,8 @@ import darecreek.lsu._
   *
   * Requirement: inputs valid must be consecutive
   * Others: all inputs of io.in share one 'ready'. 'Ready' of all outputs are from one source.
+  * 
+  * Note: 2024.02 Reduce pipeline stages from 2 -> 1
   */
 class ParallelExpander extends Module {
   val io = IO(new Bundle {
@@ -123,37 +125,56 @@ class ParallelExpander extends Module {
                         Mux(canOut && state === BUSY, expdLenAccRemainUpdate(i), 
                             expdLenAccRemain(i)))
   }
-  busy_end := state === BUSY && expdLenAccRemain(VRenameWidth) <= VRenameWidth.U && canOut
+  val busy_end_logic = state === BUSY && expdLenAccRemain(VRenameWidth) <= VRenameWidth.U
+  busy_end := busy_end_logic && canOut
 
   val hasValid = Cat(io.in.map(_.valid)).orR
   val canIn = state === IDLE || busy_end
   for (i <- 0 until VRenameWidth) {io.in(i).ready := !hasValid || canOut && canIn}
 
+  val idle_or_busyEnd = state === IDLE || busy_end_logic
+
   //---- get some ctrl signals ----
-  val v_ext = ctrl.map(c => RegEnable(c.alu && c.funct3 === "b010".U && c.funct6 === "b010010".U, fire))
-  val ldstCtrlReg = ldstCtrl.map(x => RegEnable(x, fire))
-  val expdLen_indexVd_reg = expdLen_indexVd.map(x => RegEnable(x, fire))
+  // Note: 2024.02 Reduce pipeline stages from 2 -> 1
+  // val v_ext = ctrl.map(c => RegEnable(c.alu && c.funct3 === "b010".U && c.funct6 === "b010010".U, fire))
+  val v_ext_logic = ctrl.map(c => c.alu && c.funct3 === "b010".U && c.funct6 === "b010010".U)
+  val v_ext = v_ext_logic.map(x => Mux(idle_or_busyEnd, x, RegEnable(x, fire)))
+  // val ldstCtrlReg = ldstCtrl.map(x => RegEnable(x, fire))
+  val ldstCtrlReg_logic = ldstCtrl
+  val ldstCtrlReg = ldstCtrlReg_logic.map(x => Mux(idle_or_busyEnd, x, RegEnable(x, fire)))
+  // val expdLen_indexVd_reg = expdLen_indexVd.map(x => RegEnable(x, fire))
+  val expdLen_indexVd_reg_logic = expdLen_indexVd
+  val expdLen_indexVd_reg = expdLen_indexVd_reg_logic.map(x => Mux(idle_or_busyEnd, x, RegEnable(x, fire)))
+
 
   /**
     * Expander
+    *   Note: 2024.02 Reduce pipeline stages from 2 -> 1
     */
   val io_in_updateDestEew = Wire(Vec(VRenameWidth, new VMicroOp))
   for (i <- 0 until VRenameWidth) {
     io_in_updateDestEew(i) := io.in(i).bits
     io_in_updateDestEew(i).info.destEew := veewVd(i)
   }
-  val expdIn = io_in_updateDestEew.map(x => RegEnable(x, fire))
-  val expdLenReg = RegEnable(expdLen, fire)
+  // val expdIn = io_in_updateDestEew.map(x => RegEnable(x, fire))
+  val expdIn_logic = io_in_updateDestEew
+  val expdIn = expdIn_logic.map(x => Mux(idle_or_busyEnd, x, RegEnable(x, fire)))
+  // val expdLenReg = RegEnable(expdLen, fire)
+  val expdLenReg_logic = expdLen
+  val expdLenReg = expdLenReg_logic.map(x => Mux(idle_or_busyEnd, x, RegEnable(x, fire)))
   val expdOut = Wire(Vec(VRenameWidth, new VMicroOp))
   val expdOutValid = Wire(Vec(VRenameWidth, Bool()))
   val expdIdx = Wire(Vec(VRenameWidth, UInt(3.W)))
-  val veew_minus_vsew_r = veew_minus_vsew.map(RegEnable(_, fire))
+  // val veew_minus_vsew_r = veew_minus_vsew.map(RegEnable(_, fire))
+  val veew_minus_vsew_r_logic = veew_minus_vsew
+  val veew_minus_vsew_r = veew_minus_vsew_r_logic.map(x => Mux(idle_or_busyEnd, x, RegEnable(x, fire)))
   val veew_minus_vsew_out = Wire(Vec(VRenameWidth, UInt(3.W)))
   val v_ext_out = Wire(Vec(VRenameWidth, Bool()))
   // for (i <- 0 until VRenameWidth + 1) {
   for (i <- 0 until VRenameWidth) {
     val subt = (0 until VRenameWidth + 1) map { j =>
-      i.U - expdLenAccRemain(j)
+      // i.U - expdLenAccRemain(j)
+      i.U - Mux(state === IDLE || busy_end_logic, expdLenAcc(j), expdLenAccRemainUpdate(j))
     }
     val lessThan = VecInit(subt.map(_(ExpdLenAccWidth-1))).asUInt
     // E.g., "1110000" -> "0010000"
@@ -177,7 +198,8 @@ class ParallelExpander extends Module {
     io.out(i).bits.vRobIdx := expdOut(i).vRobIdx
     io.out(i).bits.sb_id := expdOut(i).sb_id
 
-    io.out(i).valid := state === BUSY && expdOutValid(i)
+    // io.out(i).valid := state === BUSY && expdOutValid(i)
+    io.out(i).valid := (io.in(0).valid || state === BUSY && !busy_end_logic) && expdOutValid(i)
     val ctrl = expdOut(i).ctrl
     val info = expdOut(i).info
     val sew = SewOH(info.vsew)
