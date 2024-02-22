@@ -43,11 +43,11 @@ class Reduction(implicit p: Parameters) extends Module {
   io.in.ready := redint.io.in.ready && redfp.io.in.ready
 
   redint.io.in.bits := io.in.bits
-  redint.io.in.valid := io.in.valid && !fp_red
+  redint.io.in.valid := io.in.valid && io.in.ready && !fp_red
   redint.io.redirect := io.redirect
 
   redfp.io.in.bits := io.in.bits
-  redfp.io.in.valid := io.in.valid && fp_red
+  redfp.io.in.valid := io.in.valid && io.in.ready && fp_red
   redfp.io.redirect := io.redirect
 
   val arb = Module(new Arbiter(new VCrossExuOut, 2))
