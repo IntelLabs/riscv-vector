@@ -23,7 +23,7 @@ class ReductionInt(implicit p: Parameters) extends Module {
   // val flushVec = Array.fill(latency + 1)(WireInit(false.B)) // FIXME: implement flush logic
   // val flushVec = validVec.zip(uopVec).map(x => x._1 && x._2.vRobIdx.needFlush(io.redirect))  //XS
   val flushVec = validVec.zip(uopVec).map(x => x._1 && io.redirect.needFlush(
-                   x._2.asTypeOf(new darecreek.exu.vfucoreconfig.VUop).robIdx))
+    x._2.asTypeOf(new darecreek.exu.vfucoreconfig.VUop).robIdx))
 
   for (i <- 0 until latency) {
     rdyVec(i) := !validVec(i + 1) || rdyVec(i + 1)
@@ -87,7 +87,8 @@ class ReductionInt(implicit p: Parameters) extends Module {
   val vsew = uop.info.vsew
   val ma = uop.info.ma
   val ta = uop.info.ta
-  val fire = io.in.fire
+  // val fire = io.in.fire
+  val fire = regEnable(1)
 
   val vredsum_vs = (funct6 === "b000000".U) && (funct3 === "b010".U)
   val vredmax_vs = (funct6 === "b000111".U) && (funct3 === "b010".U)
@@ -129,9 +130,11 @@ class ReductionInt(implicit p: Parameters) extends Module {
   val vl_reg = RegEnable(vl, 0.U, fire)
   vd_mask_vl := vd_mask >> (VLEN.U - vl)
   vmask_vl := vmask & vd_mask_vl
-  vlRemainBytes := Mux((vl << vsew) >= Cat(uopIdx, 0.U((log2Up(VLEN)-3).W)), (vl << vsew) - Cat(uopIdx, 0.U((log2Up(VLEN)-3).W)), 0.U)
-  val reg_fire = RegNext(fire)
-  val reg2_fire = RegNext(reg_fire)
+  vlRemainBytes := Mux((vl << vsew) >= Cat(uopIdx, 0.U((log2Up(VLEN) - 3).W)), (vl << vsew) - Cat(uopIdx, 0.U((log2Up(VLEN) - 3).W)), 0.U)
+  // val reg_fire = RegNext(fire)
+  // val reg2_fire = RegNext(reg_fire)
+  val reg_fire = regEnable(2)
+  val reg2_fire = regEnable(3)
   val reg_widen = RegEnable(widen, false.B, fire)
   val reg_vsew = RegEnable(vsew, 0.U, fire)
   val reg_vd_vsew = RegEnable(vd_vsew, 0.U, fire)
