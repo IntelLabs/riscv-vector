@@ -139,7 +139,7 @@ class VslideEngine(implicit p: Parameters) extends VFuModule {
     for (i <- 0 until VLENB) {
       when(vmask_byte_strb(i).asBool) {
         when(i.U < vslide_offset) { // vs2(i-1)
-          vslideup_vd(i) := vs2_lo_bytes(VLENB.U - vslide_offset + i.U)
+          vslideup_vd(i) := vs2_lo_bytes(VLENB.U - vslide_offset +& i.U)
         }.otherwise { // vs2(i)
           vslideup_vd(i) := vs2_hi_bytes(i.U - vslide_offset)
         }
@@ -180,7 +180,7 @@ class VslideEngine(implicit p: Parameters) extends VFuModule {
   when(vd_idx === vl_idx) {
     for (i <- 0 until VLENB) {
       when((i.U >= (vlRemainBytes - vsew_bytes)) && vmask_byte_strb(i).asBool) {
-        vslide1dn_vd(i) := rs1_bytes(i.U + vsew_bytes - vlRemainBytes)
+        vslide1dn_vd(i) := rs1_bytes(i.U +& vsew_bytes - vlRemainBytes)
       }
     }
   }
