@@ -30,7 +30,7 @@ class LaneFP(implicit p: Parameters) extends VFuModule {
 
   val uop = io.out.bits.uop
   val narrow_to_1 = uop.ctrl.narrow_to_1
-  val vlmul = uop.info.vlmul
+  val vlmul = Mux(uop.info.vlmul > 3.U, 0.U, uop.info.vlmul)
   val fpu = Module(new VFPUTop()(p))
   val maskKeep = fpu.io.maskKeep
   val maskOff = fpu.io.maskOff
