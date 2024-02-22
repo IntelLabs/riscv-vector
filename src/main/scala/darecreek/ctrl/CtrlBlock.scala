@@ -72,14 +72,17 @@ class VCtrlBlock extends Module {
   // infoCalc
   infoCalc.io.ctrl := decoder.io.out.bits.ctrl
   infoCalc.io.csr := decoder.io.out.bits.csr
+  val partialVInfo_wire = Wire(ValidIO(new PartialVInfo))
   val partialVInfo_reg = Reg(ValidIO(new PartialVInfo))
+  // For narrow-to-1, set destEew = veewVs2 to facilitate tail/mask generation 
+  partialVInfo_wire.bits.destEew := Mux(decoder.io.out.bits.ctrl.narrow_to_1,
+                    infoCalc.io.infoAll.veewVs2, infoCalc.io.infoAll.veewVd)
+  partialVInfo_wire.bits.emulVd := infoCalc.io.infoAll.emulVd
+  partialVInfo_wire.bits.emulVs2 := infoCalc.io.infoAll.emulVs2
+  partialVInfo_wire.bits.vRobPtr := vq.io.enqPtrOut
+  partialVInfo_wire.valid := decoder.io.out.valid
   when (decoder.io.out.valid) {
-    // For narrow-to-1, set destEew = veewVs2 to facilitate tail/mask generation 
-    partialVInfo_reg.bits.destEew := Mux(decoder.io.out.bits.ctrl.narrow_to_1,
-                      infoCalc.io.infoAll.veewVs2, infoCalc.io.infoAll.veewVd)
-    partialVInfo_reg.bits.emulVd := infoCalc.io.infoAll.emulVd
-    partialVInfo_reg.bits.emulVs2 := infoCalc.io.infoAll.emulVs2
-    partialVInfo_reg.bits.vRobPtr := vq.io.enqPtrOut
+    partialVInfo_reg := partialVInfo_wire
   }
   partialVInfo_reg.valid := decoder.io.out.valid
   
@@ -142,7 +145,8 @@ class VCtrlBlock extends Module {
   vIllegalInstrn.io.extraInfo_for_VIllegal := infoCalc.io.extraInfo_for_VIllegal
   vIllegalInstrn.io.robPtrIn := vq.io.enqPtrOut
   vq.io.illegal := vIllegalInstrn.io.ill
-  vq.io.partialVInfo := partialVInfo_reg
+  vq.io.partialVInfo_wire := partialVInfo_wire
+  vq.io.partialVInfo_reg := partialVInfo_reg
 
   // ROB
   rob.io.in.valid := decoder.io.out.valid
