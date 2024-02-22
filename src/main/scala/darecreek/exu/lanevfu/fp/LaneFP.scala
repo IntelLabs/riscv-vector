@@ -89,8 +89,8 @@ class LaneFP(implicit p: Parameters) extends VFuModule {
   fpu.io.redirect := io.redirect
 
   val eewVd = SewOH(io.in.bits.uop.info.destEew)
-  val maskSplash = MaskReorg.splash(io.in.bits.mask, eewVd)
-  val tailSplash = MaskReorg.splash(io.in.bits.tail, eewVd)
+  val maskSplash = Mux(io.in.bits.uop.ctrl.narrow_to_1, io.in.bits.mask, MaskReorg.splash(io.in.bits.mask, eewVd))
+  val tailSplash = Mux(io.in.bits.uop.ctrl.narrow_to_1, io.in.bits.tail, MaskReorg.splash(io.in.bits.tail, eewVd))
 
   fpu.io.in.bits.mask := maskSplash
   fpu.io.in.bits.tail := tailSplash
