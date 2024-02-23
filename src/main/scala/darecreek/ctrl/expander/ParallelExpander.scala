@@ -99,7 +99,7 @@ class ParallelExpander extends Module {
       expdLen(i) := Mux(ldstCtrl(i).segment, expdLen_seg, expdLen_ldst) 
     }.elsewhen ((ldstCtrl(i).mask && ctrl(i).isLdst) || perm_vmv_vfmv || mask_onlyOneReg) {
       expdLen(i) := 1.U
-    }.elsewhen (ctrl(i).widen || ctrl(i).widen2 || ctrl(i).narrow) {
+    }.elsewhen (ctrl(i).widen && !ctrl(i).redu || ctrl(i).widen2 || ctrl(i).narrow) {
       expdLen(i) := Mux(info(i).vlmul(2), 1.U, lmul(i) << 1)  // If lmul < 1, expdLen = 1 for widen/narrow
     }.elsewhen (ctrl(i).funct6 === "b100111".U && ctrl(i).funct3 === "b011".U) {//Whole register move
       expdLen(i) := ctrl(i).lsrc(0)(2, 0) +& 1.U
@@ -207,7 +207,7 @@ class ParallelExpander extends Module {
     
     // out lsrc(1), which is vs2
     val lsrc1_inc = Wire(UInt(3.W))
-    when (ctrl.widen || v_ext_out(i) && ctrl.lsrc(0)(2,1) === 3.U) {
+    when (ctrl.widen && !ctrl.redu || v_ext_out(i) && ctrl.lsrc(0)(2,1) === 3.U) {
       lsrc1_inc := expdIdx(i) >> 1
     }.elsewhen (v_ext_out(i) && ctrl.lsrc(0)(2,1) === 2.U) {
       lsrc1_inc := expdIdx(i) >> 2
@@ -225,7 +225,7 @@ class ParallelExpander extends Module {
     // out lsrc(0), which is vs1
     io.out(i).bits.lsrcExpd(0) := ctrl.lsrc(0) +            //vcompress
               Mux(ctrl.redu || (ctrl.funct6 === "b010111".U && ctrl.funct3 === 2.U), 0.U, 
-              Mux(ctrl.widen || ctrl.widen2 || ctrl.narrow || gather16 && sew.is32, expdIdx(i) >> 1, 
+              Mux(ctrl.widen && !ctrl.redu || ctrl.widen2 || ctrl.narrow || gather16 && sew.is32, expdIdx(i) >> 1, 
               Mux(gather16 && sew.is64, expdIdx(i) >> 2, expdIdx(i))))
     // out lsrc(0) valid
     io.out(i).bits.lsrcValExpd(0) := ctrl.lsrcVal(0)
