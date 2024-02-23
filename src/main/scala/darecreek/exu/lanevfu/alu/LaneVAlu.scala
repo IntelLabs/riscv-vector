@@ -160,8 +160,8 @@ class LaneVAlu(implicit p: Parameters) extends VFuModule {
   //-------- Mask/Tail data gen --------
   //------------------------------------
   // Splash. sew = 8: unchanged, sew = 16: 0000abcd -> aabbccdd, ...
-  val maskSplash = MaskReorg.splash(io.in.bits.mask, eewVd)
-  val tailSplash = MaskReorg.splash(io.in.bits.tail, eewVd)
+  val maskSplash = Mux(uop.ctrl.narrow_to_1, io.in.bits.mask, MaskReorg.splash(io.in.bits.mask, eewVd))
+  val tailSplash = Mux(uop.ctrl.narrow_to_1, io.in.bits.tail, MaskReorg.splash(io.in.bits.tail, eewVd))
   val maskTailData = Module(new MaskTailDataVAlu)
   maskTailData.io.mask := maskSplash
   maskTailData.io.tail := tailSplash
