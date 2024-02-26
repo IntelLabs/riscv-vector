@@ -68,9 +68,10 @@ class MaskTailDataVAlu extends Module {
   val (mask, tail, oldVd, uop) = (io.mask, io.tail, io.oldVd, io.uop)
   val addWithCarry = uop.ctrl.funct6(5,2) === "b0100".U && io.opi
   val vmerge = uop.ctrl.funct6 === "b010111".U
+  val isWholeRegMv = uop.ctrl.funct6 === "b100111".U && uop.ctrl.funct3 === "b011".U
   for (i <- 0 until 8) {
     when (tail(i)) {
-      maskTail(i) := Mux(uop.info.ta || uop.ctrl.narrow_to_1, 3.U, 2.U)
+      maskTail(i) := Mux(isWholeRegMv, 0.U, Mux(uop.info.ta || uop.ctrl.narrow_to_1, 3.U, 2.U))
     }.elsewhen (addWithCarry || vmerge) {
       maskTail(i) := 0.U
     }.elsewhen (!mask(i) && !uop.ctrl.vm) {
@@ -219,7 +220,14 @@ class LaneVAlu(implicit p: Parameters) extends VFuModule {
     aluNarrowValid -> aluNarrowOut,
   ))
   val vdS1IntMasked = vdS1Int & maskKeepS1 | maskOffS1
-  val vdS1IntFinal = Mux(aluCmpValid, Cat(aluCmpOut.reverse), vdS1IntMasked)
+  val rdValid = Reg(Bool())
+  val rd = Reg(UInt(XLEN.W))
+  when (fire) {
+    rdValid := vIntMisc.io.rd.valid
+    rd := vIntMisc.io.rd.bits
+  }
+  val vdS1IntFinal = Mux(rdValid, rd,
+                         Mux(aluCmpValid, Cat(aluCmpOut.reverse), vdS1IntMasked))
 
   //--------- Ready/valid of S1Int ---------
   val readyS1Int = Wire(Bool())

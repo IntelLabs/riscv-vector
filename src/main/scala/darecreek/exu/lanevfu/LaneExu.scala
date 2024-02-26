@@ -40,6 +40,8 @@ class VLaneExu extends Module {
   val narrow = uop.ctrl.narrow
   val destEew = SewOH(uop.info.destEew)
   val expdIdx = uop.expdIdx
+  val isPermVmv = uop.ctrl.funct6 === "b010000".U && !uop.ctrl.opi &&
+                  !(uop.ctrl.funct3 === "b010".U && uop.ctrl.lsrc(0)(4))
 
   val lanes = Seq.fill(NLanes)(Module(new VLane))
   for (i <- 0 until NLanes) {
@@ -58,7 +60,7 @@ class VLaneExu extends Module {
 
   /** Input tail distribution
    */
-  val tail = TailGen(uop.info.vl, expdIdx, destEew, narrow)
+  val tail = TailGen(Mux(isPermVmv, 1.U, uop.info.vl), expdIdx, destEew, narrow)
   // Tail of each lane. It occupies the lowest bits of lane mask_input.
   val laneTail = Wire(Vec(NLanes, UInt(NByteLane.W)))
   // Lane index:        3       2       1       01
