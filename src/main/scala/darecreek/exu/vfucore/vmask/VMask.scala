@@ -131,8 +131,7 @@ class VMask(implicit p: Parameters) extends VFuModule {
   for (i <- 0 until VLEN) {
     vs2m(i) := 0.U
     when(fire) {
-      // vs2m(i) := vs2(i) & (vmask(i) | vm) & (i.U < vl)
-      vs2m(i) := vs2(i) & (vmask(i) | vm) & (i.U < vlRemain)
+      vs2m(i) := vs2(i) & (vmask(i) | vm) & (i.U < vl)
     }
   }
 
