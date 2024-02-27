@@ -26,6 +26,7 @@ class MaskTailDataVMac extends Module {
   val io = IO(new Bundle {
     val mask = Input(UInt(8.W))
     val tail = Input(UInt(8.W))
+    val vstart_gte_vl = Input(Bool())
     val oldVd = Input(UInt(64.W))
     val uop = Input(new VUop)
     val maskKeep = Output(UInt(64.W))  // keep: 11..1  off: 00..0
@@ -35,7 +36,9 @@ class MaskTailDataVMac extends Module {
   val maskTail = Wire(Vec(8, UInt(2.W))) // 00: keep result   10: old_vd(undisturbed)  11: write 1s(agnostic)
   val (mask, tail, oldVd, uop) = (io.mask, io.tail, io.oldVd, io.uop)
   for (i <- 0 until 8) {
-    when (tail(i)) {
+    when (io.vstart_gte_vl) {
+      maskTail(i) := 2.U
+    }.elsewhen (tail(i)) {
       maskTail(i) := Mux(uop.info.ta, 3.U, 2.U)
     }.elsewhen (!mask(i) && !uop.ctrl.vm) {
       maskTail(i) := Mux(uop.info.ma, 3.U, 2.U)
@@ -131,10 +134,12 @@ class LaneVMac(implicit p: Parameters) extends Module {
   val maskS1 = RegEnable(io.in.bits.mask, regEnable(1)) // io.in.fire)
   val tailS1 = RegEnable(io.in.bits.tail, regEnable(1)) // io.in.fire)
   val oldVdS1 = RegEnable(io.in.bits.old_vd, regEnable(1)) // io.in.fire)
+  val vstart_gte_vl_S1 = RegEnable(uop.info.vstart_gte_vl, regEnable(1))
   val eewVdS1 = RegEnable(eewVd, regEnable(1)) // io.in.fire)
   val maskS2 = RegEnable(maskS1, regEnable(2)) // fireS1)
   val tailS2 = RegEnable(tailS1, regEnable(2)) // fireS1)
   val oldVdS2 = RegEnable(oldVdS1, regEnable(2)) // fireS1)
+  val vstart_gte_vl_S2 = RegEnable(vstart_gte_vl_S1, regEnable(2)) // fireS1)
   val eewVdS2 = RegEnable(eewVdS1, regEnable(2)) // fireS1)
 
   val maskSplash = MaskReorg.splash(maskS2, eewVdS2)
@@ -142,6 +147,7 @@ class LaneVMac(implicit p: Parameters) extends Module {
   val maskTailData = Module(new MaskTailDataVMac)
   maskTailData.io.mask := maskSplash
   maskTailData.io.tail := tailSplash
+  maskTailData.io.vstart_gte_vl := vstart_gte_vl_S2
   maskTailData.io.oldVd := oldVdS2
   maskTailData.io.uop := uopVec(2) // uopS2
 
