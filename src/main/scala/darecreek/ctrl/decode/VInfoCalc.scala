@@ -26,6 +26,7 @@ class VInfoAll extends Bundle {
   val emulVs1 = UInt(4.W)
   val emulVs2 = UInt(4.W)
   val emulVd = UInt(4.W)
+  val vstart_gte_vl = Bool()
 }
 
 /** Calculate all info of the instruction
@@ -179,6 +180,9 @@ class VInfoCalc extends Module {
   io.infoAll.emulVd := Vlmul_to_lmul(vemulVd)
   io.infoAll.emulVs1 := Vlmul_to_lmul(vemulVs1)
   io.infoAll.emulVs2 := Vlmul_to_lmul(vemulVs2)
+  
+  io.infoAll.vstart_gte_vl := io.csr.vstart >= io.csr.vl
+
 
   io.extraInfo_for_VIllegal.ldst := ldst
   io.extraInfo_for_VIllegal.ldstCtrl := ldstCtrl

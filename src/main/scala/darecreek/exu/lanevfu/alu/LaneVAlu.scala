@@ -55,6 +55,7 @@ class MaskTailDataVAlu extends Module {
   val io = IO(new Bundle {
     val mask = Input(UInt(8.W))
     val tail = Input(UInt(8.W))
+    val vstart_gte_vl = Input(Bool())
     val oldVd = Input(UInt(64.W))
     val uop = Input(new VUop)
     val opi = Input(Bool())
@@ -70,7 +71,9 @@ class MaskTailDataVAlu extends Module {
   val vmerge = uop.ctrl.funct6 === "b010111".U
   val isWholeRegMv = uop.ctrl.funct6 === "b100111".U && uop.ctrl.funct3 === "b011".U
   for (i <- 0 until 8) {
-    when (tail(i)) {
+    when (io.vstart_gte_vl) {
+      maskTail(i) := 2.U
+    }.elsewhen (tail(i)) {
       maskTail(i) := Mux(isWholeRegMv, 0.U, Mux(uop.info.ta || uop.ctrl.narrow_to_1, 3.U, 2.U))
     }.elsewhen (addWithCarry || vmerge) {
       maskTail(i) := 0.U
@@ -166,6 +169,7 @@ class LaneVAlu(implicit p: Parameters) extends VFuModule {
   val maskTailData = Module(new MaskTailDataVAlu)
   maskTailData.io.mask := maskSplash
   maskTailData.io.tail := tailSplash
+  maskTailData.io.vstart_gte_vl := uop.info.vstart_gte_vl
   maskTailData.io.oldVd := io.in.bits.old_vd
   maskTailData.io.uop := io.in.bits.uop
   maskTailData.io.opi := opi

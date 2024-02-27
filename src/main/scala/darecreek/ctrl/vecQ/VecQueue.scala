@@ -82,6 +82,7 @@ class VecQueue extends Module with HasCircularQueuePtrHelper {
     vq(partialVInfo.bits.vRobPtr.value).info.destEew := partialVInfo.bits.destEew
     vq(partialVInfo.bits.vRobPtr.value).info.emulVd := partialVInfo.bits.emulVd
     vq(partialVInfo.bits.vRobPtr.value).info.emulVs2 := partialVInfo.bits.emulVs2
+    vq(partialVInfo.bits.vRobPtr.value).info.vstart_gte_vl := partialVInfo.bits.vstart_gte_vl
   }
 
   /**
@@ -99,6 +100,7 @@ class VecQueue extends Module with HasCircularQueuePtrHelper {
     io.out.bits.info.destEew := io.partialVInfo_wire.bits.destEew
     io.out.bits.info.emulVd := io.partialVInfo_wire.bits.emulVd
     io.out.bits.info.emulVs2 := io.partialVInfo_wire.bits.emulVs2
+    io.out.bits.info.vstart_gte_vl := io.partialVInfo_wire.bits.vstart_gte_vl
     io.out.bits.sb_id := io.in.bits.sb_id
     io.out.bits.vRobIdx := deqPtr
   }.otherwise {
@@ -114,6 +116,7 @@ class VecQueue extends Module with HasCircularQueuePtrHelper {
       io.out.bits.info.destEew := partialVInfo.bits.destEew
       io.out.bits.info.emulVd := partialVInfo.bits.emulVd
       io.out.bits.info.emulVs2 := partialVInfo.bits.emulVs2
+      io.out.bits.info.vstart_gte_vl := partialVInfo.bits.vstart_gte_vl
     }
   }
 
