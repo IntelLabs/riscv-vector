@@ -23,7 +23,9 @@ abstract class TestBehavior(filename : String, ctrlBundle : TestCtrlBundleBase, 
     def setLmulLsOneDone() = {lmulLsOneDone = true}
     def getLmulLsOneDone() = lmulLsOneDone
 
-    def getTestfilePath() : String              = Datapath.testdataRoot + filename
+    // def getTestfilePath() : String              = Datapath.testdataRoot + filename
+    def getFilename() : String = filename
+    def getTestfilePath(fname: String) : String              = Datapath.testdataRoot + fname
     def getCtrlBundle() : TestCtrlBundleBase    = ctrlBundle
     def getSign() : String                      = sign
     def getInstid() : String                    = instid
