@@ -198,6 +198,9 @@ class LaneVAlu(implicit p: Parameters) extends VFuModule {
       aluCmpOut(i) := Mux(uop.expdIdx === 0.U, ~(0.U(8.W)), 
                           Mux(uop.expdIdx === i.U, cmpMasked, aluCmpOut(i)))
     }
+    when (uop.info.vstart_gte_vl) {
+      for (i <- 0 until 8) { aluCmpOut(i) := UIntSplit(io.in.bits.old_vd, 8)(i) }
+    }
     aluCmpValid := uop.expdEnd && uop.ctrl.narrow_to_1
   }
   //---- Output of ALU MISC (not narrow) ----

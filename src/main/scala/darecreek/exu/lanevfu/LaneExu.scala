@@ -166,6 +166,9 @@ class VLaneExu extends Module {
     }
     lanes(i).io.in.data.old_vd := Mux(uop.ctrl.narrow_to_1, laneMask(i), 
              Mux(uop.ctrl.narrow, laneOldVdNarrow.asUInt, io.in.bits.vSrc(2)(i)))
+    lanes(i).io.in.data.old_vd := Mux(uop.ctrl.narrow, laneOldVdNarrow.asUInt, 
+             Mux(uop.ctrl.narrow_to_1 && !uop.info.vstart_gte_vl, laneMask(i), 
+                 io.in.bits.vSrc(2)(i)))
   }
   
   /**
@@ -196,7 +199,8 @@ class VLaneExu extends Module {
     val vdCmp = Mux1H(SewOH(io.out(wbIdx).bits.uop.info.vsew).oneHot, Seq(8,16,32,64).map(sew => cmpOutRearrange(sew, wbIdx)))
     // Final output vd
     for (i <- 0 until NLanes) {
-      io.out(wbIdx).bits.vd(i) := Mux(io.out(wbIdx).bits.uop.ctrl.narrow_to_1, (UIntSplit(vdCmp))(i), vd(i))
+      io.out(wbIdx).bits.vd(i) := Mux(io.out(wbIdx).bits.uop.ctrl.narrow_to_1 && !io.out(wbIdx).bits.uop.info.vstart_gte_vl,
+                                      UIntSplit(vdCmp)(i), vd(i))
     }
   }
   
