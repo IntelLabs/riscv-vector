@@ -124,7 +124,7 @@ class ReductionInt(implicit p: Parameters) extends Module {
   val vd_mask = (~0.U(VLEN.W))
   val vd_mask_vl = Wire(UInt(VLEN.W))
   val vmask_vl = Wire(UInt(VLEN.W))
-  val vmask_uop = MaskExtract(vmask_vl, uopIdx, eew)
+  val vmask_uop = MaskExtract(vmask_vl, uopIdx, eew, VLEN)
   val vmask_16b = MaskReorg.splash(vmask_uop, eew, vlenb)
 
   val vl_reg = RegEnable(vl, 0.U, fire)
@@ -214,8 +214,10 @@ class ReductionInt(implicit p: Parameters) extends Module {
 
   val redpre = Module(new ReductionPre)
   redpre.io.in.bits := io.in.bits
+  redpre.io.pipe_enable := Cat(regEnable(3), regEnable(2), regEnable(1))
   redpre.io.vd_reg := vd_reg
   redpre.io.in.valid := fire
+
   vs2m_bits_widen := redpre.io.vs2m_bits_widen
   vs1_zero := redpre.io.vs1_zero
   vs1_zero_logical := redpre.io.vs1_zero_logical
@@ -223,6 +225,7 @@ class ReductionInt(implicit p: Parameters) extends Module {
   val rs_vd = Wire(Vec(VLEN / 128, UInt(128.W)))
   val rs = Seq.fill(VLEN / 128)(Module(new ReductionSlice))
   for (i <- 0 until NLanes / 2) {
+    rs(i).io.pipe_enable := regEnable(2)
     rs(i).io.funct6 := uopVec(1).ctrl.funct6
     rs(i).io.funct3 := uopVec(1).ctrl.funct3
     rs(i).io.vsew := uopVec(1).info.vsew
@@ -419,29 +422,6 @@ class ReductionInt(implicit p: Parameters) extends Module {
   io.out.bits.fflags := 0.U
 
 }
-
-object MaskExtract {
-  def VLEN = 256
-
-  def apply(vmask: UInt, uopIdx: UInt, sew: SewOH) = {
-    val extracted = Wire(UInt((VLEN / 8).W))
-    extracted := Mux1H(Seq.tabulate(8)(uopIdx === _.U),
-      Seq.tabulate(8)(idx => Mux1H(sew.oneHot, Seq(VLEN / 8, VLEN / 16, VLEN / 32, VLEN / 64).map(stride =>
-        vmask((idx + 1) * stride - 1, idx * stride)))))
-    extracted
-  }
-}
-
-// object MaskReorg {
-//   // sew = 8: unchanged, sew = 16: 00000000abcdefgh -> aabbccddeeffgghh, ...
-//   def splash(bits: UInt, sew: SewOH): UInt = {
-//     Mux1H(sew.oneHot, Seq(1, 2, 4, 8).map(k => Cat(bits(vlenb / k - 1, 0).asBools.map(Fill(k, _)).reverse)))
-//   }
-//   // // sew = 8: unchanged, sew = 16: 00000000abcdefgh -> 0000abcd0000efgh, ...
-//   // def apply(bits: UInt, sew: SewOH): UInt = {
-//   //   Mux1H(sew.oneHot, Seq(1,2,4,8).map(k => Cat(UIntSplit(bits(16/k -1, 0), 2).map(_ | 0.U(8.W)).reverse)))
-//   // }
-// }
 
 object VerilogRedInt extends App {
   println("Generating hardware")

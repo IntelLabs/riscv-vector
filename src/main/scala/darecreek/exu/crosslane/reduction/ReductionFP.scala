@@ -292,13 +292,8 @@ class ReductionFP(implicit p: Parameters) extends VFuModule {
   val prestart = PrestartGen(io.in.bits.uop.info.vstart, uopIdx, eewVd, narrow)
   //---- Mask gen ----
   val maskIdx = Mux(narrow, uopIdx >> 1, uopIdx)
-  val mask16b = MaskExtract(vmask, maskIdx, eewVd)
-  val mask16b_red = MaskExtract(vmask, maskIdx, eew)
-  val old_vd_16b = MaskExtract(old_vd, maskIdx, eewVd)
+  val mask16b_red = MaskExtract(vmask, maskIdx, eew, VLEN)
 
-  val tailReorg = MaskReorg.splash(tail, eewVd)
-  val prestartReorg = MaskReorg.splash(prestart, eewVd)
-  val mask16bReorg = MaskReorg.splash(mask16b, eewVd)
   val mask16bReorg_red = MaskReorg.splash(mask16b_red, eew, vlenb)
 
   val vs2_bytes = VecInit(Seq.tabulate(vlenb)(i => vs2((i + 1) * 8 - 1, i * 8)))

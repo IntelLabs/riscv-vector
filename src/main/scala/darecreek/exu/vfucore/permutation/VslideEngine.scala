@@ -95,17 +95,17 @@ class VslideEngine(implicit p: Parameters) extends VFuModule {
   val eew = SewOH(vsew)
   val vlRemainBytes = Mux((vl << vsew) >= Cat(vd_idx, 0.U((log2Up(VLEN) - 3).W)), (vl << vsew) - Cat(vd_idx, 0.U((log2Up(VLEN) - 3).W)), 0.U)
 
-  val mask16b = MaskExtract(vmask, vd_idx, eew)
+  val mask_uop = MaskExtract(vmask, vd_idx, eew, VLEN)
 
   for (i <- 0 until VLENB) {
     when(i.U < vlRemainBytes) {
-      vmask_byte_strb(i) := mask16b(i) | vm
+      vmask_byte_strb(i) := mask_uop(i) | vm
       when(vsew === 1.U(3.W)) {
-        vmask_byte_strb(i) := mask16b(i / 2) | vm
+        vmask_byte_strb(i) := mask_uop(i / 2) | vm
       }.elsewhen(vsew === 2.U(3.W)) {
-        vmask_byte_strb(i) := mask16b(i / 4) | vm
+        vmask_byte_strb(i) := mask_uop(i / 4) | vm
       }.elsewhen(vsew === 3.U(3.W)) {
-        vmask_byte_strb(i) := mask16b(i / 8) | vm
+        vmask_byte_strb(i) := mask_uop(i / 8) | vm
       }
     }.otherwise {
       vmask_byte_strb(i) := 0.U
@@ -191,28 +191,28 @@ class VslideEngine(implicit p: Parameters) extends VFuModule {
   io.vslide1dn_vd := Cat(vslide1dn_vd.reverse)
 }
 
-object MaskExtract {
-  def VLEN = 256
+// object MaskExtract {
+//   def VLEN = 256
+//
+//   def apply(vmask: UInt, uopIdx: UInt, sew: SewOH) = {
+//     val extracted = Wire(UInt((VLEN / 8).W))
+//     extracted := Mux1H(Seq.tabulate(8)(uopIdx === _.U),
+//       Seq.tabulate(8)(idx => Mux1H(sew.oneHot, Seq(VLEN / 8, VLEN / 16, VLEN / 32, VLEN / 64).map(stride =>
+//         vmask((idx + 1) * stride - 1, idx * stride)))))
+//     extracted
+//   }
+// }
 
-  def apply(vmask: UInt, uopIdx: UInt, sew: SewOH) = {
-    val extracted = Wire(UInt((VLEN / 8).W))
-    extracted := Mux1H(Seq.tabulate(8)(uopIdx === _.U),
-      Seq.tabulate(8)(idx => Mux1H(sew.oneHot, Seq(VLEN / 8, VLEN / 16, VLEN / 32, VLEN / 64).map(stride =>
-        vmask((idx + 1) * stride - 1, idx * stride)))))
-    extracted
-  }
-}
-
-object MaskReorg {
-  // sew = 8: unchanged, sew = 16: 00000000abcdefgh -> aabbccddeeffgghh, ...
-
-  def vlenb = 256 / 8
-
-  def splash(bits: UInt, sew: SewOH): UInt = {
-    Mux1H(sew.oneHot, Seq(1, 2, 4, 8).map(k => Cat(bits(vlenb / k - 1, 0).asBools.map(Fill(k, _)).reverse)))
-  }
-  // // sew = 8: unchanged, sew = 16: 00000000abcdefgh -> 0000abcd0000efgh, ...
-  // def apply(bits: UInt, sew: SewOH): UInt = {
-  //   Mux1H(sew.oneHot, Seq(1,2,4,8).map(k => Cat(UIntSplit(bits(16/k -1, 0), 2).map(_ | 0.U(8.W)).reverse)))
-  // }
-}
+//  object MaskReorg {
+//    // sew = 8: unchanged, sew = 16: 00000000abcdefgh -> aabbccddeeffgghh, ...
+//
+//    def vlenb = 256 / 8
+//
+//    def splash(bits: UInt, sew: SewOH): UInt = {
+//      Mux1H(sew.oneHot, Seq(1, 2, 4, 8).map(k => Cat(bits(vlenb / k - 1, 0).asBools.map(Fill(k, _)).reverse)))
+//    }
+//    // // sew = 8: unchanged, sew = 16: 00000000abcdefgh -> 0000abcd0000efgh, ...
+//    // def apply(bits: UInt, sew: SewOH): UInt = {
+//    //   Mux1H(sew.oneHot, Seq(1,2,4,8).map(k => Cat(UIntSplit(bits(16/k -1, 0), 2).map(_ | 0.U(8.W)).reverse)))
+//    // }
+//  }
