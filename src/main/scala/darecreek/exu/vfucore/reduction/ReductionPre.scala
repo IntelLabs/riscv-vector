@@ -3,13 +3,15 @@ package darecreek.exu.vfucore.reduction
 import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.decode._
-// import darecreek.exu.vfucore._
+import darecreek.exu.vfucore._
 import chipsalliance.rocketchip.config._
-import darecreek._
+// import darecreek._
+import darecreek.{VExuInput, VLEN, vlenb, XLEN}
 
 class ReductionPre extends Module {
   val io = IO(new Bundle {
     val in = Input(ValidIO(new VExuInput))
+    val pipe_enable = Input(UInt(3.W))
     val vd_reg = Input(UInt(VLEN.W))
     val vs2m_bits_widen = Output(UInt((2 * VLEN).W))
     val vs1_zero = Output(UInt(64.W))
@@ -47,7 +49,9 @@ class ReductionPre extends Module {
   val vsew = uop.info.vsew
   val ma = uop.info.ma
   val ta = uop.info.ta
-  val fire = io.in.fire
+  val fire = io.pipe_enable(0)
+  val reg_fire = io.pipe_enable(1)
+  val reg2_fire = io.pipe_enable(2)
 
   val vredsum_vs = (funct6 === "b000000".U) && (funct3 === "b010".U)
   val vredmax_vs = (funct6 === "b000111".U) && (funct3 === "b010".U)
@@ -83,14 +87,13 @@ class ReductionPre extends Module {
   val vd_mask = (~0.U(VLEN.W))
   val vd_mask_vl = Wire(UInt(VLEN.W))
   val vmask_vl = Wire(UInt(VLEN.W))
-  val vmask_uop = MaskExtract(vmask_vl, uopIdx, eew)
+  val vmask_uop = MaskExtract(vmask_vl, uopIdx, eew, VLEN)
   val vmask_16b = MaskReorg.splash(vmask_uop, eew, vlenb)
 
   val vl_reg = RegEnable(vl, 0.U, fire)
   vd_mask_vl := vd_mask >> (VLEN.U - vl)
   vmask_vl := vmask & vd_mask_vl
   vlRemainBytes := Mux((vl << vsew) >= Cat(uopIdx, 0.U(log2Up(vlenb).W)), (vl << vsew) - Cat(uopIdx, 0.U(log2Up(vlenb).W)), 0.U)
-  val reg_fire = RegNext(fire)
   val reg_widen = RegEnable(widen, false.B, fire)
   val reg_vsew = RegEnable(vsew, 0.U, fire)
   val reg_vd_vsew = RegEnable(vd_vsew, 0.U, fire)
@@ -116,7 +119,6 @@ class ReductionPre extends Module {
   val vd_vsew_bits_reg = RegEnable(vd_vsew_bits, 0.U, fire)
 
   val vl_reg2 = RegEnable(vl_reg, 0.U, reg_fire)
-  val reg2_fire = RegNext(reg_fire)
   val old_vd_reg2 = RegEnable(old_vd_reg, 0.U, reg_fire)
   val ta_reg2 = RegEnable(ta_reg, false.B, reg_fire)
   val reg2_vredsum_vs = RegEnable(reg_vredsum_vs, false.B, reg_fire)
@@ -314,14 +316,14 @@ class ReductionPre extends Module {
   io.vs1_zero_logical := vs1_zero_logical
 }
 
-object MaskExtract {
-  def VLEN = 256
-
-  def apply(vmask: UInt, uopIdx: UInt, sew: SewOH) = {
-    val extracted = Wire(UInt((VLEN / 8).W))
-    extracted := Mux1H(Seq.tabulate(8)(uopIdx === _.U),
-      Seq.tabulate(8)(idx => Mux1H(sew.oneHot, Seq(VLEN / 8, VLEN / 16, VLEN / 32, VLEN / 64).map(stride =>
-        vmask((idx + 1) * stride - 1, idx * stride)))))
-    extracted
-  }
-}
+// object MaskExtract {
+//   def VLEN = 256
+//
+//   def apply(vmask: UInt, uopIdx: UInt, sew: SewOH) = {
+//     val extracted = Wire(UInt((VLEN / 8).W))
+//     extracted := Mux1H(Seq.tabulate(8)(uopIdx === _.U),
+//       Seq.tabulate(8)(idx => Mux1H(sew.oneHot, Seq(VLEN / 8, VLEN / 16, VLEN / 32, VLEN / 64).map(stride =>
+//         vmask((idx + 1) * stride - 1, idx * stride)))))
+//     extracted
+//   }
+// }

@@ -140,6 +140,7 @@ class CSA4to2(width: Int) extends Module {
 
 class ReductionSlice extends Module {
   val io = IO(new Bundle {
+    val pipe_enable = Input(Bool())
     val funct6 = Input(UInt(6.W))
     val funct3 = Input(UInt(3.W))
     val vsew = Input(UInt(3.W))
@@ -440,30 +441,31 @@ class ReductionSlice extends Module {
   compare1_2to1_sew8.io.signed := signed
   vd2_max_sew8 := compare1_2to1_sew8.io.c
 
-  when(vredand_vs || vredor_vs || vredxor_vs) {
-    vd_reg := logical_vd
-  }.elsewhen(is_max || is_min) {
-    when(vd_vsew === 0.U) {
-      vd_reg := vd2_max_sew8
-    }.elsewhen(vd_vsew === 1.U) {
-      vd_reg := vd1_max_sew16
-    }.elsewhen(vd_vsew === 2.U) {
-      vd_reg := vd1_max_sew32
-    }.elsewhen(vd_vsew === 3.U) {
-      vd_reg := vd_max_sew64
-    }
-  }.otherwise {
-    when(vd_vsew === 0.U) {
-      vd_reg := vd_sew8
-    }.elsewhen(vd_vsew === 1.U) {
-      vd_reg := vd_sew16
-    }.elsewhen(vd_vsew === 2.U) {
-      vd_reg := vd_sew32
-    }.elsewhen(vd_vsew === 3.U) {
-      vd_reg := vd_sew64
+  when(io.pipe_enable) {
+    when(vredand_vs || vredor_vs || vredxor_vs) {
+      vd_reg := logical_vd
+    }.elsewhen(is_max || is_min) {
+      when(vd_vsew === 0.U) {
+        vd_reg := vd2_max_sew8
+      }.elsewhen(vd_vsew === 1.U) {
+        vd_reg := vd1_max_sew16
+      }.elsewhen(vd_vsew === 2.U) {
+        vd_reg := vd1_max_sew32
+      }.elsewhen(vd_vsew === 3.U) {
+        vd_reg := vd_max_sew64
+      }
+    }.otherwise {
+      when(vd_vsew === 0.U) {
+        vd_reg := vd_sew8
+      }.elsewhen(vd_vsew === 1.U) {
+        vd_reg := vd_sew16
+      }.elsewhen(vd_vsew === 2.U) {
+        vd_reg := vd_sew32
+      }.elsewhen(vd_vsew === 3.U) {
+        vd_reg := vd_sew64
+      }
     }
   }
-
   io.vd := vd_reg
 }
 

@@ -63,8 +63,8 @@ class VrgatherEngine(implicit p: Parameters) extends VFuModule {
   val vd_mask = (~0.U(VLEN.W))
   val vd_mask_vl = Wire(UInt(VLEN.W))
   val vmask_vl = Wire(UInt(VLEN.W))
-  val vmask_uop = MaskExtract(vmask_vl, Mux(vrgather16_sew8, vd_idx(2, 1), vd_idx), eew)
-  val vmask_16b = MaskReorg.splash(vmask_uop, eew)
+  val vmask_uop = MaskExtract(vmask_vl, Mux(vrgather16_sew8, vd_idx(2, 1), vd_idx), eew, VLEN)
+  val vmask_16b = MaskReorg.splash(vmask_uop, eew, vlenb)
   vd_mask_vl := vd_mask >> (VLEN.U - vl)
   vmask_vl := vmask & vd_mask_vl
 

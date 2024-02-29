@@ -64,8 +64,8 @@ class VcmprsEngine(implicit p: Parameters) extends VFuModule {
   val vs2_bytes = VecInit(Seq.tabulate(VLENB)(i => vs2_reg((i + 1) * 8 - 1, i * 8)))
 
   val base = Wire(UInt((3 + log2Up(VLEN / 8)).W))
-  val vmask_uop = MaskExtract(vmask, vs_idx, eew)
-  val vmask_16b = Mux(cmprs_rd_old_vd, 0.U, MaskReorg.splash(vmask_uop, eew))
+  val vmask_uop = MaskExtract(vmask, vs_idx, eew, VLEN)
+  val vmask_16b = Mux(cmprs_rd_old_vd, 0.U, MaskReorg.splash(vmask_uop, eew, vlenb))
   val vmask_16b_reg = RegInit(0.U((VLEN / 8).W))
   val current_vs_ones_sum = Wire(UInt((log2Up(VLENB) + 1).W))
   val current_ones_sum = Wire(Vec(VLENB, UInt((log2Up(VLEN) + 1).W)))

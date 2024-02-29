@@ -282,8 +282,8 @@ class PermutationCore(implicit p: Parameters) extends VFuModule {
   // vcompress read
   val vd_mask_vl = Wire(UInt(VLEN.W))
   val vmask_vl = RegInit(0.U(VLEN.W))
-  val vmask_uop = MaskExtract(vmask_vl, vs_idx, eew)
-  val vmask_16b = Mux(rd_vs_en, MaskReorg.splash(vmask_uop, eew), 0.U)
+  val vmask_uop = MaskExtract(vmask_vl, vs_idx, eew, VLEN)
+  val vmask_16b = Mux(rd_vs_en, MaskReorg.splash(vmask_uop, eew, vlenb), 0.U)
   val current_rd_vs_ones_sum = Wire(UInt((log2Up(VLENB) + 1).W))
   val rd_ones_sum = RegInit(0.U((log2Up(VLEN) + 1).W))
   val ones_sum = Wire(UInt((log2Up(VLEN) + 1).W))

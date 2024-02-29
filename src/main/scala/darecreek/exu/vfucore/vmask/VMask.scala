@@ -144,7 +144,7 @@ class VMask(implicit p: Parameters) extends VFuModule {
   }
 
   // viota/vid/vcpop
-  val vs2m_uop = MaskExtract(Cat(vs2m.reverse), uopIdx, eew)
+  val vs2m_uop = MaskExtract(Cat(vs2m.reverse), uopIdx, eew, VLEN)
   val vs2m_uop_vid = Mux(vid_v, Fill(vlenb, vid_v), vs2m_uop)
   val one_sum = RegInit(0.U(bVL.W))
   val one_cnt = Wire(Vec(vlenb + 1, UInt(8.W)))
@@ -346,7 +346,9 @@ class VMask(implicit p: Parameters) extends VFuModule {
 
   val out_valid = RegInit(false.B)
 
-  when(fire) {
+  when(!vcpop_m && fire) {
+    out_valid := true.B
+  }.elsewhen(vcpop_m && fire && uopEnd) {
     out_valid := true.B
   }.elsewhen(io.out.valid && io.out.ready) {
     out_valid := false.B
@@ -359,18 +361,6 @@ class VMask(implicit p: Parameters) extends VFuModule {
 
   io.out.bits.uop := RegEnable(uop, fire)
 
-}
-
-object MaskExtract {
-  def VLEN = 256
-
-  def apply(vmask: UInt, uopIdx: UInt, sew: SewOH) = {
-    val extracted = Wire(UInt((VLEN / 8).W))
-    extracted := Mux1H(Seq.tabulate(8)(uopIdx === _.U),
-      Seq.tabulate(8)(idx => Mux1H(sew.oneHot, Seq(VLEN / 8, VLEN / 16, VLEN / 32, VLEN / 64).map(stride =>
-        vmask((idx + 1) * stride - 1, idx * stride)))))
-    extracted
-  }
 }
 
 import xiangshan._
