@@ -44,6 +44,7 @@ class CommitInfo extends Bundle{
     val floatRegWriteEn = Bool()
     val ldest = UInt(5.W)
     val data = UInt(64.W)
+    val vxsat = Bool()
 }
 
 class SmartVector extends Module {

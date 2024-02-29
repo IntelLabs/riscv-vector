@@ -25,6 +25,7 @@ class VCommit extends Module {
     io.out.commitInfo.return_data_float_vld  := io.in.commitInfo.bits.floatRegWriteEn
     io.out.commitInfo.return_reg_idx         := io.in.commitInfo.bits.ldest
     io.out.commitInfo.return_data            := io.in.commitInfo.bits.data
+    io.out.commitInfo.vxsat                  := io.in.commitInfo.bits.vxsat
     io.out.commitInfo.xcpt_cause             <> io.in.excpInfo.xcpt_cause
 
 }
