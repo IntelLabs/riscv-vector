@@ -164,8 +164,6 @@ class VLaneExu extends Module {
     for (k <- 0 until 2) {
       laneOldVdNarrow(k) := io.in.bits.vSrc(2)(i/2 + k*NLanes/2)(32*(i%2)+31, 32*(i%2))
     }
-    lanes(i).io.in.data.old_vd := Mux(uop.ctrl.narrow_to_1, laneMask(i), 
-             Mux(uop.ctrl.narrow, laneOldVdNarrow.asUInt, io.in.bits.vSrc(2)(i)))
     lanes(i).io.in.data.old_vd := Mux(uop.ctrl.narrow, laneOldVdNarrow.asUInt, 
              Mux(uop.ctrl.narrow_to_1 && !uop.info.vstart_gte_vl, laneMask(i), 
                  io.in.bits.vSrc(2)(i)))
