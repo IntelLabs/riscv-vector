@@ -251,7 +251,7 @@ class ParallelExpander extends Module {
     val noTail = info.vl === vlMax && !ctrl.redu && !perm_vmvsx_vfmvsf && !vcompress || perm_vmvnrr || (ldstCtrlReg(i).wholeReg && ctrl.isLdst)
     val tailNeedOldVd = !(info.ta || tailIsAgnostic || noTail)
     val noWriteback = ctrl.store || ctrl.rdVal
-    val needOldVd = (maskNeedOldVd || tailNeedOldVd || info.vstart =/= 0.U || slideUpOffset) && !noWriteback
+    val needOldVd = (maskNeedOldVd || tailNeedOldVd || info.vstart =/= 0.U || slideUpOffset) && !noWriteback || info.vstart_gte_vl
 
     io.out(i).bits.lsrcValExpd(2) := ctrl.lsrcVal(2) || needOldVd
 
