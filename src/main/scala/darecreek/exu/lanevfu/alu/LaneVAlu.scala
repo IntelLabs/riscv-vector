@@ -71,7 +71,7 @@ class MaskTailDataVAlu extends Module {
   val vmerge = uop.ctrl.funct6 === "b010111".U
   val isWholeRegMv = uop.ctrl.funct6 === "b100111".U && uop.ctrl.funct3 === "b011".U
   for (i <- 0 until 8) {
-    when (io.vstart_gte_vl) {
+    when (io.vstart_gte_vl && !isWholeRegMv) {
       maskTail(i) := 2.U
     }.elsewhen (tail(i)) {
       maskTail(i) := Mux(isWholeRegMv, 0.U, Mux(uop.info.ta || uop.ctrl.narrow_to_1, 3.U, 2.U))
