@@ -36,13 +36,14 @@ class VMerge (implicit p : Parameters) extends Module {
     
     val regDataBuffer = RegInit(0.U(128.W))
     val vxsatBuffer   = RegInit(false.B)
+    val vxsatBufferIn = Wire(Bool())
 
     val rfWriteEn         = Reg(Bool())
     val rfWriteIdx        = Reg(UInt(5.W))
     val regBackWidth      = Reg(UInt(3.W))
     val regWriteMuopIdx   = Reg(UInt(4.W))
     val scalarRegWriteEn  = Reg(Bool())
-    val floatRegWriteEn  = Reg(Bool())
+    val floatRegWriteEn   = Reg(Bool())
     val scalarRegWriteIdx = Reg(UInt(5.W))
     val muopEnd           = Reg(Bool())
     val permExpdLen       = Reg(UInt(4.W))
@@ -90,12 +91,15 @@ class VMerge (implicit p : Parameters) extends Module {
         io.out.toRegFileWrite.rfWriteIdx := io.in.lsuIn.bits.rfWriteIdx
         io.out.toRegFileWrite.rfWriteData := io.in.lsuIn.bits.data
     }.otherwise{
-            io.out.toRegFileWrite := 0.U.asTypeOf(new regWriteIn)
+        io.out.toRegFileWrite := 0.U.asTypeOf(new regWriteIn)
     }
 
     when(io.in.aluIn.valid){
-        vxsatBuffer := io.in.aluIn.bits.vxsat || vxsatBuffer
+        vxsatBufferIn := io.in.aluIn.bits.vxsat || vxsatBuffer
+    }.otherwise{
+        vxsatBufferIn := vxsatBuffer
     }
+    vxsatBuffer   := vxsatBufferIn
 
     when(io.in.aluIn.valid && muopEnd){
         io.out.commitInfo.valid := true.B
@@ -103,7 +107,7 @@ class VMerge (implicit p : Parameters) extends Module {
         io.out.commitInfo.bits.floatRegWriteEn  := floatRegWriteEn
         io.out.commitInfo.bits.ldest            := scalarRegWriteIdx
         io.out.commitInfo.bits.data             := io.in.aluIn.bits.vd
-        io.out.commitInfo.bits.vxsat            := vxsatBuffer
+        io.out.commitInfo.bits.vxsat            := vxsatBufferIn
     }.elsewhen(io.in.lsuIn.valid && io.in.lsuIn.bits.muopEnd){
         io.out.commitInfo.valid := true.B
         io.out.commitInfo.bits.scalarRegWriteEn := false.B
