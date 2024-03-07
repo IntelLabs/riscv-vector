@@ -28,9 +28,6 @@ class Scoreboard(n: Int, zero: Boolean = false)
     ens = ens || en
     when (ens) { _r := _next }
   }
-  printf("_r = %b\n", _r)
-  printf("_next = %b\n", _next)
-  printf("r = %b\n", r)
 }
 
 //class Scoreboard(n: Int, zero: Boolean = false) extends Module {

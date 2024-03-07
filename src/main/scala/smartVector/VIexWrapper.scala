@@ -45,7 +45,8 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   val bitsReg  = RegInit(0.U.asTypeOf(new Muop))
   val divNotReady = io.in.bits.uop.ctrl.div & ~SVDiv.io.in.ready
   val fpuNotReady = io.in.bits.uop.ctrl.fp  & ~SVFpu.io.in.ready
-  val ready    = ~(divNotReady || fpuNotReady)
+  val permNotReady = io.in.bits.uop.ctrl.perm & SVPerm.io.out.perm_busy
+  val ready    = ~(divNotReady || fpuNotReady || permNotReady)
 
   when(!validReg || ready){
     validReg := io.in.valid && !io.in.bits.uop.ctrl.isLdst
