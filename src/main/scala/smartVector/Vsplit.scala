@@ -416,10 +416,10 @@ class Vsplit(implicit p : Parameters) extends Module {
     val expdLenIdx  = Mux(ldStEmulVd >= ldStEmulVs2, ldStEmulVd, ldStEmulVs2)
     val expdLenLdSt = Mux(ldst && ldstCtrl.segment, expdLenSeg, Mux(ldst && ldstCtrl.indexed, expdLenIdx, ldStEmulVd))
     val maxOfVs12Vd = Mux(emulVd >= emulVs1, Mux(emulVd >= emulVs2, emulVd, emulVs2), Mux(emulVs1 >= emulVs2, emulVs1, emulVs2))
-    //val vmv_vfmv = ctrl.perm && ctrl.funct6 === "b010000".U
+    val vmv_vfmv = ctrl.alu && ctrl.funct6 === "b010000".U
 
     //val expdLenIn = Mux(ldst, expdLenLdSt, Mux(ctrl.perm || vmv_vfmv, 1.U , maxOfVs12Vd))
-    val expdLenIn = Mux(ldst, expdLenLdSt, Mux(ctrl.perm, 1.U , maxOfVs12Vd))
+    val expdLenIn = Mux(ldst, expdLenLdSt, Mux(ctrl.perm || vmv_vfmv, 1.U , maxOfVs12Vd))
     
     when(instFirstIn){
         expdLenReg := expdLenIn
