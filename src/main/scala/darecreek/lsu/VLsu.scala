@@ -109,8 +109,8 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
     */
   // Load FSM
   when (stateLd === s_idle_LD) {
-    stateLd := Mux(io.ovi_memop.sync_start, 
-               Mux(ld.fire && ld.bits.uop.expdEnd, s_busy_LD, s_issueUops_LD), s_idle_LD)
+    stateLd := Mux(firstLdFire, 
+               Mux(ld.bits.uop.expdEnd, s_busy_LD, s_issueUops_LD), s_idle_LD)
   }.elsewhen (stateLd === s_issueUops_LD) { //Wait for all expanded uops of one instrn issued from IQ
     stateLd := Mux(ld.fire && ld.bits.uop.expdEnd, s_busy_LD, s_issueUops_LD)
   }.elsewhen (stateLd === s_busy_LD) {
