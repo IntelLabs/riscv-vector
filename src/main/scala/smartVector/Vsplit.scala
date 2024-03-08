@@ -302,9 +302,10 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.out.mUopMergeAttr.bits.permExpdLen      := lmul
     io.out.mUopMergeAttr.bits.regDstIdx        := ctrl.ldest
 
-    val vs1ReadEn  = ctrl.lsrcVal(0)
+    //store should read vs3, but store do not read vs1, so reuse vs1's logic
+    val vs1ReadEn  = Mux(ctrl.store, true.B, ctrl.lsrcVal(0))
     val vs2ReadEn  = ctrl.lsrcVal(1)
-    val vs1Idx     = ctrl.lsrc(0) + lsrc0_inc
+    val vs1Idx     = Mux(ctrl.store, ctrl.ldest + ldest_inc, ctrl.lsrc(0) + lsrc0_inc)
     val vs2Idx     = ctrl.lsrc(1) + lsrc1_inc
     val needStall  = Wire(Bool())
     val hasRegConf = Wire(Vec(2,Bool()))
@@ -398,6 +399,7 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     io.scoreBoardSetIO.setEn      := RegNext(io.out.mUop.valid && ctrl.ldestVal && ~ctrl.perm)
     io.scoreBoardSetIO.setMultiEn := RegNext(io.out.mUop.valid && ctrl.ldestVal && ctrl.perm)
+    io.scoreBoardSetIO.setNum     := RegNext(lmul)
     io.scoreBoardSetIO.setAddr    := RegNext(io.out.mUopMergeAttr.bits.ldest)
 
     when((instFirstIn || currentState === ongoing) & ~needStall){

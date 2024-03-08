@@ -9,7 +9,7 @@ class Scoreboard(n: Int, zero: Boolean = false)
 {
 
   def set(en: Bool, addr: UInt): Unit = update(en, _next | mask(en, addr))
-  def setN(en: Bool, addr: UInt): Unit = update(en, _next | maskN(en, addr))
+  def setN(en: Bool, addr: UInt, num: UInt): Unit = update(en, _next | maskN(en, addr, num))
   def clear(en: Bool, addr: UInt): Unit = update(en, _next & ~mask(en, addr))
   def read(addr: UInt): Bool = r(addr)
   def readBypassed(addr: UInt): Bool = _next(addr)
@@ -22,7 +22,7 @@ class Scoreboard(n: Int, zero: Boolean = false)
   var _next = r
   var ens = false.B
   def mask(en: Bool, addr: UInt) = Mux(en, 1.U << addr, 0.U)
-  def maskN(en: Bool, addr: UInt) = Mux(en, ((1.U << n) - 1.U) << addr, 0.U)
+  def maskN(en: Bool, addr: UInt, num: UInt) = Mux(en, ((1.U << num) - 1.U) << addr, 0.U)
   def update(en: Bool, update: UInt) = {
     _next = update
     ens = ens || en
