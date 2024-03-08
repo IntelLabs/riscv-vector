@@ -108,6 +108,7 @@ class VMerge (implicit p : Parameters) extends Module {
         io.out.commitInfo.bits.ldest            := scalarRegWriteIdx
         io.out.commitInfo.bits.data             := io.in.aluIn.bits.vd
         io.out.commitInfo.bits.vxsat            := vxsatBufferIn
+        vxsatBuffer                             := false.B
     }.elsewhen(io.in.lsuIn.valid && io.in.lsuIn.bits.muopEnd){
         io.out.commitInfo.valid := true.B
         io.out.commitInfo.bits.scalarRegWriteEn := false.B
