@@ -530,7 +530,9 @@ class Permutation(implicit p: Parameters) extends VFuModule {
     perm_busy := false.B
   }.elsewhen(uop_valid) {
     perm_busy := true.B
-  }.elsewhen(calc_done) {
+  }.elsewhen(reg_vcompress && calc_done) {
+    perm_busy := false.B
+  }.elsewhen(!reg_vcompress && (vd_idx === rd_vlmul) && update_vd_idx) {
     perm_busy := false.B
   }
 
