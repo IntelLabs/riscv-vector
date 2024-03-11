@@ -302,18 +302,22 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.out.mUopMergeAttr.bits.permExpdLen      := lmul
     io.out.mUopMergeAttr.bits.regDstIdx        := ctrl.ldest
 
-    //store should read vs3, but store do not read vs1, so reuse vs1's logic
-    val vs1ReadEn  = Mux(ctrl.store, true.B, ctrl.lsrcVal(0))
+    
+    val vs1ReadEn  = ctrl.lsrcVal(0)
     val vs2ReadEn  = ctrl.lsrcVal(1)
-    val vs1Idx     = Mux(ctrl.store, ctrl.ldest + ldest_inc, ctrl.lsrc(0) + lsrc0_inc)
+    val vs3ReadEn  = ctrl.lsrcVal(2)
+    val vs1Idx     = ctrl.lsrc(0) + lsrc0_inc
     val vs2Idx     = ctrl.lsrc(1) + lsrc1_inc
+    val vs3Idx     = ctrl.ldest + ldest_inc
     val needStall  = Wire(Bool())
-    val hasRegConf = Wire(Vec(2,Bool()))
+    val hasRegConf = Wire(Vec(3,Bool()))
     val expdLen    = Wire(UInt(4.W))
     
     io.scoreBoardReadIO.readAddr1 := vs1Idx
     io.scoreBoardReadIO.readAddr2 := vs2Idx
-    io.scoreBoardReadIO.readNum   := expdLen
+    io.scoreBoardReadIO.readAddr3 := vs3Idx
+    io.scoreBoardReadIO.readNum1  := emulVs1
+    io.scoreBoardReadIO.readNum2  := emulVs2 
 
     when(!vs1ReadEn){
         hasRegConf(0) := false.B
@@ -333,6 +337,16 @@ class Vsplit(implicit p : Parameters) extends Module {
         hasRegConf(1) := false.B
     }.otherwise{
         hasRegConf(1) := true.B
+    }
+
+    when(!vs3ReadEn){
+        hasRegConf(2) := false.B
+    }.elsewhen(ctrl.perm){
+        hasRegConf(2) := io.scoreBoardReadIO.readBypassed3N
+    }.elsewhen (~io.scoreBoardReadIO.readBypassed3){
+        hasRegConf(2) := false.B
+    }.otherwise{
+        hasRegConf(2) := true.B
     }
 
     needStall := hasRegConf(0) || hasRegConf(1) || io.lsuStallSplit || io.iexNeedStall
@@ -399,7 +413,7 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     io.scoreBoardSetIO.setEn      := RegNext(io.out.mUop.valid && ctrl.ldestVal && ~ctrl.perm)
     io.scoreBoardSetIO.setMultiEn := RegNext(io.out.mUop.valid && ctrl.ldestVal && ctrl.perm)
-    io.scoreBoardSetIO.setNum     := RegNext(lmul)
+    io.scoreBoardSetIO.setNum     := RegNext(emulVd)
     io.scoreBoardSetIO.setAddr    := RegNext(io.out.mUopMergeAttr.bits.ldest)
 
     when((instFirstIn || currentState === ongoing) & ~needStall){
