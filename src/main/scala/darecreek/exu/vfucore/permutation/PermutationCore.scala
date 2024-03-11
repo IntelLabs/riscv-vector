@@ -513,8 +513,6 @@ class PermutationCore(implicit p: Parameters) extends VFuModule {
     old_vd := rdata_reg
   }.elsewhen(reg_vrgather && !rdata_rd_mask_en && rvalid_reg && (rdata_vrgather_rd_cnt === 0.U)) {
     old_vd := rdata_reg
-  }.elsewhen(reg_vcompress && rvalid_reg && rdata_cmprs_rd_old_vd) {
-    old_vd := rdata_reg
   }
 
   when(flush) {
@@ -605,7 +603,7 @@ class PermutationCore(implicit p: Parameters) extends VFuModule {
   vcmprsEngine.io.funct3 := funct3_reg
   vcmprsEngine.io.vm := vm_reg
   vcmprsEngine.io.ma := ma_reg
-  vcmprsEngine.io.ta := ta_reg
+  vcmprsEngine.io.ta := ta_reg && (vstart_reg < vl_reg)
   vcmprsEngine.io.vsew := vsew_reg
   vcmprsEngine.io.vlmul := vlmul_reg
   vcmprsEngine.io.vl := vl_reg
@@ -718,7 +716,7 @@ class PermutationCore(implicit p: Parameters) extends VFuModule {
     perm_tail_mask_vd := (vd_reg & vmask_tail_bits & vmask_vstart_bits) | tail_vd | vstart_old_vd
   }
 
-  perm_vd := Mux(reg_vcompress && !io.out.uop.info.vstart_gte_vl, vd_reg, perm_tail_mask_vd)
+  perm_vd := Mux(reg_vcompress, vd_reg, perm_tail_mask_vd)
 
   val rd_en = rd_mask_en || rd_vs_en || cmprs_rd_old_vd
   val reg_rd_en = RegInit(false.B)
