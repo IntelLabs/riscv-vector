@@ -13,8 +13,6 @@ class VMask(implicit p: Parameters) extends VFuModule {
     val out = ValidIO(new VAluOutput)
   })
 
-  io.out.valid := RegNext(io.in.valid)
-
   val funct6 = io.in.bits.uop.ctrl.funct6
   val funct3 = io.in.bits.uop.ctrl.funct3
   val vm = io.in.bits.uop.ctrl.vm
@@ -346,6 +344,7 @@ class VMask(implicit p: Parameters) extends VFuModule {
     vd_out := vid_tail_mask_vd
   }
 
+  io.out.valid := Mux(vcpop_m, RegNext(io.in.valid && uopEnd), RegNext(io.in.valid))
   io.out.bits.vd := vd_out
   io.out.bits.vxsat := false.B
 }
