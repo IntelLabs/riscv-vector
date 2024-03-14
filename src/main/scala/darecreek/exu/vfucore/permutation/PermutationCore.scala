@@ -1,20 +1,21 @@
-package darecreek.exu.vfu.perm
+package darecreek.exu.vfucore.perm
 
 import chisel3._
 import chisel3.util._
-import darecreek.exu.vfu._
-// import darecreek.exu.vfu.VFUParam._
+import darecreek.exu.vfucore._
+import darecreek.exu.vfucore.perm._
 import chipsalliance.rocketchip.config._
-import xiangshan.Redirect
-import darecreek.exu.vfu.fp.VFPU
+import darecreek.exu.vfucore.fp.VFPU
+import darecreek.exu.vfucoreconfig.{VUop, Redirect}
 
-class Permutation(implicit p: Parameters) extends VFuModule {
+class PermutationCore(implicit p: Parameters) extends VFuModule {
   val io = IO(new Bundle {
     val in = Input(new VPermInput)
-    val redirect = Input(ValidIO(new Redirect))
+    val redirect = Input(new Redirect)
     val out = Output(new VPermOutput)
   })
 
+  val uop = io.in.uop
   val ctrl = io.in.uop.ctrl
   val funct6 = io.in.uop.ctrl.funct6
   val funct3 = io.in.uop.ctrl.funct3
@@ -67,10 +68,10 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   val funct6_reg = RegInit(0.U(6.W))
   val funct3_reg = RegInit(0.U(3.W))
   val vsew_reg = RegInit(0.U(3.W))
-  val mask = RegInit(0.U(128.W))
+  val mask = RegInit(0.U(VLEN.W))
   val mask_valid = RegInit(false.B)
-  val old_vd = RegInit(0.U(128.W))
-  val vs_reg = RegInit(0.U(128.W))
+  val old_vd = RegInit(0.U(VLEN.W))
+  val vs_reg = RegInit(0.U(VLEN.W))
   val rs1_reg = RegInit(0.U(64.W))
   val vs1_preg_idx_reg = RegInit(VecInit(Seq.fill(8)(0.U(8.W))))
   val vs2_preg_idx_reg = RegInit(VecInit(Seq.fill(8)(0.U(8.W))))
@@ -79,20 +80,30 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   val vm_reg = RegInit(false.B)
   val ta_reg = RegInit(false.B)
   val ma_reg = RegInit(false.B)
-  val vstart_reg = RegInit(0.U(7.W))
-  val vl_reg = RegInit(0.U(8.W))
+  val vstart_reg = RegInit(0.U(bVSTART.W))
+  val vl_reg = RegInit(0.U(bVL.W))
   val rd_vlmul = RegInit(0.U(3.W))
   val vlmul_reg = RegInit(0.U(3.W))
+
+
+  val uop_reg = Reg(new VUop)
+
+  when(uop_valid) {
+    uop_reg := io.in.uop
+  }
 
   val vl_reg_bytes = vl_reg << vsew_reg
   val perm_busy = RegInit(false.B)
   val flush = RegInit(false.B)
-  val in_robIdx = io.in.uop.sysUop.robIdx
-  val currentRobIdx = RegEnable(in_robIdx, uop_valid)
+
+
+  val flush_in = io.redirect.needFlush(uop.asTypeOf(new darecreek.exu.vfucoreconfig.VUop).robIdx)
+  val flush_in_reg = io.redirect.needFlush(uop_reg.asTypeOf(new darecreek.exu.vfucoreconfig.VUop).robIdx)
+
   when(uop_valid) {
-    flush := in_robIdx.needFlush(io.redirect)
+    flush := flush_in
   }.otherwise {
-    flush := (flush || currentRobIdx.needFlush(io.redirect)) && perm_busy
+    flush := (flush || flush_in_reg) && perm_busy
   }
 
   val reg_vslideup_vx = (funct6_reg === "b001110".U) && (funct3_reg === "b100".U) && !flush
@@ -125,12 +136,12 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   val wb_vld = Wire(Bool())
   val wb_idx = RegInit(0.U(3.W))
 
-  val vlRemain = RegInit(0.U(8.W))
+  val vlRemain = RegInit(0.U(bVL.W))
   val vlRemainBytes = vlRemain << vsew_reg
   val vd_mask = Wire(UInt(VLEN.W))
   vd_mask := (~0.U(VLEN.W))
 
-  val vlRemain_reg = RegInit(0.U(8.W))
+  val vlRemain_reg = RegInit(0.U(bVL.W))
   when(flush) {
     vlRemain_reg := 0.U
   }.otherwise {
@@ -151,12 +162,12 @@ class Permutation(implicit p: Parameters) extends VFuModule {
 
   val vsew_bytes = Wire(UInt(3.W))
   val vsew_shift = Wire(UInt(3.W))
-  val vslideup_vd = Wire(UInt(128.W))
-  val vslidedn_vd = Wire(UInt(128.W))
-  val vslide1up_vd = Wire(UInt(128.W))
-  val vslide1dn_vd = Wire(UInt(128.W))
-  val cmprs_vd = Wire(UInt(128.W))
-  val vrgather_vd = Wire(UInt(128.W))
+  val vslideup_vd = Wire(UInt(VLEN.W))
+  val vslidedn_vd = Wire(UInt(VLEN.W))
+  val vslide1up_vd = Wire(UInt(VLEN.W))
+  val vslide1dn_vd = Wire(UInt(VLEN.W))
+  val cmprs_vd = Wire(UInt(VLEN.W))
+  val vrgather_vd = Wire(UInt(VLEN.W))
   val perm_vd = Wire(UInt(VLEN.W))
   val perm_tail_mask_vd = Wire(UInt(VLEN.W))
 
@@ -170,8 +181,8 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   val vslide_ele = Mux(reg_vslide1up || reg_vslide1dn, 1.U, rs1_reg)
   val vslide_bytes = vslide_ele << vsew_reg
 
-  val vslide_lo_valid = Mux(reg_vslideup || reg_vslide1up, vslide_bytes(70, 4) +& 1.U <= vs_idx, (reg_vslidedn || reg_vslide1dn) && (vs_idx +& vslide_bytes(70, 4) <= rd_vlmul))
-  val vslide_hi_valid = Mux(reg_vslideup || reg_vslide1up, vslide_bytes(70, 4) <= vs_idx, (reg_vslidedn || reg_vslide1dn) && (vs_idx +& vslide_bytes(70, 4) +& 1.U <= rd_vlmul))
+  val vslide_lo_valid = Mux(reg_vslideup || reg_vslide1up, vslide_bytes(70, (log2Up(VLEN) - 3)) +& 1.U <= vs_idx, (reg_vslidedn || reg_vslide1dn) && (vs_idx +& vslide_bytes(70, (log2Up(VLEN) - 3)) <= rd_vlmul))
+  val vslide_hi_valid = Mux(reg_vslideup || reg_vslide1up, vslide_bytes(70, (log2Up(VLEN) - 3)) <= vs_idx, (reg_vslidedn || reg_vslide1dn) && (vs_idx +& vslide_bytes(70, (log2Up(VLEN) - 3)) +& 1.U <= rd_vlmul))
   val vslide_cnt_max = Wire(UInt(2.W))
   val vslide_rd_cnt = RegInit(0.U(2.W))
   val rd_mask_en = RegInit(false.B)
@@ -246,11 +257,11 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   rd_idx_lo := 0.U
   rd_idx_hi := 0.U
   when(reg_vslideup || reg_vslide1up) {
-    rd_idx_lo := vs_idx - vslide_bytes(6, 4) - 1.U
-    rd_idx_hi := vs_idx - vslide_bytes(6, 4)
+    rd_idx_lo := vs_idx - vslide_bytes(log2Up(VLEN) - 1, log2Up(VLEN) - 3) - 1.U
+    rd_idx_hi := vs_idx - vslide_bytes(log2Up(VLEN) - 1, log2Up(VLEN) - 3)
   }.elsewhen(reg_vslidedn || reg_vslide1dn) {
-    rd_idx_lo := vs_idx + vslide_bytes(6, 4)
-    rd_idx_hi := vs_idx + vslide_bytes(6, 4) + 1.U
+    rd_idx_lo := vs_idx + vslide_bytes(log2Up(VLEN) - 1, log2Up(VLEN) - 3)
+    rd_idx_hi := vs_idx + vslide_bytes(log2Up(VLEN) - 1, log2Up(VLEN) - 3) + 1.U
   }
 
   vslide_rd_preg_idx := 0.U
@@ -271,11 +282,11 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   // vcompress read
   val vd_mask_vl = Wire(UInt(VLEN.W))
   val vmask_vl = RegInit(0.U(VLEN.W))
-  val vmask_uop = MaskExtract(vmask_vl, vs_idx, eew)
-  val vmask_16b = Mux(rd_vs_en, MaskReorg.splash(vmask_uop, eew), 0.U)
-  val current_rd_vs_ones_sum = Wire(UInt(5.W))
-  val rd_ones_sum = RegInit(0.U(8.W))
-  val ones_sum = Wire(UInt(8.W))
+  val vmask_uop = MaskExtract(vmask_vl, vs_idx, eew, VLEN)
+  val vmask_16b = Mux(rd_vs_en, MaskReorg.splash(vmask_uop, eew, vlenb), 0.U)
+  val current_rd_vs_ones_sum = Wire(UInt((log2Up(VLENB) + 1).W))
+  val rd_ones_sum = RegInit(0.U((log2Up(VLEN) + 1).W))
+  val ones_sum = Wire(UInt((log2Up(VLEN) + 1).W))
   val cmprs_rd_wb = Wire(Bool())
   val cmprs_rd_resent_en = Wire(Bool())
   val cmprs_rd_old_vd = RegInit(false.B)
@@ -292,8 +303,8 @@ class Permutation(implicit p: Parameters) extends VFuModule {
     vmask_vl := mask & vd_mask_vl
   }
 
-  cmprs_rd_wb := reg_vcompress && ((rd_ones_sum + current_rd_vs_ones_sum) >= Cat(wb_idx_plus1, 0.U(4.W)))
-  cmprs_rd_resent_en := reg_vcompress && ((rd_ones_sum + current_rd_vs_ones_sum) > Cat(wb_idx_plus1, 0.U(4.W)))
+  cmprs_rd_wb := reg_vcompress && ((rd_ones_sum + current_rd_vs_ones_sum) >= Cat(wb_idx_plus1, 0.U((log2Up(VLEN) - 3).W)))
+  cmprs_rd_resent_en := reg_vcompress && ((rd_ones_sum + current_rd_vs_ones_sum) > Cat(wb_idx_plus1, 0.U((log2Up(VLEN) - 3).W)))
 
   when(rd_done || flush || cmprs_rd_old_vd) {
     rd_ones_sum := 0.U
@@ -308,7 +319,7 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   }
 
   ones_sum := rd_ones_sum + current_rd_vs_ones_sum
-  cmprs_rd_old_vd_idx := ones_sum(7, 4)
+  cmprs_rd_old_vd_idx := ones_sum(log2Up(VLEN), log2Up(VLEN) - 3)
   when(flush) {
     cmprs_rd_old_vd_idx := 0.U
   }.elsewhen(cmprs_rd_old_vd) {
@@ -448,7 +459,7 @@ class Permutation(implicit p: Parameters) extends VFuModule {
     }
   }
 
-  val rdata_reg = RegInit(0.U(128.W))
+  val rdata_reg = RegInit(0.U(VLEN.W))
   val rvalid_reg = RegInit(false.B)
 
   when(flush) {
@@ -535,9 +546,9 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   }
 
   // vslide
-  val vs2_lo = Wire(UInt(128.W))
-  val vs2_hi = Wire(UInt(128.W))
-  val vslide_old_vd = Wire(UInt(128.W))
+  val vs2_lo = Wire(UInt(VLEN.W))
+  val vs2_hi = Wire(UInt(VLEN.W))
+  val vslide_old_vd = Wire(UInt(VLEN.W))
 
   vs2_lo := 0.U
   vs2_hi := 0.U
@@ -637,7 +648,7 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   vrgather_vd := vrgatherEngine.io.vrgather_vd
 
   vsew_bytes := 1.U << vsew_reg
-  vsew_shift := Cat(0.U(1.W), ~vsew_reg(1, 0)) + 1.U
+  vsew_shift := Cat(0.U(1.W), ~vsew_reg(1, 0)) + (log2Up(VLEN) - 6).U
   when(flush) {
     vlRemain := 0.U
   }.elsewhen(uop_valid) {
@@ -724,12 +735,6 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   }
 
 
-  val uop_reg = Reg(new VUop)
-
-  when(uop_valid) {
-    uop_reg := io.in.uop
-  }
-
   io.out.uop := uop_reg
   io.out.rd_en := reg_rd_en & !flush
   io.out.rd_preg_idx := reg_rd_preg_idx
@@ -738,12 +743,12 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   io.out.perm_busy := perm_busy | flush
 }
 
-import xiangshan._
-
-object Main extends App {
+object VerilogPermCore extends App {
   println("Generating hardware")
-  val p = Parameters.empty.alterPartial({ case XSCoreParamsKey => XSCoreParameters() })
-  emitVerilog(new Permutation()(p.alterPartial({ case VFuParamsKey => VFuParameters() })), Array("--target-dir", "generated",
+  val p = Parameters.empty
+  emitVerilog(new PermutationCore()(p.alterPartial({ case VFuParamsKey =>
+    VFuParameters(VLEN = 256)
+  })), Array("--target-dir", "generated",
     "--emission-options=disableMemRandomization,disableRegisterRandomization"))
 }
 

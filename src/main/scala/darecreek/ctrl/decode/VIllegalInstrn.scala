@@ -143,10 +143,28 @@ class VIllegalInstrn extends Module {
   // Segment: for indexed segment, vd reg-group cannot overlap vs2 reg-group
   val ill_segOverlap = ctrl.load && overlap(vs2, vs2End, ctrl.lsrcVal(1), vd, vdEnd_seg(5, 0), ctrl.ldestVal)
 
+  /** Some instructions does not support vd = vs2:
+   *    vslideup, v(f)slide1up, vrgather, vrgather16, vmsbf, vmsif, vmsof, vcompress
+   */
+  val slideup_gather = ctrl.funct6(5, 2) === "b0011".U && ctrl.funct6(1, 0) =/= "b11".U
+  val vmsxf = ctrl.funct6 === "b010100".U && !ctrl.lsrc(0)(4) 
+  val vcompress = ctrl.funct6 === "b010111".U && ctrl.opm
+  val ill_vd_vs2 = ctrl.ldest === ctrl.lsrc(1) && (slideup_gather || vmsxf || vcompress)
+
+  /** The destination vector register group for a masked vector instruction cannot overlap 
+   *  the source mask register (v0), unless the destination vector register is being written
+   *  with a mask value (e.g., compares) or the scalar result of a reduction.
+   */
+  val ill_vd_v0 = ctrl.ldest === 0.U && ctrl.ldestVal && !ctrl.vm && !(ctrl.redu ||
+                  ctrl.mask && ctrl.rdVal ||
+                  ctrl.funct6(5, 3) === "b011".U ||  //compare
+                  ctrl.funct6(5, 2) === "b0100".U && ctrl.funct6(0) && ctrl.opi) //vmadc/vmsbc
+
   val illFinal = ill_vsew || ill_vlmul || ill_widenNarrow || ill_vstart ||
                ill_ldstEmul || ill_seg || ill_seg_past31 || ill_nfield ||
                ill_ext || ill_nreg || ill_frm || ill_sewFP ||
-               ill_reg || ill_regGrpEnd || ill_regOverlap || ill_segOverlap
+               ill_reg || ill_regGrpEnd || ill_regOverlap || ill_segOverlap ||
+               ill_vd_vs2 || ill_vd_v0
   io.ill.valid := RegNext(illFinal || io.ctrl.illegal || io.csr.vill) && RegNext(io.validIn)
   io.ill.bits := RegNext(io.robPtrIn)
 }

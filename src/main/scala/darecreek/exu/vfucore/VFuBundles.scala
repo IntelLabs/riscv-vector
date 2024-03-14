@@ -47,6 +47,11 @@ class VAluOutput(implicit p: Parameters) extends VFuBundle {
   val vd = UInt(VLEN.W)
   val vxsat = Bool()
 }
+// Output of VMASK
+class VMaskOutput(implicit p: Parameters) extends VFuBundle {
+  val uop = new VUop
+  val vd = UInt(VLEN.W)
+}
 
 // Output of FPU
 class VFpuOutput(implicit p: Parameters) extends VFuBundle {
@@ -93,4 +98,11 @@ class LaneFUOutput(implicit p: Parameters) extends Bundle {
   val vd = UInt(64.W)
   val fflags = UInt(5.W) // Floating-point accrued exception flag
   val vxsat = Bool() // Fixed-point accrued saturation flag
+}
+
+class LaneUnit(implicit p: Parameters) extends Module {
+  val io = IO(new Bundle() {
+    val in = Flipped(DecoupledIO(new LaneFUInput))
+    val out = DecoupledIO(new LaneFUOutput)
+  })
 }

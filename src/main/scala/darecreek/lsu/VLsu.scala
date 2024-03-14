@@ -109,8 +109,8 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
     */
   // Load FSM
   when (stateLd === s_idle_LD) {
-    stateLd := Mux(io.ovi_memop.sync_start, 
-               Mux(ld.fire && ld.bits.uop.expdEnd, s_busy_LD, s_issueUops_LD), s_idle_LD)
+    stateLd := Mux(firstLdFire, 
+               Mux(ld.bits.uop.expdEnd, s_busy_LD, s_issueUops_LD), s_idle_LD)
   }.elsewhen (stateLd === s_issueUops_LD) { //Wait for all expanded uops of one instrn issued from IQ
     stateLd := Mux(ld.fire && ld.bits.uop.expdEnd, s_busy_LD, s_issueUops_LD)
   }.elsewhen (stateLd === s_busy_LD) {
@@ -495,10 +495,11 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
 
   //---- Begin generate mask_idx
   val cntMaskIdxCredit = RegInit(0.U(2.W))
+  val maskIdxCredit_stop = cntMaskIdxCredit(1)  //max No. of credit = 2
   val nLdMask = vl_ldst - vstart_ldst
   val sendingMaskIdx = RegInit(false.B)
   val ldMaskOffset = Reg(UInt(bVL.W))
-  val ldMaskOffsetUpdate = ldMaskOffset + Mux(ctrl_ldst.indexed, 1.U, 64.U)
+  val ldMaskOffsetUpdate = ldMaskOffset + Mux(maskIdxCredit_stop, 0.U, Mux(ctrl_ldst.indexed, 1.U, 64.U))
   val stopSendingMaskIdx = ldMaskOffsetUpdate >= nLdMask
   when (io.ovi_memop.sync_start && (ctrl_ldst_wire.indexed || !ctrl_ldst_wire.mask && !vm_ldst)) {
     sendingMaskIdx := true.B
@@ -512,7 +513,7 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   }.elsewhen (sendingMaskIdx) {
     ldMaskOffset := Mux(stopSendingMaskIdx, ldMaskOffset, ldMaskOffsetUpdate)
   }
-  io.ovi_maskIdx.valid := sendingMaskIdx && !cntMaskIdxCredit(1)  //max No. of credit = 2
+  io.ovi_maskIdx.valid := sendingMaskIdx && !maskIdxCredit_stop  //max No. of credit = 2
   
   val maskIdx_itemMask = Mux1H(Seq.tabulate(4)(i => ldMaskOffset(7, 6) === i.U),
                         Seq.tabulate(4)(i => maskBuf(64*i+63, 64*i)))

@@ -31,6 +31,7 @@ class VLaneExu extends Module {
       val valid = Input(Bool())
       val readys = Output(Vec(NLaneExuFUs, Bool()))
     }
+    val flush = Input(Bool())
     val out = Vec(2, Decoupled(new VLaneExuOut))
   })
 
@@ -39,6 +40,8 @@ class VLaneExu extends Module {
   val narrow = uop.ctrl.narrow
   val destEew = SewOH(uop.info.destEew)
   val expdIdx = uop.expdIdx
+  val isPermVmv = uop.ctrl.funct6 === "b010000".U && !uop.ctrl.opi &&
+                  !(uop.ctrl.funct3 === "b010".U && uop.ctrl.lsrc(0)(4))
 
   val lanes = Seq.fill(NLanes)(Module(new VLane))
   for (i <- 0 until NLanes) {
@@ -46,10 +49,10 @@ class VLaneExu extends Module {
     lanes(i).io.in.valids(0) := io.in.valid && uop.ctrl.alu
     lanes(i).io.in.valids(1) := io.in.valid && uop.ctrl.mul
     lanes(i).io.in.valids(2) := io.in.valid && uop.ctrl.fp
-    lanes(i).io.in.valids(3) := io.in.valid && uop.ctrl.div
     lanes(i).io.in.data.uop := uop
     lanes(i).io.in.data.rs1 := io.in.bits.rs1
     lanes(i).io.in.data.prestart := 0.U  // So far, set vstart = 0 for all arithmetic instructions
+    lanes(i).io.redirect.valid := io.flush
     lanes(i).io.out(0).ready := io.out(0).ready
     lanes(i).io.out(1).ready := io.out(1).ready
   }
@@ -57,11 +60,11 @@ class VLaneExu extends Module {
 
   /** Input tail distribution
    */
-  val tail = TailGen(uop.info.vl, expdIdx, destEew, narrow)
+  val tail = TailGen(Mux(isPermVmv, 1.U, uop.info.vl), expdIdx, destEew, narrow)
   // Tail of each lane. It occupies the lowest bits of lane mask_input.
   val laneTail = Wire(Vec(NLanes, UInt(NByteLane.W)))
-  // Lane index:        3       2       1       0
-  // sew=32 laneTail:  76      54      32      10
+  // Lane index:        3       2       1       01
+  // sew=32 laneTail:  76      54      32       10
   for (i <- 0 until NLanes) {
     laneTail(i) :=  Mux1H(destEew.oneHot, Seq(1,2,4,8).map(bytes => UIntSplit(tail, NByteLane/bytes)(i)))
   }
@@ -161,8 +164,9 @@ class VLaneExu extends Module {
     for (k <- 0 until 2) {
       laneOldVdNarrow(k) := io.in.bits.vSrc(2)(i/2 + k*NLanes/2)(32*(i%2)+31, 32*(i%2))
     }
-    lanes(i).io.in.data.old_vd := Mux(uop.ctrl.narrow_to_1, laneMask(i), 
-             Mux(uop.ctrl.narrow, laneOldVdNarrow.asUInt, io.in.bits.vSrc(2)(i)))
+    lanes(i).io.in.data.old_vd := Mux(uop.ctrl.narrow, laneOldVdNarrow.asUInt, 
+             Mux(uop.ctrl.narrow_to_1 && !uop.info.vstart_gte_vl, laneMask(i), 
+                 io.in.bits.vSrc(2)(i)))
   }
   
   /**
@@ -193,7 +197,8 @@ class VLaneExu extends Module {
     val vdCmp = Mux1H(SewOH(io.out(wbIdx).bits.uop.info.vsew).oneHot, Seq(8,16,32,64).map(sew => cmpOutRearrange(sew, wbIdx)))
     // Final output vd
     for (i <- 0 until NLanes) {
-      io.out(wbIdx).bits.vd(i) := Mux(io.out(wbIdx).bits.uop.ctrl.narrow_to_1, (UIntSplit(vdCmp))(i), vd(i))
+      io.out(wbIdx).bits.vd(i) := Mux(io.out(wbIdx).bits.uop.ctrl.narrow_to_1 && !io.out(wbIdx).bits.uop.info.vstart_gte_vl,
+                                      UIntSplit(vdCmp)(i), vd(i))
     }
   }
   

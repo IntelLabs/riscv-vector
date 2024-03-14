@@ -21,6 +21,7 @@ import chisel3._
 import chisel3.util._
 import utils._
 import darecreek.lsu._
+import darecreek.exu.crosslane.PermRdRF
 
 class GetScalarOperand extends Bundle {
   val exu = new Bundle {
@@ -56,6 +57,8 @@ class VIssueBlock extends Module {
       val laneMulFp = Input(ValidIO(new VLaneExuOut))
       val cross = Input(ValidIO(new VCrossExuOut))
     }
+    // For permutation read register file
+    val perm = Flipped(new PermRdRF)
     // LSU
     val toLSU = new Bundle {
       val ld = Decoupled(new VLdInput)
@@ -76,9 +79,9 @@ class VIssueBlock extends Module {
 
   val arithIQ = Module(new VArithIssueQ(ArithIQSize, VRenameWidth))
   val lsIQ = Module(new VLdstIssueQ(LsIQSize, VRenameWidth))
-  // Arith: 4    Ld: 3 (idx + old_dst + mask)  st: 3 (idx + vs3 + mask)
+  // Arith: 4    Ld: 3 (idx + old_dst + mask)  st: 3 (idx + vs3 + mask)  permutation: 1
   // Todo: reduce num of read ports of ld/st
-  val nVRFReadPorts = NArithIQs * 4 + 3 // So far load and store are serial, they need 3 read ports
+  val nVRFReadPorts = NArithIQs * 4 + 3 + 1 // So far load and store are serial, they need 3 read ports
   val regFile = Module(new VRegFile(nVRFReadPorts + nVRFReadPortsRvfi, nVRFWritePorts))
 
   // Write-back addresses: for wakeup (ready gen) of IQs
@@ -120,10 +123,8 @@ class VIssueBlock extends Module {
   // Pipeline of valid
   when (io.flush) {
     validPipe_arith := false.B
-  }.elsewhen (fireArithIQout) {
-    validPipe_arith := true.B
-  }.elsewhen (toExuReady) {
-    validPipe_arith := false.B
+  }.elsewhen (arithIQ.io.out.ready) {
+    validPipe_arith := arithIQ.io.out.valid
   }
   io.toExu.valid := validPipe_arith
   // VL remain
@@ -194,10 +195,8 @@ class VIssueBlock extends Module {
   val validPipe_ls = RegInit(false.B)
   when (io.flush) {
     validPipe_ls := false.B
-  }.elsewhen (fireLsIQout) {
-    validPipe_ls := true.B
-  }.elsewhen (io_toLSU_ready) {
-    validPipe_ls := false.B
+  }.elsewhen (lsIQ.io.out.ready) {
+    validPipe_ls := lsIQ.io.out.valid
   }
   io.toLSU.ld.valid := validPipe_ls && io.toLSU.ld.bits.uop.ctrl.load
   // Ready
@@ -222,6 +221,12 @@ class VIssueBlock extends Module {
   io.wbLSU.valid := io.fromLSU.ld.valid || io.fromLSU.st.valid
   io.wbLSU.bits := Mux(io.fromLSU.ld.valid, io.fromLSU.ld.bits.uop, io.fromLSU.st.bits.uop)
 
+  /**
+    * One read port for permutation unit
+    */
+  regFile.io.read(nVRFReadPorts - 1).addr := io.perm.rd_preg_idx
+  io.perm.rdata := RegEnable(Cat(regFile.io.read(nVRFReadPorts - 1).data.reverse), io.perm.rd_en)
+  io.perm.rvalid := RegNext(io.perm.rd_en)
 
   def calcRemain(destEew: SewOH, fireIn: Bool, uop: VExpdUOp, vl: UInt) = {
     // Notice: max VL must <= 10000...0   max vstart <= 01111...1

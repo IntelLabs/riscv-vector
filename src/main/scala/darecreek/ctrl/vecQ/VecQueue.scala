@@ -29,14 +29,13 @@ class VecQueue extends Module with HasCircularQueuePtrHelper {
     // from VIllegalInstrn.io.ill
     val illegal = Flipped(ValidIO(new VRobPtr))
     // from VIllegalInstrn.io.partialVInfo
-    val partialVInfo = Flipped(ValidIO(new PartialVInfo))
+    val partialVInfo_wire = Flipped(ValidIO(new PartialVInfo))
+    val partialVInfo_reg = Flipped(ValidIO(new PartialVInfo)) // _reg is one cycle later than _wire
     // flush from ROB
     val flush = Flipped(ValidIO(new VRobPtr))
     // enqPtr
     val enqPtrOut = Output(new VRobPtr)
-
     val out = Decoupled(new VMicroOp)
-
     // rs1 read requests from issue queues
     val get_rs1 = Flipped(new GetScalarOperand)
   })
@@ -50,21 +49,26 @@ class VecQueue extends Module with HasCircularQueuePtrHelper {
   val enqPtr = RegInit(0.U.asTypeOf(new VRobPtr))
   val deqPtr = RegInit(0.U.asTypeOf(new VRobPtr))
   assert(!(isFull(enqPtr, deqPtr) && io.in.valid), "Error: vector Queue is overflow !!!!")
+
+  // Pass through if the queue is empty
+  val bypass = isEmpty(enqPtr, deqPtr) && io.in.valid && io.out.ready
   
   /**
     * Enq
     */
-  when (io.in.valid) {
+  when (io.in.valid && !bypass) {
     vq(enqPtr.value).ctrl := io.in.bits.ctrl
     io.in.bits.csr.elements.foreach {
       case (name, data) => vq(enqPtr.value).info.elements(name) := data
     }
-    sop(enqPtr.value) := io.in.bits.scalar_opnd
     sb_id(enqPtr.value) := io.in.bits.sb_id
     valid(enqPtr.value) := true.B
     ill(enqPtr.value) := false.B
   }
-  enqPtr := enqPtr + Mux(io.in.valid, 1.U, 0.U)
+  when (io.in.valid) {
+    enqPtr := enqPtr + 1.U // + 1.U even on bypass, to generate correct ROB idx
+    sop(enqPtr.value) := io.in.bits.scalar_opnd
+  }
   io.enqPtrOut := enqPtr
 
   /** Illegal instrn */
@@ -73,10 +77,12 @@ class VecQueue extends Module with HasCircularQueuePtrHelper {
   }
 
   // Partial VInfo
-  when (io.partialVInfo.valid) {
-    vq(io.partialVInfo.bits.vRobPtr.value).info.destEew := io.partialVInfo.bits.destEew
-    vq(io.partialVInfo.bits.vRobPtr.value).info.emulVd := io.partialVInfo.bits.emulVd
-    vq(io.partialVInfo.bits.vRobPtr.value).info.emulVs2 := io.partialVInfo.bits.emulVs2
+  val partialVInfo = io.partialVInfo_reg
+  when (partialVInfo.valid) {
+    vq(partialVInfo.bits.vRobPtr.value).info.destEew := partialVInfo.bits.destEew
+    vq(partialVInfo.bits.vRobPtr.value).info.emulVd := partialVInfo.bits.emulVd
+    vq(partialVInfo.bits.vRobPtr.value).info.emulVs2 := partialVInfo.bits.emulVs2
+    vq(partialVInfo.bits.vRobPtr.value).info.vstart_gte_vl := partialVInfo.bits.vstart_gte_vl
   }
 
   /**
@@ -85,24 +91,40 @@ class VecQueue extends Module with HasCircularQueuePtrHelper {
   // val deq_is_illegal = vq(deqPtr.value).ill && valid(deqPtr.value)
   val deq_is_illegal = (ill(deqPtr.value) || io.illegal.valid && io.illegal.bits.value === deqPtr.value) && 
                        valid(deqPtr.value)
-  io.out.valid := !(isEmpty(enqPtr, deqPtr)) && !io.flush.valid && !(deq_is_illegal)
+  when (bypass) {
+    io.out.valid := true.B
+    io.out.bits.ctrl := io.in.bits.ctrl
+    io.in.bits.csr.elements.foreach {
+      case (name, data) => io.out.bits.info.elements(name) := data
+    }
+    io.out.bits.info.destEew := io.partialVInfo_wire.bits.destEew
+    io.out.bits.info.emulVd := io.partialVInfo_wire.bits.emulVd
+    io.out.bits.info.emulVs2 := io.partialVInfo_wire.bits.emulVs2
+    io.out.bits.info.vstart_gte_vl := io.partialVInfo_wire.bits.vstart_gte_vl
+    io.out.bits.sb_id := io.in.bits.sb_id
+    io.out.bits.vRobIdx := deqPtr
+  }.otherwise {
+    io.out.valid := !(isEmpty(enqPtr, deqPtr)) && !io.flush.valid && !(deq_is_illegal)
+    io.out.bits.ctrl := vq(deqPtr.value).ctrl
+    io.out.bits.info := vq(deqPtr.value).info
+    io.out.bits.sb_id := sb_id(deqPtr.value)
+    io.out.bits.vRobIdx := deqPtr
+  }
 
-  io.out.bits.ctrl := vq(deqPtr.value).ctrl
-  io.out.bits.info := vq(deqPtr.value).info
-  io.out.bits.sb_id := sb_id(deqPtr.value)
-  io.out.bits.vRobIdx := deqPtr
-
-  when (io.out.fire) {
-    when (io.partialVInfo.valid && io.partialVInfo.bits.vRobPtr === deqPtr) {
-      io.out.bits.info.destEew := io.partialVInfo.bits.destEew
-      io.out.bits.info.emulVd := io.partialVInfo.bits.emulVd
-      io.out.bits.info.emulVs2 := io.partialVInfo.bits.emulVs2
+  when (io.out.fire && !bypass) {
+    when (partialVInfo.valid && partialVInfo.bits.vRobPtr === deqPtr) {
+      io.out.bits.info.destEew := partialVInfo.bits.destEew
+      io.out.bits.info.emulVd := partialVInfo.bits.emulVd
+      io.out.bits.info.emulVs2 := partialVInfo.bits.emulVs2
+      io.out.bits.info.vstart_gte_vl := partialVInfo.bits.vstart_gte_vl
     }
   }
 
-  // deqPtr := Mux(io.flush.valid, 0.U, deqPtr + Mux(io.out.fire, 1.U, 0.U))
-  deqPtr := Mux(io.flush.valid, io.flush.bits + 1.U, 
-                deqPtr + Mux(io.out.fire || deq_is_illegal, 1.U, 0.U))
+  when (io.flush.valid) {
+    deqPtr := io.flush.bits + 1.U,
+  }.elsewhen (io.out.fire || deq_is_illegal) {
+    deqPtr := deqPtr + 1.U
+  }
   
   when (io.flush.valid || (io.out.fire || deq_is_illegal)) {
     valid(deqPtr.value) := false.B

@@ -38,14 +38,14 @@ class VDispatch extends Module {
 
   val inputHasValid = Cat(io.in.map(_.valid)).orR
   val rdyRob = io.toRob(0).ready
+  val rdyArith = io.out.toArithIQ(0).ready
+  val rdyLs = io.out.toLsIQ(0).ready
   for (i <- 0 until VRenameWidth) {
-    val canOut = io.out.toArithIQ(0).ready && io.out.toLsIQ(0).ready
+    val canOut = rdyArith && rdyLs && rdyRob
     io.in(i).ready := !inputHasValid || canOut
     
     val isArith = io.in(i).bits.ctrl.arith
     val isLs = io.in(i).bits.ctrl.load || io.in(i).bits.ctrl.store
-    val rdyArith = io.out.toArithIQ(0).ready
-    val rdyLs = io.out.toLsIQ(0).ready
     
     // -- NOTE: so far there is only one arithmetic issue queue (NArithIQs = 1)
     io.out.toArithIQ(i).valid := io.in(i).valid && isArith && rdyLs && rdyRob

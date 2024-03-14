@@ -97,10 +97,13 @@ class VCtrl extends Bundle {
   def vv = !funct3(2) && !(funct3(1) && funct3(0))
   def vx = funct3(2) 
   def vi = !funct3(2) && funct3(1) && funct3(0) 
-  def fuSel = Seq(alu, mul, fp, div, redu, mask, perm)
+  def fuSel = Seq(alu, mul, fp, redu, mask, perm, div)
   def laneExu = arith && !crossLane
   def isLdst = load || store
   def vs1_imm = lsrc(0)
+  def opi = funct3(0) === funct3(1) // OPIVV/X/I
+  def opm = funct3(1, 0) === 2.U //OPMVV/X
+  def opf = funct3(1, 0) === 1.U // OPFVV/F
 }
 
 class VExcptInfo extends Bundle {
@@ -127,6 +130,7 @@ class VInfo extends VCsr {
   val destEew = UInt(3.W) // Destination EEW
   val emulVd = UInt(4.W) // EMUL of vd
   val emulVs2 = UInt(4.W)
+  val vstart_gte_vl = Bool()
 }
 
 class VCtrlInfo extends Bundle {
@@ -255,7 +259,6 @@ class VRobCommitIO extends Bundle {
 
 class Redirect extends Bundle {
   val valid = Bool()
-  def needFlush = valid
 }
 
 /**

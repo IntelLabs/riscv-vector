@@ -45,6 +45,14 @@ object BitsExtend {
 
 // Extract 16-bit mask signal from 128-bit v0
 object MaskExtract {
+  def apply(vmask: UInt, uopIdx: UInt, sew: SewOH, VLEN: Int) = {
+    val extracted = Wire(UInt((VLEN / 8).W))
+    extracted := Mux1H(Seq.tabulate(8)(uopIdx === _.U),
+      Seq.tabulate(8)(idx => Mux1H(sew.oneHot, Seq(VLEN / 8, VLEN / 16, VLEN / 32, VLEN / 64).map(stride =>
+        vmask((idx + 1) * stride - 1, idx * stride)))))
+    extracted
+  }
+
   def apply(vmask128b: UInt, uopIdx: UInt, sew: SewOH) = {
     val extracted = Wire(UInt(16.W))
     extracted := Mux1H(Seq.tabulate(8)(uopIdx === _.U),
@@ -132,6 +140,11 @@ object PrestartGen {
 // Rearrange mask, tail, or vstart bits  (width: 16 bits)
 object MaskReorg {
   // sew = 8: unchanged, sew = 16: 00000000abcdefgh -> aabbccddeeffgghh, ...
+
+   def splash(bits: UInt, sew: SewOH, vlenb: Int): UInt = {
+     Mux1H(sew.oneHot, Seq(1, 2, 4, 8).map(k => Cat(bits(vlenb / k - 1, 0).asBools.map(Fill(k, _)).reverse)))
+   }
+
   def splash(bits: UInt, sew: SewOH): UInt = {
     Mux1H(sew.oneHot, Seq(1, 2, 4, 8).map(k => Cat(bits(16 / k - 1, 0).asBools.map(Fill(k, _)).reverse)))
   }
