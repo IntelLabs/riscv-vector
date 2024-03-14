@@ -239,9 +239,16 @@ class Vsplit(implicit p : Parameters) extends Module {
             indexIncBase := 0.U
         }
     }
+    
+    //Due to the design of vmask, these instructions need to be split into lmul, 
+    //but the same data must be sent each time
+    val vcpop    = ctrl.mask && ctrl.funct6 === "b010000".U && ctrl.lsrc(0) === "b10001".U
+    val viota    = ctrl.mask && ctrl.funct6 === "b010100".U && ctrl.lsrc(0) === "b10000".U 
+    val vid      = ctrl.mask && ctrl.funct6 === "b010100".U && ctrl.lsrc(0) === "b10001".U
+    val vmaskExcp = vcpop || viota || vid
 
     val lsrc0_inc =             //vcompress
-          Mux(ctrl.redu || floatRed || (ctrl.funct6 === "b010111".U && ctrl.funct3 === 2.U), 0.U, 
+          Mux(ctrl.redu || floatRed || (ctrl.funct6 === "b010111".U && ctrl.funct3 === 2.U) || vmaskExcp, 0.U, 
           Mux(ctrl.widen || ctrl.widen2 || ctrl.narrow, idx >> 1, idx))
               
     val lsrc1_inc = Wire(UInt(3.W))
@@ -254,7 +261,7 @@ class Vsplit(implicit p : Parameters) extends Module {
       lsrc1_inc := idx >> 2
     }.elsewhen (v_ext_out && ctrl.lsrc(0)(2,1) === 1.U) {
       lsrc1_inc := idx >> 3
-    }.elsewhen (ctrl.funct6 === "b010100".U) { //VMUNARY0
+    }.elsewhen (ctrl.funct6 === "b010100".U || vmaskExcp) { //VMUNARY0
       lsrc1_inc := 0.U
     }.otherwise {
       lsrc1_inc := idx
@@ -349,7 +356,8 @@ class Vsplit(implicit p : Parameters) extends Module {
         hasRegConf(2) := true.B
     }
 
-    needStall := hasRegConf(0) || hasRegConf(1) || io.lsuStallSplit || io.iexNeedStall
+    val narrowTo1NoStall = ctrl.narrow_to_1 && ctrl.fp 
+    needStall := hasRegConf(0) || hasRegConf(1) || io.lsuStallSplit || io.iexNeedStall && ~narrowTo1NoStall ||
                  ctrl.illegal || io.vLSUXcpt.exception_vld
          
     io.out.mUop.bits.uop.uopIdx   := Mux(ldst && ldstCtrl.segment, idx  % indexExpdLen, idx)
@@ -432,10 +440,11 @@ class Vsplit(implicit p : Parameters) extends Module {
     val expdLenIdx  = Mux(ldStEmulVd >= ldStEmulVs2, ldStEmulVd, ldStEmulVs2)
     val expdLenLdSt = Mux(ldst && ldstCtrl.segment, expdLenSeg, Mux(ldst && ldstCtrl.indexed, expdLenIdx, ldStEmulVd))
     val maxOfVs12Vd = Mux(emulVd >= emulVs1, Mux(emulVd >= emulVs2, emulVd, emulVs2), Mux(emulVs1 >= emulVs2, emulVs1, emulVs2))
-    val vmv_vfmv = ctrl.alu && ctrl.funct6 === "b010000".U
+    val vmv_vfmv = ctrl.alu && !ctrl.opi && ctrl.funct6 === "b010000".U
 
     //val expdLenIn = Mux(ldst, expdLenLdSt, Mux(ctrl.perm || vmv_vfmv, 1.U , maxOfVs12Vd))
-    val expdLenIn = Mux(ldst, expdLenLdSt, Mux(ctrl.perm || vmv_vfmv, 1.U , maxOfVs12Vd))
+    val expdLenIn = Mux(ldst, expdLenLdSt, Mux(ctrl.perm || vmv_vfmv, 1.U , 
+    (Mux(vcpop || viota || vid, lmul, maxOfVs12Vd))))
     
     when(instFirstIn){
         expdLenReg := expdLenIn
