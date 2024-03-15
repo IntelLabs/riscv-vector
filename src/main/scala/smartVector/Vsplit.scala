@@ -356,7 +356,7 @@ class Vsplit(implicit p : Parameters) extends Module {
         hasRegConf(2) := true.B
     }
 
-    val narrowTo1NoStall = ctrl.narrow_to_1 && ctrl.fp 
+    val narrowTo1NoStall = ctrl.narrow_to_1 && ctrl.mask 
     needStall := hasRegConf(0) || hasRegConf(1) || io.lsuStallSplit || io.iexNeedStall && ~narrowTo1NoStall ||
                  ctrl.illegal || io.vLSUXcpt.exception_vld
          

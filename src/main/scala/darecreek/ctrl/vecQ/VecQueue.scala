@@ -121,7 +121,7 @@ class VecQueue extends Module with HasCircularQueuePtrHelper {
   }
 
   when (io.flush.valid) {
-    deqPtr := io.flush.bits + 1.U,
+    deqPtr := io.flush.bits + 1.U
   }.elsewhen (io.out.fire || deq_is_illegal) {
     deqPtr := deqPtr + 1.U
   }
