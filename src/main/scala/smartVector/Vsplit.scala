@@ -436,9 +436,11 @@ class Vsplit(implicit p : Parameters) extends Module {
     val ldStEmulVd  = eewEmulInfo1.emulVd
     val ldStEmulVs1 = eewEmulInfo1.emulVs1
     val ldStEmulVs2 = eewEmulInfo1.emulVs2
-    val expdLenSeg  = Mux(ldstCtrl.indexed, nfield * (Mux(lmul > ldStEmulVs2, lmul, ldStEmulVs2)), nfield * lmul) 
+    val expdLenSeg = Wire(UInt(4.W))
+    expdLenSeg  := Mux(ldstCtrl.indexed, nfield * (Mux(lmul > ldStEmulVs2, lmul, ldStEmulVs2)), nfield * lmul) 
     val expdLenIdx  = Mux(ldStEmulVd >= ldStEmulVs2, ldStEmulVd, ldStEmulVs2)
-    val expdLenLdSt = Mux(ldst && ldstCtrl.segment, expdLenSeg, Mux(ldst && ldstCtrl.indexed, expdLenIdx, ldStEmulVd))
+    val expdLenLdSt = Mux(ldst && ldstCtrl.segment, expdLenSeg, Mux(ldstCtrl.wholeReg, emulVd,
+    Mux(ldst && ldstCtrl.indexed, expdLenIdx, ldStEmulVd)))
     val maxOfVs12Vd = Mux(emulVd >= emulVs1, Mux(emulVd >= emulVs2, emulVd, emulVs2), Mux(emulVs1 >= emulVs2, emulVs1, emulVs2))
     val vmv_vfmv = ctrl.alu && !ctrl.opi && ctrl.funct6 === "b010000".U
 
