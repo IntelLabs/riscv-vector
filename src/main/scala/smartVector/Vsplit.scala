@@ -242,7 +242,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     
     //Due to the design of vmask, these instructions need to be split into lmul, 
     //but the same data must be sent each time
-    val vcpop    = ctrl.mask && ctrl.funct6 === "b010000".U && ctrl.lsrc(0) === "b10001".U
+    val vcpop    = ctrl.mask && ctrl.funct6 === "b010000".U && ctrl.lsrc(0) === "b10000".U
     val viota    = ctrl.mask && ctrl.funct6 === "b010100".U && ctrl.lsrc(0) === "b10000".U 
     val vid      = ctrl.mask && ctrl.funct6 === "b010100".U && ctrl.lsrc(0) === "b10001".U
     val vmaskExcp = vcpop || viota || vid
@@ -439,7 +439,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     val expdLenSeg = Wire(UInt(4.W))
     expdLenSeg  := Mux(ldstCtrl.indexed, nfield * (Mux(lmul > ldStEmulVs2, lmul, ldStEmulVs2)), nfield * lmul) 
     val expdLenIdx  = Mux(ldStEmulVd >= ldStEmulVs2, ldStEmulVd, ldStEmulVs2)
-    val expdLenLdSt = Mux(ldst && ldstCtrl.segment, expdLenSeg, Mux(ldstCtrl.wholeReg, emulVd,
+    val expdLenLdSt = Mux(ldst && ldstCtrl.segment, expdLenSeg, Mux(ldstCtrl.wholeReg, eewEmulInfo1.emulVd,
     Mux(ldst && ldstCtrl.indexed, expdLenIdx, ldStEmulVd)))
     val maxOfVs12Vd = Mux(emulVd >= emulVs1, Mux(emulVd >= emulVs2, emulVd, emulVs2), Mux(emulVs1 >= emulVs2, emulVs1, emulVs2))
     val vmv_vfmv = ctrl.alu && !ctrl.opi && ctrl.funct6 === "b010000".U
