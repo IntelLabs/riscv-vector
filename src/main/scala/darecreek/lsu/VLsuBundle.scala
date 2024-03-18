@@ -70,7 +70,7 @@ object LdstDecoder {
     ctrl.strided := mop === 2.U
     ctrl.indexed := mop(0)
     ctrl.fof := lumop === "b10000".U && ctrl.unitStride
-    ctrl.segment := nf =/= 0.U
+    ctrl.segment := nf =/= 0.U && !ctrl.wholeReg
     ctrl.wholeReg := lumop === "b01000".U && ctrl.unitStride
     ctrl
   }
