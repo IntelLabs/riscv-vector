@@ -181,11 +181,11 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     val ctrl = Mux(instFirstIn, io.in.decodeIn.bits.vCtrl,vCtrl(0))
     val info = Mux(instFirstIn, io.in.decodeIn.bits.vInfo,vInfo(0))
-    val scalarOpnd1  = Mux(instFirstIn, io.in.decodeIn.bits.scalar_opnd_1,scalar_opnd_1(0))
-    val scalarOpnd2  = Mux(instFirstIn, io.in.decodeIn.bits.scalar_opnd_2,scalar_opnd_2(0))
-    val floatOpnd1   = Mux(instFirstIn, io.in.decodeIn.bits.float_opnd_1,float_opnd_1(0))
-    val floatRed     = Mux(instFirstIn, io.in.decodeIn.bits.floatRed, floatRedReg(0))
-    val eewEmulInfo1 = Mux(instFirstIn, io.in.decodeIn.bits.eewEmulInfo, eewEmulInfo(0))
+    val scalarOpnd1  = Mux(instFirstIn, io.in.decodeIn.bits.scalar_opnd_1, scalar_opnd_1(0))
+    val scalarOpnd2  = Mux(instFirstIn, io.in.decodeIn.bits.scalar_opnd_2, scalar_opnd_2(0))
+    val floatOpnd1   = Mux(instFirstIn, io.in.decodeIn.bits.float_opnd_1 , float_opnd_1(0))
+    val floatRed     = Mux(instFirstIn, io.in.decodeIn.bits.floatRed     , floatRedReg(0))
+    val eewEmulInfo1 = Mux(instFirstIn, io.in.decodeIn.bits.eewEmulInfo  , eewEmulInfo(0))
 
     //Because the register file do not always read the register file when instFirstIn
     val vs1     = Mux(io.in.regFileIn.readVld(0), io.in.regFileIn.readData(0), uopRegInfo(0).vs1)
@@ -207,7 +207,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     val vlmul = info.vlmul
     val lmul = Vlmul_to_lmul(vlmul)
     val indexIncBase = Wire(UInt(3.W)) 
-    val emulVd  = Mux(ctrl.ldestVal,   eewEmulInfo1.emulVd,  0.U(4.W))
+    val emulVd  = Mux(ctrl.ldestVal || ctrl.store, eewEmulInfo1.emulVd,  0.U(4.W))
     val emulVs1 = Mux(ctrl.lsrcVal(0), eewEmulInfo1.emulVs1, 0.U(4.W))
     val emulVs2 = Mux(ctrl.lsrcVal(1), eewEmulInfo1.emulVs2, 0.U(4.W))
     val idxVdInc = Wire(Bool())
