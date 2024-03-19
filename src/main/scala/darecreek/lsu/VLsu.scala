@@ -128,7 +128,7 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   }))
   when (reset.asBool) { ldUopTable.foreach(_.valid := false.B) }
   val ldBufPtrEnq = RegInit(0.U(3.W))
-  ldBufPtrEnq := Mux(completeLd, 0.U, Mux(ld.fire, ldBufPtrEnq + 1.U, ldBufPtrEnq))
+  ldBufPtrEnq := Mux(stateLd === s_busy_LD, 0.U, Mux(ld.fire, ldBufPtrEnq + 1.U, ldBufPtrEnq))
   when (ld.fire) {
     ldUopTable(ldBufPtrEnq).valid := ld.bits.uop.pdestVal
     ldUopTable(ldBufPtrEnq).uop := ld.bits.uop
@@ -401,7 +401,7 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   //-------- Write-back of load --------
   val ldBufPtrDeq = RegInit(0.U(3.W))
   ldBufPtrDeq := Mux(stateLd === s_complete_LD && ldUopTable(ldBufPtrDeq).valid, ldBufPtrDeq + 1.U, 0.U)
-  completeLd := stateLd === s_complete_LD && (!ldUopTable(ldBufPtrDeq + 1.U).valid || ldBufPtrDeq === 7.U)
+  completeLd := stateLd === s_complete_LD && (!ldUopTable(ldBufPtrDeq + 1.U).valid || ldBufPtrDeq === 7.U) && !completeLd
   io.wb.ld.valid := stateLd === s_complete_LD && !completeLd
   ldDataBuf.io.raddr := ldBufPtrDeq
   io.wb.ld.bits.vd := ldDataBuf.io.rdata
@@ -438,7 +438,7 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   }))
   when (reset.asBool) { stUopTable.foreach(_.valid := false.B) }
   val stBufPtrEnq = RegInit(0.U(3.W))
-  stBufPtrEnq := Mux(completeSt, 0.U, Mux(st.fire, stBufPtrEnq + 1.U, stBufPtrEnq))
+  stBufPtrEnq := Mux(stateSt === s_busy_ST, 0.U, Mux(st.fire, stBufPtrEnq + 1.U, stBufPtrEnq))
   when (st.fire) {
     stUopTable(stBufPtrEnq).valid := true.B
     stUopTable(stBufPtrEnq).uop := st.bits.uop
@@ -448,7 +448,7 @@ class VLsu extends Module with HasCircularQueuePtrHelper {
   // Write-back of store
   val stBufPtrDeq = RegInit(0.U(3.W))
   stBufPtrDeq := Mux(stateSt === s_complete_ST && stUopTable(stBufPtrDeq).valid, stBufPtrDeq + 1.U, 0.U)
-  completeSt := stateSt === s_complete_ST && (!stUopTable(stBufPtrDeq + 1.U).valid || stBufPtrDeq === 7.U)
+  completeSt := stateSt === s_complete_ST && (!stUopTable(stBufPtrDeq + 1.U).valid || stBufPtrDeq === 7.U) && !completeSt
   io.wb.st.valid := stateSt === s_complete_ST && !completeSt
   io.wb.st.bits.uop := stUopTable(stBufPtrDeq).uop
 
