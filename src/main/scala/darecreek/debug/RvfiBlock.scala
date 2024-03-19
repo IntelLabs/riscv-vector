@@ -79,6 +79,8 @@ class VRvfiBlock extends Module {
   class rdBufEntry extends Bundle {
     val rdAddr = UInt(5.W)
     val rd = UInt(XLEN.W)
+    val fflags = UInt(5.W)
+    val vxsat = Bool()
   }
   val rdBuf = Reg(Vec(VQSize, new rdBufEntry))
   when (io.ovi_issue_valid) {
@@ -86,7 +88,11 @@ class VRvfiBlock extends Module {
   }
   when (io.ovi_completed.valid) {
     rdBuf(io.ovi_completed.sb_id).rd := io.ovi_completed.dest_reg
+    rdBuf(io.ovi_completed.sb_id).vxsat := io.ovi_completed.vxsat
+    rdBuf(io.ovi_completed.sb_id).fflags := io.ovi_completed.fflags
   } 
   io.rvfi.rd_addr := rdBuf(io.rvfi.sb_id).rdAddr
   io.rvfi.rd_wdata := rdBuf(io.rvfi.sb_id).rd
+  io.rvfi.vxsat := rdBuf(io.rvfi.sb_id).vxsat
+  io.rvfi.fflags := rdBuf(io.rvfi.sb_id).fflags
 }

@@ -272,4 +272,6 @@ class VRvfi extends Bundle {
   val vd_wdata = UInt((VLEN*8).W)
   val rd_addr = UInt(5.W)
   val rd_wdata = UInt(xLen.W)
+  val fflags = UInt(5.W)
+  val vxsat = Bool()
 }
