@@ -195,7 +195,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     val v_ext_out = ctrl.alu && ctrl.funct3 === "b010".U && ctrl.funct6 === "b010010".U 
   
     val isfloat = !ctrl.isLdst && ctrl.funct3 === "b101".U
-    val vGatherEi16 = ctrl.perm && ctrl.funct6 === "b001110".U
+    val vGatherEi16 = ctrl.perm && ctrl.funct6 === "b001110".U && ctrl.funct3 === "b000".U
     val vGatherEi16EEW8  = vGatherEi16 && eewEmulInfo1.veewVd === "b000".U
     val vGatherEi16EEW16 = vGatherEi16 && eewEmulInfo1.veewVd === "b001".U
     val vGatherEi16EEW32 = vGatherEi16 && eewEmulInfo1.veewVd === "b010".U
