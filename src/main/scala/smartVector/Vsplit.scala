@@ -255,7 +255,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     when (ldst && ldstCtrl.indexed){
       val lsrc1_inc_tmp = Mux(idxVs2Inc, (idx % indexExpdLen) >> indexIncBase, (idx % indexExpdLen))
       lsrc1_inc := lsrc1_inc_tmp
-    }.elsewhen(ctrl.widen || v_ext_out && ctrl.lsrc(0)(2,1) === 3.U) {
+    }.elsewhen(ctrl.widen && !ctrl.redu || v_ext_out && ctrl.lsrc(0)(2,1) === 3.U) {
       lsrc1_inc := idx >> 1
     }.elsewhen (v_ext_out && ctrl.lsrc(0)(2,1) === 2.U) {
       lsrc1_inc := idx >> 2
