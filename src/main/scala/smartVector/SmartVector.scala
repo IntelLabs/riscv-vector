@@ -32,6 +32,7 @@ class ScoreboardReadIO extends Bundle {
     val readAddr1      = Input(UInt(log2Ceil(NVPhyRegs).W))
     val readAddr2      = Input(UInt(log2Ceil(NVPhyRegs).W))
     val readAddr3      = Input(UInt(log2Ceil(NVPhyRegs).W))
+    val readMaskAddr   = Input(UInt(log2Ceil(NVPhyRegs).W))
     val readNum1       = Input(UInt(3.W))
     val readNum2       = Input(UInt(3.W))
     val readBypassed1  = Output(Bool())
@@ -40,6 +41,7 @@ class ScoreboardReadIO extends Bundle {
     val readBypassed2N = Output(Bool())
     val readBypassed3  = Output(Bool())
     val readBypassed3N = Output(Bool())
+    val readBypassed4  = Output(Bool())
 }
 
 class CommitInfo extends Bundle{
@@ -144,6 +146,7 @@ class SmartVector extends Module {
     split.io.scoreBoardReadIO.readBypassed1 := sboard.readBypassed(split.io.scoreBoardReadIO.readAddr1)
     split.io.scoreBoardReadIO.readBypassed2 := sboard.readBypassed(split.io.scoreBoardReadIO.readAddr2)
     split.io.scoreBoardReadIO.readBypassed3 := sboard.readBypassed(split.io.scoreBoardReadIO.readAddr3)
+    split.io.scoreBoardReadIO.readBypassed4 := sboard.readBypassed(split.io.scoreBoardReadIO.readMaskAddr)
     split.io.scoreBoardReadIO.readBypassed1N := sboard.readBypassedN(split.io.scoreBoardReadIO.readNum1, split.io.scoreBoardReadIO.readAddr1)
     split.io.scoreBoardReadIO.readBypassed2N := sboard.readBypassedN(split.io.scoreBoardReadIO.readNum2, split.io.scoreBoardReadIO.readAddr2)
     split.io.scoreBoardReadIO.readBypassed3N := sboard.readBypassedN(1.U, split.io.scoreBoardReadIO.readAddr3)

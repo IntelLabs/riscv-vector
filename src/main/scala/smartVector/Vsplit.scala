@@ -313,18 +313,20 @@ class Vsplit(implicit p : Parameters) extends Module {
     val vs1ReadEn  = ctrl.lsrcVal(0)
     val vs2ReadEn  = ctrl.lsrcVal(1)
     val vs3ReadEn  = ctrl.lsrcVal(2)
+    val maskReadEn = ~ctrl.vm
     val vs1Idx     = ctrl.lsrc(0) + lsrc0_inc
     val vs2Idx     = ctrl.lsrc(1) + lsrc1_inc
     val vs3Idx     = ctrl.ldest + ldest_inc
     val needStall  = Wire(Bool())
-    val hasRegConf = Wire(Vec(3,Bool()))
+    val hasRegConf = Wire(Vec(4,Bool()))
     val expdLen    = Wire(UInt(4.W))
     
-    io.scoreBoardReadIO.readAddr1 := vs1Idx
-    io.scoreBoardReadIO.readAddr2 := vs2Idx
-    io.scoreBoardReadIO.readAddr3 := vs3Idx
-    io.scoreBoardReadIO.readNum1  := emulVs1
-    io.scoreBoardReadIO.readNum2  := emulVs2 
+    io.scoreBoardReadIO.readAddr1    := vs1Idx
+    io.scoreBoardReadIO.readAddr2    := vs2Idx
+    io.scoreBoardReadIO.readAddr3    := vs3Idx
+    io.scoreBoardReadIO.readMaskAddr := 0.U
+    io.scoreBoardReadIO.readNum1     := emulVs1
+    io.scoreBoardReadIO.readNum2     := emulVs2 
 
     when(!vs1ReadEn){
         hasRegConf(0) := false.B
@@ -356,8 +358,17 @@ class Vsplit(implicit p : Parameters) extends Module {
         hasRegConf(2) := true.B
     }
 
+    when(!maskReadEn){
+        hasRegConf(3) := false.B
+    }.elsewhen (~io.scoreBoardReadIO.readBypassed4){
+        hasRegConf(3) := false.B
+    }.otherwise{
+        hasRegConf(3) := true.B
+    }
+
     val narrowTo1NoStall = ctrl.narrow_to_1 && ctrl.fp 
-    needStall := hasRegConf(0) || hasRegConf(1) || io.lsuStallSplit || io.iexNeedStall && ~narrowTo1NoStall ||
+    needStall := hasRegConf(0) || hasRegConf(1) || hasRegConf(2) || hasRegConf(3) || 
+                 io.lsuStallSplit || io.iexNeedStall && ~narrowTo1NoStall ||
                  ctrl.illegal || io.vLSUXcpt.exception_vld
          
     io.out.mUop.bits.uop.uopIdx   := Mux(ldst && ldstCtrl.segment, idx  % indexExpdLen, idx)
