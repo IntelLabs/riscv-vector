@@ -151,7 +151,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   val fixCycleValid = SValu.io.out.valid || SVMac.io.out.valid || SVMask.io.out.valid || SVReduc.io.out.valid
   
   when(fixCycleValid){
-    io.out.bits.fflags := false.B
+    io.out.bits.fflags := 0.U
     io.out.bits.vd     := fixCycleResult.vd
     io.out.bits.vxsat  := fixCycleResult.vxsat
   }.elsewhen(SVDiv.io.out.valid){
@@ -163,7 +163,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
     io.out.bits.vd     := SVFpu.io.out.bits.vd
     io.out.bits.vxsat  := false.B
   }otherwise{
-    io.out.bits.fflags := false.B
+    io.out.bits.fflags := 0.U
     io.out.bits.vd     := 0.U
     io.out.bits.vxsat  := false.B
   }

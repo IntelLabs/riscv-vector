@@ -48,6 +48,7 @@ class CommitInfo extends Bundle{
     val scalarRegWriteEn = Bool()
     val floatRegWriteEn = Bool()
     val ldest = UInt(5.W)
+    val fflags = UInt(5.W)
     val data = UInt(64.W)
     val vxsat = Bool()
 }

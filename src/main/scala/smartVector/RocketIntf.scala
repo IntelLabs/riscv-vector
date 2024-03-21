@@ -80,6 +80,7 @@ class RVUCommit extends Bundle {
     val update_vl_data         = Output(UInt(5.W))
     val xcpt_cause             = Output(new HellaCacheExceptions)
     val vxsat                  = Output(Bool())
+    val fflags                 = Output(UInt(5.W))
 }
 
 class RVUExtra extends Bundle {

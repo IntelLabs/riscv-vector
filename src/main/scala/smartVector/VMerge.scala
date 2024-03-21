@@ -109,6 +109,7 @@ class VMerge (implicit p : Parameters) extends Module {
         io.out.commitInfo.bits.data             := io.in.aluIn.bits.vd
         io.out.commitInfo.bits.vxsat            := vxsatBufferIn
         vxsatBuffer                             := false.B
+        io.out.commitInfo.bits.fflags           := io.in.aluIn.bits.fflags
     }.elsewhen(io.in.lsuIn.valid && io.in.lsuIn.bits.muopEnd){
         io.out.commitInfo.valid := true.B
         io.out.commitInfo.bits.scalarRegWriteEn := false.B
@@ -116,6 +117,7 @@ class VMerge (implicit p : Parameters) extends Module {
         io.out.commitInfo.bits.ldest            := DontCare
         io.out.commitInfo.bits.data             := io.in.lsuIn.bits.data
         io.out.commitInfo.bits.vxsat            := false.B
+        io.out.commitInfo.bits.fflags           := 0.U
     }otherwise{
         io.out.commitInfo.valid := false.B
         io.out.commitInfo.bits := 0.U.asTypeOf(new CommitInfo)
