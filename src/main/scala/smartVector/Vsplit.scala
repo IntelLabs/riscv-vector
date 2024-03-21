@@ -275,7 +275,7 @@ class Vsplit(implicit p : Parameters) extends Module {
       ldest_inc := Mux(idxVdInc, idx >> indexIncBase, idx)
     }.elsewhen(ctrl.narrow) {
       ldest_inc := idx >> 1
-    }.elsewhen (ctrl.redu  || floatRed|| ctrl.narrow_to_1) {
+    }.elsewhen (ctrl.redu  || floatRed || ctrl.narrow_to_1 || vmaskExcp) {
       ldest_inc := 0.U
     }.otherwise {
       ldest_inc := idx
@@ -356,7 +356,7 @@ class Vsplit(implicit p : Parameters) extends Module {
         hasRegConf(2) := true.B
     }
 
-    val narrowTo1NoStall = ctrl.narrow_to_1 && ctrl.mask 
+    val narrowTo1NoStall = ctrl.narrow_to_1 && ctrl.fp 
     needStall := hasRegConf(0) || hasRegConf(1) || io.lsuStallSplit || io.iexNeedStall && ~narrowTo1NoStall ||
                  ctrl.illegal || io.vLSUXcpt.exception_vld
          
