@@ -36,7 +36,7 @@ trait VLsuBehavior_ld_mata {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vle8.copy(vl=8, uopIdx=0, uopEnd=true), ldReqSrc_default, "hffffffffffffffff0123456789abcdef".U),
+                (vle8.copy(vl=8, uopIdx=0, uopEnd=true, ma=true, ta=true), ldReqSrc_default, "hffffffffffffffff0123456789abcdef".U),
             )
 
             for ((c, s, r) <- ldReqs) {
@@ -65,8 +65,8 @@ trait VLsuBehavior_ld_mata {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vle8.copy(vl=19, uopIdx=0, uopEnd=false), ldReqSrc_default, "hffffffffffffffff0123456789abcdef".U),
-                (vle8.copy(vl=19, uopIdx=1, uopEnd=true),  ldReqSrc_default, "hffffffffffffffffffffffffff0f0f0f".U),
+                (vle8.copy(vl=19, uopIdx=0, uopEnd=false, ma=true, ta=true), ldReqSrc_default, "hffffffffffffffff0123456789abcdef".U),
+                (vle8.copy(vl=19, uopIdx=1, uopEnd=true, ma=true, ta=true),  ldReqSrc_default, "hffffffffffffffffffffffffff0f0f0f".U),
             )
             
             for ((c, s, r) <- ldReqs) {
@@ -96,10 +96,10 @@ trait VLsuBehavior_ld_mata {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vle16.copy(vl=27, uopIdx=0, uopEnd=false), ldReqSrc_default, "hffffffffffffffff0123456789abcdef".U),
-                (vle16.copy(vl=27, uopIdx=1, uopEnd=false), ldReqSrc_default, "hfedcba98765432100f0f0f0f0f0f0f0f".U),
-                (vle16.copy(vl=27, uopIdx=2, uopEnd=false), ldReqSrc_default, "h01010101010101011234567890123456".U),
-                (vle16.copy(vl=27, uopIdx=3, uopEnd=true),  ldReqSrc_default, "hffffffffffffffffffff678901234567".U),
+                (vle16.copy(vl=27, uopIdx=0, uopEnd=false, ma=true, ta=true), ldReqSrc_default, "hffffffffffffffff0123456789abcdef".U),
+                (vle16.copy(vl=27, uopIdx=1, uopEnd=false, ma=true, ta=true), ldReqSrc_default, "hfedcba98765432100f0f0f0f0f0f0f0f".U),
+                (vle16.copy(vl=27, uopIdx=2, uopEnd=false, ma=true, ta=true), ldReqSrc_default, "h01010101010101011234567890123456".U),
+                (vle16.copy(vl=27, uopIdx=3, uopEnd=true, ma=true, ta=true),  ldReqSrc_default, "hffffffffffffffffffff678901234567".U),
             )
             
             for ((c, s, r) <- ldReqs) {
@@ -128,9 +128,9 @@ trait VLsuBehavior_ld_mata {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vle32.copy(vl=10, uopIdx=0, uopEnd=false), ldReqSrc_default, "hffffffffffffffff0123456789abcdef".U),
-                (vle32.copy(vl=10, uopIdx=1, uopEnd=false), ldReqSrc_default, "hfedcba98765432100f0f0f0f0f0f0f0f".U),
-                (vle32.copy(vl=10, uopIdx=2, uopEnd=true),  ldReqSrc_default, "hffffffffffffffff1234567890123456".U),
+                (vle32.copy(vl=10, uopIdx=0, uopEnd=false, ma=true, ta=true), ldReqSrc_default, "hffffffffffffffff0123456789abcdef".U),
+                (vle32.copy(vl=10, uopIdx=1, uopEnd=false, ma=true, ta=true), ldReqSrc_default, "hfedcba98765432100f0f0f0f0f0f0f0f".U),
+                (vle32.copy(vl=10, uopIdx=2, uopEnd=true, ma=true, ta=true),  ldReqSrc_default, "hffffffffffffffff1234567890123456".U),
             )
             
             for ((c, s, r) <- ldReqs) {
@@ -158,8 +158,8 @@ trait VLsuBehavior_ld_mata {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut => 
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vle64.copy(vl=3, uopIdx=0, uopEnd=false), ldReqSrc_default, "hffffffffffffffff0123456789abcdef".U),
-                (vle64.copy(vl=3, uopIdx=1, uopEnd=true),  ldReqSrc_default, "hffffffffffffffff0f0f0f0f0f0f0f0f".U),
+                (vle64.copy(vl=3, uopIdx=0, uopEnd=false, ma=true, ta=true), ldReqSrc_default, "hffffffffffffffff0123456789abcdef".U),
+                (vle64.copy(vl=3, uopIdx=1, uopEnd=true, ma=true, ta=true),  ldReqSrc_default, "hffffffffffffffff0f0f0f0f0f0f0f0f".U),
             )
 
             for ((c, s, r) <- ldReqs) {
@@ -187,8 +187,8 @@ trait VLsuBehavior_ld_mata {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vle64.copy(vl=3, vstart=1, uopIdx=0, uopEnd=false), ldReqSrc_default, "hffffffffffffffffffffffffffffffff".U),
-                (vle64.copy(vl=3, vstart=1, uopIdx=1, uopEnd=true),  ldReqSrc_default, "hffffffffffffffff0f0f0f0f0f0f0f0f".U),
+                (vle64.copy(vl=3, vstart=1, uopIdx=0, uopEnd=false, ma=true, ta=true), ldReqSrc_default, "hffffffffffffffffffffffffffffffff".U),
+                (vle64.copy(vl=3, vstart=1, uopIdx=1, uopEnd=true, ma=true, ta=true),  ldReqSrc_default, "hffffffffffffffff0f0f0f0f0f0f0f0f".U),
             )
 
             for ((c, s, r) <- ldReqs) {
@@ -216,7 +216,7 @@ trait VLsuBehavior_ld_mata {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vlm.copy(vl=27, uopIdx=0, uopEnd=true), ldReqSrc_default, "hffffffffffffffffffffffff89abcdef".U),
+                (vlm.copy(vl=27, uopIdx=0, uopEnd=true, ma=true, ta=true), ldReqSrc_default, "hffffffffffffffffffffffff89abcdef".U),
             )
             
 
@@ -246,7 +246,7 @@ trait VLsuBehavior_ld_mata {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vle8ff.copy(vl=19, uopIdx=0, uopEnd=false, vstart=1), SrcBundleLd(scalar_opnd_1="h1058"), "hffffffffffffffff55555555555555ff".U),
+                (vle8ff.copy(vl=19, uopIdx=0, uopEnd=false, vstart=1, ma=true, ta=true), SrcBundleLd(scalar_opnd_1="h1058"), "h201f1e1d1c1b1a195555555555555511".U),
             )
 
             for ((c, s, r) <- ldReqs) {
@@ -278,7 +278,7 @@ trait VLsuBehavior_ld_mata {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vle16ff.copy(vl=4, uopIdx=0, uopEnd=true, vstart=0), SrcBundleLd(scalar_opnd_1="h1060"), "hffffffffffffffffffffffffffffffff".U),
+                (vle16ff.copy(vl=4, uopIdx=0, uopEnd=true, vstart=0, ma=true, ta=true), SrcBundleLd(scalar_opnd_1="h1060"), "h201f1e1d1c1b1a191817161514131211".U),
             )
 
             for ((c, s, r) <- ldReqs) {
@@ -310,7 +310,7 @@ trait VLsuBehavior_ld_mata {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vle32ff.copy(vl=7, uopIdx=0, uopEnd=false, vstart=0), SrcBundleLd(scalar_opnd_1="h105c"), "hffffffffffffffffffffffff55555555".U),
+                (vle32ff.copy(vl=7, uopIdx=0, uopEnd=false, vstart=0, ma=true, ta=true), SrcBundleLd(scalar_opnd_1="h105c"), "h201f1e1d1c1b1a191817161555555555".U),
             )
             
             for ((c, s, r) <- ldReqs) {
@@ -342,8 +342,8 @@ trait VLsuBehavior_ld_mata {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vle64ff.copy(vl=3, uopIdx=0, uopEnd=false, vstart=0), SrcBundleLd(scalar_opnd_1="h1050"), "h55555555555555554444444444444444".U),
-                (vle64ff.copy(vl=3, uopIdx=1, uopEnd=true,  vstart=0), SrcBundleLd(scalar_opnd_1="h1050"), "hffffffffffffffffffffffffffffffff".U),
+                (vle64ff.copy(vl=3, uopIdx=0, uopEnd=false, vstart=0, ma=true, ta=true), SrcBundleLd(scalar_opnd_1="h1050"), "h55555555555555554444444444444444".U),
+                (vle64ff.copy(vl=3, uopIdx=1, uopEnd=true,  vstart=0, ma=true, ta=true), SrcBundleLd(scalar_opnd_1="h1050"), "h201f1e1d1c1b1a191817161514131211".U),
             )
 
             // req0
@@ -387,7 +387,7 @@ trait VLsuBehavior_ld_mata {
             val ldReqs = Seq(
                 // 1000~1001(cdef), 1008~1009(ffff), 1010~1011(0f0f), 1018~1019(3210)
                 // 1020~1021(3456), 1028~1029(0101), 1030~1031(4567), 1038~1039(1111)
-                (vlse8.copy(vl=6, uopIdx=0, uopEnd=true), SrcBundleLd(scalar_opnd_2="hffffffff_fffffffb"), "hffffffffffffffffffff20103478eeef".U),
+                (vlse8.copy(vl=6, uopIdx=0, uopEnd=true, ma=true, ta=true), SrcBundleLd(scalar_opnd_2="hffffffff_fffffffb"), "hffffffffffffffffffff20103478eeef".U),
                 // (vlse8.copy(vl=10, uopIdx=1, uopEnd=true),  SrcBundleLd(scalar_opnd_2="h4"), "h201f1e1d1c1b1a191817161533332222".U),
             )
             
@@ -416,8 +416,8 @@ trait VLsuBehavior_ld_mata {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut => 
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vlse32.copy(vl=3, uopIdx=0, uopEnd=true), SrcBundleLd(scalar_opnd_2="hffffffff_ffffffff"), "hffffffffffffffffffffffff89abcdef".U),
-                (vlse32.copy(vl=3, uopIdx=0, uopEnd=true), SrcBundleLd(scalar_opnd_2="hffffffff_ffffffff"), "hffffffffffffffffffffffff89abcdef".U),
+                (vlse32.copy(vl=3, uopIdx=0, uopEnd=true, ma=true, ta=true), SrcBundleLd(scalar_opnd_2="hffffffff_ffffffff"), "h201f1e1d1c1b1a191817161589abcdef".U),
+                (vlse32.copy(vl=3, uopIdx=0, uopEnd=true, ma=true, ta=true), SrcBundleLd(scalar_opnd_2="hffffffff_ffffffff"), "h201f1e1d1c1b1a191817161589abcdef".U),
             )
             
             for ((c, s, r) <- ldReqs) {
@@ -451,8 +451,8 @@ trait VLsuBehavior_ld_mata {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut => 
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vlse16.copy(vl=10, uopIdx=0, uopEnd=false), SrcBundleLd(scalar_opnd_2="h4"), "hba9832100f0f0f0fffffffff4567cdef".U),
-                (vlse16.copy(vl=10, uopIdx=1, uopEnd=true),  SrcBundleLd(scalar_opnd_2="h4"), "hffffffffffffffffffffffff56783456".U),
+                (vlse16.copy(vl=10, uopIdx=0, uopEnd=false, ma=true, ta=true), SrcBundleLd(scalar_opnd_2="h4"), "hba9832100f0f0f0fffffffff4567cdef".U),
+                (vlse16.copy(vl=10, uopIdx=1, uopEnd=true, ma=true, ta=true),  SrcBundleLd(scalar_opnd_2="h4"), "hffffffffffffffffffffffff56783456".U),
             )
 
 
@@ -481,8 +481,8 @@ trait VLsuBehavior_ld_mata {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut => 
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vlse16.copy(vl=10, uopIdx=0, uopEnd=false), SrcBundleLd(scalar_opnd_2="h0"), "hcdefcdefcdefcdefcdefcdefcdefcdef".U),
-                (vlse16.copy(vl=10, uopIdx=1, uopEnd=true),  SrcBundleLd(scalar_opnd_2="h0"), "hffffffffffffffffffffffffcdefcdef".U),
+                (vlse16.copy(vl=10, uopIdx=0, uopEnd=false, ma=true, ta=true), SrcBundleLd(scalar_opnd_2="h0"), "hcdefcdefcdefcdefcdefcdefcdefcdef".U),
+                (vlse16.copy(vl=10, uopIdx=1, uopEnd=true, ma=true, ta=true),  SrcBundleLd(scalar_opnd_2="h0"), "hffffffffffffffffffffffffcdefcdef".U),
             )
 
 
@@ -511,8 +511,8 @@ trait VLsuBehavior_ld_mata {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut => 
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vlse16.copy(vl=10, uopIdx=0, uopEnd=false), SrcBundleLd(scalar_opnd_2="hffffffff_fffffffc"), "h20201010101034899012eeeeeeeecdef".U),
-                (vlse16.copy(vl=10, uopIdx=1, uopEnd=true),  SrcBundleLd(scalar_opnd_2="hffffffff_fffffffc"), "hffffffffffffffffffffffff30302020".U),
+                (vlse16.copy(vl=10, uopIdx=0, uopEnd=false, ma=true, ta=true), SrcBundleLd(scalar_opnd_2="hffffffff_fffffffc"), "h20201010101034899012eeeeeeeecdef".U),
+                (vlse16.copy(vl=10, uopIdx=1, uopEnd=true, ma=true, ta=true),  SrcBundleLd(scalar_opnd_2="hffffffff_fffffffc"), "hffffffffffffffffffffffff30302020".U),
             )
 
 
@@ -543,8 +543,8 @@ trait VLsuBehavior_ld_mata {
             val ldReqs = Seq(
                 // 1000~1001(cdef), 1008~1009(ffff), 1010~1011(0f0f), 1018~1019(3210)
                 // 1020~1021(3456), 1028~1029(0101), 1030~1031(4567), 1038~1039(1111)
-                (vlse16.copy(vm=false, vl=10, uopIdx=0, uopEnd=false), SrcBundleLd(scalar_opnd_2="h8", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fefe"), "h111145670101345632100f0fffffffff".U),
-                (vlse16.copy(vm=false, vl=10, uopIdx=1, uopEnd=true),  SrcBundleLd(scalar_opnd_2="h8", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fefe"), "hffffffffffffffffffffffff3333ffff".U),
+                (vlse16.copy(vm=false, vl=10, uopIdx=0, uopEnd=false, ma=true, ta=true), SrcBundleLd(scalar_opnd_2="h8", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fefe"), "h111145670101345632100f0fffffffff".U),
+                (vlse16.copy(vm=false, vl=10, uopIdx=1, uopEnd=true, ma=true, ta=true),  SrcBundleLd(scalar_opnd_2="h8", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fefe"), "hffffffffffffffffffffffff3333ffff".U),
             )
 
             for ((c, s, r) <- ldReqs) {
@@ -573,8 +573,8 @@ trait VLsuBehavior_ld_mata {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut => 
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vle8.copy(vl=19, uopIdx=0, uopEnd=false, vstart=1), SrcBundleLd(scalar_opnd_1="h1058"), "hffffffffffffffff55555555555555ff".U),
-                (vle8.copy(vl=8, uopIdx=0, uopEnd=true), ldReqSrc_default, "hffffffffffffffff0123456789abcdef".U),
+                (vle8.copy(vl=19, uopIdx=0, uopEnd=false, vstart=1, ma=true, ta=true), SrcBundleLd(scalar_opnd_1="h1058"), "h201f1e1d1c1b1a195555555555555511".U),
+                (vle8.copy(vl=8, uopIdx=0, uopEnd=true, ma=true, ta=true), ldReqSrc_default, "hffffffffffffffff0123456789abcdef".U),
             )
 
             for ((c, s, r) <- ldReqs) {
@@ -593,8 +593,8 @@ trait VLsuBehavior_ld_mata {
                 // dut.clock.step(100)
                 if(dut.io.xcpt.update_vl.peekBoolean()) {
                     dut.io.xcpt.update_vl.expect(true.B)
+                    dut.io.xcpt.update_data.expect(8.U)
                 } 
-                dut.io.xcpt.update_data.expect(8.U)
                 dut.io.lsuOut.bits.data.expect(r)
                 dut.clock.step(4)
             }
@@ -607,8 +607,8 @@ trait VLsuBehavior_ld_mata {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut => 
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vl2re16.copy(vl=19, uopIdx=0, uopEnd=false, vstart=1), ldReqSrc_default, "hffffffffffffffff0123456789abffff".U),
-                (vl2re16.copy(vl=8, uopIdx=1, uopEnd=true), ldReqSrc_default, "hfedcba98765432100f0f0f0f0f0f0f0f".U),
+                (vl2re16.copy(vl=19, uopIdx=0, uopEnd=false, vstart=1, ma=true, ta=true), ldReqSrc_default, "hffffffffffffffff0123456789abffff".U),
+                (vl2re16.copy(vl=8, uopIdx=1, uopEnd=true, ma=true, ta=true), ldReqSrc_default, "hfedcba98765432100f0f0f0f0f0f0f0f".U),
             )
 
              for ((c, s, r) <- ldReqs) {
@@ -637,8 +637,8 @@ trait VLsuBehavior_ld_mata {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vle8.copy(vl=19, uopIdx=0, uopEnd=false, vstart=20), ldReqSrc_default, "h201f1e1d1c1b1a191817161514131211".U),
-                (vle8.copy(vl=19, uopIdx=1, uopEnd=true,  vstart=20), ldReqSrc_default, "h201f1e1d1c1b1a191817161514131211".U),
+                (vle8.copy(vl=19, uopIdx=0, uopEnd=false, vstart=20, ma=true, ta=true), ldReqSrc_default, "h201f1e1d1c1b1a191817161514131211".U),
+                (vle8.copy(vl=19, uopIdx=1, uopEnd=true,  vstart=20, ma=true, ta=true), ldReqSrc_default, "h201f1e1d1c1b1a191817161514131211".U),
             )
             
             for ((c, s, r) <- ldReqs) {

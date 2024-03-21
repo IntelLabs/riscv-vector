@@ -26,7 +26,7 @@ class LdstIO(implicit p: Parameters) extends ParameterizedBundle()(p) {
 }
 
 object VRegSegmentStatus {
-  val invalid :: srcData :: needLdst :: notReady :: ready :: xcpt :: Nil = Enum(6)
+  val invalid :: srcData :: agnostic :: needLdst :: notReady :: ready :: xcpt :: Nil = Enum(7)
 }
 
 object Mop {
@@ -117,6 +117,9 @@ class LSULdstCtrl extends Bundle {
     val ldstType        = UInt(4.W)
     val unitSMop        = UInt(5.W)
 
+    val ma              = Bool()
+    val ta              = Bool()
+
     val vm              = Bool()
     val memwb           = UInt(4.W)
     val eewb            = UInt(4.W)
@@ -143,6 +146,9 @@ object LSULdstDecoder {
 
         ctrl.isLoad   := mUop.uop.ctrl.load
         ctrl.isStore  := mUop.uop.ctrl.store
+
+        ctrl.ma       := mUop.uop.info.ma
+        ctrl.ta       := mUop.uop.info.ta
 
         ctrl.ldstType := MuxLookup(funct6(1, 0), Mop.unit_stride, Seq(
             "b00".U -> Mop.unit_stride,     "b01".U -> Mop.index_unodered,
@@ -304,7 +310,10 @@ class SVlsu(implicit p: Parameters) extends Module {
                 (0 until vlenb).foreach { i => 
                     val pos = i.U >> ldstCtrl.log2Memwb
                     vregInfo(i).data   := io.mUop.bits.uopRegInfo.old_vd(8 * i + 7, 8 * i)
-                    vregInfo(i).status := Mux(pos < memVl, VRegSegmentStatus.needLdst, VRegSegmentStatus.srcData)
+                    vregInfo(i).status := Mux(pos < memVl, 
+                        VRegSegmentStatus.needLdst, 
+                        Mux(io.mUop.bits.uop.info.ta, VRegSegmentStatus.agnostic, VRegSegmentStatus.srcData)
+                    )
                 }
             }
         }
@@ -408,7 +417,7 @@ class SVlsu(implicit p: Parameters) extends Module {
             val maskCond = elemMaskVec(i) && !addrMisalign
 
             when(curElemPos >= startElemPos && curElemPos < endElemPos) {
-                vregInfo(i).status  := Mux(maskCond, VRegSegmentStatus.notReady, VRegSegmentStatus.srcData)
+                vregInfo(i).status  := Mux(maskCond, VRegSegmentStatus.notReady, Mux(ldstCtrlReg.ma && !addrMisalign, VRegSegmentStatus.agnostic, VRegSegmentStatus.srcData))
                 vregInfo(i).idx     := Mux(maskCond, ldstEnqPtr, vregInfo(i).idx)
 
                 val elemInnerOffset = offset + (i.U - (curElemPos << ldstCtrlReg.log2Memwb)) // which byte inside the element
@@ -495,7 +504,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     val ldstMinXcptIdx  = PriorityEncoder(ldstUopQueue.map(uop => uop.valid & (uop.xcpt =/= 0.U)))
 
     when(memXcpt && ldstUopQueue(respLdstPtr).valid && respLdstPtr < lastXcptIdx) { // exception handling
-        // 2. update xcpt info
+        // update xcpt info
         ldstUopQueue(respLdstPtr).xcpt := LdstUopXcptCause.mem_xcpt
         lastXcptIdx  := respLdstPtr
         lastXcptInfo := io.dataExchange.xcpt
@@ -517,6 +526,12 @@ class SVlsu(implicit p: Parameters) extends Module {
         // 2. update xcpt info
         xcptVlReg       := ldstUopQueue(ldstMinValidIdx).pos
 
+        (0 until vlenb).foreach { i =>
+            when(vregInfo(i).idx >= ldstMinXcptIdx) {
+                vregInfo(i).status := VRegSegmentStatus.xcpt
+            } 
+        }
+
         hellaXcptReg    := Mux(ldstUopQueue(ldstMinValidIdx).xcpt === LdstUopXcptCause.misalign, misalignXcpt, lastXcptInfo)
         hasXcpt         := true.B
     }
@@ -528,8 +543,10 @@ class SVlsu(implicit p: Parameters) extends Module {
     /*****************************writeback to uopQueue*************************/
     val vregWbReady = WireInit(false.B)
 
-    val allSrcData = vregInfo.forall(info => info.status === VRegSegmentStatus.srcData)
-    val allReadyOrSrcData = vregInfo.forall(info => info.status === VRegSegmentStatus.ready || info.status === VRegSegmentStatus.srcData)
+    val allSrcData = vregInfo.forall(info => info.status === VRegSegmentStatus.srcData || info.status === VRegSegmentStatus.agnostic)
+    val allReadyOrSrcData = vregInfo.forall(info => info.status === VRegSegmentStatus.ready 
+                                         || info.status === VRegSegmentStatus.srcData 
+                                         || info.status === VRegSegmentStatus.agnostic)
 
     when(splitCount === 0.U && allSrcData) {
         vregWbReady := RegNext(splitCount === 0.U && allSrcData) // RegNext for scoreboard clear & write contradiction
@@ -545,10 +562,10 @@ class SVlsu(implicit p: Parameters) extends Module {
         io.lsuOut.bits.rfWriteEn    := mUopInfoReg.rfWriteEn
         io.lsuOut.bits.rfWriteIdx   := mUopInfoReg.ldest
 
-        io.lsuOut.bits.data         := Mux(ldstCtrlReg.isLoad, 
-            Mux(mata && !vstartGeVl, 
-                Cat(vregInfo.reverseMap(
-                    entry => Mux(entry.status === VRegSegmentStatus.ready, entry.data, "hff".U(8.W)))),
+
+        io.lsuOut.bits.data         := Mux(ldstCtrlReg.isLoad,
+            Mux(!vstartGeVl,
+                Cat(vregInfo.reverseMap(entry => Mux(entry.status === VRegSegmentStatus.agnostic, "hff".U(8.W), entry.data))),
                 Cat(vregInfo.reverseMap(entry => entry.data))// Concatenate data from all vregInfo elements)
             ),
             DontCare

@@ -39,8 +39,8 @@ trait VLsuBehavior_ld_seg_mata {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vlseg2e8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1, segIdx=0), ldReqSrc_default, "hdc9854100f0f0f0fffffffff2367abef".U),
-                (vlseg2e8.copy(vl=16, uopIdx=0, uopEnd=true , vsew=1, segIdx=1), ldReqSrc_default, "hfeba76320f0f0f0fffffffff014589cd".U),
+                (vlseg2e8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1, segIdx=0, ma=true, ta=true), ldReqSrc_default, "hdc9854100f0f0f0fffffffff2367abef".U),
+                (vlseg2e8.copy(vl=16, uopIdx=0, uopEnd=true , vsew=1, segIdx=1, ma=true, ta=true), ldReqSrc_default, "hfeba76320f0f0f0fffffffff014589cd".U),
             )
 
             for ((c, s, r) <- ldReqs) {
@@ -69,9 +69,9 @@ trait VLsuBehavior_ld_seg_mata {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vlseg3e8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1, segIdx=0), ldReqSrc_default, "h0101127834dc76100f0fffffff2389ef".U),
-                (vlseg3e8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1, segIdx=1), ldReqSrc_default, "h0101015612fe98320f0f0fffff0167cd".U),
-                (vlseg3e8.copy(vl=16, uopIdx=0, uopEnd=true,  vsew=1, segIdx=2), ldReqSrc_default, "h010101349056ba540f0f0fffffff45ab".U),
+                (vlseg3e8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1, segIdx=0, ma=true, ta=true), ldReqSrc_default, "h0101127834dc76100f0fffffff2389ef".U),
+                (vlseg3e8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1, segIdx=1, ma=true, ta=true), ldReqSrc_default, "h0101015612fe98320f0f0fffff0167cd".U),
+                (vlseg3e8.copy(vl=16, uopIdx=0, uopEnd=true,  vsew=1, segIdx=2, ma=true, ta=true), ldReqSrc_default, "h010101349056ba540f0f0fffffff45ab".U),
             )
 
             for ((c, s, r) <- ldReqs) {
@@ -100,9 +100,9 @@ trait VLsuBehavior_ld_seg_mata {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vlseg3e16.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1, segIdx=0), ldReqSrc_default, "hffffffffffffffffffffffff0123cdef".U),
-                (vlseg3e16.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1, segIdx=1), ldReqSrc_default, "hffffffffffffffffffffffffffff89ab".U),
-                (vlseg3e16.copy(vl=3, uopIdx=0, uopEnd=true,  vsew=1, segIdx=2), ldReqSrc_default, "hffffffffffffffffffff0f0fffff4567".U),
+                (vlseg3e16.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1, segIdx=0, ma=true, ta=true), ldReqSrc_default, "hffffffffffffffffffffffff0123cdef".U),
+                (vlseg3e16.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1, segIdx=1, ma=true, ta=true), ldReqSrc_default, "hffffffffffffffffffffffffffff89ab".U),
+                (vlseg3e16.copy(vl=3, uopIdx=0, uopEnd=true,  vsew=1, segIdx=2, ma=true, ta=true), ldReqSrc_default, "hffffffffffffffffffff0f0fffff4567".U),
             )
 
             for ((c, s, r) <- ldReqs) {
@@ -131,10 +131,10 @@ trait VLsuBehavior_ld_seg_mata {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vlseg2e64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1, segIdx=0), ldReqSrc_default, "h0f0f0f0f0f0f0f0f0123456789abcdef".U),
-                (vlseg2e64.copy(vl=3, uopIdx=1, uopEnd=false, vsew=1, segIdx=0), ldReqSrc_default, "hffffffffffffffff1234567890123456".U),
-                (vlseg2e64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1, segIdx=1), ldReqSrc_default, "hfedcba9876543210ffffffffffffffff".U),
-                (vlseg2e64.copy(vl=3, uopIdx=1, uopEnd=true,  vsew=1, segIdx=1), ldReqSrc_default, "hffffffffffffffff0101010101010101".U),
+                (vlseg2e64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1, segIdx=0, ma=true, ta=true), ldReqSrc_default, "h0f0f0f0f0f0f0f0f0123456789abcdef".U),
+                (vlseg2e64.copy(vl=3, uopIdx=1, uopEnd=false, vsew=1, segIdx=0, ma=true, ta=true), ldReqSrc_default, "hffffffffffffffff1234567890123456".U),
+                (vlseg2e64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1, segIdx=1, ma=true, ta=true), ldReqSrc_default, "hfedcba9876543210ffffffffffffffff".U),
+                (vlseg2e64.copy(vl=3, uopIdx=1, uopEnd=true,  vsew=1, segIdx=1, ma=true, ta=true), ldReqSrc_default, "hffffffffffffffff0101010101010101".U),
             )
 
             for ((c, s, r) <- ldReqs) {
@@ -163,8 +163,8 @@ trait VLsuBehavior_ld_seg_mata {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vlsseg2e8.copy(vl=4, uopIdx=0, uopEnd=false, vsew=1, segIdx=0), SrcBundleLd(scalar_opnd_2="hffffffff_fffffffb"), "hffffffffffffffffffffffff3478eeef".U),
-                (vlsseg2e8.copy(vl=4, uopIdx=0, uopEnd=true,  vsew=1, segIdx=1), SrcBundleLd(scalar_opnd_2="hffffffff_fffffffb"), "hffffffffffffffffffffffff5056eecd".U),
+                (vlsseg2e8.copy(vl=4, uopIdx=0, uopEnd=false, vsew=1, segIdx=0, ma=true, ta=true), SrcBundleLd(scalar_opnd_2="hffffffff_fffffffb"), "hffffffffffffffffffffffff3478eeef".U),
+                (vlsseg2e8.copy(vl=4, uopIdx=0, uopEnd=true,  vsew=1, segIdx=1, ma=true, ta=true), SrcBundleLd(scalar_opnd_2="hffffffff_fffffffb"), "hffffffffffffffffffffffff5056eecd".U),
             )
 
             for ((c, s, r) <- ldReqs) {
@@ -193,9 +193,9 @@ trait VLsuBehavior_ld_seg_mata {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vlsseg3e8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1, segIdx=0), SrcBundleLd(scalar_opnd_2="hffffffff_ffffffff"), "h34503412907856eeeeeeeeeeeeeeeeef".U),
-                (vlsseg3e8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1, segIdx=1), SrcBundleLd(scalar_opnd_2="hffffffff_ffffffff"), "h503412907856eeeeeeeeeeeeeeeeefcd".U),
-                (vlsseg3e8.copy(vl=16, uopIdx=0, uopEnd=true,  vsew=1, segIdx=2), SrcBundleLd(scalar_opnd_2="hffffffff_ffffffff"), "h3412907856eeeeeeeeeeeeeeeeefcdab".U),
+                (vlsseg3e8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1, segIdx=0, ma=true, ta=true), SrcBundleLd(scalar_opnd_2="hffffffff_ffffffff"), "h34503412907856eeeeeeeeeeeeeeeeef".U),
+                (vlsseg3e8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1, segIdx=1, ma=true, ta=true), SrcBundleLd(scalar_opnd_2="hffffffff_ffffffff"), "h503412907856eeeeeeeeeeeeeeeeefcd".U),
+                (vlsseg3e8.copy(vl=16, uopIdx=0, uopEnd=true,  vsew=1, segIdx=2, ma=true, ta=true), SrcBundleLd(scalar_opnd_2="hffffffff_ffffffff"), "h3412907856eeeeeeeeeeeeeeeeefcdab".U),
             )
 
             for ((c, s, r) <- ldReqs) {
@@ -224,9 +224,9 @@ trait VLsuBehavior_ld_seg_mata {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vlsseg3e16.copy(vl=2, uopIdx=0, uopEnd=false, vsew=1, segIdx=0), SrcBundleLd(scalar_opnd_2="h04"), "hffffffffffffffffffffffff4567cdef".U),
-                (vlsseg3e16.copy(vl=2, uopIdx=0, uopEnd=false, vsew=1, segIdx=1), SrcBundleLd(scalar_opnd_2="h04"), "hffffffffffffffffffffffff012389ab".U),
-                (vlsseg3e16.copy(vl=2, uopIdx=0, uopEnd=true,  vsew=1, segIdx=2), SrcBundleLd(scalar_opnd_2="h04"), "hffffffffffffffffffffffffffff4567".U),
+                (vlsseg3e16.copy(vl=2, uopIdx=0, uopEnd=false, vsew=1, segIdx=0, ma=true, ta=true), SrcBundleLd(scalar_opnd_2="h04"), "hffffffffffffffffffffffff4567cdef".U),
+                (vlsseg3e16.copy(vl=2, uopIdx=0, uopEnd=false, vsew=1, segIdx=1, ma=true, ta=true), SrcBundleLd(scalar_opnd_2="h04"), "hffffffffffffffffffffffff012389ab".U),
+                (vlsseg3e16.copy(vl=2, uopIdx=0, uopEnd=true,  vsew=1, segIdx=2, ma=true, ta=true), SrcBundleLd(scalar_opnd_2="h04"), "hffffffffffffffffffffffffffff4567".U),
             )
 
             for ((c, s, r) <- ldReqs) {

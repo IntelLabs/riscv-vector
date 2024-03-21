@@ -17,7 +17,7 @@ import smartVector.lsutest.DataTable
 
 case class CtrlBundle(instrn: String = "h0",
                       ma: Boolean = false,
-                      ta: Boolean = true,
+                      ta: Boolean = false,
                       vsew: Int = 0,
                       vlmul: Int = 1,
                       vl: Int = 16,
@@ -100,6 +100,8 @@ class SmartVectorTestWrapper extends Module {
     smartVector.io.in.bits.vInfo.vlmul := io.rvuIssue.bits.ctrl.info_vlmul
     smartVector.io.in.bits.vInfo.vxrm := 0.U
     smartVector.io.in.bits.vInfo.frm := 0.U
+    smartVector.io.in.bits.frs1 := DontCare
+    
     
 
     io.rvuIssue.ready := smartVector.io.in.ready

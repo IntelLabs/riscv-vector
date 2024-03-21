@@ -31,7 +31,7 @@ trait VLsuBehavior_ld_idx_mata {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vluxei8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1), SrcBundleLd(vs2="h010004"), "hffffffffffffffffffffffffcdef4567".U),
+                (vluxei8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1, ma=true, ta=true), SrcBundleLd(vs2="h010004"), "h201f1e1d1c1b1a1918171615cdef4567".U),
                 // (vluxei8.copy(vl=16, uopIdx=1, uopEnd=true,  vsew=1), SrcBundleLd(vs2="h010004"), "hcdefcdefcdefcdefcdefcdefcdefcdef".U),
             )
 
@@ -65,8 +65,8 @@ trait VLsuBehavior_ld_idx_mata {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vluxei8.copy(vl=3, uopIdx=0, uopEnd=false, vsew=3), SrcBundleLd(vs2="h01000"), "h0f0f0f0f0f0f0f0f0123456789abcdef".U),
-                (vluxei8.copy(vl=3, uopIdx=1, uopEnd=true, vsew=3),  SrcBundleLd(vs2="h01000"), "hffffffffffffffff0123456789abcdef".U),
+                (vluxei8.copy(vl=3, uopIdx=0, uopEnd=false, vsew=3, ma=true, ta=true), SrcBundleLd(vs2="h01000"), "h0f0f0f0f0f0f0f0f0123456789abcdef".U),
+                (vluxei8.copy(vl=3, uopIdx=1, uopEnd=true, vsew=3, ma=true, ta=true),  SrcBundleLd(vs2="h01000"), "hffffffffffffffff0123456789abcdef".U),
             )
 
             for ((c, s, r) <- ldReqs) {
@@ -101,9 +101,9 @@ trait VLsuBehavior_ld_idx_mata {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vluxei16.copy(vl=5, uopIdx=0, uopEnd=false, vsew=3), SrcBundleLd(vs2="h000000180000001000080000"), "hffffffffffffffff0123456789abcdef".U),
-                (vluxei16.copy(vl=5, uopIdx=1, uopEnd=false, vsew=3), SrcBundleLd(vs2="h000000180000001000080000"), "h0123456789abcdef0f0f0f0f0f0f0f0f".U),
-                (vluxei16.copy(vl=5, uopIdx=2, uopEnd=true,  vsew=3), SrcBundleLd(vs2="h000000180000001000080000"), "hfffffffffffffffffedcba9876543210".U),
+                (vluxei16.copy(vl=5, uopIdx=0, uopEnd=false, vsew=3, ma=true, ta=true), SrcBundleLd(vs2="h000000180000001000080000"), "hffffffffffffffff0123456789abcdef".U),
+                (vluxei16.copy(vl=5, uopIdx=1, uopEnd=false, vsew=3, ma=true, ta=true), SrcBundleLd(vs2="h000000180000001000080000"), "h0123456789abcdef0f0f0f0f0f0f0f0f".U),
+                (vluxei16.copy(vl=5, uopIdx=2, uopEnd=true,  vsew=3, ma=true, ta=true), SrcBundleLd(vs2="h000000180000001000080000"), "hfffffffffffffffffedcba9876543210".U),
             )
 
             for ((c, s, r) <- ldReqs) {
@@ -133,8 +133,8 @@ trait VLsuBehavior_ld_idx_mata {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vluxei32.copy(vl=5, uopIdx=0, uopEnd=false, vsew=1), SrcBundleLd(vs2="h000000100000000000000008"), "h0".U),
-                (vluxei32.copy(vl=5, uopIdx=1, uopEnd=true, vsew=1),  SrcBundleLd(vs2="h08"), "hffffffffffffffffcdef0f0fcdefffff".U),
+                (vluxei32.copy(vl=5, uopIdx=0, uopEnd=false, vsew=1, ma=true, ta=true), SrcBundleLd(vs2="h000000100000000000000008"), "h0".U),
+                (vluxei32.copy(vl=5, uopIdx=1, uopEnd=true, vsew=1, ma=true, ta=true),  SrcBundleLd(vs2="h08"), "hffffffffffffffffcdef0f0fcdefffff".U),
             )
 
             while (!dut.io.lsuReady.peekBoolean()) {
@@ -168,8 +168,8 @@ trait VLsuBehavior_ld_idx_mata {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vluxei64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1), SrcBundleLd(vs2="h00010"), "h0".U),
-                (vluxei64.copy(vl=3, uopIdx=1, uopEnd=true,  vsew=1), SrcBundleLd(vs2="h00020"), "hffffffffffffffffffff3456cdef0f0f".U),
+                (vluxei64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1, ma=true, ta=true), SrcBundleLd(vs2="h00010"), "h0".U),
+                (vluxei64.copy(vl=3, uopIdx=1, uopEnd=true,  vsew=1, ma=true, ta=true), SrcBundleLd(vs2="h00020"), "hffffffffffffffffffff3456cdef0f0f".U),
             )
 
             while (!dut.io.lsuReady.peekBoolean()) {
@@ -202,8 +202,8 @@ trait VLsuBehavior_ld_idx_mata {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vluxei64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1), SrcBundleLd(vs2="hffff_ffff_ffff_fff0_ffff_ffff_ffff_fff8"), "h0".U),
-                (vluxei64.copy(vl=3, uopIdx=1, uopEnd=true,  vsew=1), SrcBundleLd(vs2="h00020"), "hffffffffffffffffffff34563489eeee".U),
+                (vluxei64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1, ma=true, ta=true), SrcBundleLd(vs2="hffff_ffff_ffff_fff0_ffff_ffff_ffff_fff8"), "h0".U),
+                (vluxei64.copy(vl=3, uopIdx=1, uopEnd=true,  vsew=1, ma=true, ta=true), SrcBundleLd(vs2="h00020"), "hffffffffffffffffffff34563489eeee".U),
             )
 
             while (!dut.io.lsuReady.peekBoolean()) {
@@ -236,8 +236,8 @@ trait VLsuBehavior_ld_idx_mata {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vluxei32.copy(vl=5, uopIdx=0, uopEnd=false, vsew=1), SrcBundleLd(vs2="h000000100000000000000008"), "h0".U),
-                (vluxei32.copy(vl=5, uopIdx=1, uopEnd=true, vsew=1),  SrcBundleLd(vs2="h60"), "hffffffffffffffffcdef0f0fcdefffff".U),
+                (vluxei32.copy(vl=5, uopIdx=0, uopEnd=false, vsew=1, ma=true, ta=true), SrcBundleLd(vs2="h000000100000000000000008"), "h0".U),
+                (vluxei32.copy(vl=5, uopIdx=1, uopEnd=true,  vsew=1, ma=true, ta=true), SrcBundleLd(vs2="h60"), "h201f1e1d1c1b1a19cdef0f0fcdefffff".U),
             )
 
             while (!dut.io.lsuReady.peekBoolean()) {

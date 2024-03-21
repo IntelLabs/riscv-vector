@@ -55,8 +55,8 @@ trait SmartVectorBehavior_ld_idx_mata {
             dut.clock.step(1)
             
             val ldReqs = Seq(
-                (ldstReqCtrl_default.copy(instrn=VLE8_V, vl=8, vlmul=1), SrcBundleLdst(rs1="h1068")),
-                (ldstReqCtrl_default.copy(instrn=VLUXEI8_V, vl=8, vlmul=1), ldstReqSrc_default.copy()),
+                (ldstReqCtrl_default.copy(instrn=VLE8_V, vl=8, vlmul=1, ma=true, ta=true), SrcBundleLdst(rs1="h1068")),
+                (ldstReqCtrl_default.copy(instrn=VLUXEI8_V, vl=8, vlmul=1, ma=true, ta=true), ldstReqSrc_default.copy()),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
@@ -93,8 +93,8 @@ trait SmartVectorBehavior_ld_idx_mata {
             dut.clock.step(1)
             
             val ldReqs = Seq(
-                (ldstReqCtrl_default.copy(instrn=VLE8_V, vl=8, vlmul=1), SrcBundleLdst(rs1="h1078")),
-                (ldstReqCtrl_default.copy(instrn=VLUXEI8_V, vl=8, vlmul=1, vsew=2), ldstReqSrc_default.copy()),
+                (ldstReqCtrl_default.copy(instrn=VLE8_V, vl=8, vlmul=1, ma=true, ta=true), SrcBundleLdst(rs1="h1078")),
+                (ldstReqCtrl_default.copy(instrn=VLUXEI8_V, vl=8, vlmul=1, vsew=2, ma=true, ta=true), ldstReqSrc_default.copy()),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
@@ -132,8 +132,8 @@ trait SmartVectorBehavior_ld_idx_mata {
             dut.clock.step(1)
             
             val ldReqs = Seq(
-                (ldstReqCtrl_default.copy(instrn=VLE16_V, vl=8, vlmul=1), SrcBundleLdst(rs1="h1080")),
-                (ldstReqCtrl_default.copy(instrn=VLUXEI16_V, vl=8, vlmul=1, vsew=1), ldstReqSrc_default.copy()),
+                (ldstReqCtrl_default.copy(instrn=VLE16_V, vl=8, vlmul=1, ma=true, ta=true), SrcBundleLdst(rs1="h1080")),
+                (ldstReqCtrl_default.copy(instrn=VLUXEI16_V, vl=8, vlmul=1, vsew=1, ma=true, ta=true), ldstReqSrc_default.copy()),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
@@ -170,8 +170,8 @@ trait SmartVectorBehavior_ld_idx_mata {
             dut.clock.step(1)
             
             val ldReqs = Seq(
-                (ldstReqCtrl_default.copy(instrn=VLE16_V, vl=16, vlmul=1), SrcBundleLdst(rs1="h1080")),
-                (ldstReqCtrl_default.copy(instrn=VLUXEI16_V, vl=16, vlmul=1, vsew=0), ldstReqSrc_default.copy()),
+                (ldstReqCtrl_default.copy(instrn=VLE16_V, vl=16, vlmul=1, ma=true, ta=true), SrcBundleLdst(rs1="h1080")),
+                (ldstReqCtrl_default.copy(instrn=VLUXEI16_V, vl=16, vlmul=1, vsew=0, ma=true, ta=true), ldstReqSrc_default.copy()),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)

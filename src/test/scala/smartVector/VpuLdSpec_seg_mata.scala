@@ -38,7 +38,7 @@ trait SmartVectorBehavior_ld_seg_mata {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (CtrlBundle(instrn=VLSEG2E8_V), SrcBundleLdst()),
+                (CtrlBundle(instrn=VLSEG2E8_V, ma=true, ta=true), SrcBundleLdst()),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
@@ -67,7 +67,7 @@ trait SmartVectorBehavior_ld_seg_mata {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (CtrlBundle(instrn=VLSEG3E64_V, vlmul=0, vl=2), SrcBundleLdst()),
+                (CtrlBundle(instrn=VLSEG3E64_V, vlmul=0, vl=2, ma=true, ta=true), SrcBundleLdst()),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
@@ -95,7 +95,7 @@ trait SmartVectorBehavior_ld_seg_mata {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (CtrlBundle(instrn=VLSEG4SE32_V, vlmul=0, vl=3), SrcBundleLdst(rs2="h4")),
+                (CtrlBundle(instrn=VLSEG4SE32_V, vlmul=0, vl=3, ma=true, ta=true), SrcBundleLdst(rs2="h4")),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
@@ -125,8 +125,8 @@ trait SmartVectorBehavior_ld_seg_mata {
             dut.clock.step(1)
             
             val ldReqs = Seq(
-                (ldstReqCtrl_default.copy(instrn=VLE8_V, vl=8, vlmul=0), SrcBundleLdst(rs1="h1078")),
-                (ldstReqCtrl_default.copy(instrn=VLOXSEG3EI8_V, vl=8, vlmul=1, vsew=2), ldstReqSrc_default.copy()),
+                (ldstReqCtrl_default.copy(instrn=VLE8_V, vl=8, vlmul=0, ma=true, ta=true), SrcBundleLdst(rs1="h1078")),
+                (ldstReqCtrl_default.copy(instrn=VLOXSEG3EI8_V, vl=8, vlmul=1, vsew=2, ma=true, ta=true), ldstReqSrc_default.copy()),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
@@ -167,8 +167,8 @@ trait SmartVectorBehavior_ld_seg_mata {
             dut.clock.step(1)
             
             val ldReqs = Seq(
-                (ldstReqCtrl_default.copy(instrn=VLE16_V, vl=16, vlmul=1, vsew=1), SrcBundleLdst(rs1="h1080")),
-                (ldstReqCtrl_default.copy(instrn=VLOXSEG2EI16_V, vl=16, vlmul=1, vsew=0), SrcBundleLdst()),
+                (ldstReqCtrl_default.copy(instrn=VLE16_V, vl=16, vlmul=1, vsew=1, ma=true, ta=true), SrcBundleLdst(rs1="h1080")),
+                (ldstReqCtrl_default.copy(instrn=VLOXSEG2EI16_V, vl=16, vlmul=1, vsew=0, ma=true, ta=true), SrcBundleLdst()),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)

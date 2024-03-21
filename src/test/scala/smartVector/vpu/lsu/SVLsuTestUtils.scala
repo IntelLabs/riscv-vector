@@ -17,7 +17,7 @@ case class CtrlBundle(instrn: BitPat,
                       isLoad: Boolean = true,
                       vm: Boolean = true,
                       ma: Boolean = false,
-                      ta: Boolean = true,
+                      ta: Boolean = false,
                       vsew: Int = 0,
                       vlmul: Int = 0,
                       vl: Int = 32,
@@ -293,41 +293,47 @@ class SmartVectorLsuTestWrapper(isLoad: Boolean) extends Module {
     vLsu.io.mUop.bits.uop.ctrl.mask         := false.B
     vLsu.io.mUop.bits.uop.ctrl.perm         := false.B
 
-    vLsu.io.mUop.bits.uop.info.ma           := io.mUop.bits.uop.info_ma
-    vLsu.io.mUop.bits.uop.info.ta           := io.mUop.bits.uop.info_ta
-    vLsu.io.mUop.bits.uop.info.vsew         := io.mUop.bits.uop.info_vsew
-    vLsu.io.mUop.bits.uop.info.vlmul        := io.mUop.bits.uop.info_vlmul
-    vLsu.io.mUop.bits.uop.info.vl           := io.mUop.bits.uop.info_vl
-    vLsu.io.mUop.bits.uop.info.vstart       := io.mUop.bits.uop.info_vstart
-    vLsu.io.mUop.bits.uop.info.vxrm         := DontCare
-    vLsu.io.mUop.bits.uop.info.frm          := DontCare
-    vLsu.io.mUop.bits.uop.ctrl.ldest        := DontCare
-    vLsu.io.mUop.bits.uop.ctrl.lsrc         := DontCare
+    vLsu.io.mUop.bits.uop.info.ma               := io.mUop.bits.uop.info_ma
+    vLsu.io.mUop.bits.uop.info.ta               := io.mUop.bits.uop.info_ta
+    vLsu.io.mUop.bits.uop.info.vsew             := io.mUop.bits.uop.info_vsew
+    vLsu.io.mUop.bits.uop.info.vlmul            := io.mUop.bits.uop.info_vlmul
+    vLsu.io.mUop.bits.uop.info.vl               := io.mUop.bits.uop.info_vl
+    vLsu.io.mUop.bits.uop.info.vstart           := io.mUop.bits.uop.info_vstart
+    vLsu.io.mUop.bits.uop.info.vxrm             := DontCare
+    vLsu.io.mUop.bits.uop.info.frm              := DontCare
+    vLsu.io.mUop.bits.uop.ctrl.ldest            := DontCare
+    vLsu.io.mUop.bits.uop.ctrl.lsrc             := DontCare
+    vLsu.io.mUop.bits.uop.ctrl.floatRed         := false.B
+    vLsu.io.mUop.bits.uop.ctrl.vGatherEi16EEW8  := DontCare
+    vLsu.io.mUop.bits.uop.ctrl.vGatherEi16EEW16 := DontCare
+    vLsu.io.mUop.bits.uop.ctrl.vGatherEi16EEW32 := DontCare
+    vLsu.io.mUop.bits.uop.ctrl.vGatherEi16EEW64 := DontCare
 
-    vLsu.io.mUopMergeAttr.valid             := io.mUop.valid
-    vLsu.io.mUopMergeAttr.bits.rfWriteEn    := isLoad.asBool
-    vLsu.io.mUopMergeAttr.bits.ldest        := DontCare
-    vLsu.io.mUopMergeAttr.bits.muopEnd      := DontCare
-    vLsu.io.mUopMergeAttr.bits.alu          := false.B
-    vLsu.io.mUopMergeAttr.bits.mul          := false.B
-    vLsu.io.mUopMergeAttr.bits.fp           := false.B
-    vLsu.io.mUopMergeAttr.bits.div          := false.B
-    vLsu.io.mUopMergeAttr.bits.fixP         := false.B
-    vLsu.io.mUopMergeAttr.bits.redu         := false.B
-    vLsu.io.mUopMergeAttr.bits.mask         := false.B
-    vLsu.io.mUopMergeAttr.bits.perm         := false.B
+    vLsu.io.mUopMergeAttr.valid                 := io.mUop.valid
+    vLsu.io.mUopMergeAttr.bits.rfWriteEn        := isLoad.asBool
+    vLsu.io.mUopMergeAttr.bits.ldest            := DontCare
+    vLsu.io.mUopMergeAttr.bits.muopEnd          := DontCare
+    vLsu.io.mUopMergeAttr.bits.alu              := false.B
+    vLsu.io.mUopMergeAttr.bits.mul              := false.B
+    vLsu.io.mUopMergeAttr.bits.fp               := false.B
+    vLsu.io.mUopMergeAttr.bits.div              := false.B
+    vLsu.io.mUopMergeAttr.bits.fixP             := false.B
+    vLsu.io.mUopMergeAttr.bits.redu             := false.B
+    vLsu.io.mUopMergeAttr.bits.mask             := false.B
+    vLsu.io.mUopMergeAttr.bits.perm             := false.B
+    vLsu.io.mUopMergeAttr.bits.floatRegWriteEn  := false.B
 
     vLsu.io.mUopMergeAttr.bits.scalarRegWriteEn := false.B
-    vLsu.io.mUopMergeAttr.bits.regBackWidth := 7.U
-    vLsu.io.mUopMergeAttr.bits.regWriteMuopIdx := 0.U
-    vLsu.io.mUopMergeAttr.bits.permExpdLen := 0.U 
-    vLsu.io.mUopMergeAttr.bits.regDstIdx := 0.U
+    vLsu.io.mUopMergeAttr.bits.regBackWidth     := 7.U
+    vLsu.io.mUopMergeAttr.bits.regWriteMuopIdx  := 0.U
+    vLsu.io.mUopMergeAttr.bits.permExpdLen      := 0.U 
+    vLsu.io.mUopMergeAttr.bits.regDstIdx        := 0.U
 
-    io.lsuOut.valid                         := vLsu.io.lsuOut.valid
-    io.lsuOut.bits.data                     := vLsu.io.lsuOut.bits.data
-    io.lsuOut.bits.rfWriteEn                := vLsu.io.lsuOut.bits.rfWriteEn
-    io.lsuOut.bits.rfWriteIdx               := vLsu.io.lsuOut.bits.rfWriteIdx
-    io.lsuOut.bits.muopEnd                  := vLsu.io.lsuOut.bits.muopEnd
+    io.lsuOut.valid                             := vLsu.io.lsuOut.valid
+    io.lsuOut.bits.data                         := vLsu.io.lsuOut.bits.data
+    io.lsuOut.bits.rfWriteEn                    := vLsu.io.lsuOut.bits.rfWriteEn
+    io.lsuOut.bits.rfWriteIdx                   := vLsu.io.lsuOut.bits.rfWriteIdx
+    io.lsuOut.bits.muopEnd                      := vLsu.io.lsuOut.bits.muopEnd
 
     io.xcpt <> vLsu.io.xcpt
 
