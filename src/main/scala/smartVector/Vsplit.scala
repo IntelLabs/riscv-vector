@@ -275,7 +275,7 @@ class Vsplit(implicit p : Parameters) extends Module {
       ldest_inc := Mux(idxVdInc, idx >> indexIncBase, idx)
     }.elsewhen(ctrl.narrow) {
       ldest_inc := idx >> 1
-    }.elsewhen (ctrl.redu  || floatRed || ctrl.narrow_to_1 || vmaskExcp) {
+    }.elsewhen (ctrl.redu  || floatRed || ctrl.narrow_to_1 || vcpop) {
       ldest_inc := 0.U
     }.otherwise {
       ldest_inc := idx
