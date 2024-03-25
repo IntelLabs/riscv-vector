@@ -92,7 +92,7 @@ class VAluOutput extends Bundle {
 class VFpuOutput(implicit p: Parameters) extends Bundle {
   val uop = new VUop
   val vd = UInt(128.W)
-  val fflags = UInt(5.W)
+/home/wqw/hdd/qw/riscv-vector/src/main/scala/darecreek  val fflags = UInt(5.W)
 }
 
 class VPermInput(implicit p: Parameters) extends Bundle {
