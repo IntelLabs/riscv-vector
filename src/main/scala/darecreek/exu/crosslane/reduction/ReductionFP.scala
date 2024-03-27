@@ -477,7 +477,7 @@ class ReductionFP(implicit p: Parameters) extends VFuModule {
   io.out.bits.fflags := Mux(vstart_gte_vl, 0.U, Mux(output_en, red_fflag, 0.U))
   io.out.valid := output_valid
   red_in_ready := fpu(0).io.in.ready && fpu(1).io.in.ready
-  red_out_valid := fpu(0).io.out.valid && fpu(0).io.out.valid && output_red
+  red_out_valid := fpu(0).io.out.valid && fpu(1).io.out.valid && output_red
 }
 
 import xiangshan._
