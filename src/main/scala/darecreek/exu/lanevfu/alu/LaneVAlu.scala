@@ -303,6 +303,12 @@ class LaneVAlu(implicit p: Parameters) extends VFuModule {
 
   val uopS2 = RegEnable(uopS1, fireS1FixP) 
   val vxsatS2 = RegEnable(vAluFixP.io.vxsat, fireS1FixP)
+  // Assume vstart = 0
+  val maskSplashS1 = RegEnable(maskSplash, fire)
+  val tailSplashS1 = RegEnable(tailSplash, fire)
+  val maskSplashS2 = RegEnable(maskSplashS1, fireS1FixP)
+  val tailSplashS2 = RegEnable(tailSplashS1, fireS1FixP)
+  val vxsatS2_maskTail = vxsatS2 & ~tailSplashS2 & (maskSplashS2 | Fill(8, uopS2.ctrl.vm))
 
   val validS2FixP = RegInit(false.B)
   val flushS2FixP = validS2FixP && io.redirect.needFlush(uopS2.robIdx)
@@ -327,7 +333,7 @@ class LaneVAlu(implicit p: Parameters) extends VFuModule {
   arb.io.in(0).bits.uop := uopS2
   arb.io.in(0).bits.vd := vdS2FixPFinal
   arb.io.in(0).bits.fflags := 0.U
-  arb.io.in(0).bits.vxsat := vxsatS2
+  arb.io.in(0).bits.vxsat := vxsatS2_maskTail.orR
   arb.io.in(1).bits.uop := uopS1
   arb.io.in(1).bits.vd := vdS1IntFinal
   arb.io.in(1).bits.fflags := 0.U
