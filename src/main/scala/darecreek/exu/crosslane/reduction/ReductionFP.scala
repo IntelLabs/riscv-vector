@@ -300,7 +300,7 @@ class ReductionFP(implicit p: Parameters) extends VFuModule {
   val vs2m_bytes = Wire(Vec(vlenb, UInt(8.W)))
   val vs2m_bits = RegEnable(Cat(vs2m_bytes.reverse), 0.U, fire)
   val vlRemainBytes = Wire(UInt(8.W))
-  vlRemainBytes := Mux((vl << vsew) >= Cat(uopIdx, 0.U((log2Up(VLEN)-3).W)), (vl << vsew) - Cat(uopIdx, 0.U((log2Up(VLEN)-3).W)), 0.U)
+  vlRemainBytes := Mux((vl << vsew) >= Cat(uopIdx, 0.U((log2Up(VLEN) - 3).W)), (vl << vsew) - Cat(uopIdx, 0.U((log2Up(VLEN) - 3).W)), 0.U)
 
   val vl_vmask = Wire(UInt(VLEN.W))
   val vmask_vl = Wire(UInt(VLEN.W))
@@ -469,15 +469,15 @@ class ReductionFP(implicit p: Parameters) extends VFuModule {
   }.elsewhen(output_en && io.out.valid && io.out.ready) {
     red_fflag := 0.U
   }.elsewhen(red_out_valid && red_out_ready) {
-    red_fflag := red_fflag | fpu(0).io.out.bits.fflags
+    red_fflag := red_fflag | fpu(0).io.out.bits.fflags | fpu(1).io.out.bits.fflags
   }
 
   io.out.bits.vd := VecInit(Seq.tabulate(NLanes)(i => (output_data) ((i + 1) * LaneWidth - 1, i * LaneWidth)))
-  io.in.ready := fpu(0).io.in.ready & fpu(1).io.in.ready & !red_uop_busy
+  io.in.ready := fpu(0).io.in.ready && fpu(1).io.in.ready && !red_uop_busy
   io.out.bits.fflags := Mux(vstart_gte_vl, 0.U, Mux(output_en, red_fflag, 0.U))
   io.out.valid := output_valid
-  red_in_ready := fpu(0).io.in.ready
-  red_out_valid := fpu(0).io.out.valid && output_red
+  red_in_ready := fpu(0).io.in.ready && fpu(1).io.in.ready
+  red_out_valid := fpu(0).io.out.valid && fpu(0).io.out.valid && output_red
 }
 
 import xiangshan._
