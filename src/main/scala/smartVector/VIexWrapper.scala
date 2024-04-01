@@ -104,7 +104,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
 
   //if is floatRed, when is ready, the next uop valid will be high in same cycle.
   //and the first's ready match the second's valid, it will cause second's ready invalid
-  io.iexNeedStall := Mux(bitsReg.uop.ctrl.floatRed , RegNext(iexNeedStallTmp) , iexNeedStallTmp)
+  io.iexNeedStall := Mux(bitsReg.uop.ctrl.floatRed && !iexNeedStallTmp , RegNext(iexNeedStallTmp) , iexNeedStallTmp)
   //assert(!(currentState === ongoing && validFinal), "when current state is ongoing, should not has new inst in")
   //assert(!(!SVDiv.io.in.ready && validFinal), "when div is not ready, should not has new inst in")
   //assert(!(SVPerm.io.out.perm_busy && validFinal), "when perm is busy, should not has new inst in")
