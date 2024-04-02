@@ -65,16 +65,16 @@ class VIexWrapper(implicit p : Parameters) extends Module {
 
   val permDone = Wire(Bool())
   val permWriteNum = RegInit(0.U(4.W))
-    when(SVPerm.io.out.wb_vld){
-        permWriteNum := permWriteNum + 1.U
-    }
+  when(SVPerm.io.out.wb_vld){
+      permWriteNum := permWriteNum + 1.U
+  }
 
-    when(SVPerm.io.out.wb_vld && (permWriteNum + 1.U === Vlmul_to_lmul(SVPerm.io.out.uop.info.vlmul))){
-        permWriteNum := 0.U
-        permDone := true.B
-    }.otherwise{
-        permDone := false.B
-    }
+  when(SVPerm.io.out.wb_vld && (permWriteNum + 1.U === Vlmul_to_lmul(SVPerm.io.out.uop.info.vlmul))){
+      permWriteNum := 0.U
+      permDone := true.B
+  }.otherwise{
+      permDone := false.B
+  }
 
   val oneCycleLatIn = validReg & (bitsReg.uop.ctrl.alu || bitsReg.uop.ctrl.mask)
   val twoCycleLatIn = validReg & (bitsReg.uop.ctrl.mul || bitsReg.uop.ctrl.redu)
@@ -91,7 +91,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
       }
     }
     is(ongoing){
-      when(twoCycleReg || fixLatVld || bitsReg.uop.ctrl.floatRed && SVFpu.io.in.ready){
+      when(twoCycleReg || fixLatVld || bitsReg.uop.ctrl.floatRed && SVFpu.io.in.ready && ~bitsReg.uop.uopEnd){
           currentStateNext := empty
       }.otherwise{
           currentStateNext := ongoing
