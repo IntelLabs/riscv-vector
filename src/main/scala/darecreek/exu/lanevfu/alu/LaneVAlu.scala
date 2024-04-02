@@ -281,14 +281,19 @@ class LaneVAlu(implicit p: Parameters) extends VFuModule {
     */
   // Output of fixed-point unit
   val aluFixPOut = Reg(UInt(64.W))
+  val aluFixPVxsatOut = Reg(UInt(64.W))
   val aluFixPValid = RegInit(false.B)
   val aluFixPNarrowOut = Reg(UInt(64.W))
+  val aluFixPVxsatNarrowOut = Reg(UInt(8.W))
   val aluFixPNarrowValid = RegInit(false.B)
   when (fireS1FixP) {
     aluFixPOut := vAluFixP.io.vd
+    aluFixPVxsatOut := vAluFixP.io.vxsat
     aluFixPValid := uopS1.ctrl.fixP && !uopS1.ctrl.narrow
     aluFixPNarrowOut := Mux(uopS1.expdIdx(0), Cat(vAluFixP.io.narrowVd, aluFixPNarrowOut(31, 0)),
                         Cat(0.U(32.W), vAluFixP.io.narrowVd))
+    aluFixPVxsatNarrowOut := Mux(uopS1.expdIdx(0), Cat(vAluFixP.io.vxsat(3, 0), aluFixPVxsatNarrowOut(3, 0)),
+                        Cat(0.U(4.W), vAluFixP.io.vxsat(3, 0)))
     aluFixPNarrowValid := (uopS1.expdIdx(0) || uopS1.expdEnd) && uopS1.ctrl.narrow
   }
 
@@ -296,13 +301,16 @@ class LaneVAlu(implicit p: Parameters) extends VFuModule {
     aluFixPValid -> aluFixPOut,
     aluFixPNarrowValid -> aluFixPNarrowOut
   ))
+  val vxsatS2 = Mux1H(Seq(
+    aluFixPValid -> aluFixPVxsatOut,
+    aluFixPNarrowValid -> aluFixPVxsatNarrowOut
+  ))
 
   val maskKeepS2 = RegEnable(maskKeepS1, fireS1FixP)
   val maskOffS2 = RegEnable(maskOffS1, fireS1FixP)
   val vdS2FixPFinal = vdS2FixP & maskKeepS2 | maskOffS2
 
   val uopS2 = RegEnable(uopS1, fireS1FixP) 
-  val vxsatS2 = RegEnable(vAluFixP.io.vxsat, fireS1FixP)
   // Assume vstart = 0
   val maskSplashS1 = RegEnable(maskSplash, fire)
   val tailSplashS1 = RegEnable(tailSplash, fire)
@@ -318,14 +326,14 @@ class LaneVAlu(implicit p: Parameters) extends VFuModule {
     validS2FixP := false.B
   }
   // validS2FixP := Mux(fireS1FixP, true.B, Mux(readyS2FixP, false.B, validS2FixP))
-
+  val validS2FixPFinal = Mux(uopS2.ctrl.narrow, aluFixPNarrowValid && validS2FixP, validS2FixP)
 
   /**
     *  ---- Output arbiter (int vs fix-p) ----
     *  No need to use round robin since there will be no input-fire if readyS1Int == 0.
     */
   val arb = Module(new Arbiter(new LaneFUOutput, 2))
-  arb.io.in(0).valid := validS2FixP
+  arb.io.in(0).valid := validS2FixPFinal
   arb.io.in(1).valid := validS1IntFinal
   readyS2FixP := arb.io.in(0).ready
   readyS1Int := arb.io.in(1).ready
