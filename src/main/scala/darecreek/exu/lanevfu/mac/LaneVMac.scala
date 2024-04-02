@@ -152,7 +152,9 @@ class LaneVMac(implicit p: Parameters) extends Module {
   maskTailData.io.uop := uopVec(2) // uopS2
 
   io.out.bits.vd := RegEnable(vMac64b.io.vd & maskTailData.io.maskKeep | maskTailData.io.maskOff, regEnable(3)) // fireS2)
-  io.out.bits.vxsat := RegEnable(vMac64b.io.vxsat, regEnable(3)) // fireS2)
+  // io.out.bits.vxsat := RegEnable(vMac64b.io.vxsat, regEnable(3)) // fireS2)
+  val vxsatS2_maskTail = vMac64b.io.vxsat & ~tailSplash & (maskSplash | Fill(8, uopVec(2).ctrl.vm))
+  io.out.bits.vxsat := RegEnable(vxsatS2_maskTail.orR, regEnable(3)) // fireS2)
   io.out.bits.fflags := 0.U
 
   vMac64b.io.fireIn := regEnable(1) // io.in.fire
