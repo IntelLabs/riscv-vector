@@ -43,9 +43,12 @@ class VIexWrapper(implicit p : Parameters) extends Module {
 
   val validReg = RegInit(false.B)
   val bitsReg  = RegInit(0.U.asTypeOf(new Muop))
-  val divNotReady = io.in.bits.uop.ctrl.div & ~SVDiv.io.in.ready
-  val fpuNotReady = io.in.bits.uop.ctrl.fp  & ~SVFpu.io.in.ready
-  val permNotReady = io.in.bits.uop.ctrl.perm & SVPerm.io.out.perm_busy
+  //val divNotReady  = io.in.bits.uop.ctrl.div  & ~SVDiv.io.in.ready
+  //val fpuNotReady  = io.in.bits.uop.ctrl.fp   & ~SVFpu.io.in.ready
+  //val permNotReady = io.in.bits.uop.ctrl.perm & SVPerm.io.out.perm_busy
+  val divNotReady  = ~SVDiv.io.in.ready
+  val fpuNotReady  = ~SVFpu.io.in.ready
+  val permNotReady = SVPerm.io.out.perm_busy
   val ready    = ~(divNotReady || fpuNotReady || permNotReady)
 
   when(!validReg || ready){

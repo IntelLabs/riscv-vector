@@ -10,6 +10,8 @@ import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import darecreek.VInfoCalc
 import darecreek.VInfoAll
 import darecreek.VCtrl
+import darecreek.VIllegalInstrn
+import darecreek.VRobPtr
 
 class VDecodeOutput(implicit p: Parameters) extends Bundle{
   val vCtrl         = new darecreek.VCtrl
@@ -51,6 +53,37 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   io.out.bits.scalar_opnd_2 := RegEnable(io.in.bits.rs2, io.in.valid)
   io.out.bits.float_opnd_1  := RegEnable(io.in.bits.frs1, io.in.valid)
   io.out.bits.floatRed      := RegEnable(isFloatRedu, io.in.valid)
+  
+  val infoCalc = Module(new VInfoCalc)
+  infoCalc.io.ctrl       := decode.io.out
+  infoCalc.io.csr.frm    := io.in.bits.vInfo.frm   
+  infoCalc.io.csr.vxrm   := io.in.bits.vInfo.vxrm  
+  infoCalc.io.csr.vl     := io.in.bits.vInfo.vl    
+  infoCalc.io.csr.vstart := io.in.bits.vInfo.vstart
+  infoCalc.io.csr.vsew   := io.in.bits.vInfo.vsew  
+  infoCalc.io.csr.vill   := decode.io.out.illegal  
+  infoCalc.io.csr.ma     := io.in.bits.vInfo.vma    
+  infoCalc.io.csr.ta     := io.in.bits.vInfo.vta    
+  infoCalc.io.csr.vlmul  := io.in.bits.vInfo.vlmul 
+
+  val vIllegalInstrn = Module(new VIllegalInstrn)
+  vIllegalInstrn.io.validIn    := io.in.valid
+  vIllegalInstrn.io.ctrl       := decode.io.out
+  vIllegalInstrn.io.csr.frm    := io.in.bits.vInfo.frm   
+  vIllegalInstrn.io.csr.vxrm   := io.in.bits.vInfo.vxrm  
+  vIllegalInstrn.io.csr.vl     := io.in.bits.vInfo.vl    
+  vIllegalInstrn.io.csr.vstart := io.in.bits.vInfo.vstart
+  vIllegalInstrn.io.csr.vsew   := io.in.bits.vInfo.vsew  
+  vIllegalInstrn.io.csr.vill   := decode.io.out.illegal  
+  vIllegalInstrn.io.csr.ma     := io.in.bits.vInfo.vma    
+  vIllegalInstrn.io.csr.ta     := io.in.bits.vInfo.vta    
+  vIllegalInstrn.io.csr.vlmul  := io.in.bits.vInfo.vlmul 
+
+  vIllegalInstrn.io.infoAll := infoCalc.io.infoAll
+  vIllegalInstrn.io.extraInfo_for_VIllegal := infoCalc.io.extraInfo_for_VIllegal
+  vIllegalInstrn.io.robPtrIn := 0.U.asTypeOf(new VRobPtr)
+
+  io.out.bits.vCtrl.illegal := vIllegalInstrn.io.ill.valid
 
   //val validTmp = Reg(Bool())
   //when (RegNext(io.in.valid) & (~io.out.ready || io.iexNeedStall)){
@@ -70,18 +103,7 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   io.out.bits.vInfo.vxrm    := RegEnable(io.in.bits.vInfo.vxrm  , io.in.valid)
   io.out.bits.vInfo.frm     := RegEnable(io.in.bits.vInfo.frm   , io.in.valid)
 
-  
-  val infoCalc = Module(new VInfoCalc)
-  infoCalc.io.ctrl       := decode.io.out
-  infoCalc.io.csr.frm    := io.in.bits.vInfo.frm   
-  infoCalc.io.csr.vxrm   := io.in.bits.vInfo.vxrm  
-  infoCalc.io.csr.vl     := io.in.bits.vInfo.vl    
-  infoCalc.io.csr.vstart := io.in.bits.vInfo.vstart
-  infoCalc.io.csr.vsew   := io.in.bits.vInfo.vsew  
-  infoCalc.io.csr.vill   := decode.io.out.illegal  
-  infoCalc.io.csr.ma     := io.in.bits.vInfo.vma    
-  infoCalc.io.csr.ta     := io.in.bits.vInfo.vta    
-  infoCalc.io.csr.vlmul  := io.in.bits.vInfo.vlmul 
+
 
   io.out.bits.eewEmulInfo := RegEnable(infoCalc.io.infoAll, io.in.valid)
 
