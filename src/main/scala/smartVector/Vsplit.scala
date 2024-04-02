@@ -448,7 +448,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     val ldStEmulVs1 = eewEmulInfo1.emulVs1
     val ldStEmulVs2 = eewEmulInfo1.emulVs2
     val expdLenSeg = Wire(UInt(4.W))
-    expdLenSeg  := Mux(ldstCtrl.indexed, nfield * (Mux(lmul > ldStEmulVs2, lmul, ldStEmulVs2)), nfield * lmul) 
+    expdLenSeg  := Mux(ldstCtrl.indexed, nfield * (Mux(lmul > ldStEmulVs2, lmul, ldStEmulVs2)), nfield * ldStEmulVd) 
     val expdLenIdx  = Mux(ldStEmulVd >= ldStEmulVs2, ldStEmulVd, ldStEmulVs2)
     val expdLenLdSt = Mux(ldst && ldstCtrl.segment, expdLenSeg, Mux(ldstCtrl.wholeReg, eewEmulInfo1.emulVd,
     Mux(ldst && ldstCtrl.indexed, expdLenIdx, ldStEmulVd)))
@@ -480,9 +480,11 @@ class Vsplit(implicit p : Parameters) extends Module {
         is(ongoing){
             when(needStall){
                 currentStateNext := ongoing
-            }.elsewhen((idx + 1.U) === expdLen){
+            }.elsewhen((idx + 1.U) === expdLen && ~needStall){
                 currentStateNext := empty
                 idx := 0.U
+            }.elsewhen((idx + 1.U) === expdLen && needStall){
+                currentStateNext := ongoing
             }.elsewhen((idx + 1.U) < expdLen){
                 currentStateNext := ongoing
             }
