@@ -312,7 +312,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     
     val vs1ReadEn  = ctrl.lsrcVal(0)
     val vs2ReadEn  = ctrl.lsrcVal(1)
-    val vs3ReadEn  = ctrl.lsrcVal(2)
+    val vs3ReadEn  = ctrl.store || ctrl.ldestVal
     val maskReadEn = ~ctrl.vm
     val vs1Idx     = ctrl.lsrc(0) + lsrc0_inc
     val vs2Idx     = ctrl.lsrc(1) + lsrc1_inc
