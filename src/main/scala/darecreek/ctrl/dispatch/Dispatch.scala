@@ -30,26 +30,25 @@ class VDispatch extends Module {
       val toArithIQ = Vec(VRenameWidth, Decoupled(new VExpdUOp))
       val toLsIQ = Vec(VRenameWidth, Decoupled(new VExpdUOp))
     }
-    val toRob = Vec(VRenameWidth, Decoupled(new VExpdUOp))
+    val toRob = Vec(VRenameWidth, ValidIO(new VExpdUOp))
     // To read the busy table
     val readBusyTable = Vec(VRenameWidth, Vec(4, Output(UInt(VPRegIdxWidth.W))))
     val flush = Input(Bool())
   })
 
   val inputHasValid = Cat(io.in.map(_.valid)).orR
-  val rdyRob = io.toRob(0).ready
   val rdyArith = io.out.toArithIQ(0).ready
   val rdyLs = io.out.toLsIQ(0).ready
   for (i <- 0 until VRenameWidth) {
-    val canOut = rdyArith && rdyLs && rdyRob
+    val canOut = rdyArith && rdyLs
     io.in(i).ready := !inputHasValid || canOut
     
     val isArith = io.in(i).bits.ctrl.arith
     val isLs = io.in(i).bits.ctrl.load || io.in(i).bits.ctrl.store
     
     // -- NOTE: so far there is only one arithmetic issue queue (NArithIQs = 1)
-    io.out.toArithIQ(i).valid := io.in(i).valid && isArith && rdyLs && rdyRob
-    io.out.toLsIQ(i).valid := io.in(i).valid && isLs && rdyArith && rdyRob
+    io.out.toArithIQ(i).valid := io.in(i).valid && isArith && rdyLs
+    io.out.toLsIQ(i).valid := io.in(i).valid && isLs && rdyArith
     io.toRob(i).valid := io.in(i).valid && rdyArith && rdyLs
     io.out.toArithIQ(i).bits := io.in(i).bits
     io.out.toLsIQ(i).bits := io.in(i).bits

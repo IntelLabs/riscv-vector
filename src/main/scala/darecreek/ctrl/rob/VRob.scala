@@ -19,7 +19,6 @@
  *    2) Currently the ovi_completed is ordered 
  *  Features: 
  *    1) Decoupled rename history buffer
- *    2) Small rd (scalar dest) buffer, source of io.fromDispatch.ready
  */
 package darecreek
 
@@ -60,7 +59,7 @@ class VRob extends Module with HasCircularQueuePtrHelper {
     // extract from VInfoCalc.io.infoAll
     val partialVInfo = Flipped(ValidIO(new PartialVInfo))
     // from Rename block
-    val fromDispatch = Vec(VRenameWidth, Flipped(Decoupled(new VExpdUOp)))
+    val fromDispatch = Vec(VRenameWidth, Flipped(ValidIO(new VExpdUOp)))
     // writebacks from EXU and LSU
     val wbArith_laneAlu = Input(ValidIO(new WbArith_lane))
     val wbArith_laneMulFp = Input(ValidIO(new WbArith_lane))
@@ -153,7 +152,7 @@ class VRob extends Module with HasCircularQueuePtrHelper {
   }
   enqPtrRhb := enqPtrRhb + enqRhbPopCnt
 
-  /** rd buffer */
+  /** rd (scalar dest) buffer */
   val RdBufSize = VQSize // Todo: use smaller rd-buffer-size
   val rdBuf = Reg(Vec(RdBufSize, new RdBufferEntry))
   class RdBufPtr extends CircularQueuePtr[RdBufPtr](RdBufSize)
@@ -182,8 +181,6 @@ class VRob extends Module with HasCircularQueuePtrHelper {
     }
   }
   val emptyRdBuf = isEmpty(enqPtrRdBuf, deqPtrRdBuf)
-  val fullRdBuf = isFull(enqPtrRdBuf, deqPtrRdBuf)
-  io.fromDispatch.foreach(_.ready := !fullRdBuf)
 
   /**
     * Write back
