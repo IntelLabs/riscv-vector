@@ -366,13 +366,17 @@ class Vsplit(implicit p : Parameters) extends Module {
         hasRegConf(3) := true.B
     }
 
-    val narrowTo1NoStall = ctrl.narrow_to_1 && ctrl.fp 
+    val narrowTo1NoStall = ctrl.narrow_to_1 
     needStall := hasRegConf(0) || hasRegConf(1) || hasRegConf(2) || hasRegConf(3) || 
                  io.lsuStallSplit || io.iexNeedStall && ~narrowTo1NoStall ||
                  ctrl.illegal || io.vLSUXcpt.exception_vld
     
-    io.out.mUop.bits.uop.uopIdx   := Mux(ldst && ldstCtrl.segment, idx % nfield, idx)
-    io.out.mUop.bits.uop.segIndex := idx / nfield
+    val ldStEmulVd  = eewEmulInfo1.emulVd
+    val ldStEmulVs1 = eewEmulInfo1.emulVs1
+    val ldStEmulVs2 = eewEmulInfo1.emulVs2
+    val segEmul = Mux(ldstCtrl.indexed, Mux(lmul > ldStEmulVs2, lmul, ldStEmulVs2), ldStEmulVd)
+    io.out.mUop.bits.uop.uopIdx   := Mux(ldst && ldstCtrl.segment, idx % segEmul, idx)
+    io.out.mUop.bits.uop.segIndex := idx / segEmul
     io.out.mUop.bits.uop.uopEnd   := (idx + 1.U === expdLen)
 
     io.out.mUop.bits.uop.ctrl.funct6      := ctrl.funct6
@@ -444,9 +448,6 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     val expdLenReg = Reg(UInt(4.W))
 
-    val ldStEmulVd  = eewEmulInfo1.emulVd
-    val ldStEmulVs1 = eewEmulInfo1.emulVs1
-    val ldStEmulVs2 = eewEmulInfo1.emulVs2
     val expdLenSeg = Wire(UInt(4.W))
     expdLenSeg  := Mux(ldstCtrl.indexed, nfield * (Mux(lmul > ldStEmulVs2, lmul, ldStEmulVs2)), nfield * ldStEmulVd) 
     val expdLenIdx  = Mux(ldStEmulVd >= ldStEmulVs2, ldStEmulVd, ldStEmulVs2)
