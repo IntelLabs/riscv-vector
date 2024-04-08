@@ -69,10 +69,10 @@ class VIllegalInstrn extends Module {
   val emul_ldst = Vlmul_to_lmul(vemul_ldst(2, 0))
   val emul_lmul = Mux(ldstCtrl.indexed, lmul, emul_ldst)
   val emul_x_nfield = emul_lmul * nfield
-  val ill_seg = ldst && emul_x_nfield > 8.U
+  val ill_seg = ldst && ldstCtrl.segment && emul_x_nfield > 8.U
   // Segment: illegal when reg numbers accessed would increment past 31
   val vdEnd_seg = ldest + emul_x_nfield - 1.U
-  val ill_seg_past31 = ldst && vdEnd_seg > 31.U
+  val ill_seg_past31 = ldst && ldstCtrl.segment && vdEnd_seg > 31.U
   // Whole regsiter load/store
   val ill_nfield = ldst && ldstCtrl.wholeReg && !(nfield === 1.U || nfield === 2.U || nfield === 4.U || nfield === 8.U)
 
@@ -141,7 +141,7 @@ class VIllegalInstrn extends Module {
   val ill_regOverlap = ill_regOverlap_1 || ill_regOverlap_2 || ill_regOverlap_m
 
   // Segment: for indexed segment, vd reg-group cannot overlap vs2 reg-group
-  val ill_segOverlap = ctrl.load && overlap(vs2, vs2End, ctrl.lsrcVal(1), vd, vdEnd_seg(5, 0), ctrl.ldestVal)
+  val ill_segOverlap = ctrl.load && ldstCtrl.segment && ldstCtrl.indexed && overlap(vs2, vs2End, ctrl.lsrcVal(1), vd, vdEnd_seg(5, 0), ctrl.ldestVal)
 
   /** Some instructions does not support vd = vs2:
    *    vslideup, v(f)slide1up, vrgather, vrgather16, vmsbf, vmsif, vmsof, vcompress
