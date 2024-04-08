@@ -158,7 +158,7 @@ class VCtrlBlock extends Module {
   rob.io.ovi_dispatch := io.ovi_dispatch
   rob.io.illegal := vIllegalInstrn.io.ill
   rob.io.partialVInfo := partialVInfo_reg
-  rob.io.fromDispatch <> dispatch.io.toRob
+  rob.io.fromDispatch := dispatch.io.toRob
   rob.io.wbArith_laneAlu := io.wbArith_laneAlu
   rob.io.wbArith_laneMulFp := io.wbArith_laneMulFp
   rob.io.wbArith_cross := io.wbArith_cross

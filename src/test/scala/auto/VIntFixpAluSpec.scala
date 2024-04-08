@@ -93,8 +93,11 @@ object ReadTxt {
 trait VAluBehavior {
   this: AnyFlatSpec with ChiselScalatestTester with BundleGenHelper =>
 
-  def vIntTestAll(sim:Map[Int,Map[String,String]],ctrl:TestCtrlBundleBase,s:String, tb:TestBehavior, j:Int = -1): Unit = {
-    var testName = "pass the test: " + tb.getInstid() + " lmul ls 1"
+  def vIntTestAll(rdr:TestdataReader, ctrl:TestCtrlBundleBase,s:String, tb:TestBehavior): Unit = {
+    val sim = rdr.getKeymap()
+    val j = rdr.getReportIx()
+    
+    var testName = s"pass the test: ${tb.getInstid()} datafile #${rdr.getId()} lmul ls 1"
     if (j != -1) testName += s" datasplit $j"
     it should s"$testName" in {
       test(tb.getDut()).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
@@ -119,8 +122,11 @@ trait VAluBehavior {
     }
   }
 
-  def vsalu(sim:Map[Int,Map[String,String]], ctrl:TestCtrlBundleBase, s:String, tb:TestBehavior, j:Int = -1): Unit = {
-    var testName = "pass the test: " + tb.getInstid() + " lmul gt 1"
+  def vsalu(rdr : TestdataReader, ctrl:TestCtrlBundleBase, s:String, tb:TestBehavior, j:Int = -1): Unit = {
+    val sim = rdr.getKeymap()
+    val j = rdr.getReportIx()
+    
+    var testName = s"pass the test: ${tb.getInstid()} datafile #${rdr.getId()} lmul gt 1"
     if (j != -1) testName += s" datasplit $j"
     it should s"$testName" in {
       test(tb.getDut()).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
@@ -272,12 +278,69 @@ object Datapath {
   // val testdataRoot = "/home/maoting/nanhu/testdata/10_13/unittest/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/12_14/unittest/"
   // val testdataRoot = "/home/maoting/nanhu/testdata/12_15/unittest/"
-  val testdataRoot = "/home/maoting/nanhu/testdata/debug/"
+  // val testdataRoot = "/home/maoting/nanhu/testdata/24_1_8/unittest/"
+  val testdataRoot = "/home/maoting/nanhu/testdata/24_2_28/unittest/"
+  // val testdataRoot = "/home/maoting/nanhu/testdata/debug/"
   //val testdataRoot = "C:\\kou\\XS_Vector_Unit\\src\\test\\scala\\unittest\\"
   // val testdataRoot = "/home/kou/unittest/"
   // val testdataRoot = "/home/maoting/xs-unittest/testdata/"
 }
 
+class TestdataReader(filepath: String, identifier: Int) {
+  var doneReading : Boolean = false
+  var keymap : Map[Int,Map[String,String]] = Map()
+  var reportIx : Int = -1
+
+  def read() = {
+    val dataSplitIx = sys.props.getOrElse("dataSplitIx", "0").toInt
+    val dataSplitN = sys.props.getOrElse("dataSplitN", "1").toInt
+    val dataSplitInst = sys.props.getOrElse("dataSplitInst", "")
+    val dataSplitMode : Boolean = !dataSplitInst.equals("")
+
+    val test_file = filepath
+    val key = ReadTxt.readFromTxtByline(test_file)
+    val hasvstart1 = ReadTxt.hasVstart(key)
+    // println(s"hasVstart $hasvstart1")
+    var each_input_n_lines = ReadTxt.getEachInputNLines(key)
+    // println("each_input_n_lines", each_input_n_lines)
+
+    var dataN = 1
+    var j = 0
+    if (dataSplitMode) {
+      dataN = dataSplitN
+      j = dataSplitIx
+    }
+
+    val each_asisgned_lines = ReadTxt.getNEachAssignedLines(key.length, j, dataN, each_input_n_lines)
+    val startingIndex = j * each_asisgned_lines
+    if (startingIndex < key.length) {
+      println(s"Data Split $j / $dataN: $startingIndex + $each_asisgned_lines, total ${key.length}")
+      // val testFuture : Future[Unit] = Future 
+      
+      keymap = ReadTxt.KeyFileUtil(key.slice(startingIndex, startingIndex + each_asisgned_lines))
+      // println(s"$j Future is looking at ${tb.getInstid()}, $startingIndex + $each_asisgned_lines")
+      reportIx = -1
+      if (dataSplitMode) {
+        reportIx = j
+      }
+    }
+    doneReading = true
+  }
+
+  def getKeymap() : Map[Int,Map[String,String]] = {
+    if(!doneReading) read()
+    return keymap
+  }
+
+  def getReportIx() : Int = {
+    if(!doneReading) read()
+    return reportIx
+  }
+
+  def getId() : Int = {
+    identifier
+  }
+}
 
 class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
   with BundleGenHelper with VAluBehavior {
@@ -288,7 +351,8 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
 
   var tbs : Seq[TestBehavior] = Seq(
 
-    new Vrgatherei16vvFSMTestBehavior,
+    // new Vrgatherei16vvFSMTestBehavior,
+    new VaddvvTestBehavior,
 
     // new VredsumvsTestBehavior,
     // new VredmaxuvsTestBehavior,
@@ -563,39 +627,70 @@ class VAluSpec extends AnyFlatSpec with ChiselScalatestTester
 
     // test code
     // tb.changeSwitch()
-    val test_file = tb.getTestfilePath()
+    var test_file = tb.getTestfilePath(tb.getFilename())
     val inst = tb.getCtrlBundle()
     val sign = tb.getSign()
 
-    if (Files.exists(Paths.get(test_file))) {
-      val key = ReadTxt.readFromTxtByline(test_file)
-      val hasvstart1 = ReadTxt.hasVstart(key)
-      println(s"hasVstart $hasvstart1")
-      var each_input_n_lines = ReadTxt.getEachInputNLines(key)
-      println("each_input_n_lines", each_input_n_lines)
+    // Directory path
+    val filename = tb.getFilename()
+    val dir = new File(Datapath.testdataRoot)
+    val datafile_prefix = filename.stripSuffix(".data")
 
-      var dataN = 1
-      var j = 0
-      if (dataSplitMode) {
-        dataN = dataSplitN
-        j = dataSplitIx
-      }
+    var listfiles = dir.listFiles.filter(file => file.getName.endsWith(".data") && 
+                                                file.getName.startsWith(datafile_prefix + "_"))
 
-      val each_asisgned_lines = ReadTxt.getNEachAssignedLines(key.length, j, dataN, each_input_n_lines)
-      val startingIndex = j * each_asisgned_lines
-      if (startingIndex < key.length) {
-        println(s"Data Split $j / $dataN: $startingIndex + $each_asisgned_lines, total ${key.length}")
-        // val testFuture : Future[Unit] = Future 
-        
-        val keymap = ReadTxt.KeyFileUtil(key.slice(startingIndex, startingIndex + each_asisgned_lines))
-        // println(s"$j Future is looking at ${tb.getInstid()}, $startingIndex + $each_asisgned_lines")
-        var reportIx = -1
-        if (dataSplitMode) {
-          reportIx = j
-        }
-        it should behave like vIntTestAll(keymap, inst, sign, tb, reportIx)
-        it should behave like vsalu(keymap, inst, sign, tb, reportIx)
-        // println("wtf??????????")
+    // Sort files by the integer value in their names
+    var files = listfiles.sortBy(file => {
+        val name = file.getName.stripSuffix(".data")
+        val parts = name.split("_")
+        val intValue = if (parts.length > 1) parts(parts.length - 1).toInt else 0
+        // println(s"name $name, intValue $intValue, parts.length ${parts.length} parts(parts.length - 1) ${parts(parts.length - 1)} parts(parts.length - 2) ${parts(parts.length - 2)}")
+        intValue
+    }).map(_.getName)
+
+    // Print sorted file names
+    files.foreach(println)
+
+    if (files.length == 0 && Files.exists(Paths.get(test_file))) {
+        files = Array(filename)
+    }
+
+    listfiles = null
+
+    if (files.length != 0) {
+      for(i <- 0 until files.length) {
+        // test_file = tb.getTestfilePath(files(i))
+        // val key = ReadTxt.readFromTxtByline(test_file)
+        // val hasvstart1 = ReadTxt.hasVstart(key)
+        // // println(s"hasVstart $hasvstart1")
+        // var each_input_n_lines = ReadTxt.getEachInputNLines(key)
+        // // println("each_input_n_lines", each_input_n_lines)
+
+        // var dataN = 1
+        // var j = 0
+        // if (dataSplitMode) {
+        //   dataN = dataSplitN
+        //   j = dataSplitIx
+        // }
+
+        // val each_asisgned_lines = ReadTxt.getNEachAssignedLines(key.length, j, dataN, each_input_n_lines)
+        // val startingIndex = j * each_asisgned_lines
+        // if (startingIndex < key.length) {
+        //   println(s"Data Split $j / $dataN: $startingIndex + $each_asisgned_lines, total ${key.length}")
+        //   // val testFuture : Future[Unit] = Future 
+          
+        //   val keymap = ReadTxt.KeyFileUtil(key.slice(startingIndex, startingIndex + each_asisgned_lines))
+        //   // println(s"$j Future is looking at ${tb.getInstid()}, $startingIndex + $each_asisgned_lines")
+        //   var reportIx = -1
+        //   if (dataSplitMode) {
+        //     reportIx = j
+        //   }
+        //   it should behave like vIntTestAll(keymap, inst, sign, tb, reportIx)
+        //   it should behave like vsalu(keymap, inst, sign, tb, reportIx)
+        // }
+        val rdr = new TestdataReader(tb.getTestfilePath(files(i)), i)
+        it should behave like vIntTestAll(rdr, inst, sign, tb)
+        it should behave like vsalu(rdr, inst, sign, tb)
       }
     } else {
       println(s"Data file does not exist for instruction: ${tb.getInstid()} , skipping")
