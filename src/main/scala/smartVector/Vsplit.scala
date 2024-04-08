@@ -371,8 +371,8 @@ class Vsplit(implicit p : Parameters) extends Module {
                  io.lsuStallSplit || io.iexNeedStall && ~narrowTo1NoStall ||
                  ctrl.illegal || io.vLSUXcpt.exception_vld
     
-    io.out.mUop.bits.uop.uopIdx   := Mux(ldst && ldstCtrl.segment, idx / nfield, idx)
-    io.out.mUop.bits.uop.segIndex := idx % nfield
+    io.out.mUop.bits.uop.uopIdx   := Mux(ldst && ldstCtrl.segment, idx % nfield, idx)
+    io.out.mUop.bits.uop.segIndex := idx / nfield
     io.out.mUop.bits.uop.uopEnd   := (idx + 1.U === expdLen)
 
     io.out.mUop.bits.uop.ctrl.funct6      := ctrl.funct6
