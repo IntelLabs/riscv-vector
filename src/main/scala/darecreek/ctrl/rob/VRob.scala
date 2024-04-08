@@ -154,7 +154,7 @@ class VRob extends Module with HasCircularQueuePtrHelper {
   enqPtrRhb := enqPtrRhb + enqRhbPopCnt
 
   /** rd buffer */
-  val RdBufSize = 4
+  val RdBufSize = VQSize // Todo: use smaller rd-buffer-size
   val rdBuf = Reg(Vec(RdBufSize, new RdBufferEntry))
   class RdBufPtr extends CircularQueuePtr[RdBufPtr](RdBufSize)
   val enqPtrRdBuf = RegInit(0.U.asTypeOf(new RdBufPtr))
