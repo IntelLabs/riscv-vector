@@ -312,11 +312,27 @@ class Vsplit(implicit p : Parameters) extends Module {
     
     val vs1ReadEn  = ctrl.lsrcVal(0)
     val vs2ReadEn  = ctrl.lsrcVal(1)
-    val vs3ReadEn  = ctrl.store || ctrl.ldestVal
+
+    
+    //in one inst, different uop may has same ldest, when the first one set the scoreboard, the second one 
+    // should not be stalled
+    val ldest_inc_last = RegInit(0.U(3.W))
+    val sameLdest = Wire(Bool())
+    when(ldest_inc === ldest_inc_last){
+        sameLdest := true.B
+    }.otherwise{
+        ldest_inc_last := ldest_inc
+        sameLdest := false.B
+    }
+    when(io.out.mUop.bits.uop.uopEnd){
+        ldest_inc_last := 0.U
+    }
+
+    val vs3ReadEn  = (ctrl.store || ctrl.ldestVal) & ~sameLdest
     val maskReadEn = ~ctrl.vm
     val vs1Idx     = ctrl.lsrc(0) + lsrc0_inc
     val vs2Idx     = ctrl.lsrc(1) + lsrc1_inc
-    val vs3Idx     = ctrl.ldest + ldest_inc
+    val vs3Idx     = ctrl.ldest   + ldest_inc
     val needStall  = Wire(Bool())
     val hasRegConf = Wire(Vec(4,Bool()))
     val expdLen    = Wire(UInt(4.W))
