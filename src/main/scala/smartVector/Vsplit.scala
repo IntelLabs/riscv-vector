@@ -324,7 +324,7 @@ class Vsplit(implicit p : Parameters) extends Module {
         ldest_inc_last := ldest_inc
         sameLdest := false.B
     }
-    when(io.out.mUop.bits.uop.uopEnd){
+    when(io.out.mUop.bits.uop.uopEnd & io.out.mUop.valid){
         ldest_inc_last := 0.U
     }
 
