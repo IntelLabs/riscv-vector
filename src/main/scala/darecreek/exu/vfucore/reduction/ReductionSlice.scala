@@ -268,7 +268,7 @@ class ReductionSlice extends Module {
   val carry1_sew16 = Wire(Vec(2, UInt(16.W)))
   val sum2_sew16 = Wire(UInt(16.W))
   val carry2_sew16 = Wire(UInt(16.W))
-  val vd_sew16 = Wire(UInt(16.W))
+  val vd_sew16 = Wire(UInt(32.W))
 
   val in0_sew16 = vs2
   val in1_sew16 = Cat(Cat(sum0_sew16.reverse), Cat(carry0_sew16.reverse))
@@ -312,7 +312,7 @@ class ReductionSlice extends Module {
   val carry1_sew8 = Wire(Vec(2, UInt(8.W)))
   val sum2_sew8 = Wire(UInt(8.W))
   val carry2_sew8 = Wire(UInt(8.W))
-  val vd_sew8 = Wire(UInt(8.W))
+  val vd_sew8 = Wire(UInt(16.W))
 
   val in0_sew8 = vs2(127, 0)
   val in1_sew8 = Cat(Cat(sum0_sew8.reverse), Cat(carry0_sew8.reverse))
