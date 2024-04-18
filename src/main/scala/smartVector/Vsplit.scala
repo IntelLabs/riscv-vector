@@ -212,16 +212,16 @@ class Vsplit(implicit p : Parameters) extends Module {
     val emulVs2 = Mux(ctrl.lsrcVal(1), eewEmulInfo1.emulVs2, 0.U(4.W))
     val idxVdInc = Wire(Bool())
     val idxVs2Inc = Wire(Bool())
-    val indexExpdLen = Mux(lmul > emulVs2, lmul, emulVs2)
+    val indexLmul = Mux(ldstCtrl.segment, lmul * nfield, lmul)
 
-    when(emulVs2 >= emulVd){
+    when(emulVs2 >= indexLmul){
         idxVdInc := true.B
         idxVs2Inc := false.B
-        when(emulVs2 / emulVd === 8.U){
+        when(emulVs2 / indexLmul === 8.U){
             indexIncBase := 3.U
-        }.elsewhen(emulVs2 / emulVd === 4.U){
+        }.elsewhen(emulVs2 / indexLmul === 4.U){
             indexIncBase := 2.U
-        }.elsewhen(emulVs2 / emulVd === 2.U){
+        }.elsewhen(emulVs2 / indexLmul === 2.U){
             indexIncBase := 1.U
         }.otherwise{
             indexIncBase := 0.U
@@ -229,11 +229,11 @@ class Vsplit(implicit p : Parameters) extends Module {
     }.otherwise{
         idxVdInc := false.B
         idxVs2Inc := true.B
-        when(emulVd / emulVs2 === 8.U){
+        when(indexLmul / emulVs2 === 8.U){
             indexIncBase := 3.U 
-        }.elsewhen(emulVd / emulVs2 === 4.U){
+        }.elsewhen(indexLmul / emulVs2 === 4.U){
             indexIncBase := 2.U 
-        }.elsewhen(emulVd / emulVs2 === 2.U){
+        }.elsewhen(indexLmul / emulVs2 === 2.U){
             indexIncBase := 1.U
         }.otherwise{
             indexIncBase := 0.U
@@ -253,7 +253,7 @@ class Vsplit(implicit p : Parameters) extends Module {
               
     val lsrc1_inc = Wire(UInt(3.W))
     when (ldst && ldstCtrl.indexed){
-      val lsrc1_inc_tmp = Mux(idxVs2Inc, (idx % indexExpdLen) >> indexIncBase, (idx % indexExpdLen))
+      val lsrc1_inc_tmp = Mux(idxVs2Inc, idx >> indexIncBase, idx)
       lsrc1_inc := lsrc1_inc_tmp
     }.elsewhen(ctrl.widen && !ctrl.redu && !floatRed || v_ext_out && ctrl.lsrc(0)(2,1) === 3.U) {
       lsrc1_inc := idx >> 1
@@ -267,7 +267,7 @@ class Vsplit(implicit p : Parameters) extends Module {
       lsrc1_inc := idx
     }
 
-    val ldest_inc = Wire(UInt(3.W))
+    val ldest_inc = Wire(UInt(4.W))
     //ToDo: add ldst idex inc
     //when (ldstCtrlReg(i).indexed && ctrl.isLdst) {
     //  ldest_inc := sewSide_inc
@@ -316,16 +316,19 @@ class Vsplit(implicit p : Parameters) extends Module {
     
     //in one inst, different uop may has same ldest, when the first one set the scoreboard, the second one 
     // should not be stalled
-    val ldest_inc_last = RegInit(0.U(3.W))
+    val ldest_inc_last = RegInit(15.U(3.W))
     val sameLdest = Wire(Bool())
     when(ldest_inc === ldest_inc_last){
         sameLdest := true.B
     }.otherwise{
-        ldest_inc_last := ldest_inc
         sameLdest := false.B
     }
+
+    when(~io.out.mUop.bits.uop.uopEnd & io.out.mUop.valid){ 
+        ldest_inc_last := ldest_inc
+    }
     when(io.out.mUop.bits.uop.uopEnd & io.out.mUop.valid){
-        ldest_inc_last := 0.U
+        ldest_inc_last := 15.U
     }
 
     val vs3ReadEn  = (ctrl.store || ctrl.ldestVal) & ~sameLdest
