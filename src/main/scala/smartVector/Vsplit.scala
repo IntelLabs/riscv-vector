@@ -316,7 +316,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     
     //in one inst, different uop may has same ldest, when the first one set the scoreboard, the second one 
     // should not be stalled
-    val ldest_inc_last = RegInit(15.U(3.W))
+    val ldest_inc_last = RegInit(15.U(4.W))
     val sameLdest = Wire(Bool())
     when(ldest_inc === ldest_inc_last){
         sameLdest := true.B
