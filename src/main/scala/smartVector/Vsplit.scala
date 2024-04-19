@@ -337,7 +337,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     val vs3Idx     = ctrl.ldest   + ldest_inc
     val needStall  = Wire(Bool())
     val hasRegConf = Wire(Vec(4,Bool()))
-    val expdLen    = Wire(UInt(4.W))
+    val expdLen    = Wire(UInt(7.W))
     
     io.scoreBoardReadIO.readAddr1    := vs1Idx
     io.scoreBoardReadIO.readAddr2    := vs2Idx
@@ -464,19 +464,25 @@ class Vsplit(implicit p : Parameters) extends Module {
         io.out.mUop.valid := false.B
     }
 
-    val expdLenReg = Reg(UInt(4.W))
-
-    val expdLenSeg = Wire(UInt(4.W))
+    val expdWidth   = 7
+    val expdLenReg  =  Reg(UInt(expdWidth.W))
+    val expdLenSeg  = Wire(UInt(expdWidth.W))
+    val expdLenIdx  = Wire(UInt(expdWidth.W))
+    val expdLenLdSt = Wire(UInt(expdWidth.W))
+    val expdLenIn   = Wire(UInt(expdWidth.W))
+    
     expdLenSeg  := Mux(ldstCtrl.indexed, (Mux(lmul > ldStEmulVs2, lmul * nfield, ldStEmulVs2 * nfield)), nfield * ldStEmulVd) 
-    val expdLenIdx  = Mux(ldStEmulVd >= ldStEmulVs2, ldStEmulVd, ldStEmulVs2)
-    val expdLenLdSt = Mux(ldst && ldstCtrl.segment, expdLenSeg, Mux(ldstCtrl.wholeReg, eewEmulInfo1.emulVd,
-    Mux(ldst && ldstCtrl.indexed, expdLenIdx, ldStEmulVd)))
+    expdLenIdx  := Mux(ldStEmulVd >= ldStEmulVs2, ldStEmulVd, ldStEmulVs2)
+    expdLenLdSt := Mux(ldst && ldstCtrl.segment, expdLenSeg, 
+                        Mux(ldstCtrl.wholeReg, eewEmulInfo1.emulVd,
+                        Mux(ldst && ldstCtrl.indexed, expdLenIdx, ldStEmulVd)))
+    
     val maxOfVs12Vd = Mux(emulVd >= emulVs1, Mux(emulVd >= emulVs2, emulVd, emulVs2), Mux(emulVs1 >= emulVs2, emulVs1, emulVs2))
-    val vmv_vfmv = ctrl.alu && !ctrl.opi && ctrl.funct6 === "b010000".U
+    val vmv_vfmv    = ctrl.alu && !ctrl.opi && ctrl.funct6 === "b010000".U
 
     //val expdLenIn = Mux(ldst, expdLenLdSt, Mux(ctrl.perm || vmv_vfmv, 1.U , maxOfVs12Vd))
-    val expdLenIn = Mux(ldst, expdLenLdSt, Mux(ctrl.perm || vmv_vfmv, 1.U , 
-    (Mux(vcpop || viota || vid, lmul, maxOfVs12Vd))))
+    expdLenIn := Mux(ldst, expdLenLdSt,
+                    Mux(ctrl.perm || vmv_vfmv, 1.U, (Mux(vcpop || viota || vid, lmul, maxOfVs12Vd))))
     
     when(instFirstIn){
         expdLenReg := expdLenIn
