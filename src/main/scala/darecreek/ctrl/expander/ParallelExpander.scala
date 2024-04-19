@@ -240,16 +240,18 @@ class ParallelExpander extends Module {
       sew.is64 -> Cat(lmul, 0.U((log2Up(vlenb) -3).W)),
     ))
     val maskNeedOldVd = !ctrl.vm && !info.ma
-    val perm_vmvnrr = ctrl.perm && ctrl.funct6 === "b100111".U
-    val perm_vmvsx_vfmvsf = ctrl.perm && ctrl.funct6 === "b010000".U && ctrl.vx
+    val wholeRegMv = ctrl.funct6 === "b100111".U && ctrl.funct3 === "b011".U //Whole register move
+    val perm_vmvsx_vfmvsf = ctrl.funct6 === "b010000".U && (ctrl.funct3 === "b101".U || ctrl.funct3 === "b110".U)
     //vslideup: !!!! Lack of judgement of whether offset != 0, but rs1 is not visible here so far, and immediate of offset 0 seems meaningless
     val slideUpOffset = ctrl.funct6 === "b001110".U && (ctrl.funct3(0) === ctrl.funct3(1) && ctrl.funct3(1) =/= ctrl.funct3(2))
     val vcompress = ctrl.funct6 === "b010111".U && ctrl.funct3 === "b010".U
                                                     // mask   excludes viota/vid
     val mask_onlyOneReg = ctrl.mask && !(ctrl.funct6(3, 2) === "b01".U && ctrl.lsrc(0)(4))
     val tailIsAgnostic = ctrl.narrow_to_1 || mask_onlyOneReg || (ldstCtrlReg(i).mask && ctrl.isLdst)
-    val noTail = info.vl === vlMax && !ctrl.redu && !perm_vmvsx_vfmvsf && !vcompress || perm_vmvnrr || (ldstCtrlReg(i).wholeReg && ctrl.isLdst)
-    val tailNeedOldVd = !(info.ta || tailIsAgnostic || noTail)
+    val noTail = info.vl === vlMax && !ctrl.redu && !perm_vmvsx_vfmvsf && !vcompress || wholeRegMv || (ldstCtrlReg(i).wholeReg && ctrl.isLdst)
+    // Todo: this signal (thereMayBeTail) is temp! Need to be optimized off.
+    val thereMayBeTail = ctrl.isLdst && veew_minus_vsew(i) =/= 0.U && !ldstCtrlReg(i).wholeReg
+    val tailNeedOldVd = !(info.ta || tailIsAgnostic || noTail && !thereMayBeTail)
     val noWriteback = ctrl.store || ctrl.rdVal
     val needOldVd = (maskNeedOldVd || tailNeedOldVd || info.vstart =/= 0.U || slideUpOffset) && !noWriteback || info.vstart_gte_vl
 
