@@ -212,16 +212,15 @@ class Vsplit(implicit p : Parameters) extends Module {
     val emulVs2 = Mux(ctrl.lsrcVal(1), eewEmulInfo1.emulVs2, 0.U(4.W))
     val idxVdInc = Wire(Bool())
     val idxVs2Inc = Wire(Bool())
-    val indexLmul = Mux(ldstCtrl.segment, lmul * nfield, lmul)
 
-    when(emulVs2 >= indexLmul){
+    when(emulVs2 >= emulVd){
         idxVdInc := true.B
         idxVs2Inc := false.B
-        when(emulVs2 / indexLmul === 8.U){
+        when(emulVs2 / emulVd === 8.U){
             indexIncBase := 3.U
-        }.elsewhen(emulVs2 / indexLmul === 4.U){
+        }.elsewhen(emulVs2 / emulVd === 4.U){
             indexIncBase := 2.U
-        }.elsewhen(emulVs2 / indexLmul === 2.U){
+        }.elsewhen(emulVs2 / emulVd === 2.U){
             indexIncBase := 1.U
         }.otherwise{
             indexIncBase := 0.U
@@ -229,11 +228,11 @@ class Vsplit(implicit p : Parameters) extends Module {
     }.otherwise{
         idxVdInc := false.B
         idxVs2Inc := true.B
-        when(indexLmul / emulVs2 === 8.U){
+        when(emulVd / emulVs2 === 8.U){
             indexIncBase := 3.U 
-        }.elsewhen(indexLmul / emulVs2 === 4.U){
+        }.elsewhen(emulVd / emulVs2 === 4.U){
             indexIncBase := 2.U 
-        }.elsewhen(indexLmul / emulVs2 === 2.U){
+        }.elsewhen(emulVd / emulVs2 === 2.U){
             indexIncBase := 1.U
         }.otherwise{
             indexIncBase := 0.U
@@ -468,7 +467,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     val expdLenReg = Reg(UInt(4.W))
 
     val expdLenSeg = Wire(UInt(4.W))
-    expdLenSeg  := Mux(ldstCtrl.indexed, (Mux(lmul * nfield > ldStEmulVs2, lmul * nfield, ldStEmulVs2)), nfield * ldStEmulVd) 
+    expdLenSeg  := Mux(ldstCtrl.indexed, (Mux(lmul > ldStEmulVs2, lmul * nfield, ldStEmulVs2 * nfield)), nfield * ldStEmulVd) 
     val expdLenIdx  = Mux(ldStEmulVd >= ldStEmulVs2, ldStEmulVd, ldStEmulVs2)
     val expdLenLdSt = Mux(ldst && ldstCtrl.segment, expdLenSeg, Mux(ldstCtrl.wholeReg, eewEmulInfo1.emulVd,
     Mux(ldst && ldstCtrl.indexed, expdLenIdx, ldStEmulVd)))
