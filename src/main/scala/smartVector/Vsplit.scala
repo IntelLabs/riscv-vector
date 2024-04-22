@@ -464,16 +464,24 @@ class Vsplit(implicit p : Parameters) extends Module {
         io.out.mUop.valid := false.B
     }
 
-    val expdWidth   = 7
-    val expdLenReg  =  Reg(UInt(expdWidth.W))
-    val expdLenSeg  = Wire(UInt(expdWidth.W))
-    val expdLenIdx  = Wire(UInt(expdWidth.W))
-    val expdLenLdSt = Wire(UInt(expdWidth.W))
-    val expdLenIn   = Wire(UInt(expdWidth.W))
-    
-    expdLenSeg  := Mux(ldstCtrl.indexed, (Mux(lmul > ldStEmulVs2, lmul * nfield, ldStEmulVs2 * nfield)), nfield * ldStEmulVd) 
+    val expdWidth = 7
+    val expdLenReg          =  Reg(UInt(expdWidth.W))
+    val expdLenSeg          = Wire(UInt(expdWidth.W))
+    val expdLenIdx          = Wire(UInt(expdWidth.W))
+    val expdLenLdSt         = Wire(UInt(expdWidth.W))
+    val expdLenIn           = Wire(UInt(expdWidth.W))
+
+    val lmulMulNfield       = Wire(UInt(expdWidth.W))
+    val vs2EmulMulNfield    = Wire(UInt(expdWidth.W))
+    val vdEmulMulNfield     = Wire(UInt(expdWidth.W))
+
+    lmulMulNfield := lmul * nfield
+    vs2EmulMulNfield := ldStEmulVs2 * nfield
+    vdEmulMulNfield := ldStEmulVd * nfield
+
+    expdLenSeg  := Mux(ldstCtrl.indexed, (Mux(lmul > ldStEmulVs2, lmulMulNfield, vs2EmulMulNfield)), vdEmulMulNfield)
     expdLenIdx  := Mux(ldStEmulVd >= ldStEmulVs2, ldStEmulVd, ldStEmulVs2)
-    expdLenLdSt := Mux(ldst && ldstCtrl.segment, expdLenSeg, 
+    expdLenLdSt := Mux(ldst && ldstCtrl.segment, expdLenSeg,
                         Mux(ldstCtrl.wholeReg, eewEmulInfo1.emulVd,
                         Mux(ldst && ldstCtrl.indexed, expdLenIdx, ldStEmulVd)))
     
