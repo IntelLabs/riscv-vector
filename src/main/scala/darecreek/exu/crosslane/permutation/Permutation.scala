@@ -42,7 +42,7 @@ class Permutation(implicit p: Parameters) extends VFuModule {
 
   val q = Module(new Queue(new VExpdUOp, 8))
   q.io.enq.bits := uop
-  q.io.enq.valid := (fire && !vrgather16_sew8) || (fire && vrgather16_sew8 && uopIdx(1))
+  q.io.enq.valid := (fire && !vrgather16_sew8) || (fire && vrgather16_sew8 && uopIdx(0))
 
   val uop_out = q.io.deq.bits
   q.io.deq.ready := perm.io.out.wb_vld
