@@ -131,7 +131,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     val float_opnd_1  = Reg(Vec(1, UInt(64.W)))
     val uopRegInfo    = Reg(Vec(1, new UopRegInfo))
     val eewEmulInfo   = Reg(Vec(1, new VInfoAll))
-    val idx           = RegInit(UInt(5.W), 0.U)
+    val idx           = RegInit(UInt(7.W), 0.U)
     val floatRedReg   = Reg(Vec(1, Bool()))
 
     //vCtrl(0).illegal     := RegInit(false.B)
