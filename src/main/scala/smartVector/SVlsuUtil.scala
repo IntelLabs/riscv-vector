@@ -57,6 +57,9 @@ object LdstUopXcptCause {
 class LdstUop extends Bundle {
     val valid = Bool()
     val addr  = UInt(addrWidth.W)
+    val groupIdx = UInt(2.W)
+    val splitIdx = UInt(vlenbWidth.W)
+    val memCmd = Bool()
     val pos   = UInt(bVL.W) // position in vl
     val xcpt  = UInt(2.W)
 }
@@ -70,6 +73,12 @@ class VRegSegmentInfo extends Bundle {
     val offset  = UInt(log2Ceil(8).W)
     // data of current vreg segement
     val data    = UInt(8.W)
+}
+
+class VRegInfo extends Bundle {
+    val busy        = Bool()
+    val clean    = Bool()
+    val vregSeg     = Vec(vlenb, new VRegSegmentInfo)
 }
 
 class mUopInfo extends Bundle {
@@ -173,6 +182,62 @@ object LSULdstDecoder {
         ctrl.log2MinLen := ctrl.log2Elen min ctrl.log2Mlen
         
         ctrl
+    }
+}
+
+
+class GroupInfo extends Bundle {
+    val allocIdx = UInt(GroupNum.W)
+    val ldstCtrl = new LSULdstCtrl
+    val muopInfo = new mUopInfo
+}
+
+class GroupInfoQueue(size: Int) extends Module {
+    val io = IO(
+        new Bundle {
+            val enq = Flipped(Decoupled(new GroupInfo))
+            val deq = Decoupled(new GroupInfo)
+            val front = ValidIO(new GroupInfo)
+            val tail = ValidIO(new GroupInfo)
+            val clear = Input(Bool())
+        }
+    )
+
+    val queue       = RegInit(VecInit(Seq.fill(size)(0.U.asTypeOf(new GroupInfo))))
+    val enqPtr      = RegInit(0.U(log2Ceil(size).W))
+    val lastEnqPtr  = RegInit(0.U(log2Ceil(size).W))
+    val deqPtr      = RegInit(0.U(log2Ceil(size).W))
+    val count       = RegInit(0.U(log2Ceil(size).W))
+
+    io.enq.ready := count < size.U
+    io.deq.valid := count > 0.U
+    io.deq.bits := queue(deqPtr)
+
+    io.front.valid := count > 0.U
+    io.front.bits := queue(deqPtr)
+
+    io.tail.valid := count > 0.U
+    io.tail.bits := queue(lastEnqPtr)
+
+    when (io.clear) {
+        (0 until size).foreach(i => queue(i).muopInfo := 0.U.asTypeOf(new mUopInfo))
+
+        enqPtr  := 0.U
+        lastEnqPtr := 0.U
+        deqPtr  := 0.U
+        count   := 0.U
+    } .otherwise {
+        when(io.enq.fire()) {
+            queue(enqPtr) := io.enq.bits
+            enqPtr := enqPtr + 1.U
+            count := count + 1.U
+            lastEnqPtr := enqPtr
+        }
+
+        when(io.deq.fire()) {
+            deqPtr := deqPtr + 1.U
+            count := count - 1.U
+        }
     }
 }
 
