@@ -99,12 +99,10 @@ class ParallelExpander extends Module {
       expdLen(i) := Mux(ldstCtrl(i).segment, expdLen_seg, expdLen_ldst) 
     }.elsewhen ((ldstCtrl(i).mask && ctrl(i).isLdst) || perm_vmv_vfmv || mask_onlyOneReg) {
       expdLen(i) := 1.U
-    }.elsewhen (ctrl(i).widen && !ctrl(i).redu || ctrl(i).widen2 || ctrl(i).narrow) {
+    }.elsewhen (ctrl(i).widen && !ctrl(i).redu || ctrl(i).widen2 || ctrl(i).narrow || gather16 && info(i).vsew === 0.U) {
       expdLen(i) := Mux(info(i).vlmul(2), 1.U, lmul(i) << 1)  // If lmul < 1, expdLen = 1 for widen/narrow
     }.elsewhen (ctrl(i).funct6 === "b100111".U && ctrl(i).funct3 === "b011".U) {//Whole register move
       expdLen(i) := ctrl(i).lsrc(0)(2, 0) +& 1.U
-    }.elsewhen (gather16 && info(i).vsew === 0.U) {
-      expdLen(i) := lmul(i) << 1
     }.otherwise {
       expdLen(i) := lmul(i)
     }
@@ -286,7 +284,7 @@ class ParallelExpander extends Module {
       io.out(i).bits.ldestValExpd := sewSide_valid
     }.elsewhen (ctrl.narrow_to_1 || ctrl.redu) {
       io.out(i).bits.ldestValExpd := expdIdx(i) === io.out(i).bits.expdLen - 1.U
-    }.elsewhen (ctrl.narrow) {
+    }.elsewhen (ctrl.narrow || gather16 && sew.is8) {
       io.out(i).bits.ldestValExpd := expdIdx(i)(0) || io.out(i).bits.expdLen === 1.U
     }.otherwise {
       io.out(i).bits.ldestValExpd := ctrl.ldestVal
