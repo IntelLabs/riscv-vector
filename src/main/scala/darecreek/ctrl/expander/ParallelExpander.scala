@@ -207,7 +207,7 @@ class ParallelExpander extends Module {
     
     // out lsrc(1), which is vs2
     val lsrc1_inc = Wire(UInt(3.W))
-    when (ctrl.widen && !ctrl.redu || v_ext_out(i) && ctrl.lsrc(0)(2,1) === 3.U) {
+    when (ctrl.widen && !ctrl.redu || v_ext_out(i) && ctrl.lsrc(0)(2,1) === 3.U || gather16 && sew.is8) {
       lsrc1_inc := expdIdx(i) >> 1
     }.elsewhen (v_ext_out(i) && ctrl.lsrc(0)(2,1) === 2.U) {
       lsrc1_inc := expdIdx(i) >> 2
@@ -271,7 +271,7 @@ class ParallelExpander extends Module {
     val ldest_inc = Wire(UInt(3.W))
     when (ldstCtrlReg(i).indexed && ctrl.isLdst) {
       ldest_inc := sewSide_inc
-    }.elsewhen (ctrl.narrow) {
+    }.elsewhen (ctrl.narrow || gather16 && sew.is8) {
       ldest_inc := expdIdx(i) >> 1
     }.elsewhen (ctrl.redu || ctrl.narrow_to_1) {
       ldest_inc := 0.U
