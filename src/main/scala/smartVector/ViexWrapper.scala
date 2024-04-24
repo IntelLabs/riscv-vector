@@ -12,34 +12,13 @@ import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import chipsalliance.rocketchip.config
 import darecreek.Vlmul_to_lmul
 
-class IexOutput extends Bundle {
-  val vd = UInt(128.W)
-  val vxsat = Bool()
-  val fflags = UInt(5.W)
-}
-
-class VPermRegIn extends Bundle{
-  val rdata = UInt(128.W)
-  val rvalid = Bool()
-}
-
 class VIexWrapper(implicit p : Parameters) extends Module {
   
   val io = IO(new Bundle {
     val in = Input(ValidIO(new Muop))
     val out = ValidIO(new IexOutput)
-    val permOut = new(VPermOutput)
-    val permRegIn = Input(new(VPermRegIn))
     val iexNeedStall = Output(Bool())
   })
-
-  val SValu   = Module(new VAluWrapper()(p))
-  val SVMac   = Module(new VMacWrapper()(p))
-  val SVMask  = Module(new VMaskWrapper()(p))
-  val SVReduc = Module(new VReducWrapper()(p))
-  val SVDiv   = Module(new VDivWrapper()(p))
-  val SVPerm  = Module(new VPermWrapper()(p))
-  val SVFpu   = Module(new VSFPUWrapper()(p))
 
   val validReg = RegInit(false.B)
   val bitsReg  = RegInit(0.U.asTypeOf(new Muop))
@@ -176,7 +155,4 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   }
   io.out.valid := outValid
 }
-
-
-
 
