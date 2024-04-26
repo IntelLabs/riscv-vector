@@ -252,7 +252,7 @@ class Vsplit(implicit p : Parameters) extends Module {
               
     val lsrc1_inc = Wire(UInt(3.W))
     when (ldst && ldstCtrl.indexed){
-      val lsrc1_inc_tmp = Mux(idxVs2Inc, idx >> indexIncBase, idx % emulVs2)
+      val lsrc1_inc_tmp = Mux(idxVs2Inc, (idx >> indexIncBase) % emulVs2, idx % emulVs2)
       lsrc1_inc := lsrc1_inc_tmp
     }.elsewhen(ctrl.widen && !ctrl.redu && !floatRed || v_ext_out && ctrl.lsrc(0)(2,1) === 3.U) {
       lsrc1_inc := idx >> 1
@@ -271,7 +271,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     //when (ldstCtrlReg(i).indexed && ctrl.isLdst) {
     //  ldest_inc := sewSide_inc
     when (ldst && ldstCtrl.indexed){
-      ldest_inc := Mux(idxVdInc, idx >> indexIncBase, idx % emulVd)
+      ldest_inc := Mux(idxVdInc, idx >> indexIncBase, idx)
     }.elsewhen(ctrl.narrow) {
       ldest_inc := idx >> 1
     }.elsewhen (ctrl.redu  || floatRed || ctrl.narrow_to_1 || vcpop) {
