@@ -213,6 +213,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     val splitStart      = RegInit(0.U(vlenbWidth.W))
 
     // ldQueue
+    val canEnqueue      = WireInit(false.B)
     val ldstEnqPtr      = RegInit(0.U(ldstUopQueueWidth.W))
     val issueLdstPtr    = RegInit(0.U(ldstUopQueueWidth.W))
     val ldstUopQueue    = RegInit(VecInit(Seq.fill(ldstUopQueueSize)(0.U.asTypeOf(new LdstUop))))
@@ -271,7 +272,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     uopState := nextUopState
 
     // if exception occurs or split finished, stop split
-    stopSplit := memXcpt || (uopState === uop_split && curSplitIdx < splitCount && addrMisalign) ||
+    stopSplit := memXcpt || (uopState === uop_split && curSplitIdx < splitCount && addrMisalign && canEnqueue) ||
                 (curSplitIdx + 1.U >= splitCount) || (splitCount === 0.U)
 
     /*****************************SPLIT -- IDLE stage****************************************/
@@ -395,7 +396,7 @@ class SVlsu(implicit p: Parameters) extends Module {
     val isNotMasked = elemMaskVec.asUInt =/= 0.U
 
     when(uopState === uop_split && !memXcpt && curSplitIdx < splitCount) {
-        val canEnqueue = (ldstCtrlReg.vm || isNotMasked) && (curSplitIdx + canLoadElemCnt >= splitStart)
+        canEnqueue := (ldstCtrlReg.vm || isNotMasked) && (curSplitIdx + canLoadElemCnt >= splitStart)
         when(canEnqueue) {
             ldstUopQueue(ldstEnqPtr).valid  := true.B
             ldstUopQueue(ldstEnqPtr).addr   := alignedAddr
