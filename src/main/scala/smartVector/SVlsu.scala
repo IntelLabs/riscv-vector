@@ -218,6 +218,9 @@ class SVlsu(implicit p: Parameters) extends Module {
     val issueLdstPtr    = RegInit(0.U(ldstUopQueueWidth.W))
     val ldstUopQueue    = RegInit(VecInit(Seq.fill(ldstUopQueueSize)(0.U.asTypeOf(new LdstUop))))
 
+    val lastStoreIdx    = RegInit(ldstUopQueueSize.U(ldstUopQueueWidth.W))
+    val replayIdx       = RegInit(ldstUopQueueSize.U(ldstUopQueueWidth.W))
+
     // xcpt info
     val xcptVlReg       = RegInit(0.U(bVL.W))
     val hellaXcptReg    = RegInit(0.U.asTypeOf(new HellaCacheExceptions))
@@ -299,6 +302,8 @@ class SVlsu(implicit p: Parameters) extends Module {
             mUopInfoReg  := mUopInfo
             ldstCtrlReg  := ldstCtrl
             addrReg      := Mux(io.mUop.bits.uop.uopIdx === 0.U, io.mUop.bits.scalar_opnd_1 + (mUopInfo.segIdx << ldstCtrl.log2Memwb), addrReg)
+            lastStoreIdx  := ldstUopQueueSize.U
+
             // Set split info
             ldstEnqPtr   := 0.U
             issueLdstPtr := 0.U
@@ -437,14 +442,27 @@ class SVlsu(implicit p: Parameters) extends Module {
     val isNoXcptUop = ldstUopQueue(issueLdstPtr).valid && (ldstUopQueue(issueLdstPtr).xcpt === 0.U)
     // update issueLdPtr
     // <= or < ?
+    
+    /*
+     * load => issue
+     * store => wait until resp
+     * replay => reissue
+     */
+
+    val canIssue = (issueLdstPtr === replayIdx && ldstUopQueue(issueLdstPtr).valid) || 
+        (isNoXcptUop && (ldstCtrlReg.isLoad || (ldstCtrlReg.isStore && 
+            ((io.dataExchange.resp.valid && io.dataExchange.resp.bits.idx === lastStoreIdx) || lastStoreIdx === ldstUopQueueSize.U)))
+        )
+
     when(io.dataExchange.resp.bits.nack && io.dataExchange.resp.bits.idx <= issueLdstPtr) {
+        replayIdx    := io.dataExchange.resp.bits.idx
         issueLdstPtr := io.dataExchange.resp.bits.idx
-    }.elsewhen(isNoXcptUop && io.dataExchange.req.ready) {
+    }.elsewhen(io.dataExchange.req.ready && canIssue) {
+        replayIdx    := ldstUopQueueSize.U
         issueLdstPtr := issueLdstPtr + 1.U
     }
 
-
-    when(isNoXcptUop) {
+    when(canIssue) {
         val storeDataVec = VecInit(Seq.fill(8)(0.U(8.W)))
         val storeMaskVec = VecInit(Seq.fill(8)(0.U(1.W)))
 
@@ -461,6 +479,9 @@ class SVlsu(implicit p: Parameters) extends Module {
         io.dataExchange.req.bits.idx    := issueLdstPtr
         io.dataExchange.req.bits.data   := Mux(ldstCtrlReg.isLoad, DontCare, storeDataVec.asUInt)
         io.dataExchange.req.bits.mask   := Mux(ldstCtrlReg.isLoad, DontCare, storeMaskVec.asUInt)
+
+        lastStoreIdx  := issueLdstPtr
+        lastStoreAddr := ldstUopQueue(issueLdstPtr).addr
     }.otherwise {
         io.dataExchange.req.valid       := false.B
         io.dataExchange.req.bits        := DontCare
