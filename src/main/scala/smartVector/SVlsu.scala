@@ -216,9 +216,6 @@ class SVlsu(implicit p: Parameters) extends Module {
     val issueLdstPtr    = RegInit(0.U(ldstUopQueueWidth.W))
     val ldstUopQueue    = RegInit(VecInit(Seq.fill(ldstUopQueueSize)(0.U.asTypeOf(new LdstUop))))
 
-    val lastStoreIdx    = RegInit(ldstUopQueueSize.U(ldstUopQueueWidth.W))
-    val replayIdx       = RegInit(ldstUopQueueSize.U(ldstUopQueueWidth.W))
-
     // xcpt info
     val xcptVlReg       = RegInit(0.U(bVL.W))
     val hellaXcptReg    = RegInit(0.U.asTypeOf(new HellaCacheExceptions))
@@ -303,7 +300,6 @@ class SVlsu(implicit p: Parameters) extends Module {
             mUopInfoReg  := mUopInfo
             ldstCtrlReg  := ldstCtrl
             addrReg      := Mux(io.mUop.bits.uop.uopIdx === 0.U, io.mUop.bits.scalar_opnd_1 + (mUopInfo.segIdx << ldstCtrl.log2Memwb), addrReg)
-            lastStoreIdx := ldstUopQueueSize.U
 
             // Set split info
             ldstEnqPtr   := 0.U
@@ -451,29 +447,36 @@ class SVlsu(implicit p: Parameters) extends Module {
      * store => wait until resp
      * replay => reissue
      */
-    val canIssue = WireInit(false.B)
 
-    when (issueLdstPtr === replayIdx && ldstUopQueue(issueLdstPtr).valid) { // Replay
-        canIssue := true.B
-    }.elsewhen (isNoXcptUop && ldstCtrlReg.isLoad && !io.dataExchange.resp.bits.nack) { // load & !replay
-        canIssue := true.B
-    }.elsewhen (isNoXcptUop && ldstCtrlReg.isStore && io.dataExchange.resp.valid && io.dataExchange.resp.bits.idx === lastStoreIdx) { // store & resp back
-        canIssue := true.B
-    }.elsewhen (isNoXcptUop && ldstCtrlReg.isStore && lastStoreIdx === ldstUopQueueSize.U) { // store & first store
-        canIssue := true.B
-    }.otherwise {
-        canIssue := false.B
+    val issue_go :: issue_wait :: Nil = Enum(2)
+
+    val issueState = RegInit(issue_go)
+
+    switch (issueState) {
+        is (issue_go) {
+            when (ldstCtrlReg.isLoad) {
+                issueState := issue_go
+            }.elsewhen (ldstCtrlReg.isStore && io.dataExchange.req.fire) {
+                issueState := issue_wait
+            }
+            // when (io.dataExchange.req.fire) { // stall load & store until resp back
+            //     issueState := issue_wait
+            // }
+        }
+        is (issue_wait) {
+            when (io.dataExchange.resp.valid || io.dataExchange.resp.bits.nack || memXcpt) {
+                issueState := issue_go
+            }
+        }
     }
 
     when (io.dataExchange.resp.bits.nack && io.dataExchange.resp.bits.idx <= issueLdstPtr) {
-        replayIdx    := io.dataExchange.resp.bits.idx
         issueLdstPtr := io.dataExchange.resp.bits.idx
-    }.elsewhen (io.dataExchange.req.ready && canIssue) {
-        replayIdx    := ldstUopQueueSize.U
-        issueLdstPtr := issueLdstPtr + 1.U
+    }.elsewhen (io.dataExchange.req.ready && issueState === issue_go && !completeLdst) {
+        issueLdstPtr := issueLdstPtr + 1.U // NOTE: exsits multiple issues for the same uop
     }
 
-    when (canIssue) {
+    when (issueState === issue_go && isNoXcptUop) {
         val storeDataVec = VecInit(Seq.fill(8)(0.U(8.W)))
         val storeMaskVec = VecInit(Seq.fill(8)(0.U(1.W)))
 
@@ -490,9 +493,6 @@ class SVlsu(implicit p: Parameters) extends Module {
         io.dataExchange.req.bits.idx    := issueLdstPtr
         io.dataExchange.req.bits.data   := Mux(ldstCtrlReg.isLoad, DontCare, storeDataVec.asUInt)
         io.dataExchange.req.bits.mask   := Mux(ldstCtrlReg.isLoad, DontCare, storeMaskVec.asUInt)
-
-        lastStoreIdx                    := issueLdstPtr
-
     }.otherwise {
         io.dataExchange.req.valid       := false.B
         io.dataExchange.req.bits        := DontCare
