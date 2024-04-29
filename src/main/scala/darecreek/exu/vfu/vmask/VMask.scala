@@ -13,8 +13,6 @@ class VMask(implicit p: Parameters) extends VFuModule {
     val out = ValidIO(new VAluOutput)
   })
 
-  io.out.valid := RegNext(io.in.valid)
-
   val funct6 = io.in.bits.uop.ctrl.funct6
   val funct3 = io.in.bits.uop.ctrl.funct3
   val vm = io.in.bits.uop.ctrl.vm
@@ -50,6 +48,8 @@ class VMask(implicit p: Parameters) extends VFuModule {
   val vmsof_m = (funct6 === "b010100".U) && (funct3 === "b010".U) && (vs1_imm === "b00010".U)
   val viota_m = (funct6 === "b010100".U) && (funct3 === "b010".U) && (vs1_imm === "b10000".U)
   val vid_v = (funct6 === "b010100".U) && (funct3 === "b010".U) && (vs1_imm === "b10001".U)
+  val vmask_order = vcpop_m || viota_m || vid_v
+
 
   val vm_logical = vmand_mm ||
     vmnand_mm ||
@@ -80,15 +80,15 @@ class VMask(implicit p: Parameters) extends VFuModule {
 
   val eew = SewOH(vsew)
   val vsew_plus1 = Wire(UInt(3.W))
-  vsew_plus1 := Cat(0.U(1.W), ~vsew(1,0)) + 1.U
-  val vsew_bytes = 1.U << vsew
-  val vsew_bits = 8.U << vsew
-  val ele_cnt = VLENB.U >> vsew
+  vsew_plus1 := Cat(0.U(1.W), ~vsew(1, 0)) + 1.U
+  val vsew_bytes = Mux1H(eew.oneHot, Seq(1.U(4.W), 2.U(4.W), 4.U(4.W), 8.U(4.W)))
+  val vsew_bits = Mux1H(eew.oneHot, Seq(8.U(7.W), 16.U(7.W), 32.U(7.W), 64.U(7.W)))
+  val ele_cnt = Mux1H(eew.oneHot, Seq(16.U(5.W), 8.U(5.W), 4.U(5.W), 2.U(5.W)))
   val vlRemain = Wire(UInt(8.W))
   val vlRemainBytes = vlRemain << vsew
   val all_one = (~0.U(VLEN.W))
 
-  val vmfirst = Wire(UInt(XLEN.W))
+  val vmfirst = Wire(SInt(XLEN.W))
   val vmsbf = Wire(UInt(VLEN.W))
   val vmsif = Cat(vmsbf(VLEN - 2, 0), 1.U)
   val vmsof = Wire(UInt(VLEN.W))
@@ -136,7 +136,12 @@ class VMask(implicit p: Parameters) extends VFuModule {
 
   vmsof := ~vmsbf & vmsif
   vmsbf := sbf(Cat(vs2m.reverse))
-  vmfirst := BitsExtend(vfirst(Cat(vs2m.reverse)), XLEN, true.B)
+
+  when(!Cat(vs2m.reverse).orR) {
+    vmfirst := (-1.S(XLEN.W))
+  }.otherwise {
+    vmfirst := vfirst(Cat(vs2m.reverse)).asSInt
+  }
 
   // viota/vid/vcpop
   val vs2m_uop = MaskExtract(Cat(vs2m.reverse), uopIdx, eew)
@@ -158,14 +163,12 @@ class VMask(implicit p: Parameters) extends VFuModule {
     one_cnt_uop(i + 1) := PopCount(vs2m_uop_vid(i, 0))
   }
 
-  when(uopEnd && fire) {
-    one_sum := 0.U
-  }.otherwise {
+  when(fire && vmask_order) {
     one_sum := one_cnt(ele_cnt)
   }
 
   for (i <- 0 until VLENB + 1) {
-    one_cnt(i) := one_sum + one_cnt_uop(i)
+    one_cnt(i) := Mux(uopIdx === 0.U, one_cnt_uop(i), one_sum + one_cnt_uop(i))
   }
 
   val tail_vd = Wire(UInt(VLEN.W))
@@ -225,7 +228,7 @@ class VMask(implicit p: Parameters) extends VFuModule {
   val reg_viota_m = RegEnable(viota_m, false.B, fire)
   val reg_vid_v = RegEnable(vid_v, false.B, fire)
   val vsew_plus1_reg = Wire(UInt(3.W))
-  vsew_plus1_reg := Cat(0.U(1.W), ~vsew_reg(1,0)) + 1.U
+  vsew_plus1_reg := Cat(0.U(1.W), ~vsew_reg(1, 0)) + 1.U
 
   val vmask_bits = Wire(UInt(VLEN.W))
   vmask_bits := vmask_reg >> (uopIdx_reg << vsew_plus1_reg)
@@ -333,7 +336,7 @@ class VMask(implicit p: Parameters) extends VFuModule {
   tail_vd := vstart_vd | old_vd_vl_mask | (mask_vd & vd_vl_mask & vstart_mask)
 
   vd_out := vd_reg
-  when(vstart_reg >= vl_reg) {
+  when((vstart_reg >= vl_reg) && !reg_vfirst_m && !reg_vcpop_m) {
     vd_out := old_vd_reg
   }.elsewhen(reg_vm_logical || reg_vmsbf_m || reg_vmsif_m || reg_vmsof_m) {
     vd_out := tail_vd
@@ -341,6 +344,7 @@ class VMask(implicit p: Parameters) extends VFuModule {
     vd_out := vid_tail_mask_vd
   }
 
+  io.out.valid := Mux(vcpop_m, RegNext(io.in.valid && uopEnd), RegNext(io.in.valid))
   io.out.bits.vd := vd_out
   io.out.bits.vxsat := false.B
 }

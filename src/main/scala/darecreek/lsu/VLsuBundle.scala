@@ -1,3 +1,15 @@
+/***************************************************************************************
+*Copyright (c) 2023-2024 Intel Corporation
+*Vector Acceleration IP core for RISC-V* is licensed under Mulan PSL v2.
+*You can use this software according to the terms and conditions of the Mulan PSL v2.
+*You may obtain a copy of Mulan PSL v2 at:
+*        http://license.coscl.org.cn/MulanPSL2
+*THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+*EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+*MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+*See the Mulan PSL v2 for more details.
+***************************************************************************************/
+
 package darecreek.lsu
 
 import chisel3._
@@ -10,8 +22,6 @@ class VLdInput extends Bundle {
   val vs2 = UInt(VLEN.W)
   val oldVd = UInt(VLEN.W)
   val vmask = UInt(VLEN.W)
-  val nextVRobIdx = new VRobPtr
-  val iqEmpty = Bool()
 }
 
 class VStInput extends Bundle {
@@ -20,8 +30,6 @@ class VStInput extends Bundle {
   val vs2 = UInt(VLEN.W)
   val vs3 = UInt(VLEN.W)
   val vmask = UInt(VLEN.W)
-  val nextVRobIdx = new VRobPtr
-  val iqEmpty = Bool()
 }
 
 class VLdOutput extends Bundle {
@@ -62,7 +70,7 @@ object LdstDecoder {
     ctrl.strided := mop === 2.U
     ctrl.indexed := mop(0)
     ctrl.fof := lumop === "b10000".U && ctrl.unitStride
-    ctrl.segment := nf =/= 0.U
+    ctrl.segment := nf =/= 0.U && !ctrl.wholeReg
     ctrl.wholeReg := lumop === "b01000".U && ctrl.unitStride
     ctrl
   }

@@ -1,3 +1,0 @@
-vfdiv_vv
-vfsqrt_v
-vfdiv_vf

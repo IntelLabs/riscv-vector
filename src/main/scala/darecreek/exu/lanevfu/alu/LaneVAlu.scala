@@ -1,3 +1,15 @@
+/***************************************************************************************
+*Copyright (c) 2023-2024 Intel Corporation
+*Vector Acceleration IP core for RISC-V* is licensed under Mulan PSL v2.
+*You can use this software according to the terms and conditions of the Mulan PSL v2.
+*You may obtain a copy of Mulan PSL v2 at:
+*        http://license.coscl.org.cn/MulanPSL2
+*THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+*EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+*MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+*See the Mulan PSL v2 for more details.
+***************************************************************************************/
+
 /** Integer and fixed-point (except mult and div)
   *   
   * Perform below instructions:
@@ -25,18 +37,27 @@ package darecreek.exu.lanevfu.alu
 import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.decode._
-import darecreek.{LaneFUInput, LaneFUOutput, SewOH, VExpdUOp, UIntSplit, MaskReorg}
+import darecreek.{SewOH, UIntSplit, MaskReorg}
 import chipsalliance.rocketchip.config._
-import darecreek.exu.vfu.alu._
-import darecreek.exu.vfu.{VFuModule, VFuParamsKey, VFuParameters}
+import darecreek.exu.vfucore.alu._
+import darecreek.exu.vfucore.{VFuModule, VFuParamsKey, VFuParameters}
+import darecreek.exu.vfucore.{LaneFUInput, LaneFUOutput}
+import darecreek.exu.vfucoreconfig.{VUop, Redirect}
+
+class VIntFixpDecode extends Bundle {
+  val sub = Bool()
+  val misc = Bool()
+  val fixp = Bool()
+}
 
 // finalResult = result & maskKeep | maskOff
 class MaskTailDataVAlu extends Module {
   val io = IO(new Bundle {
     val mask = Input(UInt(8.W))
     val tail = Input(UInt(8.W))
+    val vstart_gte_vl = Input(Bool())
     val oldVd = Input(UInt(64.W))
-    val uop = Input(new VExpdUOp)
+    val uop = Input(new VUop)
     val opi = Input(Bool())
     val maskKeep = Output(UInt(64.W))  // keep: 11..1  off: 00..0
     val maskOff = Output(UInt(64.W))   // keep: 00..0  off: old_vd or 1.U
@@ -48,9 +69,12 @@ class MaskTailDataVAlu extends Module {
   val (mask, tail, oldVd, uop) = (io.mask, io.tail, io.oldVd, io.uop)
   val addWithCarry = uop.ctrl.funct6(5,2) === "b0100".U && io.opi
   val vmerge = uop.ctrl.funct6 === "b010111".U
+  val isWholeRegMv = uop.ctrl.funct6 === "b100111".U && uop.ctrl.funct3 === "b011".U
   for (i <- 0 until 8) {
-    when (tail(i)) {
-      maskTail(i) := Mux(uop.info.ta || uop.ctrl.narrow_to_1, 3.U, 2.U)
+    when (io.vstart_gte_vl && !isWholeRegMv) {
+      maskTail(i) := 2.U
+    }.elsewhen (tail(i)) {
+      maskTail(i) := Mux(isWholeRegMv, 0.U, Mux(uop.info.ta || uop.ctrl.narrow_to_1, 3.U, 2.U))
     }.elsewhen (addWithCarry || vmerge) {
       maskTail(i) := 0.U
     }.elsewhen (!mask(i) && !uop.ctrl.vm) {
@@ -77,13 +101,15 @@ class MaskTailDataVAlu extends Module {
 class LaneVAlu(implicit p: Parameters) extends VFuModule {
   val io = IO(new Bundle {
     val in = Flipped(Decoupled(new LaneFUInput))
+    val redirect = Input(new Redirect)
     val out = Decoupled(new LaneFUOutput)
   })
   
   val uop = io.in.bits.uop
   val sew = SewOH(uop.info.vsew)  // 0:8, 1:16, 2:32, 3:64
   val eewVd = SewOH(uop.info.destEew)
-  val fire = io.in.fire
+  val flushIn = io.in.valid && io.redirect.needFlush(io.in.bits.uop.robIdx)
+  val fire = io.in.fire && !flushIn
   // broadcast rs1 or imm to all elements, assume xLen = 64
   val imm = uop.ctrl.lsrc(0)
   //                            |sign-extend imm to 64 bits|
@@ -132,17 +158,18 @@ class LaneVAlu(implicit p: Parameters) extends VFuModule {
   vIntMisc.io.vs1 := vs1_rs1_imm
   vIntMisc.io.vs2 := io.in.bits.vs2
   vIntMisc.io.vmask := io.in.bits.mask
-
+  vIntMisc.io.fs1:= io.in.bits.rs1(FLEN-1, 0)
 
   //------------------------------------
   //-------- Mask/Tail data gen --------
   //------------------------------------
   // Splash. sew = 8: unchanged, sew = 16: 0000abcd -> aabbccdd, ...
-  val maskSplash = MaskReorg.splash(io.in.bits.mask, eewVd)
-  val tailSplash = MaskReorg.splash(io.in.bits.tail, eewVd)
+  val maskSplash = Mux(uop.ctrl.narrow_to_1, io.in.bits.mask, MaskReorg.splash(io.in.bits.mask, eewVd))
+  val tailSplash = Mux(uop.ctrl.narrow_to_1, io.in.bits.tail, MaskReorg.splash(io.in.bits.tail, eewVd))
   val maskTailData = Module(new MaskTailDataVAlu)
   maskTailData.io.mask := maskSplash
   maskTailData.io.tail := tailSplash
+  maskTailData.io.vstart_gte_vl := uop.info.vstart_gte_vl
   maskTailData.io.oldVd := io.in.bits.old_vd
   maskTailData.io.uop := io.in.bits.uop
   maskTailData.io.opi := opi
@@ -171,6 +198,9 @@ class LaneVAlu(implicit p: Parameters) extends VFuModule {
       aluCmpOut(i) := Mux(uop.expdIdx === 0.U, ~(0.U(8.W)), 
                           Mux(uop.expdIdx === i.U, cmpMasked, aluCmpOut(i)))
     }
+    when (uop.info.vstart_gte_vl) {
+      for (i <- 0 until 8) { aluCmpOut(i) := UIntSplit(io.in.bits.old_vd, 8)(i) }
+    }
     aluCmpValid := uop.expdEnd && uop.ctrl.narrow_to_1
   }
   //---- Output of ALU MISC (not narrow) ----
@@ -197,15 +227,27 @@ class LaneVAlu(implicit p: Parameters) extends VFuModule {
     aluNarrowValid -> aluNarrowOut,
   ))
   val vdS1IntMasked = vdS1Int & maskKeepS1 | maskOffS1
-  val vdS1IntFinal = Mux(aluCmpValid, Cat(aluCmpOut.reverse), vdS1IntMasked)
+  val rdValid = Reg(Bool())
+  val rd = Reg(UInt(XLEN.W))
+  when (fire) {
+    rdValid := vIntMisc.io.rd.valid
+    rd := vIntMisc.io.rd.bits
+  }
+  val vdS1IntFinal = Mux(rdValid, rd,
+                         Mux(aluCmpValid, Cat(aluCmpOut.reverse), vdS1IntMasked))
 
   //--------- Ready/valid of S1Int ---------
   val readyS1Int = Wire(Bool())
   val readyS1FixP = Wire(Bool())
-  io.in.ready := !io.in.valid || (readyS1Int && readyS1FixP) //S1: pipeline stage 1
   val validS1Int = RegInit(false.B)
-  validS1Int := Mux(fire && !uop.ctrl.fixP, true.B, Mux(readyS1Int, false.B, validS1Int))
   val uopS1 = RegEnable(uop, fire)
+  val flushS1Int = validS1Int && io.redirect.needFlush(uopS1.robIdx)
+  when (fire && !uop.ctrl.fixP) { 
+    validS1Int := true.B
+  }.elsewhen (readyS1Int || flushS1Int) {
+    validS1Int := false.B
+  }
+  // validS1Int := Mux(fire && !uop.ctrl.fixP, true.B, Mux(readyS1Int, false.B, validS1Int))
   val validS1IntFinal = Mux(uopS1.ctrl.narrow_to_1, aluCmpValid && validS1Int, 
                         Mux(uopS1.ctrl.narrow, aluNarrowValid && validS1Int, validS1Int))
 
@@ -222,24 +264,36 @@ class LaneVAlu(implicit p: Parameters) extends VFuModule {
   //--------- Ready/valid of S1FixP (S1: pipeline stage 1) ---------
   val validS1FixP = RegInit(false.B)
   val readyS2FixP = Wire(Bool())
-  readyS1FixP := !validS1FixP || readyS2FixP
-  validS1FixP := Mux(fire && uop.ctrl.fixP, true.B, Mux(readyS1FixP, false.B, validS1FixP))
-  val fireS1FixP = validS1FixP && readyS1FixP
+  readyS1FixP := readyS2FixP
+  val flushS1FixP = validS1FixP && io.redirect.needFlush(uopS1.robIdx)
+  when (fire && uop.ctrl.fixP) { 
+    validS1FixP := true.B
+  }.elsewhen (readyS1FixP || flushS1FixP) {
+    validS1FixP := false.B
+  }
+  // validS1FixP := Mux(fire && uop.ctrl.fixP, true.B, Mux(readyS1FixP, false.B, validS1FixP))
+  val fireS1FixP = validS1FixP && readyS1FixP && !flushS1FixP
 
+  io.in.ready := (readyS1Int || !validS1Int) && (readyS1FixP || !validS1FixP) //S1: pipeline stage 1
 
   /**
     *  ---- Pipeline-stage 2 (fixed-point instructions) ----
     */
   // Output of fixed-point unit
   val aluFixPOut = Reg(UInt(64.W))
+  val aluFixPVxsatOut = Reg(UInt(64.W))
   val aluFixPValid = RegInit(false.B)
   val aluFixPNarrowOut = Reg(UInt(64.W))
+  val aluFixPVxsatNarrowOut = Reg(UInt(8.W))
   val aluFixPNarrowValid = RegInit(false.B)
   when (fireS1FixP) {
     aluFixPOut := vAluFixP.io.vd
+    aluFixPVxsatOut := vAluFixP.io.vxsat
     aluFixPValid := uopS1.ctrl.fixP && !uopS1.ctrl.narrow
     aluFixPNarrowOut := Mux(uopS1.expdIdx(0), Cat(vAluFixP.io.narrowVd, aluFixPNarrowOut(31, 0)),
                         Cat(0.U(32.W), vAluFixP.io.narrowVd))
+    aluFixPVxsatNarrowOut := Mux(uopS1.expdIdx(0), Cat(vAluFixP.io.vxsat(3, 0), aluFixPVxsatNarrowOut(3, 0)),
+                        Cat(0.U(4.W), vAluFixP.io.vxsat(3, 0)))
     aluFixPNarrowValid := (uopS1.expdIdx(0) || uopS1.expdEnd) && uopS1.ctrl.narrow
   }
 
@@ -247,24 +301,39 @@ class LaneVAlu(implicit p: Parameters) extends VFuModule {
     aluFixPValid -> aluFixPOut,
     aluFixPNarrowValid -> aluFixPNarrowOut
   ))
+  val vxsatS2 = Mux1H(Seq(
+    aluFixPValid -> aluFixPVxsatOut,
+    aluFixPNarrowValid -> aluFixPVxsatNarrowOut
+  ))
 
   val maskKeepS2 = RegEnable(maskKeepS1, fireS1FixP)
   val maskOffS2 = RegEnable(maskOffS1, fireS1FixP)
   val vdS2FixPFinal = vdS2FixP & maskKeepS2 | maskOffS2
 
   val uopS2 = RegEnable(uopS1, fireS1FixP) 
-  val vxsatS2 = RegEnable(vAluFixP.io.vxsat, fireS1FixP)
+  // Assume vstart = 0
+  val maskSplashS1 = RegEnable(maskSplash, fire)
+  val tailSplashS1 = RegEnable(tailSplash, fire)
+  val maskSplashS2 = RegEnable(maskSplashS1, fireS1FixP)
+  val tailSplashS2 = RegEnable(tailSplashS1, fireS1FixP)
+  val vxsatS2_maskTail = vxsatS2 & ~tailSplashS2 & (maskSplashS2 | Fill(8, uopS2.ctrl.vm))
 
   val validS2FixP = RegInit(false.B)
-  validS2FixP := Mux(fireS1FixP, true.B, Mux(readyS2FixP, false.B, validS2FixP))
-
+  val flushS2FixP = validS2FixP && io.redirect.needFlush(uopS2.robIdx)
+  when (fireS1FixP) {
+    validS2FixP := true.B
+  }.elsewhen (readyS2FixP || flushS2FixP) {
+    validS2FixP := false.B
+  }
+  // validS2FixP := Mux(fireS1FixP, true.B, Mux(readyS2FixP, false.B, validS2FixP))
+  val validS2FixPFinal = Mux(uopS2.ctrl.narrow, aluFixPNarrowValid && validS2FixP, validS2FixP)
 
   /**
     *  ---- Output arbiter (int vs fix-p) ----
     *  No need to use round robin since there will be no input-fire if readyS1Int == 0.
     */
   val arb = Module(new Arbiter(new LaneFUOutput, 2))
-  arb.io.in(0).valid := validS2FixP
+  arb.io.in(0).valid := validS2FixPFinal
   arb.io.in(1).valid := validS1IntFinal
   readyS2FixP := arb.io.in(0).ready
   readyS1Int := arb.io.in(1).ready
@@ -272,20 +341,11 @@ class LaneVAlu(implicit p: Parameters) extends VFuModule {
   arb.io.in(0).bits.uop := uopS2
   arb.io.in(0).bits.vd := vdS2FixPFinal
   arb.io.in(0).bits.fflags := 0.U
-  arb.io.in(0).bits.vxsat := vxsatS2
+  arb.io.in(0).bits.vxsat := vxsatS2_maskTail.orR
   arb.io.in(1).bits.uop := uopS1
   arb.io.in(1).bits.vd := vdS1IntFinal
   arb.io.in(1).bits.fflags := 0.U
   arb.io.in(1).bits.vxsat := false.B
 
   io.out <> arb.io.out
-}
-
-import xiangshan._
-object Main extends App {
-  println("Generating hardware")
-  val p = Parameters.empty
-  emitVerilog(new LaneVAlu()(p.alterPartial({case VFuParamsKey => 
-              VFuParameters(VLEN = 256)})), Array("--target-dir", "generated",
-              "--emission-options=disableMemRandomization,disableRegisterRandomization"))
 }

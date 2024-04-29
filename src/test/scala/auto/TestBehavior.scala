@@ -23,7 +23,9 @@ abstract class TestBehavior(filename : String, ctrlBundle : TestCtrlBundleBase, 
     def setLmulLsOneDone() = {lmulLsOneDone = true}
     def getLmulLsOneDone() = lmulLsOneDone
 
-    def getTestfilePath() : String              = Datapath.testdataRoot + filename
+    // def getTestfilePath() : String              = Datapath.testdataRoot + filename
+    def getFilename() : String = filename
+    def getTestfilePath(fname: String) : String              = Datapath.testdataRoot + fname
     def getCtrlBundle() : TestCtrlBundleBase    = ctrlBundle
     def getSign() : String                      = sign
     def getInstid() : String                    = instid
@@ -31,6 +33,10 @@ abstract class TestBehavior(filename : String, ctrlBundle : TestCtrlBundleBase, 
     def getDut() : Module               = {
         val dut = new VAluWrapper
         return dut
+    }
+
+    def randomFlush() : Boolean = {
+        return RandomGen.rand.nextInt(100) > 95
     }
 
     def getHexfield(simi : Map[String,String], keyname : String) : Int = {
@@ -67,13 +73,13 @@ abstract class TestBehavior(filename : String, ctrlBundle : TestCtrlBundleBase, 
 
     def dump(simi : Map[String,String], dut_out : String, golden_vd : String, fault_wb : String = "") = {
         //println("fault_wb in TestBehavior", fault_wb)
-        TestResults.addResult(TestResults.InstTestRes(
+        /*TestResults.addResult(TestResults.InstTestRes(
             this.getInstid(),
             true,
             dut_out,
             golden_vd,
             fault_wb
-        ))
+        ))*/
         Dump.dump(simi, instid, dut_out, golden_vd, fault_wb=fault_wb)
     }
 

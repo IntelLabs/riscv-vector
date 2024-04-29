@@ -1,3 +1,15 @@
+/***************************************************************************************
+*Copyright (c) 2023-2024 Intel Corporation
+*Vector Acceleration IP core for RISC-V* is licensed under Mulan PSL v2.
+*You can use this software according to the terms and conditions of the Mulan PSL v2.
+*You may obtain a copy of Mulan PSL v2 at:
+*        http://license.coscl.org.cn/MulanPSL2
+*THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+*EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+*MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+*See the Mulan PSL v2 for more details.
+***************************************************************************************/
+
 /**
   * Integer and fixed-point (except mult and div)
   *   
@@ -61,6 +73,7 @@ class VIntFixpAlu64b(implicit p: Parameters) extends VFuModule {
     val isFixp = Input(Bool())
     val isMisc = Input(Bool())
     val isSub = Input(Bool())  // subtract (exclude vrsub)
+    val fs1 = Input(UInt(FLEN.W)) // for vfmv.s.f
 
     val vd = Output(UInt(64.W))
     val narrowVd = Output(UInt(32.W))
@@ -97,6 +110,7 @@ class VIntFixpAlu64b(implicit p: Parameters) extends VFuModule {
   vIntMisc64b.io.vs1 := io.vs1
   vIntMisc64b.io.vs2 := io.vs2_misc
   vIntMisc64b.io.vmask := io.vmask
+  vIntMisc64b.io.fs1 := io.fs1
 
   val vdAdderS1 = RegEnable(vIntAdder64b.io.vd, io.valid)
   val vdMiscS1 = RegEnable(vIntMisc64b.io.vd, io.valid)
@@ -161,6 +175,7 @@ class VAlu(implicit p: Parameters) extends VFuModule {
     vIntFixpAlu64bs(i).io.vi := io.in.bits.uop.ctrl.vi
     vIntFixpAlu64bs(i).io.vm := io.in.bits.uop.ctrl.vm
     vIntFixpAlu64bs(i).io.vs1_imm := io.in.bits.uop.ctrl.vs1_imm
+    vIntFixpAlu64bs(i).io.fs1:= io.in.bits.rs1(FLEN-1, 0)
     vIntFixpAlu64bs(i).io.ma := io.in.bits.uop.info.ma
     vIntFixpAlu64bs(i).io.widen := io.in.bits.uop.ctrl.widen
     vIntFixpAlu64bs(i).io.widen2 := io.in.bits.uop.ctrl.widen2
@@ -263,10 +278,7 @@ class VAlu(implicit p: Parameters) extends VFuModule {
    */
   val old_cmpOutResult = Reg(UInt(128.W))
   val cmpOutResult = old_cmpOutResult & cmpOutOff | cmpOutKeep // Compare and carry-out instrns
-  val uopEndS1 = RegEnable(uopEnd, valid)
-  when (RegNext(valid)) {
-    old_cmpOutResult := Mux(uopEndS1, 0.U, cmpOutResult)
-  }
+  when (RegNext(valid && narrow_to_1)) { old_cmpOutResult := cmpOutResult }
   io.out.valid := RegNext(Mux(narrow_to_1, uopEnd && valid, valid), init = false.B)
 
   /**

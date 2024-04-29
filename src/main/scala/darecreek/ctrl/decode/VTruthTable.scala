@@ -1,3 +1,15 @@
+/***************************************************************************************
+*Copyright (c) 2023-2024 Intel Corporation
+*Vector Acceleration IP core for RISC-V* is licensed under Mulan PSL v2.
+*You can use this software according to the terms and conditions of the Mulan PSL v2.
+*You may obtain a copy of Mulan PSL v2 at:
+*        http://license.coscl.org.cn/MulanPSL2
+*THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+*EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+*MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+*See the Mulan PSL v2 for more details.
+***************************************************************************************/
+
 /**
   * Split up truth table into several parts to deal with the NP-hard problem
   *       Split up into: vClass0, vClass1, vClass2, ...
@@ -192,9 +204,9 @@ class VecDecode1 extends VecDecode {
     VMERGE_VVM        -> BitPat("b1 011 10   00    10   1 0 0 0 0 0 0 0  0000"),
     VMERGE_VXM        -> BitPat("b1 010 10   00    10   1 0 0 0 0 0 0 0  0000"),
     VMERGE_VIM        -> BitPat("b1 010 10   00    10   1 0 0 0 0 0 0 0  0000"),
-    VMV_V_V           -> BitPat("b1 011 10   00    10   1 0 0 0 0 0 0 0  0000"),
-    VMV_V_X           -> BitPat("b1 010 10   00    10   1 0 0 0 0 0 0 0  0000"),
-    VMV_V_I           -> BitPat("b1 010 10   00    10   1 0 0 0 0 0 0 0  0000"),
+    VMV_V_V           -> BitPat("b1 001 10   00    10   1 0 0 0 0 0 0 0  0000"),
+    VMV_V_X           -> BitPat("b1 000 10   00    10   1 0 0 0 0 0 0 0  0000"),
+    VMV_V_I           -> BitPat("b1 000 10   00    10   1 0 0 0 0 0 0 0  0000"),
   )
 }
 
@@ -236,18 +248,18 @@ class VecDecode2 extends VecDecode {
     VWMACCSU_VV       -> BitPat("b1 111 10   00    10   0 1 0 0 0 0 0 0  1000"),
     VWMACCSU_VX       -> BitPat("b1 110 10   00    10   0 1 0 0 0 0 0 0  1000"),
     VWMACCUS_VX       -> BitPat("b1 110 10   00    10   0 1 0 0 0 0 0 0  1000"),
-    VDIVU_VV          -> BitPat("b1 011 10   00    10   0 0 0 1 0 0 0 0  0000"),
-    VDIVU_VX          -> BitPat("b1 010 10   00    10   0 0 0 1 0 0 0 0  0000"),
-    VDIV_VV           -> BitPat("b1 011 10   00    10   0 0 0 1 0 0 0 0  0000"),
-    VDIV_VX           -> BitPat("b1 010 10   00    10   0 0 0 1 0 0 0 0  0000"),
-    VREMU_VV          -> BitPat("b1 011 10   00    10   0 0 0 1 0 0 0 0  0000"),
-    VREMU_VX          -> BitPat("b1 010 10   00    10   0 0 0 1 0 0 0 0  0000"),
-    VREM_VV           -> BitPat("b1 011 10   00    10   0 0 0 1 0 0 0 0  0000"),
-    VREM_VX           -> BitPat("b1 010 10   00    10   0 0 0 1 0 0 0 0  0000"),
-    VFDIV_VV          -> BitPat("b1 011 10   00    10   0 0 0 1 0 0 0 0  0000"),
-    VFDIV_VF          -> BitPat("b1 010 10   00    10   0 0 0 1 0 0 0 0  0000"),
-    VFRDIV_VF         -> BitPat("b1 010 10   00    10   0 0 0 1 0 0 0 0  0000"),
-    VFSQRT_V          -> BitPat("b1 010 10   00    10   0 0 0 1 0 0 0 0  0000"),
+    VDIVU_VV          -> BitPat("b1 011 10   00    11   0 0 0 1 0 0 0 0  0000"),
+    VDIVU_VX          -> BitPat("b1 010 10   00    11   0 0 0 1 0 0 0 0  0000"),
+    VDIV_VV           -> BitPat("b1 011 10   00    11   0 0 0 1 0 0 0 0  0000"),
+    VDIV_VX           -> BitPat("b1 010 10   00    11   0 0 0 1 0 0 0 0  0000"),
+    VREMU_VV          -> BitPat("b1 011 10   00    11   0 0 0 1 0 0 0 0  0000"),
+    VREMU_VX          -> BitPat("b1 010 10   00    11   0 0 0 1 0 0 0 0  0000"),
+    VREM_VV           -> BitPat("b1 011 10   00    11   0 0 0 1 0 0 0 0  0000"),
+    VREM_VX           -> BitPat("b1 010 10   00    11   0 0 0 1 0 0 0 0  0000"),
+    VFDIV_VV          -> BitPat("b1 011 10   00    11   0 0 0 1 0 0 0 0  0000"),
+    VFDIV_VF          -> BitPat("b1 010 10   00    11   0 0 0 1 0 0 0 0  0000"),
+    VFRDIV_VF         -> BitPat("b1 010 10   00    11   0 0 0 1 0 0 0 0  0000"),
+    VFSQRT_V          -> BitPat("b1 010 10   00    11   0 0 0 1 0 0 0 0  0000"),
   )
 }
 
@@ -411,14 +423,14 @@ class VecDecode5 extends VecDecode {
     VREDAND_VS        -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  0000"),
     VREDOR_VS         -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  0000"),
     VREDXOR_VS        -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  0000"),
-    VWREDSUMU_VS      -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  0000"),
-    VWREDSUM_VS       -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  0000"),
+    VWREDSUMU_VS      -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  1000"),
+    VWREDSUM_VS       -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  1000"),
     VFREDOSUM_VS      -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  0000"),
     VFREDUSUM_VS      -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  0000"),
     VFREDMIN_VS       -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  0000"),
     VFREDMAX_VS       -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  0000"),
-    VFWREDUSUM_VS     -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  0000"),
-    VFWREDOSUM_VS     -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  0000"),
+    VFWREDUSUM_VS     -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  1000"),
+    VFWREDOSUM_VS     -> BitPat("b1 011 10   00    11   0 0 0 0 0 1 0 0  1000"),
 
     // Vector mask instructions
     VMAND_MM          -> BitPat("b1 011 10   00    11   0 0 0 0 0 0 1 0  0000"),
@@ -438,10 +450,10 @@ class VecDecode5 extends VecDecode {
     VID_V             -> BitPat("b1 000 10   00    11   0 0 0 0 0 0 1 0  0000"),
 
     // Vector permutation instructions
-    VMV_X_S           -> BitPat("b1 010 01   00    11   0 0 0 0 0 0 0 1  0000"),
-    VMV_S_X           -> BitPat("b1 000 10   00    11   0 0 0 0 0 0 0 1  0000"),
-    VFMV_F_S          -> BitPat("b1 010 01   00    11   0 0 0 0 0 0 0 1  0000"),
-    VFMV_S_F          -> BitPat("b1 000 10   00    11   0 0 0 0 0 0 0 1  0000"),
+    VMV_X_S           -> BitPat("b1 010 01   00    10   1 0 0 0 0 0 0 0  0000"),
+    VMV_S_X           -> BitPat("b1 000 10   00    10   1 0 0 0 0 0 0 0  0000"),
+    VFMV_F_S          -> BitPat("b1 010 01   00    10   1 0 0 0 0 0 0 0  0000"),
+    VFMV_S_F          -> BitPat("b1 000 10   00    10   1 0 0 0 0 0 0 0  0000"),
     VSLIDEUP_VX       -> BitPat("b1 010 10   00    11   0 0 0 0 0 0 0 1  0000"),
     VSLIDEUP_VI       -> BitPat("b1 010 10   00    11   0 0 0 0 0 0 0 1  0000"),
     VSLIDEDOWN_VX     -> BitPat("b1 010 10   00    11   0 0 0 0 0 0 0 1  0000"),
@@ -455,9 +467,9 @@ class VecDecode5 extends VecDecode {
     VRGATHER_VX       -> BitPat("b1 010 10   00    11   0 0 0 0 0 0 0 1  0000"),
     VRGATHER_VI       -> BitPat("b1 010 10   00    11   0 0 0 0 0 0 0 1  0000"),
     VCOMPRESS_VM      -> BitPat("b1 011 10   00    11   0 0 0 0 0 0 0 1  0000"),
-    VMV1R_V           -> BitPat("b1 010 10   00    11   0 0 0 0 0 0 0 1  0000"),
-    VMV2R_V           -> BitPat("b1 010 10   00    11   0 0 0 0 0 0 0 1  0000"),
-    VMV4R_V           -> BitPat("b1 010 10   00    11   0 0 0 0 0 0 0 1  0000"),
-    VMV8R_V           -> BitPat("b1 010 10   00    11   0 0 0 0 0 0 0 1  0000"),
+    VMV1R_V           -> BitPat("b1 010 10   00    10   1 0 0 0 0 0 0 0  0000"),
+    VMV2R_V           -> BitPat("b1 010 10   00    10   1 0 0 0 0 0 0 0  0000"),
+    VMV4R_V           -> BitPat("b1 010 10   00    10   1 0 0 0 0 0 0 0  0000"),
+    VMV8R_V           -> BitPat("b1 010 10   00    10   1 0 0 0 0 0 0 0  0000"),
   )
 }

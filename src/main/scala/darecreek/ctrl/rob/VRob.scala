@@ -1,3 +1,15 @@
+/***************************************************************************************
+*Copyright (c) 2023-2024 Intel Corporation
+*Vector Acceleration IP core for RISC-V* is licensed under Mulan PSL v2.
+*You can use this software according to the terms and conditions of the Mulan PSL v2.
+*You may obtain a copy of Mulan PSL v2 at:
+*        http://license.coscl.org.cn/MulanPSL2
+*THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+*EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+*MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+*See the Mulan PSL v2 for more details.
+***************************************************************************************/
+
 /** OVI (Open Vector Interface) adoption
  *    Every instrucion in VRob will finally be commited OR flushed
  *  Notes:
@@ -7,7 +19,6 @@
  *    2) Currently the ovi_completed is ordered 
  *  Features: 
  *    1) Decoupled rename history buffer
- *    2) Small rd (scalar dest) buffer, source of io.fromDispatch.ready
  */
 package darecreek
 
@@ -45,13 +56,15 @@ class VRob extends Module with HasCircularQueuePtrHelper {
     val ovi_dispatch = new OVIdispatch
     // from VIllegalInstrn.io.ill
     val illegal = Flipped(ValidIO(new VRobPtr))
-    // from VIllegalInstrn.io.partialVInfo
+    // extract from VInfoCalc.io.infoAll
     val partialVInfo = Flipped(ValidIO(new PartialVInfo))
     // from Rename block
-    val fromDispatch = Vec(VRenameWidth, Flipped(Decoupled(new VExpdUOp)))
+    val fromDispatch = Vec(VRenameWidth, Flipped(ValidIO(new VExpdUOp)))
     // writebacks from EXU and LSU
-    val wbArith = Flipped(ValidIO(new WbArith))
-    val wbLSU = Vec(2, Flipped(ValidIO(new VExpdUOp)))
+    val wbArith_laneAlu = Input(ValidIO(new WbArith_lane))
+    val wbArith_laneMulFp = Input(ValidIO(new WbArith_lane))
+    val wbArith_cross = Input(ValidIO(new WbArith_cross))
+    val wbLSU = Input(ValidIO(new VExpdUOp))
     // OVI completed
     val ovi_completed = new OVIcompleted
     // Vec ROB commits
@@ -139,8 +152,8 @@ class VRob extends Module with HasCircularQueuePtrHelper {
   }
   enqPtrRhb := enqPtrRhb + enqRhbPopCnt
 
-  /** rd buffer */
-  val RdBufSize = 4
+  /** rd (scalar dest) buffer */
+  val RdBufSize = VQSize // Todo: use smaller rd-buffer-size
   val rdBuf = Reg(Vec(RdBufSize, new RdBufferEntry))
   class RdBufPtr extends CircularQueuePtr[RdBufPtr](RdBufSize)
   val enqPtrRdBuf = RegInit(0.U.asTypeOf(new RdBufPtr))
@@ -149,35 +162,71 @@ class VRob extends Module with HasCircularQueuePtrHelper {
     rdBuf(enqPtrRdBuf.value).robPtr := enqPtr
     enqPtrRdBuf := enqPtrRdBuf + 1.U
   }
-  val wb_rdBuf_oneHot = rdBuf.map(_.robPtr === io.wbArith.bits.uop.vRobIdx)
-  rdBuf zip wb_rdBuf_oneHot map { case (entry, hit) => 
-    when (hit && io.wbArith.valid && io.wbArith.bits.uop.ctrl.rdVal) {
-      entry.rd := io.wbArith.bits.rd
+  val wbA_laneAlu_rdBuf_oneHot = rdBuf.map(_.robPtr === io.wbArith_laneAlu.bits.uop.vRobIdx)
+  rdBuf zip wbA_laneAlu_rdBuf_oneHot map { case (entry, hit) => 
+    when (hit && io.wbArith_laneAlu.valid && io.wbArith_laneAlu.bits.uop.ctrl.rdVal) {
+      entry.rd := io.wbArith_laneAlu.bits.rd
+    }
+  }
+  val wbA_laneMulFp_rdBuf_oneHot = rdBuf.map(_.robPtr === io.wbArith_laneMulFp.bits.uop.vRobIdx)
+  rdBuf zip wbA_laneMulFp_rdBuf_oneHot map { case (entry, hit) => 
+    when (hit && io.wbArith_laneMulFp.valid && io.wbArith_laneMulFp.bits.uop.ctrl.rdVal) {
+      entry.rd := io.wbArith_laneMulFp.bits.rd
+    }
+  }
+  val wbA_cross_rdBuf_oneHot = rdBuf.map(_.robPtr === io.wbArith_cross.bits.uop.vRobIdx)
+  rdBuf zip wbA_cross_rdBuf_oneHot map { case (entry, hit) => 
+    when (hit && io.wbArith_cross.valid && io.wbArith_cross.bits.uop.ctrl.rdVal) {
+      entry.rd := io.wbArith_cross.bits.rd
     }
   }
   val emptyRdBuf = isEmpty(enqPtrRdBuf, deqPtrRdBuf)
-  val fullRdBuf = isFull(enqPtrRdBuf, deqPtrRdBuf)
-  io.fromDispatch.foreach(_.ready := !fullRdBuf)
 
   /**
     * Write back
+    * Note: So far, set constant 0 to OVI_COMPLETED.vstart (does not support load retry)
     */
-  // Write back of arith
-  val wbA = io.wbArith.bits.uop
-  when (io.wbArith.valid) {
-    busy(wbA.vRobIdx.value) := !wbA.expdEnd  // Only support in-order write-backs under the same instruction
-    oviCompltSigs(wbA.vRobIdx.value) := Cat(io.wbArith.bits.fflags, io.wbArith.bits.vxsat).asTypeOf(new OviCompltSigs)
+  //---- Write-back of arith_lane_alu ----
+  val wbA_laneAlu = io.wbArith_laneAlu.bits.uop
+  val wbA_laneAlu_valid = io.wbArith_laneAlu.valid
+  val wbA_laneAlu_vRobIdx_value = wbA_laneAlu.vRobIdx.value
+  // Only support in-order write-backs under the same instruction
+  when (wbA_laneAlu_valid) {
+    busy(wbA_laneAlu_vRobIdx_value) := !wbA_laneAlu.expdEnd
+    oviCompltSigs(wbA_laneAlu_vRobIdx_value).fflags := oviCompltSigs(wbA_laneAlu_vRobIdx_value).fflags |
+                                                      io.wbArith_laneAlu.bits.fflags
+    oviCompltSigs(wbA_laneAlu_vRobIdx_value).vxsat := oviCompltSigs(wbA_laneAlu_vRobIdx_value).vxsat ||
+                                                      io.wbArith_laneAlu.bits.vxsat
   }
-  // Write back of ld
-  val wbL = io.wbLSU(0).bits
-  when (io.wbLSU(0).valid) {
-    busy(wbL.vRobIdx.value) := !wbL.expdEnd
+  //---- Write-back of arith_lane_mulFp ----
+  val wbA_laneMulFp = io.wbArith_laneMulFp.bits.uop
+  val wbA_laneMulFp_valid = io.wbArith_laneMulFp.valid
+  val wbA_laneMulFp_vRobIdx_value = wbA_laneMulFp.vRobIdx.value
+  // Only support in-order write-backs under the same instruction
+  when (wbA_laneMulFp_valid) {
+    busy(wbA_laneMulFp_vRobIdx_value) := !wbA_laneMulFp.expdEnd
+    oviCompltSigs(wbA_laneMulFp_vRobIdx_value).fflags := oviCompltSigs(wbA_laneMulFp_vRobIdx_value).fflags |
+                                                         io.wbArith_laneMulFp.bits.fflags
+    oviCompltSigs(wbA_laneMulFp_vRobIdx_value).vxsat := oviCompltSigs(wbA_laneMulFp_vRobIdx_value).vxsat ||
+                                                         io.wbArith_laneMulFp.bits.vxsat
   }
-  // Write back of st
-  val wbS = io.wbLSU(1).bits
-  when (io.wbLSU(1).valid) {
-    busy(wbS.vRobIdx.value) := !wbS.expdEnd
+  
+  //---- Write-back of arith_cross ----
+  val wbA_cross = io.wbArith_cross.bits.uop
+  val wbA_cross_valid = io.wbArith_cross.valid
+  val wbA_cross_vRobIdx_value = wbA_cross.vRobIdx.value
+  // Only support in-order write-backs under the same instruction
+  when (wbA_cross_valid) {
+    busy(wbA_cross_vRobIdx_value) := !wbA_cross.expdEnd
+    oviCompltSigs(wbA_cross_vRobIdx_value).fflags := oviCompltSigs(wbA_cross_vRobIdx_value).fflags |
+                                                     io.wbArith_cross.bits.fflags
   }
+  //---- Write back of ld/st ----
+  val wbLs = io.wbLSU.bits
+  val wbLs_valid = io.wbLSU.valid
+  val wbLs_vRobIdx_value = wbLs.vRobIdx.value
+  // Only support in-order write-backs under the same instruction
+  when (wbLs_valid) { busy(wbLs_vRobIdx_value) := !wbLs.expdEnd }
 
   /**
     * Complete
@@ -191,7 +240,6 @@ class VRob extends Module with HasCircularQueuePtrHelper {
   ovi_completed.valid := canComplete
   ovi_completed.sb_id := sb_id(compltPtr.value)
   ovi_completed.illegal := illegal(compltPtr.value)
-  // !! Fake !!
   ovi_completed.vstart := 0.U  // !! Fake
   ovi_completed.fflags := oviCompltSigs(compltPtr.value).fflags
   ovi_completed.vxsat := oviCompltSigs(compltPtr.value).vxsat
@@ -239,7 +287,7 @@ class VRob extends Module with HasCircularQueuePtrHelper {
   }
 
   for (i <- 0 until VCommitWidth) {
-    commitInfo.info(i).pdestVal := rhb((deqPtrRhb + i.U).value).pdestVal
+    commitInfo.info(i).pdestVal := rhb((deqPtrRhb + i.U).value).pdestVal && ldestVal(deqPtr.value)
     commitInfo.info(i).ldest := rhb((deqPtrRhb + i.U).value).ldest
     commitInfo.info(i).pdest := rhb((deqPtrRhb + i.U).value).pdest
     commitInfo.info(i).old_pdest := rhb((deqPtrRhb + i.U).value).old_pdest

@@ -6,6 +6,7 @@ import darecreek.exu.vfu._
 // import darecreek.exu.vfu.VFUParam._
 import chipsalliance.rocketchip.config._
 import xiangshan.Redirect
+import darecreek.exu.vfu.fp.VFPU
 
 class Permutation(implicit p: Parameters) extends VFuModule {
   val io = IO(new Bundle {
@@ -20,7 +21,6 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   val vm = io.in.uop.ctrl.vm
   val vs1_imm = io.in.uop.ctrl.vs1_imm
   val vsew = io.in.uop.info.vsew
-  val rs1 = io.in.rs1
   val vs1_preg_idx = io.in.vs1_preg_idx
   val vs2_preg_idx = io.in.vs2_preg_idx
   val old_vd_preg_idx = io.in.old_vd_preg_idx
@@ -30,10 +30,9 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   val vstart = io.in.uop.info.vstart
   val vl = io.in.uop.info.vl
   val vlmul = io.in.uop.info.vlmul
-  val uop_valid = io.in.uop_valid
+  val uop_valid = io.in.uop_valid && !io.out.perm_busy
   val rdata = io.in.rdata
   val rvalid = io.in.rvalid
-  val rs1_imm = Mux(ctrl.vi, Cat(0.U(59.W), vs1_imm), rs1)
 
   val vslideup_vx = (funct6 === "b001110".U) && (funct3 === "b100".U)
   val vslideup_vi = (funct6 === "b001110".U) && (funct3 === "b011".U)
@@ -59,6 +58,12 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   val vslide = vslideup || vslidedn || vslide1up || vslide1dn
   val vrgather = vrgather_vv || vrgather_vxi || vrgather16
 
+  val perm_fp = vfslide1up_vf || vfslide1dn_vf
+  val ftype = VFPU.getTypeTagFromVSEW(vsew)
+  val rs1_fp = VFPU.unbox(io.in.rs1, ftype)
+  val rs1 = Mux(perm_fp, rs1_fp, io.in.rs1)
+  val rs1_imm = Mux(ctrl.vi, Cat(0.U(59.W), vs1_imm), rs1)
+
   val funct6_reg = RegInit(0.U(6.W))
   val funct3_reg = RegInit(0.U(3.W))
   val vsew_reg = RegInit(0.U(3.W))
@@ -80,30 +85,39 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   val vlmul_reg = RegInit(0.U(3.W))
 
   val vl_reg_bytes = vl_reg << vsew_reg
+  val perm_busy = RegInit(false.B)
+  val flush = RegInit(false.B)
+  val in_robIdx = io.in.uop.sysUop.robIdx
+  val currentRobIdx = RegEnable(in_robIdx, uop_valid)
+  when(uop_valid) {
+    flush := in_robIdx.needFlush(io.redirect)
+  }.otherwise {
+    flush := (flush || currentRobIdx.needFlush(io.redirect)) && perm_busy
+  }
 
-  val reg_vslideup_vx = (funct6_reg === "b001110".U) && (funct3_reg === "b100".U)
-  val reg_vslideup_vi = (funct6_reg === "b001110".U) && (funct3_reg === "b011".U)
-  val reg_vslideup = reg_vslideup_vx || reg_vslideup_vi
-  val reg_vslidedn_vx = (funct6_reg === "b001111".U) && (funct3_reg === "b100".U)
-  val reg_vslidedn_vi = (funct6_reg === "b001111".U) && (funct3_reg === "b011".U)
-  val reg_vslidedn = reg_vslidedn_vx || reg_vslidedn_vi
-  val reg_vslide1up_vx = (funct6_reg === "b001110".U) && (funct3_reg === "b110".U)
-  val reg_vfslide1up_vf = (funct6_reg === "b001110".U) && (funct3_reg === "b101".U)
-  val reg_vslide1up = reg_vslide1up_vx || reg_vfslide1up_vf
-  val reg_vslide1dn_vx = (funct6_reg === "b001111".U) && (funct3_reg === "b110".U)
-  val reg_vfslide1dn_vf = (funct6_reg === "b001111".U) && (funct3_reg === "b101".U)
-  val reg_vslide1dn = reg_vslide1dn_vx || reg_vfslide1dn_vf
-  val reg_vrgather_vv = (funct6_reg === "b001100".U) && (funct3_reg === "b000".U)
-  val reg_vrgather16 = (funct6_reg === "b001110".U) && (funct3_reg === "b000".U)
-  val reg_vrgather_vx = (funct6_reg === "b001100".U) && (funct3_reg === "b100".U)
-  val reg_vrgather_vi = (funct6_reg === "b001100".U) && (funct3_reg === "b011".U)
-  val reg_vrgather_vxi = reg_vrgather_vx || reg_vrgather_vi
-  val reg_vcompress = (funct6_reg === "b010111".U) && (funct3_reg === "b010".U)
-  val reg_vrgather16_sew8 = reg_vrgather16 && (vsew_reg === 0.U)
-  val reg_vrgather16_sew32 = reg_vrgather16 && (vsew_reg === 2.U)
-  val reg_vrgather16_sew64 = reg_vrgather16 && (vsew_reg === 3.U)
-  val reg_vslide = reg_vslideup || reg_vslidedn || reg_vslide1up || reg_vslide1dn
-  val reg_vrgather = reg_vrgather_vv || reg_vrgather_vxi || reg_vrgather16
+  val reg_vslideup_vx = (funct6_reg === "b001110".U) && (funct3_reg === "b100".U) && !flush
+  val reg_vslideup_vi = (funct6_reg === "b001110".U) && (funct3_reg === "b011".U) && !flush
+  val reg_vslideup = reg_vslideup_vx || reg_vslideup_vi && !flush
+  val reg_vslidedn_vx = (funct6_reg === "b001111".U) && (funct3_reg === "b100".U) && !flush
+  val reg_vslidedn_vi = (funct6_reg === "b001111".U) && (funct3_reg === "b011".U) && !flush
+  val reg_vslidedn = reg_vslidedn_vx || reg_vslidedn_vi && !flush
+  val reg_vslide1up_vx = (funct6_reg === "b001110".U) && (funct3_reg === "b110".U) && !flush
+  val reg_vfslide1up_vf = (funct6_reg === "b001110".U) && (funct3_reg === "b101".U) && !flush
+  val reg_vslide1up = reg_vslide1up_vx || reg_vfslide1up_vf && !flush
+  val reg_vslide1dn_vx = (funct6_reg === "b001111".U) && (funct3_reg === "b110".U) && !flush
+  val reg_vfslide1dn_vf = (funct6_reg === "b001111".U) && (funct3_reg === "b101".U) && !flush
+  val reg_vslide1dn = reg_vslide1dn_vx || reg_vfslide1dn_vf && !flush
+  val reg_vrgather_vv = (funct6_reg === "b001100".U) && (funct3_reg === "b000".U) && !flush
+  val reg_vrgather16 = (funct6_reg === "b001110".U) && (funct3_reg === "b000".U) && !flush
+  val reg_vrgather_vx = (funct6_reg === "b001100".U) && (funct3_reg === "b100".U) && !flush
+  val reg_vrgather_vi = (funct6_reg === "b001100".U) && (funct3_reg === "b011".U) && !flush
+  val reg_vrgather_vxi = reg_vrgather_vx || reg_vrgather_vi && !flush
+  val reg_vcompress = (funct6_reg === "b010111".U) && (funct3_reg === "b010".U) && !flush
+  val reg_vrgather16_sew8 = reg_vrgather16 && (vsew_reg === 0.U) && !flush
+  val reg_vrgather16_sew32 = reg_vrgather16 && (vsew_reg === 2.U) && !flush
+  val reg_vrgather16_sew64 = reg_vrgather16 && (vsew_reg === 3.U) && !flush
+  val reg_vslide = reg_vslideup || reg_vslidedn || reg_vslide1up || reg_vslide1dn && !flush
+  val reg_vrgather = reg_vrgather_vv || reg_vrgather_vxi || reg_vrgather16 && !flush
   val vs1_type = Mux(reg_vrgather16, 1.U, vsew_reg)
 
   val vslide_wb_vld = Wire(Bool())
@@ -116,7 +130,12 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   val vd_mask = Wire(UInt(VLEN.W))
   vd_mask := (~0.U(VLEN.W))
 
-  val vlRemain_reg = RegNext(vlRemain)
+  val vlRemain_reg = RegInit(0.U(8.W))
+  when(flush) {
+    vlRemain_reg := 0.U
+  }.otherwise {
+    vlRemain_reg := vlRemain
+  }
   val vlRemainBytes_reg = vlRemain_reg << vsew_reg
   val tail_bytes = Mux((vlRemainBytes_reg >= VLENB.U), 0.U, VLENB.U - vlRemainBytes_reg)
   val tail_bits = Cat(tail_bytes, 0.U(3.W))
@@ -141,7 +160,6 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   val perm_vd = Wire(UInt(VLEN.W))
   val perm_tail_mask_vd = Wire(UInt(VLEN.W))
 
-  val perm_busy = RegInit(false.B)
   val vs_idx = RegInit(0.U(3.W))
   val rdata_vs_idx = RegInit(0.U(3.W))
   val rdata_wb_idx = RegInit(0.U(3.W))
@@ -151,14 +169,14 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   val cmprs_update_vs_idx = Wire(Bool())
   val vslide_ele = Mux(reg_vslide1up || reg_vslide1dn, 1.U, rs1_reg)
   val vslide_bytes = vslide_ele << vsew_reg
-  val vslide_lo_valid = Mux(reg_vslideup || reg_vslide1up, vslide_bytes(65, 4) + 1.U <= vs_idx, (reg_vslidedn || reg_vslide1dn) && (vs_idx + vslide_bytes(65, 4) <= rd_vlmul))
-  val vslide_hi_valid = Mux(reg_vslideup || reg_vslide1up, vslide_bytes(65, 4) <= vs_idx, (reg_vslidedn || reg_vslide1dn) && (vs_idx + vslide_bytes(65, 4) + 1.U <= rd_vlmul))
+
+  val vslide_lo_valid = Mux(reg_vslideup || reg_vslide1up, vslide_bytes(70, 4) +& 1.U <= vs_idx, (reg_vslidedn || reg_vslide1dn) && (vs_idx +& vslide_bytes(70, 4) <= rd_vlmul))
+  val vslide_hi_valid = Mux(reg_vslideup || reg_vslide1up, vslide_bytes(70, 4) <= vs_idx, (reg_vslidedn || reg_vslide1dn) && (vs_idx +& vslide_bytes(70, 4) +& 1.U <= rd_vlmul))
   val vslide_cnt_max = Wire(UInt(2.W))
   val vslide_rd_cnt = RegInit(0.U(2.W))
   val rd_mask_en = RegInit(false.B)
   val rd_vs_en = RegInit(false.B)
   val vslide_rd_preg_idx = Wire(UInt(8.W))
-  val vs1_rd_idx = RegInit(0.U(3.W))
   val rdata_rd_mask_en = Wire(Bool())
   val rdata_wb_vld = Wire(Bool())
   val rdata_update_vs_idx = Wire(Bool())
@@ -172,16 +190,6 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   val rec_done = uop_valid
   val rd_done = (wb_idx === rd_vlmul) && wb_vld
   val calc_done = RegInit(false.B)
-
-  val flush = RegInit(false.B)
-
-  val in_robIdx = io.in.uop.sysUop.robIdx
-  val currentRobIdx = RegEnable(in_robIdx, uop_valid)
-  when(uop_valid) {
-    flush := in_robIdx.needFlush(io.redirect)
-  }.otherwise {
-    flush := flush || currentRobIdx.needFlush(io.redirect)
-  }
 
   when(flush) {
     funct6_reg := 0.U
@@ -219,7 +227,9 @@ class Permutation(implicit p: Parameters) extends VFuModule {
 
   // vslide read
   vslide_cnt_max := Cat(0.U(1.W), vslide_lo_valid) + Cat(0.U(1.W), vslide_hi_valid)
-  when(rd_vs_en) {
+  when(flush) {
+    vslide_rd_cnt := 0.U
+  }.elsewhen(rd_vs_en && reg_vslide) {
     when(vslide_rd_cnt === vslide_cnt_max) {
       vslide_rd_cnt := 0.U
     }.otherwise {
@@ -260,7 +270,7 @@ class Permutation(implicit p: Parameters) extends VFuModule {
 
   // vcompress read
   val vd_mask_vl = Wire(UInt(VLEN.W))
-  val vmask_vl = Wire(UInt(VLEN.W))
+  val vmask_vl = RegInit(0.U(VLEN.W))
   val vmask_uop = MaskExtract(vmask_vl, vs_idx, eew)
   val vmask_16b = Mux(rd_vs_en, MaskReorg.splash(vmask_uop, eew), 0.U)
   val current_rd_vs_ones_sum = Wire(UInt(5.W))
@@ -273,9 +283,14 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   val wb_idx_plus1 = Wire(UInt(4.W))
   val cmprs_rd_preg_idx = Wire(UInt(8.W))
   vd_mask_vl := vd_mask >> (VLEN.U - vl_reg)
-  vmask_vl := mask & vd_mask_vl
   wb_idx_plus1 := Cat(0.U(1.W), wb_idx) + 1.U
   current_rd_vs_ones_sum := PopCount(vmask_16b)
+
+  when(flush) {
+    vmask_vl := 0.U
+  }.otherwise {
+    vmask_vl := mask & vd_mask_vl
+  }
 
   cmprs_rd_wb := reg_vcompress && ((rd_ones_sum + current_rd_vs_ones_sum) >= Cat(wb_idx_plus1, 0.U(4.W)))
   cmprs_rd_resent_en := reg_vcompress && ((rd_ones_sum + current_rd_vs_ones_sum) > Cat(wb_idx_plus1, 0.U(4.W)))
@@ -327,7 +342,9 @@ class Permutation(implicit p: Parameters) extends VFuModule {
 
   vrgather_cnt_max := 2.U + Cat(0.U(1.W), rd_vlmul)
 
-  when(rd_vs_en) {
+  when(flush) {
+    vrgather_rd_cnt := 0.U
+  }.elsewhen(rd_vs_en && reg_vrgather) {
     when(vrgather_rd_cnt === vrgather_cnt_max) {
       vrgather_rd_cnt := 0.U
     }.otherwise {
@@ -340,14 +357,10 @@ class Permutation(implicit p: Parameters) extends VFuModule {
     vrgather_rd_preg_idx := mask_preg_idx_reg
   }.elsewhen(reg_vrgather && rd_vs_en) {
     when(vrgather_rd_cnt === 0.U) {
-      vrgather_rd_preg_idx := Mux(reg_vrgather16_sew8, old_vd_preg_idx_reg(vs_idx(2, 1)), old_vd_preg_idx_reg(vs_idx))
+      vrgather_rd_preg_idx := old_vd_preg_idx_reg(vs_idx)
     }.elsewhen(vrgather_rd_cnt === 1.U) {
       when(reg_vrgather_vxi) {
         vrgather_rd_preg_idx := vs2_preg_idx_reg(vs_idx)
-      }.elsewhen(reg_vrgather16_sew32) {
-        vrgather_rd_preg_idx := vs1_preg_idx_reg(vs_idx(2, 1))
-      }.elsewhen(reg_vrgather16_sew64) {
-        vrgather_rd_preg_idx := vs1_preg_idx_reg(vs_idx(2))
       }.otherwise {
         vrgather_rd_preg_idx := vs1_preg_idx_reg(vs_idx)
       }
@@ -356,7 +369,12 @@ class Permutation(implicit p: Parameters) extends VFuModule {
     }
   }
 
-  val update_vd_idx = RegNext(rdata_wb_vld)
+  val update_vd_idx = RegInit(false.B)
+  when(flush) {
+    update_vd_idx := false.B
+  }.otherwise {
+    update_vd_idx := rdata_wb_vld
+  }
   update_vs_idx := vslide_update_vs_idx || cmprs_update_vs_idx || vrgather_update_vs_idx
   wb_vld := vslide_wb_vld || cmprs_wb_vld || vrgather_wb_vld
   val rd_preg_idx = Mux(reg_vcompress, cmprs_rd_preg_idx, Mux(reg_vslide, vslide_rd_preg_idx, vrgather_rd_preg_idx))
@@ -430,8 +448,20 @@ class Permutation(implicit p: Parameters) extends VFuModule {
     }
   }
 
-  val rdata_reg = RegNext(rdata)
-  val rvalid_reg = RegNext(rvalid)
+  val rdata_reg = RegInit(0.U(128.W))
+  val rvalid_reg = RegInit(false.B)
+
+  when(flush) {
+    rdata_reg := 0.U
+  }.elsewhen(rvalid) {
+    rdata_reg := rdata
+  }
+
+  when(flush) {
+    rvalid_reg := false.B
+  }.otherwise {
+    rvalid_reg := rvalid
+  }
 
   val vperm_fifo = Module(new perm_RegFifo(UInt(8.W), 8))
   val vslide_fifo_wdata = Wire(UInt(8.W))
@@ -442,18 +472,19 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   cmprs_fifo_wdata := Cat(0.U(3.W), cmprs_rd_old_vd, cmprs_rd_wb, update_vs_idx, wb_vld, rd_mask_en)
   vrgather_fifo_wdata := Cat(0.U(1.W), vrgather_rd_cnt, update_vs_idx, wb_vld, rd_mask_en)
 
+  vperm_fifo.io.rst := flush
   vperm_fifo.io.enq.bits := Mux(reg_vcompress, cmprs_fifo_wdata, Mux(reg_vslide, vslide_fifo_wdata, vrgather_fifo_wdata))
   vperm_fifo.io.enq.valid := rd_mask_en || rd_vs_en || cmprs_rd_old_vd
-  vperm_fifo.io.deq.ready := rvalid_reg
-  rdata_rd_mask_en := rvalid_reg && vperm_fifo.io.deq.bits(0)
-  rdata_wb_vld := rvalid_reg && vperm_fifo.io.deq.bits(1)
-  rdata_vslide_lo_valid := rvalid_reg && vperm_fifo.io.deq.bits(2)
-  rdata_vslide_hi_valid := rvalid_reg && vperm_fifo.io.deq.bits(3)
-  rdata_vslide_rd_cnt := Mux(rvalid_reg, vperm_fifo.io.deq.bits(5, 4), 0.U)
-  rdata_update_vs_idx := rvalid_reg && vperm_fifo.io.deq.bits(2)
-  rdata_cmprs_rd_wb := rvalid_reg && vperm_fifo.io.deq.bits(3)
-  rdata_cmprs_rd_old_vd := rvalid_reg && vperm_fifo.io.deq.bits(4)
-  rdata_vrgather_rd_cnt := Mux(rvalid_reg, vperm_fifo.io.deq.bits(6, 3), 0.U)
+  vperm_fifo.io.deq.ready := rvalid_reg && vperm_fifo.io.deq.valid
+  rdata_rd_mask_en := rvalid_reg && vperm_fifo.io.deq.bits(0) && vperm_fifo.io.deq.valid
+  rdata_wb_vld := rvalid_reg && vperm_fifo.io.deq.bits(1) && vperm_fifo.io.deq.valid
+  rdata_vslide_lo_valid := rvalid_reg && vperm_fifo.io.deq.bits(2) && vperm_fifo.io.deq.valid && reg_vslide
+  rdata_vslide_hi_valid := rvalid_reg && vperm_fifo.io.deq.bits(3) && vperm_fifo.io.deq.valid && reg_vslide
+  rdata_vslide_rd_cnt := Mux(rvalid_reg && reg_vslide, vperm_fifo.io.deq.bits(5, 4), 0.U) & Fill(2, vperm_fifo.io.deq.valid)
+  rdata_update_vs_idx := rvalid_reg && vperm_fifo.io.deq.bits(2) && vperm_fifo.io.deq.valid && (reg_vcompress || reg_vrgather)
+  rdata_cmprs_rd_wb := rvalid_reg && vperm_fifo.io.deq.bits(3) && vperm_fifo.io.deq.valid && reg_vcompress
+  rdata_cmprs_rd_old_vd := rvalid_reg && vperm_fifo.io.deq.bits(4) && vperm_fifo.io.deq.valid && reg_vcompress
+  rdata_vrgather_rd_cnt := Mux(rvalid_reg && reg_vrgather, vperm_fifo.io.deq.bits(6, 3), 0.U) & Fill(4, vperm_fifo.io.deq.valid)
 
   when(flush) {
     mask := 0.U
@@ -497,7 +528,9 @@ class Permutation(implicit p: Parameters) extends VFuModule {
     perm_busy := false.B
   }.elsewhen(uop_valid) {
     perm_busy := true.B
-  }.elsewhen(calc_done) {
+  }.elsewhen(reg_vcompress && calc_done) {
+    perm_busy := false.B
+  }.elsewhen(!reg_vcompress && (vd_idx === rd_vlmul) && update_vd_idx) {
     perm_busy := false.B
   }
 
@@ -559,7 +592,7 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   vcmprsEngine.io.funct3 := funct3_reg
   vcmprsEngine.io.vm := vm_reg
   vcmprsEngine.io.ma := ma_reg
-  vcmprsEngine.io.ta := ta_reg
+  vcmprsEngine.io.ta := ta_reg && (vstart_reg < vl_reg)
   vcmprsEngine.io.vsew := vsew_reg
   vcmprsEngine.io.vlmul := vlmul_reg
   vcmprsEngine.io.vl := vl_reg
@@ -567,10 +600,10 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   vcmprsEngine.io.vd_idx := rdata_wb_idx
   vcmprsEngine.io.vs2 := rdata_reg
   vcmprsEngine.io.old_vd := rdata_reg
-  vcmprsEngine.io.vmask := mask
+  vcmprsEngine.io.vmask := vmask_vl
   vcmprsEngine.io.vd_reg := vd_reg
-  vcmprsEngine.io.update_vs_idx := rdata_update_vs_idx
   vcmprsEngine.io.cmprs_rd_wb := rdata_cmprs_rd_wb
+  vcmprsEngine.io.update_vs_idx := rdata_update_vs_idx
   vcmprsEngine.io.cmprs_rd_old_vd := rdata_cmprs_rd_old_vd
   vcmprsEngine.io.calc_done := calc_done
   vcmprsEngine.io.flush := flush
@@ -611,15 +644,27 @@ class Permutation(implicit p: Parameters) extends VFuModule {
     vlRemain := Mux(vslideup && (rs1_imm > vl), Mux(rs1_imm > VLEN.U, VLEN.U, rs1_imm), vl)
   }.elsewhen(reg_vcompress && rdata_update_vs_idx) {
     vlRemain := Mux(vlRemain >= (1.U << vsew_shift), vlRemain - (1.U << vsew_shift), 0.U)
-  }.elsewhen(!reg_vrgather16_sew8 && !reg_vcompress && rdata_wb_vld) {
+  }.elsewhen(!reg_vcompress && rdata_wb_vld) {
     vlRemain := Mux(vlRemain >= (1.U << vsew_shift), vlRemain - (1.U << vsew_shift), 0.U)
-  }.elsewhen(reg_vrgather16_sew8 && rdata_wb_vld && wb_idx(0)) {
-    vlRemain := Mux(vlRemain >= (1.U << vsew_shift), vlRemain - (1.U << vsew_shift), 0.U)
+  }
+
+  val rdata_update_vs_idx_reg = RegInit(false.B)
+  val rdata_wb_vld_reg = RegInit(false.B)
+  val rdata_wb_vld_reg2 = RegInit(false.B)
+
+  when(flush) {
+    rdata_update_vs_idx_reg := false.B
+    rdata_wb_vld_reg := false.B
+    rdata_wb_vld_reg2 := false.B
+  }.otherwise {
+    rdata_update_vs_idx_reg := rdata_update_vs_idx
+    rdata_wb_vld_reg := rdata_wb_vld
+    rdata_wb_vld_reg2 := rdata_wb_vld_reg
   }
 
   when(flush) {
     vd_reg := 0.U
-  }.elsewhen(reg_vcompress && (rdata_update_vs_idx || rdata_wb_vld)) {
+  }.elsewhen(reg_vcompress && (rdata_update_vs_idx_reg || rdata_wb_vld_reg)) {
     vd_reg := cmprs_vd
   }.elsewhen(reg_vslideup && rdata_wb_vld) {
     vd_reg := vslideup_vd
@@ -662,31 +707,35 @@ class Permutation(implicit p: Parameters) extends VFuModule {
 
   perm_vd := Mux(reg_vcompress, vd_reg, perm_tail_mask_vd)
 
-  io.out.uop.ctrl.funct6 := funct6_reg
-  io.out.uop.ctrl.funct3 := funct3_reg
-  io.out.uop.ctrl.vm := vm_reg
-  io.out.uop.ctrl.vs1_imm := 0.U
-  io.out.uop.ctrl.widen := false.B
-  io.out.uop.ctrl.widen2 := false.B
-  io.out.uop.ctrl.narrow := false.B
-  io.out.uop.ctrl.narrow_to_1 := false.B
-  io.out.uop.info.vsew := vsew_reg
-  io.out.uop.info.ta := ta_reg
-  io.out.uop.info.ma := ma_reg
-  io.out.uop.info.vstart := vstart_reg
-  io.out.uop.info.vl := vl_reg
-  io.out.uop.info.vlmul := vlmul_reg
-  io.out.uop.info.vxrm := 0.U
-  io.out.uop.info.frm := 0.U
-  io.out.uop.uopIdx := 0.U
-  io.out.uop.uopEnd := true.B
-  io.out.uop.sysUop := RegEnable(io.in.uop.sysUop, uop_valid)
+  val rd_en = rd_mask_en || rd_vs_en || cmprs_rd_old_vd
+  val reg_rd_en = RegInit(false.B)
+  val reg_rd_preg_idx = RegInit(0.U(8.W))
 
-  io.out.rd_en := rd_mask_en || rd_vs_en || cmprs_rd_old_vd
-  io.out.rd_preg_idx := rd_preg_idx
-  io.out.wb_vld := wb_vld & !flush
+  when(flush) {
+    reg_rd_en := false.B
+  }.otherwise {
+    reg_rd_en := rd_en
+  }
+
+  when(flush) {
+    reg_rd_preg_idx := 0.U
+  }.elsewhen(rd_en) {
+    reg_rd_preg_idx := rd_preg_idx
+  }
+
+
+  val uop_reg = Reg(new VUop)
+
+  when(uop_valid) {
+    uop_reg := io.in.uop
+  }
+
+  io.out.uop := uop_reg
+  io.out.rd_en := reg_rd_en & !flush
+  io.out.rd_preg_idx := reg_rd_preg_idx
+  io.out.wb_vld := Mux(reg_vcompress, rdata_wb_vld_reg2 & !flush, rdata_wb_vld_reg & !flush)
   io.out.wb_data := perm_vd
-  io.out.perm_busy := perm_busy
+  io.out.perm_busy := perm_busy | flush
 }
 
 import xiangshan._

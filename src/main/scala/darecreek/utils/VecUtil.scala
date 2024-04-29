@@ -80,14 +80,14 @@ object UIntToCont1s {
     }
   }
   // E.g., 0.U(3.W) => b"00000001"  7.U(3.W) => b"1111_1111"
-  def applySLL(data: UInt, dw: Int): UInt = {  // dw is width of data
-    if (dw == 1) {
-      Mux(data === 0.U, 1.U(2.W), 3.U(2.W))
-    } else {
-      Mux(data(dw-1), Cat(apply(data(dw-2, 0), dw-1), ~0.U((1 << (dw-1)).W)),
-                      Cat(0.U((1 << (dw-1)).W), apply(data(dw-2, 0), dw-1)))
-    }
-  }
+  // def applySLL(data: UInt, dw: Int): UInt = {  // dw is width of data
+  //   if (dw == 1) {
+  //     Mux(data === 0.U, 1.U(2.W), 3.U(2.W))
+  //   } else {
+  //     Mux(data(dw-1), Cat(applySLL(data(dw-2, 0), dw-1), ~0.U((1 << (dw-1)).W)),
+  //                     Cat(0.U((1 << (dw-1)).W), applySLL(data(dw-2, 0), dw-1)))
+  //   }
+  // }
 }
 
 // Tail generation: vlenb bits. Note: uopIdx < 8
@@ -95,11 +95,11 @@ object TailGen {
   def apply(vl: UInt, uopIdx: UInt, eew: SewOH, narrow: Bool = false.B): UInt = {
     val tail = Wire(UInt(vlenb.W))
     // vl - uopIdx * VLEN/eew
-    val nElemRemain = Cat(0.U(1.W), vl) - Mux1H(eew.oneHot, Seq(3,2,1,0).map(_ + log2Up(VLEN/64)).map(x => 
+    val nElemRemain = Cat(0.U(1.W), vl) - Mux1H(eew.oneHot, Seq(3,2,1,0).map(_ + log2Up(VLEN/64)).map(x =>
                                                     Cat(Mux(narrow, uopIdx(2,1), uopIdx(2,0)), 0.U(x.W))))
     val maxNElemInOneUop = Mux1H(eew.oneHot, Seq(8,4,2,1).map(x => (x * VLEN/64).U))
     val vl_width = vl.getWidth
-    require(vl_width == (log2Up(VLEN) + 1))
+    require(vl_width == (log2Up(VLEN) + 1)) //bVL
     when (nElemRemain(vl_width)) {
       tail := ~0.U(vlenb.W)
     }.elsewhen (nElemRemain >= maxNElemInOneUop) {
@@ -111,10 +111,43 @@ object TailGen {
   }
 }
 
+// Prestart generation: 16 bits. Note: uopIdx < 8
+object PrestartGen {
+  def apply(vstart: UInt, uopIdx: UInt, eew: SewOH, narrow: Bool = false.B): UInt = {
+    val prestart = Wire(UInt(vlenb.W))
+    // vstart - uopIdx * VLEN/eew
+    val nElemRemain = Cat(0.U(1.W), vstart) - Mux1H(eew.oneHot, Seq(3,2,1,0).map(_ + log2Up(VLEN/64)).map(x =>
+                                                    Cat(Mux(narrow, uopIdx(2,1), uopIdx(2,0)), 0.U(x.W))))
+    val maxNElemInOneUop = Mux1H(eew.oneHot, Seq(8,4,2,1).map(x => (x * VLEN/64).U))
+    val vstart_width = bVstart
+    when (nElemRemain(vstart_width)) {
+      prestart := 0.U
+    }.elsewhen (nElemRemain >= maxNElemInOneUop) {
+      prestart := ~0.U(vlenb.W)
+    }.otherwise {
+      prestart := ~(UIntToCont0s(nElemRemain(log2Up(vlenb) - 1, 0), log2Up(vlenb)))
+    }
+    prestart
+  }
+}
+
 // Rearrange mask, tail, or vstart bits  (width: NByteLane bits)
 object MaskReorg {
   // sew = 8: unchanged, sew = 16: 0000abcd -> aabbccdd, ...
   def splash(bits: UInt, sew: SewOH): UInt = {
     Mux1H(sew.oneHot, Seq(1,2,4,8).map(k => Cat(bits(NByteLane/k -1, 0).asBools.map(Fill(k, _)).reverse)))
+  }
+  def splash(bits: UInt, sew: SewOH, vlenb_in: Int): UInt = {
+    Mux1H(sew.oneHot, Seq(1,2,4,8).map(k => Cat(bits(vlenb_in/k -1, 0).asBools.map(Fill(k, _)).reverse)))
+  }
+}
+
+object MaskExtract {
+  def apply(vmask: UInt, uopIdx: UInt, sew: SewOH, VLEN: Int) = {
+    val extracted = Wire(UInt((VLEN / 8).W))
+    extracted := Mux1H(Seq.tabulate(8)(uopIdx === _.U),
+      Seq.tabulate(8)(idx => Mux1H(sew.oneHot, Seq(VLEN / 8, VLEN / 16, VLEN / 32, VLEN / 64).map(stride =>
+        vmask((idx + 1) * stride - 1, idx * stride)))))
+    extracted
   }
 }

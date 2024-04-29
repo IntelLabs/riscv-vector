@@ -14,6 +14,11 @@ class VRvfiBlock extends Module {
     val commits = Flipped(new VRobCommitIO)
     val sb_id = Input(UInt(5.W))
     val commitEnd = Input(Bool())
+    // for rd
+    val ovi_issue_valid = Input(Bool())
+    val ovi_issue_sb_id = Input(UInt(5.W))
+    val ovi_issue_inst = Input(UInt(32.W))
+    val ovi_completed = Flipped(new OVIcompleted)
     // read RF
     val rfRd = Vec(VCommitWidth, Flipped(new VRFReadPort(LaneWidth)))
     // output RVFI signals
@@ -69,7 +74,25 @@ class VRvfiBlock extends Module {
   assert(emul =/= 4.U, "Error: Emul of RVFI interface is not a valid value! (RvfiBlock.scala)" )
   io.rvfi.vd_emul := emul
 
-  // temp
-  io.rvfi.rd_addr := 0.U
-  io.rvfi.rd_wdata := 0.U
+  //---- rvif rd handling ----
+  // A buffer to store sb_id and rd
+  class rdBufEntry extends Bundle {
+    val rdAddr = UInt(5.W)
+    val rd = UInt(XLEN.W)
+    val fflags = UInt(5.W)
+    val vxsat = Bool()
+  }
+  val rdBuf = Reg(Vec(VQSize, new rdBufEntry))
+  when (io.ovi_issue_valid) {
+    rdBuf(io.ovi_issue_sb_id).rdAddr := io.ovi_issue_inst(11, 7)
+  }
+  when (io.ovi_completed.valid) {
+    rdBuf(io.ovi_completed.sb_id).rd := io.ovi_completed.dest_reg
+    rdBuf(io.ovi_completed.sb_id).vxsat := io.ovi_completed.vxsat
+    rdBuf(io.ovi_completed.sb_id).fflags := io.ovi_completed.fflags
+  } 
+  io.rvfi.rd_addr := rdBuf(io.rvfi.sb_id).rdAddr
+  io.rvfi.rd_wdata := rdBuf(io.rvfi.sb_id).rd
+  io.rvfi.vxsat := rdBuf(io.rvfi.sb_id).vxsat
+  io.rvfi.fflags := rdBuf(io.rvfi.sb_id).fflags
 }

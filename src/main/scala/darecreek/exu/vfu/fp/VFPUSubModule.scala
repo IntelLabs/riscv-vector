@@ -58,14 +58,15 @@ trait HasPipelineReg {
 
   val validVec = io.in.valid +: Array.fill(latency)(RegInit(false.B))
   // true is not ready?
-  val rdyVec = (Array.fill(latency - 1)(Wire(Bool())) :+ io.out.ready) :+ WireInit(true.B)
+  // val rdyVec = (Array.fill(latency - 1)(Wire(Bool())) :+ io.out.ready) :+ WireInit(true.B)
+  val rdyVec = Array.fill(latency)(Wire(Bool())) :+ io.out.ready
   val uopVec = io.in.bits.uop +: Array.fill(latency)(Reg(new VFPUOp))
 
   // if flush(0), valid 0 will not given, so set flushVec(0) to false.B
   // val flushVec = Array.fill(latency+1)(WireInit(false.B)) // FIXME: implement flush logic
   val flushVec = validVec.zip(uopVec).map(x => x._1 && x._2.sysUop.robIdx.needFlush(io.redirect))
 
-  for (i <- 0 until latency - 1) {
+  for (i <- 0 until latency) {
     rdyVec(i) := !validVec(i + 1) || rdyVec(i + 1)
   }
 
@@ -79,8 +80,10 @@ trait HasPipelineReg {
   }
 
   io.in.ready := rdyVec(0)
-  io.out.valid := validVec.takeRight(2).head
-  io.out.bits.uop := uopVec.takeRight(2).head
+ //  io.out.valid := validVec.takeRight(2).head
+ //  io.out.bits.uop := uopVec.takeRight(2).head
+  io.out.valid := validVec.last && !uopVec.last.sysUop.robIdx.needFlush(io.redirect)
+  io.out.bits.uop := uopVec.last
 
   def regEnable(i: Int): Bool = validVec(i - 1) && rdyVec(i - 1) && !flushVec(i - 1)
 

@@ -1,0 +1,15 @@
+vmsbf_m
+vmsif_m
+vmsof_m
+vmand_mm
+vmnand_mm
+vmandn_mm
+vmxor_mm
+vmor_mm
+vmnor_mm
+vmorn_mm
+vmxnor_mm
+vfirst_m
+vid_v
+viota_m
+vcpop_m

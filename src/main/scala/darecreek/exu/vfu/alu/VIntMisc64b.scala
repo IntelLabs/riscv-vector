@@ -1,3 +1,15 @@
+/***************************************************************************************
+*Copyright (c) 2023-2024 Intel Corporation
+*Vector Acceleration IP core for RISC-V* is licensed under Mulan PSL v2.
+*You can use this software according to the terms and conditions of the Mulan PSL v2.
+*You may obtain a copy of Mulan PSL v2 at:
+*        http://license.coscl.org.cn/MulanPSL2
+*THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+*EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+*MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+*See the Mulan PSL v2 for more details.
+***************************************************************************************/
+
 /**
   * Perform below instructions:
   *     11.3  vzext, ...
@@ -17,7 +29,7 @@ package darecreek.exu.vfu.alu
 import chisel3._
 import chisel3.util._
 import darecreek.exu.vfu._
-// import darecreek.exu.vfu.VFUParam._
+import darecreek.exu.vfu.fp.VFPU
 import chipsalliance.rocketchip.config.Parameters
 
 class VIntMisc64b(implicit p: Parameters) extends VFuModule {
@@ -33,6 +45,7 @@ class VIntMisc64b(implicit p: Parameters) extends VFuModule {
     val vs1 = Input(UInt(64.W))
     val vs2 = Input(UInt(64.W))
     val vmask = Input(UInt(8.W))
+    val fs1 = Input(UInt(FLEN.W)) // for vfmv.s.f
 
     val vd = Output(UInt(64.W))
     val narrowVd = Output(UInt(32.W))
@@ -196,7 +209,8 @@ class VIntMisc64b(implicit p: Parameters) extends VFuModule {
   val perm_vmv = Wire(UInt(64.W))
   perm_vmv := Mux1H(Seq(
     (funct3 === "b110".U) -> Mux1H(sew.oneHot, Seq(8, 16, 32, 64).map(k => vs1(k-1, 0))),
-    (funct3 === "b101".U) -> Mux1H(sew.oneHot(3,2), Seq(32, 64).map(k => vs1(k-1, 0)))
+    // (funct3 === "b101".U) -> Mux1H(sew.oneHot(3,2), Seq(32, 64).map(k => vs1(k-1, 0)))
+    (funct3 === "b101".U) -> Mux(sew.oneHot(3), io.fs1, VFPU.unbox(io.fs1, VFPU.S))
   ))
 
   // Output arbiter                      // vmv<nr>r
@@ -205,7 +219,8 @@ class VIntMisc64b(implicit p: Parameters) extends VFuModule {
            Mux(funct6(5, 2) === "b0010".U, bitLogical, mergeMove)))
   io.rd.bits := Mux1H(Seq(
     (funct3 === "b010".U) -> Mux1H(sew.oneHot, Seq(8, 16, 32, 64).map(k => vs2(k-1, 0).asSInt.pad(XLEN).asUInt)),
-    (funct3 === "b001".U) -> Mux1H(sew.oneHot(3,2), Seq(32, 64).map(k => vs2(k-1, 0).asUInt.pad(XLEN))),
+    // (funct3 === "b001".U) -> Mux1H(sew.oneHot(3,2), Seq(32, 64).map(k => vs2(k-1, 0).asUInt.pad(XLEN))),
+    (funct3 === "b001".U) -> Mux(sew.oneHot(3), vs2(FLEN-1, 0), Cat(~0.U(32.W), vs2(31, 0))),
   ))
   io.rd.valid := funct6 === "b010000".U && (funct3 === "b010".U || funct3 === "b001".U)
 }

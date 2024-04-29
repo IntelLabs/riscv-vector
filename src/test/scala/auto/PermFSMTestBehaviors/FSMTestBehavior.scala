@@ -7,28 +7,13 @@ import chiseltest.WriteVcdAnnotation
 import scala.reflect.io.File
 import scala.reflect.runtime.universe._
 import scala.util.control.Breaks._
+import scala.util.Random
 
 import darecreek.exu.vfu.perm._
 import darecreek.exu.vfu._
 import darecreek.exu.vfu.alu._
 import darecreek.exu.vfu.VInstructions._
 import chipsalliance.rocketchip.config.Parameters
-
-// case class VS1DT(vs1 : String, vs1_pidx : Int)
-
-// object Vs1Funcs {
-//     def firstRs1(vs1data : Array[String], j : Int, n_inputs : Int) : VS1DT = {
-//         return VS1DT(vs1data(0), 0)
-//     }
-
-//     def firstVs1(vs1data : Array[String], j : Int, n_inputs : Int) : VS1DT = {
-//         return VS1DT(vs1data(n_inputs - 1), 0)
-//     }
-
-//     def jthVs1(vs1data : Array[String], j : Int, n_inputs : Int) : VS1DT = {
-//         return VS1DT(vs1data(n_inputs - 1 - j), j)
-//     }
-// }
 
 class VslideupvxFSMTestBehavior extends slidefsm("vslideup.vx.data", ctrlBundles.vslideup_vx, "-", "vslideup_vx") {}
 class VslidedownvxFSMTestBehavior extends slidefsm("vslidedown.vx.data", ctrlBundles.vslidedown_vx, "-", "vslidedown_vx") {}
@@ -49,9 +34,13 @@ class VrgatherviFSMTestBehavior extends slidefsm("vrgather.vi.data", ctrlBundles
 class Vfslide1upvfFSMTestBehavior extends slidefsm("vfslide1up.vf.data", ctrlBundles.vfslide1up_vf, "-", "vfslide1up_vf") {}
 class Vfslide1downvfFSMTestBehavior extends slidefsm("vfslide1down.vf.data", ctrlBundles.vfslide1down_vf, "-", "vfslide1down_vf") {}
 
+object RandomGen {
+    val rand = new Random(seed = 42)
+}
+
 class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extends TestBehavior(fn, cb, s, instid) {
     
-    val rand = new scala.util.Random
+    // val rand = new scala.util.Random
     val maxBlocks = 20
     var blocks = 0
     val vs1base = 100
@@ -59,6 +48,11 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
     val oldvdbase = 120
     val vdbase = 130
     val maskbase = 140
+    var robIdxValid = false
+
+    val useFlushDebug = false
+
+    var testCountsDebug = 0
 
     override def getDut() : Module               = {
         val dut = new Permutation
@@ -70,7 +64,7 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
     case class ClkAry(clk : Int, ary: Array[String])
 
     def randomBool() : Boolean = {
-        if(rand.nextInt(100) > 50 && blocks < maxBlocks) {
+        if(RandomGen.rand.nextInt(100) > 50 && blocks < maxBlocks) {
             blocks += 1
             return true
         }
@@ -88,7 +82,10 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
         }
     }
 
-    def stageTwo(dut : Permutation, preg_to_value : Map[Int, String], n_res : Int, ctrl : CtrlBundle) : Array[String] = {
+    def stageTwo(
+        dut : Permutation, preg_to_value : Map[Int, String], 
+        n_res : Int, ctrlBundle : CtrlBundle, srcBundle : FSMSrcBundle
+    ) : Array[String] = {
         // ====================================================================
         // stage 2: checking for FSM's read requests
         // ====================================================================
@@ -120,18 +117,18 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
             }
             
 
-            var fsmSrcBundle = FSMSrcBundle(
-                rdata="h0", rvalid=false
-            )
-            var fsmCtrl = ctrl.copy()
+            var fsmSrcBundle = srcBundle.copy()
+            fsmSrcBundle.rdata="h0"
+            fsmSrcBundle.rvalid=false
+            var fsmCtrl = ctrlBundle.copy()
             
             // Stage 2.1: see if values are written back ============================
-            if(wb_counts < wb_idxs.length && wb_idxs(wb_counts).clk == clock_counter) {
+            /*if(wb_counts < wb_idxs.length && wb_idxs(wb_counts).clk == clock_counter) {
                 vd = dut.io.out.wb_data.peek().litValue
                 res_vds :+= f"h$vd%032x"
                 println("res: ", f"h$vd%032x")
                 wb_counts += 1
-            }
+            }*/
 
             // Stage 2.2: if busy is down ============================================
             if(!done && dut.io.out.perm_busy.peek().litValue.toInt != 1) {
@@ -147,28 +144,66 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
                 val rd_idx = rd_idxs(rd_counts).idx
 
                 println(s"rd_idx: ${rd_idx}")
-                fsmSrcBundle = FSMSrcBundle(
-                    rdata=preg_to_value(rd_idx),
-                    rvalid=true
-                )
+                fsmSrcBundle.rdata=preg_to_value(rd_idx)
+                fsmSrcBundle.rvalid=true
                     
                 rd_counts += 1
             }
+
+            // ================================================
+            // 10.27 add random flush
+            var robIdx = (true, 1)
+            robIdxValid = randomFlush()
+            /*if (robIdxValid) {
+                robIdx = (true, 1)
+            }*/
+
+            fsmCtrl.robIdx = robIdx
 
             dut.io.in.poke(genFSMInput(
                 fsmSrcBundle,
                 fsmCtrl
             ))
-            dut.io.redirect.poke(genFSMRedirect())
+            dut.io.redirect.poke(genFSMRedirect((robIdxValid, robIdxValid, 0)))
 
             // Stage 2.4: see if any wb value is there to be written =============
             val fsm_wb_vld = dut.io.out.wb_vld.peek().litValue.toInt
             if (fsm_wb_vld == 1) {
                 wb_idxs :+= ClkIdx(clock_counter + WB_DELAY, 0)
+
+                // 12.5: wb_data comes at the same cycle with wb_vld
+                vd = dut.io.out.wb_data.peek().litValue
+                res_vds :+= f"h$vd%032x"
+                println("res: ", f"h$vd%032x")
+                wb_counts += 1
             }
 
             dut.clock.step(1)
             clock_counter += 1
+
+            if (robIdxValid) {
+                // flushed
+                println("flushed")
+
+                fsmSrcBundle.uop_valid = false
+                fsmSrcBundle.rdata="h0"
+                fsmSrcBundle.rvalid=false
+                fsmCtrl = ctrlBundle.copy()
+
+                // turning off redirect bits
+                dut.io.in.poke(genFSMInput(
+                    fsmSrcBundle,
+                    fsmCtrl
+                ))
+                dut.io.redirect.poke(genFSMRedirect())
+                
+                while(dut.io.out.perm_busy.peek().litValue.toInt == 1) {
+                    dut.clock.step(1)
+                    clock_counter += 1
+                }
+                dut.clock.step(1)
+                return res_vds
+            }
         }}
 
         if(clock_counter >= LOOP_MAX) println(s"!!!!!!!! Exceeds LOOP_MAX !!!!!!!! FSM has not done work after ${LOOP_MAX} cycles")
@@ -247,36 +282,50 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
             preg_to_value = preg_to_value + ((oldvdbase + j) -> oldvddata(n_inputs - 1 - j))
             old_vd_preg_idx :+= (oldvdbase + j)
 
-            println(s"${vs1base + j} ${vs2base + j} ${oldvdbase + j}")
+            // println(s"${vs1base + j} ${vs2base + j} ${oldvdbase + j}")
         }
 
         var rs1value = "h0"
         if (hasRS1 || hasFS1) rs1value = vs1data(0)
-        // else if (!hasVS1) rs1value = f"h${getImm(simi)}%032x"
+
+        /*// ================================================
+        // 10.27 add flush
+        var robIdx = (false, 0)
+        val robIdxValid = randomBool()
+        if (robIdxValid) {
+            robIdx = (true, 1)
+        }*/
+
+        val srcBundle = FSMSrcBundle(
+            rs1=rs1value,
+            vs1_preg_idx=vs1_preg_idx,
+            vs2_preg_idx=vs2_preg_idx,
+            old_vd_preg_idx=old_vd_preg_idx,
+            mask_preg_idx=maskbase,
+            uop_valid=true,
+        )
+
+        val ctrlBundle = ctrl.copy(
+            vsew=vsew,
+            vl=vl,
+            vs1_imm=getImm(simi),
+            vlmul = UtilFuncs.lmulconvert(vflmul).toInt, 
+            ma = ma,
+            ta = ta,
+            vm = vm,
+            uopIdx=0,
+            uopEnd=true,
+            vxrm = vxrm,
+            vstart = vstart,
+            // robIdx = robIdx
+            robIdx = (true, 1)
+        )
+
 
         // ==========================================================================================================================
         dut.io.in.poke(genFSMInput(
-            FSMSrcBundle(
-                rs1=rs1value,
-                vs1_preg_idx=vs1_preg_idx,
-                vs2_preg_idx=vs2_preg_idx,
-                old_vd_preg_idx=old_vd_preg_idx,
-                mask_preg_idx=maskbase,
-                uop_valid=true,
-            ),
-            ctrl.copy(
-                vsew=vsew,
-                vl=vl,
-                vs1_imm=getImm(simi),
-                vlmul = UtilFuncs.lmulconvert(vflmul).toInt, 
-                ma = ma,
-                ta = ta,
-                vm = vm,
-                uopIdx=0,
-                uopEnd=true,
-                vxrm = vxrm,
-                vstart = vstart
-            )
+            srcBundle,
+            ctrlBundle
         ))
 
         dut.io.redirect.poke(genFSMRedirect())
@@ -284,7 +333,13 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
         dut.clock.step(1)
 
         // ==========================================================================================================================
-        val res_vds = stageTwo(dut, preg_to_value, n_inputs, ctrl)
+        val res_vds = stageTwo(
+            dut, preg_to_value, n_inputs, ctrlBundle, srcBundle
+        )
+        if (robIdxValid) {
+            println("robIdxValid = true, flush this instruction")
+            return
+        }
         resComp(expectvd, res_vds, n_inputs, simi)
     }
 
@@ -343,53 +398,81 @@ class slidefsm(fn : String, cb : CtrlBundle, s : String, instid : String) extend
 
             // mapping old_vd index to value
             preg_to_value = preg_to_value + ((oldvdbase + j) -> oldvddata(n_inputs - 1 - j))
-            old_vd_preg_idx :+= (oldvdbase + j)
+            var old_vd_each_step = 1
+            if (vs1_n_inputs > n_inputs) {
+                // vsew=8
+                old_vd_each_step = vs1_n_inputs / n_inputs
+            }
+
+            for (_ <- 0 until old_vd_each_step) {
+                old_vd_preg_idx :+= (oldvdbase + j)
+            }
 
             // println(s"${vs1base + j} ${vs2base + j} ${oldvdbase + j}")
         }
 
         for(j <- 0 until vs1_n_inputs) {
+            var each_step = 1
+            if (n_inputs > vs1_n_inputs) {
+                each_step = n_inputs / vs1_n_inputs
+            }
             // mapping vs1 index to value
             preg_to_value = preg_to_value + ((vs1base + j) -> vs1data(vs1_n_inputs - 1 - j))
-            vs1_preg_idx :+= (vs1base + j)
+            for (_ <- 0 until each_step) {
+                vs1_preg_idx :+= (vs1base + j)
+            }
 
             println(s"vsew ${simi.get("vsew").get.toInt}, ${vs1_n_inputs}, ${n_inputs}")
             println(s"vs1base + j: ${vs1base + j}, ${vs1data(vs1_n_inputs - 1 - j)}")
         }
 
         // ========================================================================================================================
+        val srcBundle = FSMSrcBundle(
+            rs1="h0",
+            vs1_preg_idx=vs1_preg_idx,
+            vs2_preg_idx=vs2_preg_idx,
+            old_vd_preg_idx=old_vd_preg_idx,
+            mask_preg_idx=maskbase,
+            uop_valid=true,
+        )
+
+        val ctrlBundle = ctrl.copy(
+            vsew=vsew,
+            vl=vl,
+            vlmul = UtilFuncs.lmulconvert(vflmul).toInt, 
+            ma = ma,
+            ta = ta,
+            vm = vm,
+            uopIdx=0,
+            uopEnd=true,
+            vxrm = vxrm,
+            vstart = vstart,
+            robIdx = (true, 1)
+        )
+        
         dut.io.in.poke(genFSMInput(
-            FSMSrcBundle(
-                rs1="h0",
-                vs1_preg_idx=vs1_preg_idx,
-                vs2_preg_idx=vs2_preg_idx,
-                old_vd_preg_idx=old_vd_preg_idx,
-                mask_preg_idx=maskbase,
-                uop_valid=true,
-            ),
-            ctrl.copy(
-                vsew=vsew,
-                vl=vl,
-                vlmul = UtilFuncs.lmulconvert(vflmul).toInt, 
-                ma = ma,
-                ta = ta,
-                vm = vm,
-                uopIdx=0,
-                uopEnd=true,
-                vxrm = vxrm,
-                vstart = vstart
-            )
+            srcBundle,
+            ctrlBundle
         ))
         dut.io.redirect.poke(genFSMRedirect())
         dut.clock.step(1)
 
         // ========================================================================================================================
-        val res_vds = stageTwo(dut, preg_to_value, n_inputs, ctrl)
+        val res_vds = stageTwo(
+            dut, preg_to_value, n_inputs, ctrlBundle, srcBundle
+        )
+        
+        if (robIdxValid) {
+            println("robIdxValid = true, flush this instruction")
+            return
+        }
         resComp(expectvd, res_vds, n_inputs, simi)
     }
 
     override def testMultiple(simi:Map[String,String],ctrl:CtrlBundle,s:String, dut:Permutation) : Unit = {
         blocks = 0
+        robIdxValid = false
+        testCountsDebug += 1
         if(instid.equals("vrgatherei16_vv")) ei16FSMTestMultiple(simi, ctrl, s, dut)
         else normalFSMTestMultiple(simi, ctrl, s, dut)
     }

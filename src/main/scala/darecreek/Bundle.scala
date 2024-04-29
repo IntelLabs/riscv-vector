@@ -1,3 +1,15 @@
+/***************************************************************************************
+*Copyright (c) 2023-2024 Intel Corporation
+*Vector Acceleration IP core for RISC-V* is licensed under Mulan PSL v2.
+*You can use this software according to the terms and conditions of the Mulan PSL v2.
+*You may obtain a copy of Mulan PSL v2 at:
+*        http://license.coscl.org.cn/MulanPSL2
+*THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+*EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+*MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+*See the Mulan PSL v2 for more details.
+***************************************************************************************/
+
 package darecreek
 
 import chisel3._
@@ -85,9 +97,13 @@ class VCtrl extends Bundle {
   def vv = !funct3(2) && !(funct3(1) && funct3(0))
   def vx = funct3(2) 
   def vi = !funct3(2) && funct3(1) && funct3(0) 
-  def fuSel = Seq(alu, mul, fp, div, redu, mask, perm)
+  def fuSel = Seq(alu, mul, fp, redu, mask, perm, div)
   def laneExu = arith && !crossLane
   def isLdst = load || store
+  def vs1_imm = lsrc(0)
+  def opi = funct3(0) === funct3(1) // OPIVV/X/I
+  def opm = funct3(1, 0) === 2.U //OPMVV/X
+  def opf = funct3(1, 0) === 1.U // OPFVV/F
 }
 
 class VExcptInfo extends Bundle {
@@ -96,22 +112,25 @@ class VExcptInfo extends Bundle {
   val excptPosition = UInt(bVstart.W)
 }
 
-// Information of the micro-op which is not directly from decoder.
-// Basically they are information for both unexpanded and expanded uop
-class VInfo extends Bundle {
-  val vstart = UInt(bVstart.W) // from CSR
-  val vl = UInt(bVL.W) //---- Todo: width reduction
+// Vector CSR
+class VCsr extends Bundle {
+  val vstart = UInt(bVstart.W)
+  val vl = UInt(bVL.W)
   val vxrm = UInt(2.W)
   val frm = UInt(3.W)
-  val vlmul = UInt(3.W) // see spec
-  val vsew = UInt(3.W)  // see spec
+  val vlmul = UInt(3.W)
+  val vsew = UInt(3.W)
   val vill = Bool()
-  val ma = Bool() // mask agnostic
-  val ta = Bool() // tail agnostic
-  // val lmul = UInt(4.W) // 1, 2, 4, 8
+  val ma = Bool()
+  val ta = Bool()
+}
+// Information of the micro-op which is not directly from decoder.
+// Basically they are information for both unexpanded and expanded uop
+class VInfo extends VCsr {
   val destEew = UInt(3.W) // Destination EEW
-  val emulVd = UInt(4.W)
-  // val wenRF = Bool() // RF wen. E.g., vstart >= vl or vl=0 
+  val emulVd = UInt(4.W) // EMUL of vd
+  val emulVs2 = UInt(4.W)
+  val vstart_gte_vl = Bool()
 }
 
 class VCtrlInfo extends Bundle {
@@ -181,12 +200,17 @@ class VExuInput extends Bundle {
   val vstartRemain = UInt(bVstart.W)
   val vlRemain = UInt(bVL.W)
 }
-// Output of Arith EXU
-class VExuOutput extends Bundle {
+// Outputs of Arith EXU
+class VLaneExuOut extends Bundle {
   val uop = new VExpdUOp
   val vd = Vec(NLanes, UInt(LaneWidth.W))
   val fflags = UInt(5.W) // Floating-point accrued exception flag
   val vxsat = Bool() // Fixed-point accrued saturation flag
+}
+class VCrossExuOut extends Bundle {
+  val uop = new VExpdUOp
+  val vd = Vec(NLanes, UInt(LaneWidth.W))
+  val fflags = UInt(5.W) // Floating-point accrued exception flag
 }
 
 // Input of the lane FU
@@ -209,10 +233,15 @@ class LaneFUOutput extends Bundle {
 }
 
 // Write back of arithmetic exu
-class WbArith extends Bundle {
+class WbArith_lane extends Bundle {
   val uop = new VExpdUOp
   val fflags = UInt(5.W)
   val vxsat = Bool()
+  val rd = UInt(xLen.W)  // Only for OVI
+}
+class WbArith_cross extends Bundle {
+  val uop = new VExpdUOp
+  val fflags = UInt(5.W)
   val rd = UInt(xLen.W)  // Only for OVI
 }
 
@@ -228,6 +257,10 @@ class VRobCommitIO extends Bundle {
   val info = Vec(VCommitWidth, Output(new VRobCommitInfo))
 }
 
+class Redirect extends Bundle {
+  val valid = Bool()
+}
+
 /**
   *  Debug signals
   */
@@ -239,4 +272,6 @@ class VRvfi extends Bundle {
   val vd_wdata = UInt((VLEN*8).W)
   val rd_addr = UInt(5.W)
   val rd_wdata = UInt(xLen.W)
+  val fflags = UInt(5.W)
+  val vxsat = Bool()
 }
