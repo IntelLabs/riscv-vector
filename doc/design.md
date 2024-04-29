@@ -1,7 +1,5 @@
 # Design Introduction
 
-[TOC]
-
 ## Decoder
 The decoder decodes instructions from scalar core into micro-ops. These output micro-ops are fed into vector queue, vector ROB, info calculator, and illegal instruction detector.
 The info calculator (VInfoCalc) calculates some extra information from micro-op.
@@ -13,6 +11,7 @@ Vector queue buffers micro-ops from decoder. The sizes of vector queue and vecto
 ## Parallel Expander
 The output of vector queue goes to the expander which expands micro-op into multiple expanded micro-ops. For example, a micro-op of vector-add with LMUL=8 is expanded into 8 expanded micro-ops.
 The expander supports parallel inputs and outputs. Below are examples of parallelism equals to 2.
+
 (1) Example of one vadd (lmul=4) and one vsub (lmul=4) instruction:
 |          | clock1 | clock2 | clock3 | clock4 | clock5 |
 | --- | --- | --- | --- | --- | --- |
