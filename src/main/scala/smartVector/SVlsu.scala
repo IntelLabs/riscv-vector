@@ -481,7 +481,6 @@ class SVlsu(implicit p: Parameters) extends Module {
         io.dataExchange.req.bits.mask   := Mux(ldstCtrlReg.isLoad, DontCare, storeMaskVec.asUInt)
 
         lastStoreIdx  := issueLdstPtr
-        lastStoreAddr := ldstUopQueue(issueLdstPtr).addr
     }.otherwise {
         io.dataExchange.req.valid       := false.B
         io.dataExchange.req.bits        := DontCare
