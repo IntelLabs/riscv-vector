@@ -18,6 +18,7 @@ class regReadIn(implicit p: Parameters) extends Bundle {
 class regWriteIn(implicit p: Parameters) extends Bundle {
   //val rfReadEn = Vec(2,Bool())
   val rfWriteEn = Bool()
+  val rfWriteMask = UInt((VLEN/8).W)
   //val rfReadIdx = Vec(2,UInt(5.W))
   val rfWriteIdx = UInt(5.W)
   val rfWriteData = UInt(VLEN.W)

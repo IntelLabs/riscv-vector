@@ -600,6 +600,8 @@ class SVlsu(implicit p: Parameters) extends Module {
         io.lsuOut.bits.rfWriteEn    := mUopInfoReg.rfWriteEn
         io.lsuOut.bits.rfWriteIdx   := mUopInfoReg.ldest
 
+        io.lsuOut.bits.rfWriteMask  := Cat(vregInfo.map(info => info.status === VRegSegmentStatus.srcData)).asUInt
+
 
         io.lsuOut.bits.data         := Mux(ldstCtrlReg.isLoad,
             Mux(!vstartGeVl,

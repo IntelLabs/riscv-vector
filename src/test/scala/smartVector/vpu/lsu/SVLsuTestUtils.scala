@@ -333,6 +333,7 @@ class SmartVectorLsuTestWrapper(isLoad: Boolean) extends Module {
     io.lsuOut.valid                             := vLsu.io.lsuOut.valid
     io.lsuOut.bits.data                         := vLsu.io.lsuOut.bits.data
     io.lsuOut.bits.rfWriteEn                    := vLsu.io.lsuOut.bits.rfWriteEn
+    io.lsuOut.bits.rfWriteMask                  := vLsu.io.lsuOut.bits.rfWriteMask
     io.lsuOut.bits.rfWriteIdx                   := vLsu.io.lsuOut.bits.rfWriteIdx
     io.lsuOut.bits.muopEnd                      := vLsu.io.lsuOut.bits.muopEnd
 

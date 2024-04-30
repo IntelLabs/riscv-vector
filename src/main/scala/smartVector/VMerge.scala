@@ -13,6 +13,7 @@ import darecreek.exu.vfu.VPermOutput
 class LsuOutput extends Bundle{
     val data = UInt(VLEN.W)
     val rfWriteEn         = Bool()
+    val rfWriteMask       = UInt((VLEN/8).W)
     val rfWriteIdx        = UInt(5.W)
     val muopEnd           = Bool()
 }
@@ -64,14 +65,16 @@ class VMerge (implicit p : Parameters) extends Module {
          
     when(io.in.aluIn.valid && rfWriteEn){
         when(regBackWidth === "b111".U){
-            io.out.toRegFileWrite.rfWriteEn  := true.B
-            io.out.toRegFileWrite.rfWriteIdx := rfWriteIdx
+            io.out.toRegFileWrite.rfWriteEn   := true.B
+            io.out.toRegFileWrite.rfWriteMask := Fill(VLEN/8, 1.U)
+            io.out.toRegFileWrite.rfWriteIdx  := rfWriteIdx
             io.out.toRegFileWrite.rfWriteData := io.in.aluIn.bits.vd
         }.elsewhen(regBackWidth === "b11".U){
             when(regWriteMuopIdx === 0.U){
                 when(muopEnd){
-                    io.out.toRegFileWrite.rfWriteEn  := true.B
-                    io.out.toRegFileWrite.rfWriteIdx := rfWriteIdx
+                    io.out.toRegFileWrite.rfWriteEn   := true.B
+                    io.out.toRegFileWrite.rfWriteMask := Fill(VLEN/8, 1.U)
+                    io.out.toRegFileWrite.rfWriteIdx  := rfWriteIdx
                     io.out.toRegFileWrite.rfWriteData := io.in.aluIn.bits.vd
                 }.otherwise{
                     io.out.toRegFileWrite.rfWriteEn  := false.B
@@ -80,6 +83,7 @@ class VMerge (implicit p : Parameters) extends Module {
                 }               
             }.otherwise{
                 io.out.toRegFileWrite.rfWriteEn  := true.B
+                io.out.toRegFileWrite.rfWriteMask := Fill(VLEN/8, 1.U)
                 io.out.toRegFileWrite.rfWriteIdx := rfWriteIdx
                 io.out.toRegFileWrite.rfWriteData := 
                     Cat(io.in.aluIn.bits.vd(127,64), regDataBuffer(63,0))
@@ -89,8 +93,9 @@ class VMerge (implicit p : Parameters) extends Module {
         }
     }.elsewhen(io.in.lsuIn.valid && io.in.lsuIn.bits.rfWriteEn)
     {
-        io.out.toRegFileWrite.rfWriteEn  := true.B
-        io.out.toRegFileWrite.rfWriteIdx := io.in.lsuIn.bits.rfWriteIdx
+        io.out.toRegFileWrite.rfWriteEn   := true.B
+        io.out.toRegFileWrite.rfWriteMask := Fill(VLEN/8, 1.U)
+        io.out.toRegFileWrite.rfWriteIdx  := io.in.lsuIn.bits.rfWriteIdx
         io.out.toRegFileWrite.rfWriteData := io.in.lsuIn.bits.data
     }.otherwise{
         io.out.toRegFileWrite := 0.U.asTypeOf(new regWriteIn)
@@ -132,8 +137,9 @@ class VMerge (implicit p : Parameters) extends Module {
     //Perm is not same as others, need to deal seperately
     val permWriteNum = RegInit(0.U(4.W))
     when(io.in.permIn.wb_vld){
-        io.out.toRegFileWrite.rfWriteEn  := true.B
-        io.out.toRegFileWrite.rfWriteIdx := regDstIdx + permWriteNum
+        io.out.toRegFileWrite.rfWriteEn   := true.B
+        io.out.toRegFileWrite.rfWriteMask := Fill(VLEN/8, 1.U)
+        io.out.toRegFileWrite.rfWriteIdx  := regDstIdx + permWriteNum
         io.out.toRegFileWrite.rfWriteData := io.in.permIn.wb_data
         permWriteNum := permWriteNum + 1.U
     }
