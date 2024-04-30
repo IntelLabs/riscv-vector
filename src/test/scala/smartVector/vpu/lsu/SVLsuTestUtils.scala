@@ -187,7 +187,6 @@ class LSUFakeDCache extends Module {
     val s2_req   = RegNext(s1_req)
 
     when(hasXcpt || hasMiss) {
-        s1_valid := false.B
         s2_valid := false.B
     }
 
@@ -195,8 +194,10 @@ class LSUFakeDCache extends Module {
     noise := noise >> 1.U
     val miss = noise(0)
 
+    val s1_nack = miss & s1_valid
+
     io.dataExchange.resp.bits.idx        := s2_req.idx
-    io.dataExchange.req.ready            := true.B
+    io.dataExchange.req.ready            := !s1_nack
     io.dataExchange.xcpt                 := 0.U.asTypeOf(new HellaCacheExceptions())
     io.dataExchange.resp.bits.mask       := 0.U
 

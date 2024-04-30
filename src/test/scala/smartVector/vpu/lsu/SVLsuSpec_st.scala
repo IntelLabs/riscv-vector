@@ -515,17 +515,17 @@ trait VLsuBehavior_st {
 
 class VLsuSpec_st extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VLsuBehavior_st {
   behavior of "LSU test"
-    // it should behave like vLsuTest0()   // unit-stride store
-    // it should behave like vLsuTest1()   // unit-stride store
-    // it should behave like vLsuTest2()   // unit-stride store
-    // it should behave like vLsuTest3()   // unit-stride store
-    // it should behave like vLsuTest4()   // unit-stride store
-    // it should behave like vLsuTest5()   // unit-stride store 
-    // it should behave like vLsuTest6()   // unit-stride mask store
-    // it should behave like vLsuTest7()   // strided store
-    // it should behave like vLsuTest8()   // strided store
-    // it should behave like vLsuTest9()   // strided store
-    // it should behave like vLsuTest10()  // strided store with mask enabled
-    // it should behave like vLsuTest11()  // unit-stride exception
+    it should behave like vLsuTest0()   // unit-stride store
+    it should behave like vLsuTest1()   // unit-stride store
+    it should behave like vLsuTest2()   // unit-stride store
+    it should behave like vLsuTest3()   // unit-stride store
+    it should behave like vLsuTest4()   // unit-stride store
+    it should behave like vLsuTest5()   // unit-stride store 
+    it should behave like vLsuTest6()   // unit-stride mask store
+    it should behave like vLsuTest7()   // strided store
+    it should behave like vLsuTest8()   // strided store
+    it should behave like vLsuTest9()   // strided store
+    it should behave like vLsuTest10()  // strided store with mask enabled
+    it should behave like vLsuTest11()  // unit-stride exception
     it should behave like vLsuTest12()
 }
