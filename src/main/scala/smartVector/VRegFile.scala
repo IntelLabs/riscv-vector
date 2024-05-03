@@ -32,15 +32,15 @@ class subVRegFile(numRead: Int, numWrite: Int, regLen: Int) extends Module {
     val rfData = Output(Vec(NVPhyRegs, UInt((VLEN/NLanes).W)))
   })
 
-  val rf = Reg(Vec(NVPhyRegs, UInt(regLen.W)))
+  val rf = Reg(Vec(NVPhyRegs, Vec(regLen/8, UInt(8.W))))
   for (r <- io.read) { 
-      r.data := rf(r.addr)
+      r.data := rf(r.addr).asUInt
   }
   for (w <- io.write) {
     when (w.wen) {
       for (i <- 0 until regLen/8) {
         when (!w.wmask(i)) {
-          rf(w.addr)(i*8+7, i*8) := w.data(i*8+7, i*8)
+          rf(w.addr)(i) := w.data(i*8+7, i*8)
         }
       }
     }
@@ -48,7 +48,7 @@ class subVRegFile(numRead: Int, numWrite: Int, regLen: Int) extends Module {
 
   //TODO: This is reserved for verification, delete it later
   for(i <- 0 until NVPhyRegs){
-    io.rfData(i) := rf(i)
+    io.rfData(i) := rf(i).asUInt
   }
 }
 

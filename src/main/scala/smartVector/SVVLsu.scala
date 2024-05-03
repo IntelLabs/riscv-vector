@@ -38,7 +38,7 @@ class SegLdstUop extends Bundle {
 
 
 
-class SVlsuSeg(implicit p: Parameters) extends Module {
+class SVVLsu(implicit p: Parameters) extends Module {
     val io = IO(new LdstIO())
 
     // * BEGIN
@@ -95,7 +95,7 @@ class SVlsuSeg(implicit p: Parameters) extends Module {
                             mUopInfo.rs2Val.asSInt, 11111.S)
 
 
-    val validLdstSegReq = io.mUop.valid && io.mUop.bits.uop.ctrl.isLdst
+    val validLdstSegReq = io.mUop.valid && io.mUop.bits.uop.ctrl.isLdst && ldstCtrl.nfield > 1.U
 
     when (validLdstSegReq) {
         when (ldstCtrl.ldstType === Mop.unit_stride) {
@@ -147,7 +147,7 @@ class SVlsuSeg(implicit p: Parameters) extends Module {
     // *          v0(i) = 1 => not masked
     // *          v0(i) = 0 => masked
     val isMasked = Mux(ldstCtrl.vm, false.B, !mUopInfo.mask(curVl))
-    canEnqueue := io.mUop.valid && !isMasked && curVl >= vstart && curVl < vl
+    canEnqueue := validLdstSegReq && !isMasked && curVl >= vstart && curVl < vl
     
     val misalignXcpt = 0.U.asTypeOf(new HellaCacheExceptions)
     misalignXcpt.ma.ld := ldstCtrl.isLoad && addrMisalign
@@ -177,8 +177,8 @@ class SVlsuSeg(implicit p: Parameters) extends Module {
 
     val isNoXcptUop = ldstUopQueue(issueLdstPtr).valid && (ldstUopQueue(issueLdstPtr).commitInfo.xcpt.asUInt.orR === 0.U)
     
-    when (io.dataExchange.resp.bits.nack && io.dataExchange.resp.bits.idx <= issueLdstPtr) {
-        issueLdstPtr := io.dataExchange.resp.bits.idx
+    when (io.dataExchange.resp.bits.nack && io.dataExchange.resp.bits.idx(3, 0) <= issueLdstPtr) {
+        issueLdstPtr := io.dataExchange.resp.bits.idx(3, 0)
     }.elsewhen (isNoXcptUop) {
         issueLdstPtr := issueLdstPtr + 1.U // NOTE: exsits multiple issues for the same uop
     }
@@ -198,7 +198,7 @@ class SVlsuSeg(implicit p: Parameters) extends Module {
         io.dataExchange.req.valid       := true.B
         io.dataExchange.req.bits.addr   := ldstUopQueue(issueLdstPtr).addr
         io.dataExchange.req.bits.cmd    := memOp
-        io.dataExchange.req.bits.idx    := issueLdstPtr
+        io.dataExchange.req.bits.idx    := (1 << 4).U | issueLdstPtr
         io.dataExchange.req.bits.data   := DontCare
         io.dataExchange.req.bits.mask   := DontCare
         // io.dataExchange.req.bits.data   := Mux(memOp, DontCare, storeDataVec.asUInt)
@@ -213,7 +213,7 @@ class SVlsuSeg(implicit p: Parameters) extends Module {
 
     // * BEGIN
     // * Recv Resp
-    val (respLdstPtr, respData) = (io.dataExchange.resp.bits.idx, io.dataExchange.resp.bits.data)
+    val (respLdstPtr, respData) = (io.dataExchange.resp.bits.idx(3, 0), io.dataExchange.resp.bits.data)
     val lastXcptInfo = RegInit(0.U.asTypeOf(new HellaCacheExceptions))
     val lastXcptIdx  = RegInit(ldstUopQueueSize.U(ldstUopQueueWidth.W))
 
