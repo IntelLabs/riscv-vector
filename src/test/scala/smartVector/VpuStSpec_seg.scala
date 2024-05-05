@@ -17,38 +17,38 @@ trait SmartVectorBehavior_st_seg {
     val ldstReqSrc_default  = SrcBundleLdst()
 
     // def VLE8_V             = BitPat("b???000?00000?????000?????0000111")
-    // vle8 v2, 0(x1), 0x0
-    def VLE8_V  = "b000_000_1_00000_00001_000_00010_0000111"
+    // vle8 v8, 0(x1), 0x0
+    def VLE8_V  = "b000_000_1_00000_00001_000_01000_0000111"
 
-    def VLE16_V = "b000_000_1_00000_00001_101_00010_0000111"
+    def VLE16_V = "b000_000_1_00000_00001_101_01000_0000111"
 
-    def VLE32_V = "b000_000_1_00000_00001_110_00010_0000111"
+    def VLE32_V = "b000_000_1_00000_00001_110_01000_0000111"
     
-    def VLE64_V = "b000_000_1_00000_00001_111_00010_0000111"
+    def VLE64_V = "b000_000_1_00000_00001_111_01000_0000111"
 
     // def VLSE8_V            = BitPat("b???010???????????000?????0000111")
-    def VLSE8_V  = "b000_010_1_00010_00001_000_00010_0000111"
+    def VLSE8_V  = "b000_010_1_00010_00001_000_01000_0000111"
 
-    def VLSE16_V = "b000_010_1_00010_00001_101_00010_0000111"
+    def VLSE16_V = "b000_010_1_00010_00001_101_01000_0000111"
 
-    def VLSE32_V = "b000_010_1_00010_00001_110_00010_0000111"
+    def VLSE32_V = "b000_010_1_00010_00001_110_01000_0000111"
     
-    def VLSE64_V = "b000_010_1_00010_00001_111_00010_0000111"
+    def VLSE64_V = "b000_010_1_00010_00001_111_01000_0000111"
 
     // def VLE8_V             = BitPat("b???000?00000?????000?????0000111")
-    // vle8 v2, 0(x1), 0x0
-    def VSSEG2E8_V  = "b001_000_1_00000_00001_000_00010_0100111"
+    // vle8 v8, 0(x1), 0x0
+    def VSSEG2E8_V  = "b001_000_1_00000_00001_000_01000_0100111"
     
-    def VSSEG3E64_V = "b010_000_1_00000_00001_111_00010_0100111"
+    def VSSEG3E64_V = "b010_000_1_00000_00001_111_01000_0100111"
 
     // def VSSE8_V            = BitPat("b???010???????????000?????0100111")
-    def VSSE8_V  = "b000_010_1_00010_00001_000_00010_0100111"
+    def VSSE8_V  = "b000_010_1_00010_00001_000_01000_0100111"
 
-    def VSSE16_V = "b000_010_1_00010_00001_101_00010_0100111"
+    def VSSE16_V = "b000_010_1_00010_00001_101_01000_0100111"
 
-    def VSSE32_V = "b000_010_1_00010_00001_110_00010_0100111"
+    def VSSE32_V = "b000_010_1_00010_00001_110_01000_0100111"
     
-    def VSSE64_V = "b000_010_1_00010_00001_111_00010_0100111"
+    def VSSE64_V = "b000_010_1_00010_00001_111_01000_0100111"
 
 
     var addressMap = Map(
@@ -98,7 +98,7 @@ trait SmartVectorBehavior_st_seg {
     val index1070 = addressMap("h1070")
 
     def vLsuTest0(): Unit = {
-        it should "pass: unit-stride segment load (uops=4, eew=8, vl=16, vstart=0, segment=2)" in {
+        it should "pass: unit-stride segment load (eew=8, vl=16, vstart=0, segment=2)" in {
         test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
@@ -106,7 +106,7 @@ trait SmartVectorBehavior_st_seg {
                 (CtrlBundle(instrn=VLE16_V, vl=27, vlmul=2, vsew=1), SrcBundleLdst()),
             )
             val stReqs = Seq(
-                (CtrlBundle(instrn=VSSEG2E8_V, vl=16, vlmul=1, vsew=1), SrcBundleLdst()),
+                (CtrlBundle(instrn=VSSEG2E8_V, vl=16, vlmul=1, vsew=0), SrcBundleLdst()),
             )
 
             /**************load*********************/
@@ -121,10 +121,10 @@ trait SmartVectorBehavior_st_seg {
             dut.io.rvuCommit.commit_vld.expect(true.B)
             // dut.clock.step(100)
             dut.clock.step(1)
-            dut.io.rfData(2).expect("hffffffffffffffff0123456789abcdef".U)
-            dut.io.rfData(3).expect("hfedcba98765432100f0f0f0f0f0f0f0f".U)
-            dut.io.rfData(4).expect("h01010101010101011234567890123456".U)
-            dut.io.rfData(5).expect("h00000000000000000000678901234567".U)
+            dut.io.rfData( 8).expect("hffffffffffffffff0123456789abcdef".U)
+            dut.io.rfData( 9).expect("hfedcba98765432100f0f0f0f0f0f0f0f".U)
+            dut.io.rfData(10).expect("h01010101010101011234567890123456".U)
+            dut.io.rfData(11).expect("h00000000000000000000678901234567".U)
 
             /*************store*****************/
 
@@ -158,7 +158,7 @@ trait SmartVectorBehavior_st_seg {
                 (CtrlBundle(instrn=VLE16_V, vl=27, vlmul=2, vsew=1), SrcBundleLdst()),
             )
             val stReqs = Seq(
-                (CtrlBundle(instrn=VSSEG3E64_V, vl=2, vlmul=0, vsew=1), SrcBundleLdst()),
+                (CtrlBundle(instrn=VSSEG3E64_V, vl=2, vlmul=0, vsew=3), SrcBundleLdst()),
             )
 
             /**************load*********************/
@@ -173,10 +173,10 @@ trait SmartVectorBehavior_st_seg {
             dut.io.rvuCommit.commit_vld.expect(true.B)
             // dut.clock.step(100)
             dut.clock.step(1)
-            dut.io.rfData(2).expect("hffffffffffffffff0123456789abcdef".U)
-            dut.io.rfData(3).expect("hfedcba98765432100f0f0f0f0f0f0f0f".U)
-            dut.io.rfData(4).expect("h01010101010101011234567890123456".U)
-            dut.io.rfData(5).expect("h00000000000000000000678901234567".U)
+            dut.io.rfData( 8).expect("hffffffffffffffff0123456789abcdef".U)
+            dut.io.rfData( 9).expect("hfedcba98765432100f0f0f0f0f0f0f0f".U)
+            dut.io.rfData(10).expect("h01010101010101011234567890123456".U)
+            dut.io.rfData(11).expect("h00000000000000000000678901234567".U)
 
             /*************store*****************/
 
@@ -226,8 +226,8 @@ trait SmartVectorBehavior_st_seg {
             dut.io.rvuCommit.commit_vld.expect(true.B)
             // dut.clock.step(100)
             dut.clock.step(1)
-            dut.io.rfData(2).expect("h111145670101345632100f0fffffcdef".U)
-            dut.io.rfData(3).expect("h00000000000000000000000033332222".U)
+            dut.io.rfData(8).expect("h111145670101345632100f0fffffcdef".U)
+            dut.io.rfData(9).expect("h00000000000000000000000033332222".U)
             /*************store*****************/
 
             dut.io.rvuIssue.valid.poke(true.B)
