@@ -132,7 +132,6 @@ class SVHLsu(implicit p: Parameters) extends Module {
             mUopInfoReg  := mUopInfo
             ldstCtrlReg  := ldstCtrl
             addrReg      := Mux(io.mUop.bits.uop.uopIdx === 0.U, io.mUop.bits.scalar_opnd_1 + (mUopInfo.segIdx << ldstCtrl.log2Memwb), addrReg)
-
             // Set split info
             ldstEnqPtr   := 0.U
             issueLdstPtr := 0.U
@@ -274,6 +273,15 @@ class SVHLsu(implicit p: Parameters) extends Module {
 
     val isNoXcptUop = ldstUopQueue(issueLdstPtr).valid && (ldstUopQueue(issueLdstPtr).xcpt === 0.U)
     
+    // // non store waiting code
+    // when (io.dataExchange.resp.bits.nack && io.dataExchange.resp.bits.idx <= issueLdstPtr) {
+    //     issueLdstPtr := io.dataExchange.resp.bits.idx
+    // }.elsewhen (isNoXcptUop && io.dataExchange.req.ready) {
+    //     issueLdstPtr := issueLdstPtr + 1.U
+    // }
+
+    // when (isNoXcptUop) {
+    
     /*
      * load => issue
      * store => wait until resp
@@ -394,7 +402,7 @@ class SVHLsu(implicit p: Parameters) extends Module {
         xcptVlReg       := ldstUopQueue(ldstMinValidIdx).pos
 
         (0 until vlenb).foreach { i =>
-            when (vregInfo(i).idx >= ldstMinXcptIdx) {
+            when(vregInfo(i).idx >= ldstMinXcptIdx) {
                 vregInfo(i).status := VRegSegmentStatus.xcpt
             } 
         }
@@ -452,8 +460,9 @@ class SVHLsu(implicit p: Parameters) extends Module {
             vregInfo(i).data    := DontCare
         }
     }.otherwise {
-        io.lsuOut.valid := false.B
-        io.lsuOut.bits  := DontCare
+        io.lsuOut.valid          := false.B
+        io.lsuOut.bits           := DontCare
+        io.lsuOut.bits.rfWriteEn := false.B
     }
 
     // exception output
