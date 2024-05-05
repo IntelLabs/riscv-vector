@@ -66,14 +66,14 @@ class VMerge (implicit p : Parameters) extends Module {
     when(io.in.aluIn.valid && rfWriteEn){
         when(regBackWidth === "b111".U){
             io.out.toRegFileWrite.rfWriteEn   := true.B
-            io.out.toRegFileWrite.rfWriteMask := Fill(VLEN/8, 1.U)
+            io.out.toRegFileWrite.rfWriteMask := Fill(VLEN/8, 0.U)
             io.out.toRegFileWrite.rfWriteIdx  := rfWriteIdx
             io.out.toRegFileWrite.rfWriteData := io.in.aluIn.bits.vd
         }.elsewhen(regBackWidth === "b11".U){
             when(regWriteMuopIdx === 0.U){
                 when(muopEnd){
                     io.out.toRegFileWrite.rfWriteEn   := true.B
-                    io.out.toRegFileWrite.rfWriteMask := Fill(VLEN/8, 1.U)
+                    io.out.toRegFileWrite.rfWriteMask := Fill(VLEN/8, 0.U)
                     io.out.toRegFileWrite.rfWriteIdx  := rfWriteIdx
                     io.out.toRegFileWrite.rfWriteData := io.in.aluIn.bits.vd
                 }.otherwise{
@@ -83,7 +83,7 @@ class VMerge (implicit p : Parameters) extends Module {
                 }               
             }.otherwise{
                 io.out.toRegFileWrite.rfWriteEn  := true.B
-                io.out.toRegFileWrite.rfWriteMask := Fill(VLEN/8, 1.U)
+                io.out.toRegFileWrite.rfWriteMask := Fill(VLEN/8, 0.U)
                 io.out.toRegFileWrite.rfWriteIdx := rfWriteIdx
                 io.out.toRegFileWrite.rfWriteData := 
                     Cat(io.in.aluIn.bits.vd(127,64), regDataBuffer(63,0))
@@ -138,7 +138,7 @@ class VMerge (implicit p : Parameters) extends Module {
     val permWriteNum = RegInit(0.U(4.W))
     when(io.in.permIn.wb_vld){
         io.out.toRegFileWrite.rfWriteEn   := true.B
-        io.out.toRegFileWrite.rfWriteMask := Fill(VLEN/8, 1.U)
+        io.out.toRegFileWrite.rfWriteMask := Fill(VLEN/8, 0.U)
         io.out.toRegFileWrite.rfWriteIdx  := regDstIdx + permWriteNum
         io.out.toRegFileWrite.rfWriteData := io.in.permIn.wb_data
         permWriteNum := permWriteNum + 1.U
