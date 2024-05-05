@@ -75,7 +75,7 @@ class VUopCtrlW extends Bundle {
 class VUop(implicit p: Parameters) extends Bundle {
   val ctrl = new VUopCtrlW
   val info = new VUopInfo
-  val uopIdx = UInt(3.W)
+  val uopIdx = UInt(6.W) // max 16 elements * 4 register
   val segIndex = UInt(3.W)
   val uopEnd = Bool()
   // Temp: system uop

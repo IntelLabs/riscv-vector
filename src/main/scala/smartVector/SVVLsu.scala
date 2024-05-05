@@ -36,8 +36,6 @@ class SegLdstUop extends Bundle {
     val commitInfo  = new CommitInfoRecorded()
 }
 
-
-
 class SVVLsu(implicit p: Parameters) extends Module {
     val io = IO(new LdstIO())
 
@@ -49,16 +47,15 @@ class SVVLsu(implicit p: Parameters) extends Module {
 
     // ldQueue
     val canEnqueue      = WireInit(false.B)
-    val ldstEnqPtr      = RegInit(0.U(ldstUopQueueWidth.W))
-    val issueLdstPtr    = RegInit(0.U(ldstUopQueueWidth.W))
-    val commitPtr       = RegInit(0.U(ldstUopQueueWidth.W))
-    val inQCnt          = RegInit(0.U(ldstUopQueueWidth.W))
-    val ldstUopQueue    = RegInit(VecInit(Seq.fill(ldstUopQueueSize)(0.U.asTypeOf(new SegLdstUop))))
+    val ldstEnqPtr      = RegInit(0.U(vLdstUopQueueWidth.W))
+    val issueLdstPtr    = RegInit(0.U(vLdstUopQueueWidth.W))
+    val commitPtr       = RegInit(0.U(vLdstUopQueueWidth.W))
+    val ldstUopQueue    = RegInit(VecInit(Seq.fill(vLdstUopQueueSize)(0.U.asTypeOf(new SegLdstUop))))
 
     // * signal define
     // * END
 
-    val ldstQueueFull = (inQCnt >= ldstUopQueueSize.U)
+    val ldstQueueFull = ldstUopQueue.zipWithIndex.map { case (uop, i) => uop.valid }.reduce(_ && _)
     io.lsuReady := !ldstQueueFull
 
     // decode nfield / indexed / unit-stride / strided
@@ -82,7 +79,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
     val idxVal      = WireInit(0.U(XLEN.W))
     val idxMask     = WireInit(0.U(XLEN.W))
     val eew         = ldstCtrl.eewb << 3.U // change eew byte to eew bit
-    val beginIdx    = (curVl  - ((curVl >> ldstCtrl.elen) << ldstCtrl.elen)) << 3.U
+    val beginIdx    = (curVl  - ((curVl >> ldstCtrl.log2Elen) << ldstCtrl.log2Elen)) << (ldstCtrl.log2Eewb +& 3.U)
     idxMask        := (("h1".asUInt(addrWidth.W) << eew) - 1.U)
     idxVal         := (mUopInfo.vs2 >> beginIdx) & idxMask
 
@@ -93,7 +90,6 @@ class SVVLsu(implicit p: Parameters) extends Module {
 
     stride         := Mux(ldstCtrl.ldstType === Mop.constant_stride, 
                             mUopInfo.rs2Val.asSInt, 11111.S)
-
 
     val validLdstSegReq = io.mUop.valid && io.mUop.bits.uop.ctrl.isLdst && ldstCtrl.nfield > 1.U
 
@@ -116,11 +112,8 @@ class SVVLsu(implicit p: Parameters) extends Module {
                 addr := addrReg + (mUopInfo.segIdx << ldstCtrl.log2Memwb)
             }
         }.elsewhen (ldstCtrl.ldstType === Mop.index_ordered || ldstCtrl.ldstType === Mop.index_unodered) {
-            when (mUopInfo.segIdx === 0.U && mUopInfo.uopIdx === 0.U) {
+            when (mUopInfo.segIdx === 0.U) {
                 addr := baseAddr + idxVal
-                addrReg := addr
-            }.elsewhen (mUopInfo.segIdx === 0.U) {
-                addr := addrReg + idxVal
                 addrReg := addr
             }.otherwise {
                 addr := addrReg + ldstCtrl.memwb
@@ -215,7 +208,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
     // * Recv Resp
     val (respLdstPtr, respData) = (io.dataExchange.resp.bits.idx(3, 0), io.dataExchange.resp.bits.data)
     val lastXcptInfo = RegInit(0.U.asTypeOf(new HellaCacheExceptions))
-    val lastXcptIdx  = RegInit(ldstUopQueueSize.U(ldstUopQueueWidth.W))
+    val lastXcptIdx  = RegInit((vLdstUopQueueSize-1).U(vLdstUopQueueWidth.W))
 
     when (io.dataExchange.resp.valid) {
         val isLoadResp = ldstUopQueue(respLdstPtr).memOp === VMemCmd.read
@@ -231,10 +224,12 @@ class SVVLsu(implicit p: Parameters) extends Module {
         ldstUopQueue(respLdstPtr).data := ldData
         ldstUopQueue(respLdstPtr).status := SegLdstUopStatus.ready
     }
-    // commit
+    // * Recv Resp
+    // * END
 
-    // excpetion handling
 
+    // * BEGIN
+    // * Commit
     val canCommit  = ldstUopQueue(commitPtr).valid && ldstUopQueue(commitPtr).status === SegLdstUopStatus.ready
     val commitXcpt = canCommit && ldstUopQueue(commitPtr).commitInfo.xcpt.asUInt.orR
     
@@ -253,7 +248,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
             io.xcpt.update_data     := 0.U
         }
 
-        for (i <- 0 until ldstUopQueueSize) {
+        for (i <- 0 until vLdstUopQueueSize) {
             ldstUopQueue(i) := 0.U.asTypeOf(new SegLdstUop)
         }
     }.otherwise {
@@ -272,7 +267,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
         val wMask = VecInit(Seq.fill(vlenb)(0.U(1.W)))
 
         for (i <- 0 until vlenb) {
-            wMask(i) := Mux(i.U >= (destPos * dataSz) && i.U < (destPos * dataSz) + dataSz, 1.U, 0.U)
+            wMask(i) := Mux(i.U >= (destPos * dataSz) && i.U < (destPos * dataSz) + dataSz, 0.U, 1.U)
         }
 
         io.lsuOut.valid             := true.B
@@ -284,6 +279,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
     }.otherwise {
         io.lsuOut.valid := false.B
         io.lsuOut.bits  := DontCare
+        io.lsuOut.bits.rfWriteEn := false.B
     }
 
     when (io.lsuOut.fire) {
@@ -291,6 +287,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
         ldstUopQueue(commitPtr).status := SegLdstUopStatus.notReady
         ldstUopQueue(commitPtr).valid  := false.B
     }
-
+    // * Commit
+    // * END
 
 }

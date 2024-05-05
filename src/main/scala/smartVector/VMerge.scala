@@ -94,7 +94,7 @@ class VMerge (implicit p : Parameters) extends Module {
     }.elsewhen(io.in.lsuIn.valid && io.in.lsuIn.bits.rfWriteEn)
     {
         io.out.toRegFileWrite.rfWriteEn   := true.B
-        io.out.toRegFileWrite.rfWriteMask := Fill(VLEN/8, 1.U)
+        io.out.toRegFileWrite.rfWriteMask := io.in.lsuIn.bits.rfWriteMask
         io.out.toRegFileWrite.rfWriteIdx  := io.in.lsuIn.bits.rfWriteIdx
         io.out.toRegFileWrite.rfWriteData := io.in.lsuIn.bits.data
     }.otherwise{

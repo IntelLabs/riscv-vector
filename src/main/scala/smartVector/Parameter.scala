@@ -36,6 +36,9 @@ trait smartParas {
   val dataWidth = 64
   val ldstUopQueueSize = 17
   val ldstUopQueueWidth = log2Up(ldstUopQueueSize)
+
+  val vLdstUopQueueSize = 4
+  val vLdstUopQueueWidth = log2Up(vLdstUopQueueSize)
 }
 
 object SmartParam extends smartParas

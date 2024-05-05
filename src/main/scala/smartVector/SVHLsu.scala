@@ -432,7 +432,8 @@ class SVHLsu(implicit p: Parameters) extends Module {
         io.lsuOut.bits.rfWriteEn    := mUopInfoReg.rfWriteEn
         io.lsuOut.bits.rfWriteIdx   := mUopInfoReg.ldest
 
-        io.lsuOut.bits.rfWriteMask  := Cat(vregInfo.map(info => info.status === VRegSegmentStatus.srcData)).asUInt
+        // io.lsuOut.bits.rfWriteMask  := Cat(vregInfo.map(info => info.status === VRegSegmentStatus.srcData)).asUInt
+        io.lsuOut.bits.rfWriteMask  := 0.U
 
 
         io.lsuOut.bits.data         := Mux(ldstCtrlReg.isLoad,

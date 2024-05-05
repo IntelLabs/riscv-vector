@@ -73,7 +73,7 @@ class VRegSegmentInfo extends Bundle {
 }
 
 class mUopInfo extends Bundle {
-    val uopIdx      = UInt(3.W)
+    val uopIdx      = UInt(6.W)
     val uopEnd      = Bool()
     val segIdx      = UInt(log2Ceil(8).W)
 
