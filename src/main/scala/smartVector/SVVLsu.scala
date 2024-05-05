@@ -26,12 +26,12 @@ class CommitInfoRecorded extends Bundle {
 class SegLdstUop extends Bundle {
     val valid       = Bool()
     val status      = UInt(1.W)
-    val memOp       = UInt(1.W)
-    val size        = UInt((dataWidth/8).W)
+    val memOp       = Bool()
+    val size        = UInt(log2Ceil(dataWidth/8).W)
     val addr        = UInt(addrWidth.W)
     val offset      = UInt(log2Ceil(dataWidth/8).W)
     val pos         = UInt(bVL.W) // position in vl
-    val destPos     = UInt(bVL.W)
+    val destElem    = UInt(bVL.W)
     val data        = UInt(dataWidth.W)
     val commitInfo  = new CommitInfoRecorded()
 }
@@ -131,7 +131,15 @@ class SVVLsu(implicit p: Parameters) extends Module {
    
     val addrMisalign = (addr & addrMask).orR  // align addr to memwb ?
     
-    val destPos  = (curVl  - ((curVl >> ldstCtrl.log2Mlen) << ldstCtrl.log2Mlen))
+    // * Calculate Addr
+    // * END
+
+
+    // store data to queue
+    val memw     = ldstCtrl.memwb << 3.U
+    val destElem = (curVl  - ((curVl >> ldstCtrl.log2Mlen) << ldstCtrl.log2Mlen))
+    val destMask = (1.U << memw) - 1.U
+    val destData = (io.mUop.bits.uopRegInfo.old_vd >> (destElem << (ldstCtrl.log2Memwb +& 3.U))) & destMask
     
     // push request to queue
     
@@ -140,26 +148,27 @@ class SVVLsu(implicit p: Parameters) extends Module {
     // *          v0(i) = 1 => not masked
     // *          v0(i) = 0 => masked
     val isMasked = Mux(ldstCtrl.vm, false.B, !mUopInfo.mask(curVl))
-    canEnqueue := validLdstSegReq && !isMasked && curVl >= vstart && curVl < vl
+    canEnqueue  := validLdstSegReq && !isMasked && curVl >= vstart && curVl < vl
     
-    val misalignXcpt = 0.U.asTypeOf(new HellaCacheExceptions)
-    misalignXcpt.ma.ld := ldstCtrl.isLoad && addrMisalign
+    val misalignXcpt    = 0.U.asTypeOf(new HellaCacheExceptions)
+    misalignXcpt.ma.ld := ldstCtrl.isLoad  && addrMisalign
     misalignXcpt.ma.st := ldstCtrl.isStore && addrMisalign
 
     when (canEnqueue) {
-        ldstUopQueue(ldstEnqPtr).valid  := true.B
-        ldstUopQueue(ldstEnqPtr).status := SegLdstUopStatus.notReady
-        ldstUopQueue(ldstEnqPtr).memOp  := ldstCtrl.isStore
-        ldstUopQueue(ldstEnqPtr).addr   := alignedAddr
-        ldstUopQueue(ldstEnqPtr).pos    := curVl
-        ldstUopQueue(ldstEnqPtr).offset := offset
-        ldstUopQueue(ldstEnqPtr).size   := ldstCtrl.memwb
-        ldstUopQueue(ldstEnqPtr).destPos := destPos
-        ldstUopQueue(ldstEnqPtr).commitInfo.muopEnd := uopEnd
-        ldstUopQueue(ldstEnqPtr).commitInfo.rfWriteEn := mUopInfo.rfWriteEn
-        ldstUopQueue(ldstEnqPtr).commitInfo.rfWriteIdx := mUopInfo.ldest
-        ldstUopQueue(ldstEnqPtr).commitInfo.isFof := ldstCtrl.unitSMop === UnitStrideMop.fault_only_first
-        ldstUopQueue(ldstEnqPtr).commitInfo.xcpt := misalignXcpt
+        ldstUopQueue(ldstEnqPtr).valid                  := true.B
+        ldstUopQueue(ldstEnqPtr).status                 := SegLdstUopStatus.notReady
+        ldstUopQueue(ldstEnqPtr).memOp                  := ldstCtrl.isStore
+        ldstUopQueue(ldstEnqPtr).addr                   := alignedAddr
+        ldstUopQueue(ldstEnqPtr).pos                    := curVl
+        ldstUopQueue(ldstEnqPtr).offset                 := offset
+        ldstUopQueue(ldstEnqPtr).size                   := ldstCtrl.log2Memwb
+        ldstUopQueue(ldstEnqPtr).destElem               := destElem
+        ldstUopQueue(ldstEnqPtr).data                   := Mux(ldstCtrl.isStore, destData, ldstUopQueue(ldstEnqPtr).data)
+        ldstUopQueue(ldstEnqPtr).commitInfo.muopEnd     := uopEnd
+        ldstUopQueue(ldstEnqPtr).commitInfo.rfWriteEn   := mUopInfo.rfWriteEn
+        ldstUopQueue(ldstEnqPtr).commitInfo.rfWriteIdx  := mUopInfo.ldest
+        ldstUopQueue(ldstEnqPtr).commitInfo.isFof       := ldstCtrl.unitSMop === UnitStrideMop.fault_only_first
+        ldstUopQueue(ldstEnqPtr).commitInfo.xcpt        := misalignXcpt
 
         ldstEnqPtr  := ldstEnqPtr + 1.U
     }
@@ -177,25 +186,25 @@ class SVVLsu(implicit p: Parameters) extends Module {
     }
 
     when (isNoXcptUop) {
-        // val storeDataVec = VecInit(Seq.fill(8)(0.U(8.W)))
-        // val storeMaskVec = VecInit(Seq.fill(8)(0.U(1.W)))
+        val data    = ldstUopQueue(issueLdstPtr).data
+        val dataSz  = (1.U << ldstUopQueue(issueLdstPtr).size)
+        val offset  = ldstUopQueue(issueLdstPtr).offset
 
-        // (0 until vlenb).foreach { i =>
-        //     when (ldstCtrlReg.isStore && vregInfo(i).status === VRegSegmentStatus.notReady && vregInfo(i).idx === issueLdstPtr) {
-        //         val offset = vregInfo(i).offset
-        //         storeDataVec(offset) := vregInfo(i).data
-        //         storeMaskVec(offset) := 1.U
-        //     }
-        // }
+        val wData = data << (offset << 3.U)
+        val wMask = VecInit(Seq.fill(8)(0.U(1.W)))
+
+        for (i <- 0 until 8) {
+            // 1 to write, 0 to skip
+            wMask(i) := Mux(i.U >= offset && i.U < offset + dataSz, 1.U, 0.U)
+        }
+
         val memOp = ldstUopQueue(issueLdstPtr).memOp
         io.dataExchange.req.valid       := true.B
         io.dataExchange.req.bits.addr   := ldstUopQueue(issueLdstPtr).addr
         io.dataExchange.req.bits.cmd    := memOp
-        io.dataExchange.req.bits.idx    := (1 << 4).U | issueLdstPtr
-        io.dataExchange.req.bits.data   := DontCare
-        io.dataExchange.req.bits.mask   := DontCare
-        // io.dataExchange.req.bits.data   := Mux(memOp, DontCare, storeDataVec.asUInt)
-        // io.dataExchange.req.bits.mask   := Mux(memOp, DontCare, storeMaskVec.asUInt)
+        io.dataExchange.req.bits.idx    := (1 << 4).U | issueLdstPtr // to figure out hlsu or vlsu
+        io.dataExchange.req.bits.data   := Mux(memOp, wData, DontCare)
+        io.dataExchange.req.bits.mask   := Mux(memOp, wMask.asUInt, DontCare)
     }.otherwise {
         io.dataExchange.req.valid       := false.B
         io.dataExchange.req.bits        := DontCare
@@ -215,13 +224,13 @@ class SVVLsu(implicit p: Parameters) extends Module {
         val isLoadRespDataValid = io.dataExchange.resp.bits.has_data
         val loadComplete  = isLoadResp && isLoadRespDataValid
 
-        val dataSz = ldstUopQueue(respLdstPtr).size
+        val dataSz = (1.U << ldstUopQueue(respLdstPtr).size)
         val ldData = WireInit(0.U(64.W))
         val offset = ldstUopQueue(respLdstPtr).offset
         // ldData := io.dataExchange.resp.bits.data((offset + dataSz) << 3.U - 1.U, offset << 3.U)
         ldData := (respData >> (offset << 3.U)) & ((1.U << (dataSz << 3.U)) - 1.U)
 
-        ldstUopQueue(respLdstPtr).data := ldData
+        ldstUopQueue(respLdstPtr).data   := Mux(loadComplete, ldData, ldstUopQueue(respLdstPtr).data)
         ldstUopQueue(respLdstPtr).status := SegLdstUopStatus.ready
     }
     // * Recv Resp
@@ -259,15 +268,16 @@ class SVVLsu(implicit p: Parameters) extends Module {
     }
 
     when (canCommit && !commitXcpt) {
-        val destPos = ldstUopQueue(commitPtr).destPos
-        val data    = ldstUopQueue(commitPtr).data
-        val dataSz  = ldstUopQueue(commitPtr).size
-
-        val wData = data << ((destPos * dataSz) << 3.U)
-        val wMask = VecInit(Seq.fill(vlenb)(0.U(1.W)))
+        val destElem     = ldstUopQueue(commitPtr).destElem
+        val data        = ldstUopQueue(commitPtr).data
+        val dataSz      = (1.U << ldstUopQueue(commitPtr).size)
+        val log2DataSz  = ldstUopQueue(commitPtr).size
+    
+        val wData       = data << ((destElem << log2DataSz) << 3.U)
+        val wMask       = VecInit(Seq.fill(vlenb)(0.U(1.W)))
 
         for (i <- 0 until vlenb) {
-            wMask(i) := Mux(i.U >= (destPos * dataSz) && i.U < (destPos * dataSz) + dataSz, 0.U, 1.U)
+            wMask(i) := ~(i.U >= (destElem << log2DataSz) && i.U < (destElem << log2DataSz) + dataSz)
         }
 
         io.lsuOut.valid             := true.B
@@ -277,9 +287,9 @@ class SVVLsu(implicit p: Parameters) extends Module {
         io.lsuOut.bits.data         := wData
         io.lsuOut.bits.rfWriteMask  := wMask.asUInt
     }.otherwise {
-        io.lsuOut.valid := false.B
-        io.lsuOut.bits  := DontCare
-        io.lsuOut.bits.rfWriteEn := false.B
+        io.lsuOut.valid             := false.B
+        io.lsuOut.bits              := DontCare
+        io.lsuOut.bits.rfWriteEn    := false.B
     }
 
     when (io.lsuOut.fire) {
