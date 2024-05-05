@@ -185,6 +185,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
         issueLdstPtr := issueLdstPtr + 1.U // NOTE: exsits multiple issues for the same uop
     }
 
+    // TODO: store waiting resp
     when (isNoXcptUop) {
         val data    = ldstUopQueue(issueLdstPtr).data
         val dataSz  = (1.U << ldstUopQueue(issueLdstPtr).size)
