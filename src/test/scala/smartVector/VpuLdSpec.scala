@@ -9,7 +9,7 @@ import smartVector._
 import darecreek.ctrl.decode.VInstructions._
 import SmartParam._
 
-trait SmartVectorBehavior_ld_mutu {
+trait SmartVectorBehavior_ld {
   this: AnyFlatSpec with ChiselScalatestTester with BundleGenHelper =>
 
     val ldstReqCtrl_default = CtrlBundle()
@@ -73,7 +73,7 @@ trait SmartVectorBehavior_ld_mutu {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (ldstReqCtrl_default.copy(instrn=VLE8_V, vl=19, vlmul=2), ldstReqSrc_default.copy()),
+                (ldstReqCtrl_default.copy(instrn=VLE8_V, vl=19, vlmul=2, ma=true, ta=true), ldstReqSrc_default.copy()),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
@@ -334,7 +334,7 @@ trait SmartVectorBehavior_ld_mutu {
     // }
 }
 
-class VPULdSpec_mutu extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with SmartVectorBehavior_ld_mutu {
+class VPULdSpec extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with SmartVectorBehavior_ld {
   behavior of "SmartVector Load test"
     it should behave like vLsuTest0()   //
     it should behave like vLsuTest1()   //
