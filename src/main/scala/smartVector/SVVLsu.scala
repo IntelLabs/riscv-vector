@@ -129,7 +129,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
 
     when (canEnqueue) {
         ldstUopQueue(ldstEnqPtr).valid                  := true.B
-        ldstUopQueue(ldstEnqPtr).status                 := SegLdstUopStatus.notReady
+        ldstUopQueue(ldstEnqPtr).status                 := Mux(addrMisalign, LdstUopStatus.ready, LdstUopStatus.notReady)
         ldstUopQueue(ldstEnqPtr).memOp                  := ldstCtrl.isStore
         ldstUopQueue(ldstEnqPtr).addr                   := alignedAddr
         ldstUopQueue(ldstEnqPtr).pos                    := curVl
@@ -190,8 +190,6 @@ class SVVLsu(implicit p: Parameters) extends Module {
     // * BEGIN
     // * Recv Resp
     val (respLdstPtr, respData) = (io.dataExchange.resp.bits.idx(3, 0), io.dataExchange.resp.bits.data)
-    val lastXcptInfo = RegInit(0.U.asTypeOf(new HellaCacheExceptions))
-    val lastXcptIdx  = RegInit((vLdstUopQueueSize-1).U(vLdstUopQueueWidth.W))
 
     when (io.dataExchange.resp.valid) {
         val isLoadResp = ldstUopQueue(respLdstPtr).memOp === VMemCmd.read
@@ -205,15 +203,17 @@ class SVVLsu(implicit p: Parameters) extends Module {
         ldData := (respData >> (offset << 3.U)) & ((1.U << (dataSz << 3.U)) - 1.U)
 
         ldstUopQueue(respLdstPtr).data   := Mux(loadComplete, ldData, ldstUopQueue(respLdstPtr).data)
-        ldstUopQueue(respLdstPtr).status := SegLdstUopStatus.ready
+        ldstUopQueue(respLdstPtr).status := LdstUopStatus.ready
+        ldstUopQueue(respLdstPtr).commitInfo.xcpt := io.dataExchange.xcpt
     }
+
     // * Recv Resp
     // * END
 
 
     // * BEGIN
     // * Commit
-    val canCommit  = ldstUopQueue(commitPtr).valid && ldstUopQueue(commitPtr).status === SegLdstUopStatus.ready
+    val canCommit  = ldstUopQueue(commitPtr).valid && ldstUopQueue(commitPtr).status === LdstUopStatus.ready
     val commitXcpt = canCommit && ldstUopQueue(commitPtr).commitInfo.xcpt.asUInt.orR
     
 
@@ -268,7 +268,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
 
     when (io.lsuOut.fire) {
         commitPtr                      := commitPtr + 1.U
-        ldstUopQueue(commitPtr).status := SegLdstUopStatus.notReady
+        ldstUopQueue(commitPtr).status := LdstUopStatus.notReady
         ldstUopQueue(commitPtr).valid  := false.B
     }
     // * Commit
