@@ -47,6 +47,7 @@ class SVHLsu(implicit p: Parameters) extends Module {
     val canEnqueue      = WireInit(false.B)
     val ldstEnqPtr      = RegInit(0.U(ldstUopQueueWidth.W))
     val issueLdstPtr    = RegInit(0.U(ldstUopQueueWidth.W))
+    val commitPtr       = RegInit(0.U(ldstUopQueueWidth.W))
     val ldstUopQueue    = RegInit(VecInit(Seq.fill(ldstUopQueueSize)(0.U.asTypeOf(new LdstUop))))
 
     // xcpt info
@@ -135,6 +136,7 @@ class SVHLsu(implicit p: Parameters) extends Module {
             // Set split info
             ldstEnqPtr   := 0.U
             issueLdstPtr := 0.U
+            commitPtr    := 0.U
             curSplitIdx  := 0.U
             splitCount   := microVl  
             splitStart   := microVstart
@@ -229,13 +231,19 @@ class SVHLsu(implicit p: Parameters) extends Module {
     val elemMaskVec = VecInit(Seq.fill(vlenb)(false.B))
     val isNotMasked = elemMaskVec.asUInt =/= 0.U
 
+    val misalignXcpt    = 0.U.asTypeOf(new HellaCacheExceptions)
+    misalignXcpt.ma.ld := ldstCtrlReg.isLoad  && addrMisalign
+    misalignXcpt.ma.st := ldstCtrlReg.isStore && addrMisalign
+
     when (uopState === uop_split && !memXcpt && curSplitIdx < splitCount) {
         canEnqueue := (ldstCtrlReg.vm || isNotMasked) && (curSplitIdx + canLoadElemCnt >= splitStart)
         when (canEnqueue) {
             ldstUopQueue(ldstEnqPtr).valid  := true.B
+            ldstUopQueue(ldstEnqPtr).status := Mux(addrMisalign, LdstUopStatus.ready, LdstUopStatus.notReady)
+            ldstUopQueue(ldstEnqPtr).memOp  := ldstCtrlReg.isStore
             ldstUopQueue(ldstEnqPtr).addr   := alignedAddr
             ldstUopQueue(ldstEnqPtr).pos    := curVl
-            ldstUopQueue(ldstEnqPtr).xcpt   := Mux(addrMisalign, LdstUopXcptCause.misalign, 0.U)
+            ldstUopQueue(ldstEnqPtr).xcpt   := misalignXcpt
             ldstEnqPtr  := ldstEnqPtr + 1.U
         }
 
@@ -271,45 +279,8 @@ class SVHLsu(implicit p: Parameters) extends Module {
     // * BEGIN
     // * Issue LdstUop
 
-    val isNoXcptUop = ldstUopQueue(issueLdstPtr).valid && (ldstUopQueue(issueLdstPtr).xcpt === 0.U)
+    val isNoXcptUop = ldstUopQueue(issueLdstPtr).valid && (ldstUopQueue(issueLdstPtr).xcpt.asUInt.orR === 0.U)
     
-    
-    // /*
-    //  * load => issue
-    //  * store => wait until resp
-    //  * replay => reissue
-    //  */
-
-    // val issue_go :: issue_wait :: Nil = Enum(2)
-
-    // val issueState = RegInit(issue_go)
-
-    // switch (issueState) {
-    //     is (issue_go) {
-    //         when (ldstCtrlReg.isLoad) {
-    //             issueState := issue_go
-    //         }.elsewhen (ldstCtrlReg.isStore && io.dataExchange.req.fire) {
-    //             issueState := issue_wait
-    //         }
-    //         // when (io.dataExchange.req.fire) { // stall load & store until resp back
-    //         //     issueState := issue_wait
-    //         // }
-    //     }
-    //     is (issue_wait) {
-    //         when (io.dataExchange.resp.valid || io.dataExchange.resp.bits.nack || memXcpt) {
-    //             issueState := issue_go
-    //         }
-    //     }
-    // }
-
-    // when (io.dataExchange.resp.bits.nack && io.dataExchange.resp.bits.idx <= issueLdstPtr) {
-    //     issueLdstPtr := io.dataExchange.resp.bits.idx
-    // }.elsewhen (io.dataExchange.req.ready && issueState === issue_go && !completeLdst) {
-    //     issueLdstPtr := issueLdstPtr + 1.U // NOTE: exsits multiple issues for the same uop
-    // }
-
-    // when (issueState === issue_go && isNoXcptUop) {
-
     // non store waiting code
     when (io.dataExchange.resp.bits.nack && io.dataExchange.resp.bits.idx <= issueLdstPtr) {
         issueLdstPtr := io.dataExchange.resp.bits.idx
@@ -328,12 +299,14 @@ class SVHLsu(implicit p: Parameters) extends Module {
                 storeMaskVec(offset) := 1.U
             }
         }
+
+        val memOp                        = ldstUopQueue(issueLdstPtr).memOp
         io.dataExchange.req.valid       := true.B
         io.dataExchange.req.bits.addr   := ldstUopQueue(issueLdstPtr).addr
-        io.dataExchange.req.bits.cmd    := Mux(ldstCtrlReg.isLoad, VMemCmd.read, VMemCmd.write)
+        io.dataExchange.req.bits.cmd    := memOp
         io.dataExchange.req.bits.idx    := issueLdstPtr
-        io.dataExchange.req.bits.data   := Mux(ldstCtrlReg.isLoad, DontCare, storeDataVec.asUInt)
-        io.dataExchange.req.bits.mask   := Mux(ldstCtrlReg.isLoad, DontCare, storeMaskVec.asUInt)
+        io.dataExchange.req.bits.data   := Mux(memOp, storeDataVec.asUInt, DontCare)
+        io.dataExchange.req.bits.mask   := Mux(memOp, storeMaskVec.asUInt, DontCare)
     }.otherwise {
         io.dataExchange.req.valid       := false.B
         io.dataExchange.req.bits        := DontCare
@@ -346,23 +319,14 @@ class SVHLsu(implicit p: Parameters) extends Module {
     // * BEGIN
     // * Recv Resp
     val (respLdstPtr, respData) = (io.dataExchange.resp.bits.idx, io.dataExchange.resp.bits.data)
-    val lastXcptInfo = RegInit(0.U.asTypeOf(new HellaCacheExceptions))
-    val lastXcptIdx  = RegInit(ldstUopQueueSize.U(ldstUopQueueWidth.W))
 
-    when (io.dataExchange.resp.valid && uopState =/= uop_idle && respLdstPtr < lastXcptIdx) {
-        val loadComplete  = ldstCtrlReg.isLoad && io.dataExchange.resp.bits.has_data
-        val storeComplete = ldstCtrlReg.isStore
+    when (io.dataExchange.resp.valid || memXcpt) {
+        ldstUopQueue(respLdstPtr).status := LdstUopStatus.ready
+        ldstUopQueue(respLdstPtr).xcpt   := io.dataExchange.xcpt
+    }
 
-        ldstUopQueue(respLdstPtr).valid := false.B
-
-        (0 until vlenb).foreach { i =>
-            when (vregInfo(i).status === VRegSegmentStatus.notReady && vregInfo(i).idx === respLdstPtr) {
-                vregInfo(i).status := VRegSegmentStatus.ready
-                vregInfo(i).idx    := ldstUopQueueSize.U
-            } 
-        }
-
-        when (loadComplete) {
+    when (io.dataExchange.resp.valid) {
+        when (ldstUopQueue(respLdstPtr).memOp === VMemCmd.read) {
             (0 until vlenb).foreach { i =>
                 when (vregInfo(i).status === VRegSegmentStatus.notReady && vregInfo(i).idx === respLdstPtr) {
                     val offsetOH = UIntToOH(vregInfo(i).offset, 8)
@@ -373,50 +337,48 @@ class SVHLsu(implicit p: Parameters) extends Module {
                     )
                 }
             }
-         }
-
-    }
-    
-    val ldstMinValidIdx = PriorityEncoder(ldstUopQueue.map(uop => uop.valid))
-    val ldstMinXcptIdx  = PriorityEncoder(ldstUopQueue.map(uop => uop.valid & (uop.xcpt =/= 0.U)))
-
-    when (memXcpt && ldstUopQueue(respLdstPtr).valid && respLdstPtr < lastXcptIdx) { // exception handling
-        // update xcpt info
-        ldstUopQueue(respLdstPtr).xcpt := LdstUopXcptCause.mem_xcpt
-        lastXcptIdx  := respLdstPtr
-        lastXcptInfo := io.dataExchange.xcpt
-    }
-    
-    val misalignXcpt    = Wire(new HellaCacheExceptions)
-    misalignXcpt.ma.ld := ldstCtrlReg.isLoad
-    misalignXcpt.ma.st := ldstCtrlReg.isStore
-    misalignXcpt.pf.ld := false.B
-    misalignXcpt.pf.st := false.B
-    misalignXcpt.gf.ld := false.B
-    misalignXcpt.gf.st := false.B
-    misalignXcpt.ae.ld := false.B
-    misalignXcpt.ae.st := false.B
-
-    when (ldstMinValidIdx === ldstMinXcptIdx && (ldstMinValidIdx =/= (ldstUopQueueSize - 1).U)) {
-        // 1. clear ldstUopQueue
-        ldstUopQueue.foreach(uop => uop.valid := false.B)
-        // 2. update xcpt info
-        xcptVlReg       := ldstUopQueue(ldstMinValidIdx).pos
-
-        (0 until vlenb).foreach { i =>
-            when(vregInfo(i).idx >= ldstMinXcptIdx && vregInfo(i).idx < ldstUopQueueSize.U) {
-                vregInfo(i).status := VRegSegmentStatus.xcpt
-            } 
         }
-
-        hellaXcptReg    := Mux(ldstUopQueue(ldstMinValidIdx).xcpt === LdstUopXcptCause.misalign, misalignXcpt, lastXcptInfo)
-        hasXcpt         := true.B
     }
 
     completeLdst := ldstUopQueue.forall(uop => uop.valid === false.B) // ld completed or xcpt happened
 
     // * Recv Resp
     // * END
+
+
+    // * BEGIN
+    // * Commit to VRegIngo
+    val canCommit  = ldstUopQueue(commitPtr).valid && ldstUopQueue(commitPtr).status === LdstUopStatus.ready
+    val commitXcpt = canCommit && ldstUopQueue(commitPtr).xcpt.asUInt.orR =/= 0.U
+
+    when(commitXcpt) {
+        (0 until vlenb).foreach { i =>
+            when (vregInfo(i).idx >= commitPtr && vregInfo(i).idx < ldstUopQueueSize.U) {
+                vregInfo(i).status := VRegSegmentStatus.xcpt
+            } 
+        }
+
+        // 1. clear ldstUopQueue
+        ldstUopQueue.foreach(uop => uop.valid := false.B)
+        // 2. update xcpt info
+        xcptVlReg       := ldstUopQueue(commitPtr).pos
+        hellaXcptReg    := ldstUopQueue(commitPtr).xcpt
+        hasXcpt         := true.B
+    }.elsewhen (canCommit) {
+        ldstUopQueue(commitPtr).valid := false.B
+
+        (0 until vlenb).foreach { i =>
+            when (vregInfo(i).status === VRegSegmentStatus.notReady && vregInfo(i).idx === commitPtr) {
+                vregInfo(i).status := VRegSegmentStatus.ready
+                vregInfo(i).idx    := ldstUopQueueSize.U
+            } 
+        }
+        commitPtr := commitPtr + 1.U
+    }
+
+    // * Commit to VRegIngo
+    // * END
+
 
 
     // * BEGIN
@@ -478,7 +440,6 @@ class SVHLsu(implicit p: Parameters) extends Module {
 
         // reset xcpt
         hasXcpt     := false.B
-        lastXcptIdx := ldstUopQueueSize.U
     }.otherwise {
         io.xcpt.exception_vld       := false.B
         io.xcpt.update_vl           := false.B

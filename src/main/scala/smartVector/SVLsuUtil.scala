@@ -55,11 +55,39 @@ object LdstUopXcptCause {
     val mem_xcpt = 2.U
 }
 
+object LdstUopStatus {
+    val notReady = 0.U
+    val ready    = 1.U
+}
+
+class CommitInfoRecorded extends Bundle {
+    val muopEnd     = Bool()
+    val rfWriteEn   = Bool()
+    val rfWriteIdx  = UInt(5.W)
+    val isFof       = Bool()
+    val xcpt        = new HellaCacheExceptions()
+}
+
 class LdstUop extends Bundle {
-    val valid = Bool()
-    val addr  = UInt(addrWidth.W)
-    val pos   = UInt(bVL.W) // position in vl
-    val xcpt  = UInt(2.W)
+    val valid       = Bool()
+    val status      = UInt(1.W)                     // ready to commit?
+    val memOp       = Bool()                        // load or store
+    val addr        = UInt(addrWidth.W)
+    val pos         = UInt(bVL.W)                   // position in vl
+    val xcpt        = new HellaCacheExceptions()
+}
+
+class SegLdstUop extends Bundle {
+    val valid       = Bool()
+    val status      = UInt(1.W)                     // ready to commit?
+    val memOp       = Bool()                        // load or store
+    val size        = UInt(log2Ceil(dataWidth/8).W) // element size
+    val addr        = UInt(addrWidth.W)             
+    val offset      = UInt(log2Ceil(dataWidth/8).W) // offset in byte
+    val pos         = UInt(bVL.W)                   // position in vl
+    val destElem    = UInt(bVL.W)                   // data position in vreg
+    val data        = UInt(dataWidth.W)
+    val commitInfo  = new CommitInfoRecorded()
 }
 
 class VRegSegmentInfo extends Bundle {
