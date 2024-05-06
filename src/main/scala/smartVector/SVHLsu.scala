@@ -273,50 +273,51 @@ class SVHLsu(implicit p: Parameters) extends Module {
 
     val isNoXcptUop = ldstUopQueue(issueLdstPtr).valid && (ldstUopQueue(issueLdstPtr).xcpt === 0.U)
     
-    // // non store waiting code
-    // when (io.dataExchange.resp.bits.nack && io.dataExchange.resp.bits.idx <= issueLdstPtr) {
-    //     issueLdstPtr := io.dataExchange.resp.bits.idx
-    // }.elsewhen (isNoXcptUop && io.dataExchange.req.ready) {
-    //     issueLdstPtr := issueLdstPtr + 1.U
+    
+    // /*
+    //  * load => issue
+    //  * store => wait until resp
+    //  * replay => reissue
+    //  */
+
+    // val issue_go :: issue_wait :: Nil = Enum(2)
+
+    // val issueState = RegInit(issue_go)
+
+    // switch (issueState) {
+    //     is (issue_go) {
+    //         when (ldstCtrlReg.isLoad) {
+    //             issueState := issue_go
+    //         }.elsewhen (ldstCtrlReg.isStore && io.dataExchange.req.fire) {
+    //             issueState := issue_wait
+    //         }
+    //         // when (io.dataExchange.req.fire) { // stall load & store until resp back
+    //         //     issueState := issue_wait
+    //         // }
+    //     }
+    //     is (issue_wait) {
+    //         when (io.dataExchange.resp.valid || io.dataExchange.resp.bits.nack || memXcpt) {
+    //             issueState := issue_go
+    //         }
+    //     }
     // }
 
-    // when (isNoXcptUop) {
-    
-    /*
-     * load => issue
-     * store => wait until resp
-     * replay => reissue
-     */
+    // when (io.dataExchange.resp.bits.nack && io.dataExchange.resp.bits.idx <= issueLdstPtr) {
+    //     issueLdstPtr := io.dataExchange.resp.bits.idx
+    // }.elsewhen (io.dataExchange.req.ready && issueState === issue_go && !completeLdst) {
+    //     issueLdstPtr := issueLdstPtr + 1.U // NOTE: exsits multiple issues for the same uop
+    // }
 
-    val issue_go :: issue_wait :: Nil = Enum(2)
+    // when (issueState === issue_go && isNoXcptUop) {
 
-    val issueState = RegInit(issue_go)
-
-    switch (issueState) {
-        is (issue_go) {
-            when (ldstCtrlReg.isLoad) {
-                issueState := issue_go
-            }.elsewhen (ldstCtrlReg.isStore && io.dataExchange.req.fire) {
-                issueState := issue_wait
-            }
-            // when (io.dataExchange.req.fire) { // stall load & store until resp back
-            //     issueState := issue_wait
-            // }
-        }
-        is (issue_wait) {
-            when (io.dataExchange.resp.valid || io.dataExchange.resp.bits.nack || memXcpt) {
-                issueState := issue_go
-            }
-        }
-    }
-
+    // non store waiting code
     when (io.dataExchange.resp.bits.nack && io.dataExchange.resp.bits.idx <= issueLdstPtr) {
         issueLdstPtr := io.dataExchange.resp.bits.idx
-    }.elsewhen (io.dataExchange.req.ready && issueState === issue_go && !completeLdst) {
-        issueLdstPtr := issueLdstPtr + 1.U // NOTE: exsits multiple issues for the same uop
+    }.elsewhen (isNoXcptUop && io.dataExchange.req.ready) {
+        issueLdstPtr := issueLdstPtr + 1.U
     }
 
-    when (issueState === issue_go && isNoXcptUop) {
+    when (isNoXcptUop) {
         val storeDataVec = VecInit(Seq.fill(8)(0.U(8.W)))
         val storeMaskVec = VecInit(Seq.fill(8)(0.U(1.W)))
 
@@ -356,7 +357,8 @@ class SVHLsu(implicit p: Parameters) extends Module {
 
         (0 until vlenb).foreach { i =>
             when (vregInfo(i).status === VRegSegmentStatus.notReady && vregInfo(i).idx === respLdstPtr) {
-                 vregInfo(i).status := VRegSegmentStatus.ready
+                vregInfo(i).status := VRegSegmentStatus.ready
+                vregInfo(i).idx    := ldstUopQueueSize.U
             } 
         }
 
@@ -402,7 +404,7 @@ class SVHLsu(implicit p: Parameters) extends Module {
         xcptVlReg       := ldstUopQueue(ldstMinValidIdx).pos
 
         (0 until vlenb).foreach { i =>
-            when(vregInfo(i).idx >= ldstMinXcptIdx) {
+            when(vregInfo(i).idx >= ldstMinXcptIdx && vregInfo(i).idx < ldstUopQueueSize.U) {
                 vregInfo(i).status := VRegSegmentStatus.xcpt
             } 
         }
@@ -440,15 +442,12 @@ class SVHLsu(implicit p: Parameters) extends Module {
         io.lsuOut.bits.rfWriteEn    := mUopInfoReg.rfWriteEn
         io.lsuOut.bits.rfWriteIdx   := mUopInfoReg.ldest
 
-        // io.lsuOut.bits.rfWriteMask  := Cat(vregInfo.map(info => info.status === VRegSegmentStatus.srcData)).asUInt
-        io.lsuOut.bits.rfWriteMask  := 0.U
+        io.lsuOut.bits.rfWriteMask  := Cat(vregInfo.reverseMap(info => info.status =/= VRegSegmentStatus.ready)).asUInt
+        // io.lsuOut.bits.rfWriteMask  := 0.U
 
 
         io.lsuOut.bits.data         := Mux(ldstCtrlReg.isLoad,
-            Mux(!vstartGeVl,
-                Cat(vregInfo.reverseMap(entry => Mux(entry.status === VRegSegmentStatus.agnostic, "hff".U(8.W), entry.data))),
-                Cat(vregInfo.reverseMap(entry => entry.data))// Concatenate data from all vregInfo elements)
-            ),
+            Cat(vregInfo.reverseMap(entry => entry.data)),
             DontCare
         )
 

@@ -26,7 +26,8 @@ class LdstIO(implicit p: Parameters) extends ParameterizedBundle()(p) {
 }
 
 object VRegSegmentStatus {
-  val invalid :: srcData :: agnostic :: needLdst :: notReady :: ready :: xcpt :: Nil = Enum(7)
+    //     0          1          2           3           4          5        6
+    val invalid :: srcData :: agnostic :: needLdst :: notReady :: ready :: xcpt :: Nil = Enum(7)
 }
 
 object Mop {
