@@ -73,13 +73,13 @@ class VUopCtrlW extends Bundle {
 } 
 
 class VUop(implicit p: Parameters) extends Bundle {
-  val ctrl = new VUopCtrlW
-  val info = new VUopInfo
-  val uopIdx = UInt(6.W) // max 16 elements * 4 register
-  val segIndex = UInt(3.W)
-  val uopEnd = Bool()
+  val ctrl      = new VUopCtrlW
+  val info      = new VUopInfo
+  val uopIdx    = UInt(7.W) // max 16 elements * 8 register for segment 0~127
+  val segIndex  = UInt(3.W)
+  val uopEnd    = Bool()
   // Temp: system uop
-  val sysUop = new MicroOp
+  val sysUop    = new MicroOp
 }
 
 class UopRegInfo(implicit p : Parameters) extends Bundle {
@@ -221,23 +221,30 @@ class Vsplit(implicit p : Parameters) extends Module {
     val vmaskExcp = vcpop || viota || vid
 
 
-    val uopIdx = Mux(ldst && ldstCtrl.segment, (idx - (idx % nfield))/nfield, idx)
     val segIndex = idx % nfield
+    val uopIdx   = Mux(ldst && ldstCtrl.segment, (idx - segIndex)/nfield, idx)
     // for segment ldst insts
-    val destEEW = MuxLookup(eewEmulInfo1.veewVd, 8.U, Seq(
-        "b000".U -> 8.U,
-        "b001".U -> 16.U,
-        "b010".U -> 32.U,
-        "b011".U -> 64.U,
+
+    val log2DestElen = MuxLookup(eewEmulInfo1.veewVd, 4.U, Seq(
+        "b000".U -> 4.U, // VLEN has 16 elements
+        "b001".U -> 3.U, // 8
+        "b010".U -> 2.U, // 4
+        "b011".U -> 1.U, // 2
     ))
 
-    val srcEEW = MuxLookup(eewEmulInfo1.veewVs2, 8.U, Seq(
-        "b000".U -> 8.U,
-        "b001".U -> 16.U,
-        "b010".U -> 32.U,
-        "b011".U -> 64.U,
+    val log2SrcElen = MuxLookup(eewEmulInfo1.veewVs2, 4.U, Seq(
+        "b000".U -> 4.U, // VLEN has 16 elements
+        "b001".U -> 3.U, // 8
+        "b010".U -> 2.U, // 4
+        "b011".U -> 1.U, // 2
     ))
 
+    val log2EmulVd = MuxLookup(emulVd, 1.U, Seq(
+        1.U -> 0.U,
+        2.U -> 1.U,
+        4.U -> 2.U,
+        8.U -> 3.U,
+    ))
 
     // for non-segment indexed ldst insts
     idxVdInc  := emulVs2 >= emulVd
@@ -264,7 +271,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     val lsrc1_inc = Wire(UInt(3.W))
 
     when(ldst && ldstCtrl.segment && ldstCtrl.indexed) { // segment indexed ldst insts
-      lsrc1_inc := idx / (nfield * VLEN.U / srcEEW)
+      lsrc1_inc := (idx / nfield) >> log2SrcElen
     }.elsewhen (ldst && ldstCtrl.indexed){              // non-segment indexed ldst insts
       lsrc1_inc := Mux(idxVs2Inc, (idx >> indexIncBase) % emulVs2, idx % emulVs2)
     }.elsewhen(ctrl.widen && !ctrl.redu && !floatRed || v_ext_out && ctrl.lsrc(0)(2,1) === 3.U) {
@@ -282,7 +289,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     val ldest_inc = Wire(UInt(4.W))
 
     when (ldst && ldstCtrl.segment) {
-      ldest_inc := segIndex * emulVd + (uopIdx / (VLEN.U / destEEW))
+      ldest_inc := (segIndex << log2EmulVd) + (uopIdx >> log2DestElen)
     }.elsewhen (ldst && ldstCtrl.indexed){
       ldest_inc := Mux(idxVdInc, idx >> indexIncBase, idx)
     }.elsewhen(ctrl.narrow) {
@@ -410,11 +417,6 @@ class Vsplit(implicit p : Parameters) extends Module {
     needStall := hasRegConf(0) || hasRegConf(1) || hasRegConf(2) || hasRegConf(3) || 
                  io.lsuStallSplit || io.iexNeedStall && ~narrowTo1NoStall ||
                  ctrl.illegal || io.vLSUXcpt.exception_vld
-    
-    val ldStEmulVd  = eewEmulInfo1.emulVd
-    val ldStEmulVs1 = eewEmulInfo1.emulVs1
-    val ldStEmulVs2 = eewEmulInfo1.emulVs2
-    val segEmul = Mux(ldstCtrl.indexed, Mux(lmul > ldStEmulVs2, lmul, ldStEmulVs2), ldStEmulVd)
 
     io.out.mUop.bits.uop.uopIdx   := uopIdx
     io.out.mUop.bits.uop.segIndex := segIndex
@@ -487,12 +489,15 @@ class Vsplit(implicit p : Parameters) extends Module {
         io.out.mUop.valid := false.B
     }
 
-    val expdWidth = 8
-    val expdLenReg          =  Reg(UInt(expdWidth.W))
-    val expdLenSeg          = Wire(UInt(expdWidth.W))
-    val expdLenIdx          = Wire(UInt(expdWidth.W))
-    val expdLenLdSt         = Wire(UInt(expdWidth.W))
-    val expdLenIn           = Wire(UInt(expdWidth.W))
+    val expdWidth = 8 // 1~128
+    val expdLenReg  =  Reg(UInt(expdWidth.W))
+    val expdLenSeg  = Wire(UInt(expdWidth.W))
+    val expdLenIdx  = Wire(UInt(expdWidth.W))
+    val expdLenLdSt = Wire(UInt(expdWidth.W))
+    val expdLenIn   = Wire(UInt(expdWidth.W))
+
+    val ldStEmulVd  = eewEmulInfo1.emulVd
+    val ldStEmulVs2 = eewEmulInfo1.emulVs2
 
     expdLenSeg  := info.vl * nfield
     expdLenIdx  := Mux(ldStEmulVd >= ldStEmulVs2, ldStEmulVd, ldStEmulVs2)
