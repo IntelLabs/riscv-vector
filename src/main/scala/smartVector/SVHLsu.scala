@@ -129,7 +129,7 @@ class SVHLsu(implicit p: Parameters) extends Module {
     val vregClean   = vregInfo.forall(info => info.status === VRegSegmentStatus.invalid)
 
     when (uopState === uop_idle) {
-        when (io.mUop.valid && io.mUop.bits.uop.ctrl.isLdst) {
+        when (io.mUop.valid && io.mUop.bits.uop.ctrl.isLdst && ldstCtrl.nfield === 1.U) {
             mUopInfoReg  := mUopInfo
             ldstCtrlReg  := ldstCtrl
             addrReg      := Mux(io.mUop.bits.uop.uopIdx === 0.U, io.mUop.bits.scalar_opnd_1 + (mUopInfo.segIdx << ldstCtrl.log2Memwb), addrReg)
