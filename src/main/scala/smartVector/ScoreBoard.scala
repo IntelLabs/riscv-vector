@@ -11,6 +11,7 @@ class Scoreboard(n: Int, zero: Boolean = false)
   def set(en: Bool, addr: UInt): Unit = update(en, _next | mask(en, addr))
   def setN(en: Bool, addr: UInt, num: UInt): Unit = update(en, _next | maskN(en, addr, num))
   def clear(en: Bool, addr: UInt): Unit = update(en, _next & ~mask(en, addr))
+  def clearN(en: Bool, addr: UInt, num: UInt): Unit = update(en, _next & ~maskN(en, addr, num))
   def read(addr: UInt): Bool = r(addr)
   def readBypassed(addr: UInt): Bool = _next(addr)
   def readBypassedN(n: UInt, addr: UInt) = {

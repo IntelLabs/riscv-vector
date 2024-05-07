@@ -479,9 +479,9 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.out.toRegFileRead.rfReadIdx(2)     := 0.U
     io.out.toRegFileRead.rfReadIdx(3)     := ctrl.ldest + ldest_inc
 
-    io.scoreBoardSetIO.setEn      := RegNext(io.out.mUop.valid && ctrl.ldestVal && ~ctrl.perm)
-    io.scoreBoardSetIO.setMultiEn := RegNext(io.out.mUop.valid && ctrl.ldestVal && ctrl.perm)
-    io.scoreBoardSetIO.setNum     := RegNext(emulVd)
+    io.scoreBoardSetIO.setEn      := RegNext(io.out.mUop.valid && ctrl.ldestVal && (~ctrl.perm || ~ldstCtrl.segment))
+    io.scoreBoardSetIO.setMultiEn := RegNext(io.out.mUop.valid && ctrl.ldestVal && (ctrl.perm || ldstCtrl.segment))
+    io.scoreBoardSetIO.setNum     := RegNext(Mux(ctrl.perm, emulVd, emulVd * nfield))
     io.scoreBoardSetIO.setAddr    := RegNext(io.out.mUopMergeAttr.bits.ldest)
 
     when((instFirstIn || currentState === ongoing) & ~needStall){
