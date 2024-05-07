@@ -62,6 +62,8 @@ object LdstUopStatus {
 
 class CommitInfoRecorded extends Bundle {
     val muopEnd     = Bool()
+    val regCount    = UInt(4.W)
+    val regStartIdx = UInt(5.W)
     val rfWriteEn   = Bool()
     val rfWriteIdx  = UInt(5.W)
     val isFof       = Bool()

@@ -34,6 +34,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
     // decode nfield / indexed / unit-stride / strided
     val (vstart, vl)     = (io.mUop.bits.uop.info.vstart, io.mUop.bits.uop.info.vl)
     val (uopIdx, uopEnd) = (io.mUop.bits.uop.uopIdx, io.mUop.bits.uop.uopEnd)
+    val (regCount, regStartIdx) = (io.mUopMergeAttr.bits.regCount, io.mUopMergeAttr.bits.regDstIdx)
     
     val ldstCtrl = LSULdstDecoder(io.mUop.bits, io.mUopMergeAttr.bits)
     val mUopInfo = mUopInfoSelecter(io.mUop.bits, io.mUopMergeAttr.bits)
@@ -142,6 +143,8 @@ class SVVLsu(implicit p: Parameters) extends Module {
         ldstUopQueue(ldstEnqPtr).commitInfo.rfWriteIdx  := mUopInfo.ldest
         ldstUopQueue(ldstEnqPtr).commitInfo.isFof       := ldstCtrl.unitSMop === UnitStrideMop.fault_only_first
         ldstUopQueue(ldstEnqPtr).commitInfo.xcpt        := misalignXcpt
+        ldstUopQueue(ldstEnqPtr).commitInfo.regCount    := regCount
+        ldstUopQueue(ldstEnqPtr).commitInfo.regStartIdx := regStartIdx
 
         ldstEnqPtr  := ldstEnqPtr + 1.U
     }
@@ -242,7 +245,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
     }
 
     when (canCommit && !commitXcpt) {
-        val destElem     = ldstUopQueue(commitPtr).destElem
+        val destElem    = ldstUopQueue(commitPtr).destElem
         val data        = ldstUopQueue(commitPtr).data
         val dataSz      = (1.U << ldstUopQueue(commitPtr).size)
         val log2DataSz  = ldstUopQueue(commitPtr).size
@@ -260,6 +263,9 @@ class SVVLsu(implicit p: Parameters) extends Module {
         io.lsuOut.bits.rfWriteIdx   := ldstUopQueue(commitPtr).commitInfo.rfWriteIdx
         io.lsuOut.bits.data         := wData
         io.lsuOut.bits.rfWriteMask  := wMask.asUInt
+        io.lsuOut.bits.isSegment    := true.B
+        io.lsuOut.bits.regCount     := ldstUopQueue(commitPtr).commitInfo.regCount
+        io.lsuOut.bits.regStartIdx  := ldstUopQueue(commitPtr).commitInfo.regStartIdx
     }.otherwise {
         io.lsuOut.valid             := false.B
         io.lsuOut.bits              := DontCare

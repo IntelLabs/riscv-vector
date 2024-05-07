@@ -403,9 +403,11 @@ class SVHLsu(implicit p: Parameters) extends Module {
         io.lsuOut.bits.muopEnd      := mUopInfoReg.muopEnd
         io.lsuOut.bits.rfWriteEn    := mUopInfoReg.rfWriteEn
         io.lsuOut.bits.rfWriteIdx   := mUopInfoReg.ldest
-
         io.lsuOut.bits.rfWriteMask  := Cat(vregInfo.reverseMap(info => info.status =/= VRegSegmentStatus.ready)).asUInt
         // io.lsuOut.bits.rfWriteMask  := 0.U
+        io.lsuOut.bits.regCount     := 1.U
+        io.lsuOut.bits.regStartIdx  := mUopInfoReg.ldest
+        io.lsuOut.bits.isSegment    := false.B
 
 
         io.lsuOut.bits.data         := Mux(ldstCtrlReg.isLoad,

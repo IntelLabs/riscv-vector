@@ -29,6 +29,7 @@ class MuopMergeAttr extends Bundle {
     val perm = Bool()
     val permExpdLen = UInt(4.W)
     val regDstIdx = UInt(5.W)
+    val regCount  = UInt(4.W)
     
     //000:8bit
     //001:16bit
@@ -333,6 +334,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     //Just for perm instruction
     io.out.mUopMergeAttr.bits.permExpdLen      := lmul
     io.out.mUopMergeAttr.bits.regDstIdx        := ctrl.ldest
+    io.out.mUopMergeAttr.bits.regCount         := nfield << log2EmulVd
 
     // * organize muop merge attr
     // * END

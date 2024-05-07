@@ -16,6 +16,9 @@ class LsuOutput extends Bundle{
     val rfWriteMask       = UInt((VLEN/8).W)
     val rfWriteIdx        = UInt(5.W)
     val muopEnd           = Bool()
+    val isSegment         = Bool()
+    val regStartIdx       = UInt(5.W)
+    val regCount          = UInt(4.W) // 2~8
 }
 class VMerge (implicit p : Parameters) extends Module {
 
