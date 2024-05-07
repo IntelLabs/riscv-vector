@@ -407,7 +407,7 @@ class SVHLsu(implicit p: Parameters) extends Module {
         // io.lsuOut.bits.rfWriteMask  := 0.U
         io.lsuOut.bits.regCount     := 1.U
         io.lsuOut.bits.regStartIdx  := mUopInfoReg.ldest
-        io.lsuOut.bits.isSegment    := false.B
+        io.lsuOut.bits.isSegLoad    := false.B
 
 
         io.lsuOut.bits.data         := Mux(ldstCtrlReg.isLoad,
@@ -430,23 +430,16 @@ class SVHLsu(implicit p: Parameters) extends Module {
 
     // exception output
     when (hasXcpt) {
-        when (ldstCtrlReg.unitSMop === UnitStrideMop.fault_only_first && xcptVlReg > 0.U) {
-            io.xcpt.exception_vld   := false.B
-            io.xcpt.xcpt_cause      := 0.U.asTypeOf(new HellaCacheExceptions)
-        }.otherwise {
-            io.xcpt.exception_vld   := true.B
-            io.xcpt.xcpt_cause      := hellaXcptReg
-        }
-        io.xcpt.update_vl           := true.B
-        io.xcpt.update_data         := xcptVlReg
+        val fofValid = ldstCtrlReg.unitSMop === UnitStrideMop.fault_only_first && xcptVlReg > 0.U 
+        io.lsuOut.bits.xcpt.exception_vld := ~fofValid
+        io.lsuOut.bits.xcpt.xcpt_cause    := Mux(fofValid, 0.U.asTypeOf(new HellaCacheExceptions), hellaXcptReg)
+        io.lsuOut.bits.xcpt.update_vl     := true.B
+        io.lsuOut.bits.xcpt.update_data   := xcptVlReg
 
         // reset xcpt
         hasXcpt     := false.B
     }.otherwise {
-        io.xcpt.exception_vld       := false.B
-        io.xcpt.update_vl           := false.B
-        io.xcpt.update_data         := DontCare
-        io.xcpt.xcpt_cause          := 0.U.asTypeOf(new HellaCacheExceptions)
+        io.lsuOut.bits.xcpt := 0.U.asTypeOf(new VLSUXcpt)
     }
     // * Writeback to uopQueue
     // * END

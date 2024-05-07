@@ -16,11 +16,22 @@ class VLSUXcpt extends Bundle {
     val xcpt_cause      = new HellaCacheExceptions()
 }
 
+class LsuOutput extends Bundle{
+    val data = UInt(VLEN.W)
+    val rfWriteEn         = Bool()
+    val rfWriteMask       = UInt((VLEN/8).W)
+    val rfWriteIdx        = UInt(5.W)
+    val muopEnd           = Bool()
+    val isSegLoad         = Bool()
+    val regStartIdx       = UInt(5.W)
+    val regCount          = UInt(4.W) // 2~8
+    val xcpt              = new VLSUXcpt
+}
+
 class LdstIO(implicit p: Parameters) extends ParameterizedBundle()(p) {
     val mUop            = Input(ValidIO(new Muop()(p)))
     val mUopMergeAttr   = Input(ValidIO(new MuopMergeAttr))
     val lsuOut          = Output(ValidIO(new LsuOutput))
-    val xcpt            = Output(new VLSUXcpt)
     val dataExchange    = new RVUMemory()
     val lsuReady        = Output(Bool())
 }

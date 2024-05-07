@@ -10,16 +10,6 @@ import SmartParam._
 import darecreek.exu.vfu.VAluOutput
 import darecreek.exu.vfu.VPermOutput
 
-class LsuOutput extends Bundle{
-    val data = UInt(VLEN.W)
-    val rfWriteEn         = Bool()
-    val rfWriteMask       = UInt((VLEN/8).W)
-    val rfWriteIdx        = UInt(5.W)
-    val muopEnd           = Bool()
-    val isSegment         = Bool()
-    val regStartIdx       = UInt(5.W)
-    val regCount          = UInt(4.W) // 2~8
-}
 class VMerge (implicit p : Parameters) extends Module {
 
     val io = IO(new Bundle{
@@ -155,9 +145,15 @@ class VMerge (implicit p : Parameters) extends Module {
         io.out.commitInfo.bits.data             := io.in.permIn.wb_data
     }
     
-    io.scoreBoardCleanIO.clearEn   := io.out.toRegFileWrite.rfWriteEn
-    io.scoreBoardCleanIO.clearAddr := Mux(io.in.lsuIn.bits.isSegment & io.in.lsuIn.bits.muopEnd, 
-                                      io.in.lsuIn.bits.regStartIdx, io.out.toRegFileWrite.rfWriteIdx)
-    io.scoreBoardCleanIO.clearMultiEn := io.in.lsuIn.bits.isSegment & io.in.lsuIn.bits.muopEnd
-    io.scoreBoardCleanIO.clearNum  := io.in.lsuIn.bits.regCount
+    // xcpt occurs or is fault-only-first
+    val ldstXcpt = (io.in.lsuIn.bits.xcpt.exception_vld || io.in.lsuIn.bits.xcpt.update_vl)
+    // for load, when muopEnd or xcpt occurs, clear scoreboard
+    val sboadrClearMulti = io.in.lsuIn.valid && (io.in.lsuIn.bits.muopEnd || ldstXcpt) && io.in.lsuIn.bits.isSegLoad
+
+    io.scoreBoardCleanIO.clearEn        := io.out.toRegFileWrite.rfWriteEn && !io.in.lsuIn.bits.isSegLoad
+    io.scoreBoardCleanIO.clearAddr      := Mux(sboadrClearMulti, 
+                                                io.in.lsuIn.bits.regStartIdx, 
+                                                io.out.toRegFileWrite.rfWriteIdx)
+    io.scoreBoardCleanIO.clearMultiEn   := sboadrClearMulti
+    io.scoreBoardCleanIO.clearNum       := io.in.lsuIn.bits.regCount
 }

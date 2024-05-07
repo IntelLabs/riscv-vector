@@ -220,31 +220,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
     val commitXcpt = canCommit && ldstUopQueue(commitPtr).commitInfo.xcpt.asUInt.orR
     
 
-    when (commitXcpt) {
-        val xcptVl = ldstUopQueue(commitPtr).pos
-        when(ldstUopQueue(commitPtr).commitInfo.isFof && xcptVl > 0.U) {
-            io.xcpt.exception_vld   := false.B
-            io.xcpt.xcpt_cause      := 0.U.asTypeOf(new HellaCacheExceptions)
-            io.xcpt.update_vl       := true.B
-            io.xcpt.update_data     := 0.U
-        }.otherwise {
-            io.xcpt.exception_vld   := true.B
-            io.xcpt.xcpt_cause      := ldstUopQueue(commitPtr).commitInfo.xcpt
-            io.xcpt.update_vl       := false.B
-            io.xcpt.update_data     := 0.U
-        }
-
-        for (i <- 0 until vLdstUopQueueSize) {
-            ldstUopQueue(i) := 0.U.asTypeOf(new SegLdstUop)
-        }
-    }.otherwise {
-        io.xcpt.exception_vld   := false.B
-        io.xcpt.xcpt_cause      := 0.U.asTypeOf(new HellaCacheExceptions)
-        io.xcpt.update_vl       := false.B
-        io.xcpt.update_data     := 0.U
-    }
-
-    when (canCommit && !commitXcpt) {
+    when (canCommit) {
         val destElem    = ldstUopQueue(commitPtr).destElem
         val data        = ldstUopQueue(commitPtr).data
         val dataSz      = (1.U << ldstUopQueue(commitPtr).size)
@@ -259,11 +235,11 @@ class SVVLsu(implicit p: Parameters) extends Module {
 
         io.lsuOut.valid             := true.B
         io.lsuOut.bits.muopEnd      := ldstUopQueue(commitPtr).commitInfo.muopEnd
-        io.lsuOut.bits.rfWriteEn    := ldstUopQueue(commitPtr).commitInfo.rfWriteEn
+        io.lsuOut.bits.rfWriteEn    := Mux(commitXcpt, false.B, ldstUopQueue(commitPtr).commitInfo.rfWriteEn)
         io.lsuOut.bits.rfWriteIdx   := ldstUopQueue(commitPtr).commitInfo.rfWriteIdx
         io.lsuOut.bits.data         := wData
         io.lsuOut.bits.rfWriteMask  := wMask.asUInt
-        io.lsuOut.bits.isSegment    := true.B
+        io.lsuOut.bits.isSegLoad    := ldstUopQueue(commitPtr).memOp === VMemCmd.read
         io.lsuOut.bits.regCount     := ldstUopQueue(commitPtr).commitInfo.regCount
         io.lsuOut.bits.regStartIdx  := ldstUopQueue(commitPtr).commitInfo.regStartIdx
     }.otherwise {
@@ -271,6 +247,24 @@ class SVVLsu(implicit p: Parameters) extends Module {
         io.lsuOut.bits              := DontCare
         io.lsuOut.bits.rfWriteEn    := false.B
     }
+
+    when (commitXcpt) {
+        val xcptVl   = ldstUopQueue(commitPtr).pos
+        val fofValid = ldstUopQueue(commitPtr).commitInfo.isFof && xcptVl > 0.U
+
+        io.lsuOut.bits.xcpt.exception_vld := ~fofValid
+        io.lsuOut.bits.xcpt.xcpt_cause    := Mux(fofValid, 0.U.asTypeOf(new HellaCacheExceptions), ldstUopQueue(commitPtr).commitInfo.xcpt)
+        io.lsuOut.bits.xcpt.update_vl     := true.B
+        io.lsuOut.bits.xcpt.update_data   := xcptVl
+
+        // clear ldstUop Queue
+        for (i <- 0 until vLdstUopQueueSize) {
+            ldstUopQueue(i) := 0.U.asTypeOf(new SegLdstUop)
+        }
+    }.otherwise {
+        io.lsuOut.bits.xcpt := 0.U.asTypeOf(new VLSUXcpt)
+    }
+
 
     when (io.lsuOut.fire) {
         commitPtr                      := commitPtr + 1.U
