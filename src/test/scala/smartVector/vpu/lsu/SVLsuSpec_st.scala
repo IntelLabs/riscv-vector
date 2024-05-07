@@ -381,7 +381,7 @@ trait VLsuBehavior_st {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsse16.copy(vl=10, uopIdx=0, uopEnd=true, isLoad=false), SrcBundleSt(scalar_opnd_2="h8")),
+                (vsse16.copy(vl=10, uopIdx=0, uopEnd=false, isLoad=false), SrcBundleSt(scalar_opnd_2="h8")),
                 (vsse16.copy(vl=10, uopIdx=1, uopEnd=true, isLoad=false), SrcBundleSt(scalar_opnd_2="h8"))
             )
 
@@ -416,7 +416,7 @@ trait VLsuBehavior_st {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsse16.copy(vm=false, vl=10, uopIdx=0, uopEnd=true, isLoad=false), SrcBundleSt(scalar_opnd_2="h8", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fefe")),
+                (vsse16.copy(vm=false, vl=10, uopIdx=0, uopEnd=false, isLoad=false), SrcBundleSt(scalar_opnd_2="h8", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fefe")),
                 (vsse16.copy(vm=false, vl=10, uopIdx=1, uopEnd=true, isLoad=false), SrcBundleSt(scalar_opnd_2="h8", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fefe"))
             )
 

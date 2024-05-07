@@ -35,7 +35,7 @@ trait SmartVectorBehavior_ld_seg {
     def vLsuTest0(): Unit = {
         it should "pass: unit-stride segment load (eew=8, vl=16, vstart=0, segment=2)" in {
         test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            dut.clock.setTimeout(1000)
+            dut.clock.setTimeout(100)
             dut.clock.step(1)
             val ldReqs = Seq(
                 (CtrlBundle(instrn=VLSEG2E8_V), SrcBundleLdst()),
@@ -90,7 +90,7 @@ trait SmartVectorBehavior_ld_seg {
     def vLsuTest2(): Unit = {
         it should "pass: strided segment load (eew=64, vl=2, vstart=0, segment=4, stride=4)" in {
         test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            dut.clock.setTimeout(1000)
+            dut.clock.setTimeout(100)
             dut.clock.step(1)
             val ldReqs = Seq(
                 (CtrlBundle(instrn=VLSEG4SE32_V, vlmul=0, vsew=2, vl=3), SrcBundleLdst(rs2="h4")),
@@ -119,7 +119,7 @@ trait SmartVectorBehavior_ld_seg {
     def vLsuTest3(): Unit = {
          it should "pass: indexed segment load (sew=32, eew=8, vl=8, vstart=0, segment=3)" in {
         test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            dut.clock.setTimeout(1000)
+            dut.clock.setTimeout(100)
             dut.clock.step(1)
             
             val ldReqs = Seq(
@@ -161,7 +161,7 @@ trait SmartVectorBehavior_ld_seg {
     def vLsuTest4(): Unit = {
         it should "pass: indexed segment load (sew=8, eew=16, vl=16, vstart=0, segment=2)" in {
         test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            dut.clock.setTimeout(1000)
+            dut.clock.setTimeout(100)
             dut.clock.step(1)
             
             val ldReqs = Seq(

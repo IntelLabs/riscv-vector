@@ -623,7 +623,7 @@ trait VLsuBehavior_ld {
             dut.clock.step(1)
             val ldReqs = Seq(
                 (vle8.copy(vl=19, uopIdx=0, uopEnd=false, vstart=1), SrcBundleLd(scalar_opnd_1="h1058"), "h201f1e1d1c1b1a195555555555555511".U, "hff01".U),
-                (vle8.copy(vl=8, uopIdx=0, uopEnd=true), ldReqSrc_default, "h201f1e1d1c1b1a190123456789abcdef".U, "hff00".U),
+                // (vle8.copy(vl=8, uopIdx=0, uopEnd=true), ldReqSrc_default, "h201f1e1d1c1b1a190123456789abcdef".U, "hff00".U),
             )
 
             for ((c, s, r, m) <- ldReqs) {

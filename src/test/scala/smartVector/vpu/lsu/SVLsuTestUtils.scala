@@ -327,6 +327,7 @@ class SmartVectorLsuTestWrapper(isLoad: Boolean) extends Module {
     vLsu.io.mUopMergeAttr.bits.regWriteMuopIdx  := 0.U
     vLsu.io.mUopMergeAttr.bits.permExpdLen      := 0.U 
     vLsu.io.mUopMergeAttr.bits.regDstIdx        := 0.U
+    vLsu.io.mUopMergeAttr.bits.regCount         := 1.U
 
     io.lsuOut.valid                             := vLsu.io.lsuOut.valid
     io.lsuOut.bits.data                         := vLsu.io.lsuOut.bits.data
@@ -334,8 +335,11 @@ class SmartVectorLsuTestWrapper(isLoad: Boolean) extends Module {
     io.lsuOut.bits.rfWriteMask                  := vLsu.io.lsuOut.bits.rfWriteMask
     io.lsuOut.bits.rfWriteIdx                   := vLsu.io.lsuOut.bits.rfWriteIdx
     io.lsuOut.bits.muopEnd                      := vLsu.io.lsuOut.bits.muopEnd
-
-    io.xcpt <> vLsu.io.xcpt
+    io.lsuOut.bits.isSegLoad                    := vLsu.io.lsuOut.bits.isSegLoad
+    io.lsuOut.bits.regStartIdx                  := vLsu.io.lsuOut.bits.regStartIdx
+    io.lsuOut.bits.regCount                     := vLsu.io.lsuOut.bits.regCount
+    io.lsuOut.bits.xcpt                         := vLsu.io.lsuOut.bits.xcpt
+    io.xcpt                                     := vLsu.io.lsuOut.bits.xcpt
 
     val dcache = Module(new LSUFakeDCache)
     vLsu.io.dataExchange <> dcache.io.dataExchange
