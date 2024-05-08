@@ -247,6 +247,7 @@ class Vsplit(implicit p : Parameters) extends Module {
         8.U -> 3.U,
     ))
 
+    val segmentRegNotFirstElem = uopIdx - (uopIdx >> log2DestElen << log2DestElen) =/= 0.U
     // for non-segment indexed ldst insts
     idxVdInc  := emulVs2 >= emulVd
     idxVs2Inc := emulVs2 < emulVd
@@ -346,7 +347,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     // should not be stalled
     val ldest_inc_last = RegInit(15.U(4.W))
     val sameLdest = Wire(Bool())
-    when(ldstCtrl.segment && idx =/= 0.U) {
+    when(ldstCtrl.segment && segmentRegNotFirstElem) {
         sameLdest := true.B
     }.elsewhen(ldstCtrl.indexed && ldest_inc === ldest_inc_last){
         sameLdest := true.B
@@ -479,9 +480,9 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.out.toRegFileRead.rfReadIdx(2)     := 0.U
     io.out.toRegFileRead.rfReadIdx(3)     := ctrl.ldest + ldest_inc
 
-    io.scoreBoardSetIO.setEn      := RegNext(io.out.mUop.valid && ctrl.ldestVal && ~(ctrl.perm || ldstCtrl.segment))
-    io.scoreBoardSetIO.setMultiEn := RegNext(io.out.mUop.valid && ctrl.ldestVal && (ctrl.perm || ldstCtrl.segment))
-    io.scoreBoardSetIO.setNum     := RegNext(Mux(ctrl.perm, emulVd, nfield << log2EmulVd))
+    io.scoreBoardSetIO.setEn      := RegNext(io.out.mUop.valid && ctrl.ldestVal && (~ctrl.perm || ~(ldstCtrl.segment && segmentRegNotFirstElem)))
+    io.scoreBoardSetIO.setMultiEn := RegNext(io.out.mUop.valid && ctrl.ldestVal && ctrl.perm)
+    io.scoreBoardSetIO.setNum     := RegNext(emulVd)
     io.scoreBoardSetIO.setAddr    := RegNext(io.out.mUopMergeAttr.bits.ldest)
 
     when((instFirstIn || currentState === ongoing) & ~needStall){

@@ -148,12 +148,12 @@ class VMerge (implicit p : Parameters) extends Module {
     // xcpt occurs or is fault-only-first
     val ldstXcpt = (io.in.lsuIn.bits.xcpt.exception_vld || io.in.lsuIn.bits.xcpt.update_vl)
     // for load, when muopEnd or xcpt occurs, clear scoreboard
-    val sboadrClearMulti = io.in.lsuIn.valid && (io.in.lsuIn.bits.muopEnd || ldstXcpt) && io.in.lsuIn.bits.isSegLoad
+    val sboardClearMulti = io.in.lsuIn.valid && (io.in.lsuIn.bits.muopEnd || ldstXcpt) && io.in.lsuIn.bits.isSegLoad
 
     io.scoreBoardCleanIO.clearEn        := io.out.toRegFileWrite.rfWriteEn && !io.in.lsuIn.bits.isSegLoad
-    io.scoreBoardCleanIO.clearAddr      := Mux(sboadrClearMulti, 
+    io.scoreBoardCleanIO.clearAddr      := Mux(sboardClearMulti, 
                                                 io.in.lsuIn.bits.regStartIdx, 
                                                 io.out.toRegFileWrite.rfWriteIdx)
-    io.scoreBoardCleanIO.clearMultiEn   := sboadrClearMulti
+    io.scoreBoardCleanIO.clearMultiEn   := sboardClearMulti
     io.scoreBoardCleanIO.clearNum       := io.in.lsuIn.bits.regCount
 }
