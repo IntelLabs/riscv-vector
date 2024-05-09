@@ -90,7 +90,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
                 addr := baseAddr + idxVal
                 addrReg := addr
             }.otherwise {
-                addr := addrReg + ldstCtrl.memwb
+               addr := addrReg + (mUopInfo.segIdx << ldstCtrl.log2Memwb)
             }
         }.otherwise {
             addr := 0.U
