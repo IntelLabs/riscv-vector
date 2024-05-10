@@ -25,11 +25,12 @@ class SVVLsu(implicit p: Parameters) extends Module {
     val commitPtr       = RegInit(0.U(vLdstUopQueueWidth.W))
     val ldstUopQueue    = RegInit(VecInit(Seq.fill(vLdstUopQueueSize)(0.U.asTypeOf(new SegLdstUop))))
 
+    val ldstQueueCnt   = Mux(ldstEnqPtr >= commitPtr, ldstEnqPtr - commitPtr, ldstEnqPtr + vLdstUopQueueSize.U - commitPtr)
+    val ldstQueueFull  = ldstQueueCnt >= (vLdstUopQueueSize - 1).U
+
     // * signal define
     // * END
-
-    val ldstQueueFull = ldstUopQueue.zipWithIndex.map { case (uop, i) => uop.valid }.reduce(_ && _)
-    io.lsuReady := !ldstQueueFull
+    io.lsuReady      := !ldstQueueFull
 
     // decode nfield / indexed / unit-stride / strided
     val (vstart, vl)     = (io.mUop.bits.uop.info.vstart, io.mUop.bits.uop.info.vl)
@@ -152,11 +153,17 @@ class SVVLsu(implicit p: Parameters) extends Module {
 
     // * BEGIN
     // * Issue LdstUop
+    val (respLdstPtr, respData) = (io.dataExchange.resp.bits.idx(3, 0), io.dataExchange.resp.bits.data)
 
     val isNoXcptUop = ldstUopQueue(issueLdstPtr).valid && (ldstUopQueue(issueLdstPtr).commitInfo.xcpt.asUInt.orR === 0.U)
     
-    when (io.dataExchange.resp.bits.nack && io.dataExchange.resp.bits.idx(3, 0) <= issueLdstPtr) {
-        issueLdstPtr := io.dataExchange.resp.bits.idx(3, 0)
+    // nack index smaller than issuePtr can replay
+    val issue2CommitDist = Mux(issueLdstPtr >= commitPtr, issueLdstPtr - commitPtr, issueLdstPtr + vLdstUopQueueSize.U - commitPtr)
+    val nack2CommitDist  = Mux(respLdstPtr  >= commitPtr, respLdstPtr  - commitPtr, respLdstPtr  + vLdstUopQueueSize.U - commitPtr)
+    val smallerNack      = issue2CommitDist > nack2CommitDist
+
+    when (io.dataExchange.resp.bits.nack && smallerNack) {
+        issueLdstPtr := respLdstPtr
     }.elsewhen (isNoXcptUop) {
         issueLdstPtr := issueLdstPtr + 1.U // NOTE: exsits multiple issues for the same uop
     }
@@ -192,7 +199,6 @@ class SVVLsu(implicit p: Parameters) extends Module {
 
     // * BEGIN
     // * Recv Resp
-    val (respLdstPtr, respData) = (io.dataExchange.resp.bits.idx(3, 0), io.dataExchange.resp.bits.data)
 
     when (io.dataExchange.resp.valid) {
         val isLoadResp = ldstUopQueue(respLdstPtr).memOp === VMemCmd.read
