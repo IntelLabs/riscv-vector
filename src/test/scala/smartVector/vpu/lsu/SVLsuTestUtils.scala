@@ -160,6 +160,10 @@ object DataTable {
       (0x1088.U, BigInt("000000080004001c", 16).U, false.B),
       (0x1090.U, BigInt("00080004000c0018", 16).U, false.B),
       (0x1098.U, BigInt("00380004000c0020", 16).U, false.B),
+      (0x1100.U, BigInt("00080001000c0004", 16).U, false.B),
+      (0x1108.U, BigInt("000000080004001c", 16).U, false.B),
+      (0x1110.U, BigInt("00080060000c0004", 16).U, false.B),
+      (0x1118.U, BigInt("000000080004001c", 16).U, false.B),
   )
 }
 
@@ -191,7 +195,7 @@ class LSUFakeDCache extends Module {
         s2_valid := false.B
     }
 
-    val noise = RegInit("b011000001".U(32.W))
+    val noise = RegInit("b011001001".U(32.W))
     noise := noise >> 1.U
     val miss = noise(0)
 

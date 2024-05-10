@@ -33,7 +33,7 @@ trait VLsuBehavior_ld_seg {
     def vLsuTest0(): Unit = {
         it should "pass: unit-stride segment load (uops=2, eew=8, vl=16, vstart=0, segments=2)" in {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            dut.clock.setTimeout(1000)
+            dut.clock.setTimeout(100)
             dut.clock.step(1)
             val ldReqs = Seq(
                 (vlseg2e8.copy(vl=3, segIdx=0, uopIdx=0, uopEnd=false, vsew=1), ldReqSrc_default, "hef".U, "hfffe".U),

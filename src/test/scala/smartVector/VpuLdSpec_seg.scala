@@ -20,9 +20,12 @@ trait SmartVectorBehavior_ld_seg {
     def VLE16_V = "b000_000_1_00000_00001_101_01000_0000111"
 
     def VLSEG2E8_V  = "b001_000_1_00000_00001_000_01000_0000111"
-    
+
     def VLSEG3E64_V = "b010_000_1_00000_00001_111_01000_0000111"
 
+
+    def VLSEG8E8_V = "b111_000_1_00000_00001_000_01000_0000111"
+        
     def VLSEG4SE32_V = "b011_010_1_00010_00001_110_01000_0000111"
 
     // vluexi8 v16, 0(x1), vs8
@@ -198,6 +201,146 @@ trait SmartVectorBehavior_ld_seg {
         }
     }
 
+    def vLsuTest5(): Unit = {
+        it should "pass: indexed segment load (sew=8, eew=16, vl=8, vstart=0, segment=2) misalign exception" in {
+        test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            dut.clock.setTimeout(100)
+            dut.clock.step(1)
+            
+            val ldReqs = Seq(
+                (ldstReqCtrl_default.copy(instrn=VLE16_V, vl=8, vlmul=1, vsew=1), SrcBundleLdst(rs1="h1100")),
+                (ldstReqCtrl_default.copy(instrn=VLOXSEG2EI16_V, vl=8, vlmul=1, vsew=1), SrcBundleLdst()),
+            )
+
+            dut.io.rvuIssue.valid.poke(true.B)
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(0)._1, ldReqs(0)._2))
+            dut.clock.step(1)
+            dut.io.rvuIssue.valid.poke(false.B)
+
+            while (!dut.io.rvuCommit.commit_vld.peekBoolean()) {
+                dut.clock.step(1)
+            }
+            dut.io.rvuCommit.commit_vld.expect(true.B)
+            dut.clock.step(1)
+            dut.io.rfData(8).expect("h000000080004001c00080001000c0004".U)
+
+            dut.io.rvuIssue.valid.poke(true.B)
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(1)._1, ldReqs(1)._2))
+            dut.clock.step(1)
+            dut.io.rvuIssue.valid.poke(false.B)
+
+            while (!dut.io.rvuCommit.commit_vld.peekBoolean()) {
+                dut.clock.step(1)
+            }
+            dut.io.rvuCommit.commit_vld.expect(true.B)
+            dut.io.rvuCommit.update_vl.expect(true.B)
+            dut.io.rvuCommit.update_vl_data.expect(2.U)    
+            dut.io.rvuCommit.exception_vld.expect(true.B)
+            dut.clock.step(1)
+            dut.io.rfData(16).expect("hffff4567".U)
+            dut.io.rfData(18).expect("hffff0123".U)
+        }
+        }
+    }
+
+    def vLsuTest6(): Unit = {
+        it should "pass: indexed segment load (sew=8, eew=16, vl=8, vstart=0, segment=2) cache exception" in {
+        test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            dut.clock.setTimeout(100)
+            dut.clock.step(1)
+            
+            val ldReqs = Seq(
+                (ldstReqCtrl_default.copy(instrn=VLE16_V, vl=8, vlmul=1, vsew=1), SrcBundleLdst(rs1="h1110")),
+                (ldstReqCtrl_default.copy(instrn=VLOXSEG2EI16_V, vl=8, vlmul=1, vsew=1), SrcBundleLdst()),
+            )
+
+            dut.io.rvuIssue.valid.poke(true.B)
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(0)._1, ldReqs(0)._2))
+            dut.clock.step(1)
+            dut.io.rvuIssue.valid.poke(false.B)
+
+            while (!dut.io.rvuCommit.commit_vld.peekBoolean()) {
+                dut.clock.step(1)
+            }
+            dut.io.rvuCommit.commit_vld.expect(true.B)
+            dut.clock.step(1)
+            dut.io.rfData(8).expect("h000000080004001c00080060000c0004".U)
+
+            dut.io.rvuIssue.valid.poke(true.B)
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(1)._1, ldReqs(1)._2))
+            dut.clock.step(1)
+            dut.io.rvuIssue.valid.poke(false.B)
+
+            while (!dut.io.rvuCommit.commit_vld.peekBoolean()) {
+                dut.clock.step(1)
+            }
+            dut.io.rvuCommit.commit_vld.expect(true.B)
+            dut.io.rvuCommit.update_vl.expect(true.B)
+            dut.io.rvuCommit.update_vl_data.expect(2.U)    
+            dut.io.rvuCommit.exception_vld.expect(true.B)
+            dut.clock.step(1)
+            dut.io.rfData(16).expect("hffff4567".U)
+            dut.io.rfData(18).expect("hffff0123".U)
+        }
+        }
+    }
+
+    def vLsuTest7(): Unit = {
+        it should "pass: unit-stride segment load (eew=8, vl=16, vstart=0, segment=8)" in {
+        test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            dut.clock.setTimeout(1000)
+            dut.clock.step(1)
+            val ldReqs = Seq(
+                (CtrlBundle(instrn=VLSEG8E8_V, vlmul=0, vsew=0), SrcBundleLdst(rs1="h0fe0")),
+            )
+            dut.io.rvuIssue.valid.poke(true.B)
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(0)._1, ldReqs(0)._2))
+            dut.clock.step(1)
+            dut.io.rvuIssue.valid.poke(false.B)
+
+            while (!dut.io.rvuCommit.commit_vld.peekBoolean()) {
+                dut.clock.step(1)
+            }
+            dut.io.rvuCommit.commit_vld.expect(true.B)
+
+            dut.clock.step(1)
+
+            dut.io.rfData( 8).expect("h5544332211670156100fffefee891020".U)
+            dut.io.rfData(15).expect("h5544332211230112fe0fff01ee561020".U)
+
+            dut.clock.step(1)
+        }
+        }
+    }
+
+    def vLsuTest8(): Unit = {
+        it should "pass: unit-stride segment load (eew=8, vl=16, vstart=0, segment=8) exception" in {
+        test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            dut.clock.setTimeout(1000)
+            dut.clock.step(1)
+            val ldReqs = Seq(
+                (CtrlBundle(instrn=VLSEG8E8_V, vlmul=0, vsew=0), SrcBundleLdst()),
+            )
+            dut.io.rvuIssue.valid.poke(true.B)
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(0)._1, ldReqs(0)._2))
+            dut.clock.step(1)
+            dut.io.rvuIssue.valid.poke(false.B)
+
+            while (!dut.io.rvuCommit.commit_vld.peekBoolean()) {
+                dut.clock.step(1)
+            }
+            dut.io.rvuCommit.commit_vld.expect(true.B)
+            dut.io.rvuCommit.update_vl.expect(true.B)
+            dut.io.rvuCommit.update_vl_data.expect("hc".U)
+            dut.clock.step(1)
+            dut.io.rfData( 8).expect("h5544332211670156100fffef".U)
+            dut.io.rfData(15).expect("h5544332211230112fe0fff01".U)
+
+            dut.clock.step(1)
+        }
+        }
+    }
+
 }
 
 class VPULdSpec_seg extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with SmartVectorBehavior_ld_seg {
@@ -207,4 +350,8 @@ class VPULdSpec_seg extends AnyFlatSpec with ChiselScalatestTester with BundleGe
     it should behave like vLsuTest2()   //
     it should behave like vLsuTest3()   //
     it should behave like vLsuTest4()   //
+    it should behave like vLsuTest5()   //
+    it should behave like vLsuTest6()   //
+    it should behave like vLsuTest7()   //
+    it should behave like vLsuTest8()   //
 }

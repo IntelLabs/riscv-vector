@@ -79,7 +79,7 @@ trait VLsuBehavior_st_seg {
     def vLsuTest0(): Unit = {
         it should "pass: unit-stride segment store (eew=8, vl=3, vstart=0, segments=2)" in {
         test(new SmartVectorLsuTestWrapper(false)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            dut.clock.setTimeout(1000)
+            dut.clock.setTimeout(200)
             dut.clock.step(1)
 
             val stReqs = Seq(
@@ -111,7 +111,7 @@ trait VLsuBehavior_st_seg {
     def vLsuTest1(): Unit = {
         it should "pass: unit-stride segment store (eew=16, vl=3, vstart=0, segments=3)" in {
         test(new SmartVectorLsuTestWrapper(false)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            dut.clock.setTimeout(1000)
+            dut.clock.setTimeout(200)
             dut.clock.step(1)
 
             val stReqs = Seq(
@@ -148,7 +148,7 @@ trait VLsuBehavior_st_seg {
     def vLsuTest2(): Unit = {
         it should "pass: unit-stride segment store (eew=64, vl=3, vstart=0, segments=2)" in {
         test(new SmartVectorLsuTestWrapper(false)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            dut.clock.setTimeout(1000)
+            dut.clock.setTimeout(200)
             dut.clock.step(1)
             val stReqs = Seq(
                 (vsseg2e64.copy(vl=3, segIdx=0, uopIdx=0, uopEnd=false, vsew=1, isLoad=false), stReqSrc_default),
@@ -181,7 +181,7 @@ trait VLsuBehavior_st_seg {
     def vLsuTest3(): Unit = {
         it should "pass: strided segment store (uops=2, eew=8, vl=4, vstart=0, segments=2, stride=-5)" in {
         test(new SmartVectorLsuTestWrapper(false)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            dut.clock.setTimeout(1000)
+            dut.clock.setTimeout(200)
             dut.clock.step(1)
             val stReqs = Seq(
                 (vssseg2e8.copy(vl=4, segIdx=0, uopIdx=0, uopEnd=false, vsew=1, isLoad=false), SrcBundleSt(scalar_opnd_2="hffffffff_fffffffb")),
@@ -216,7 +216,7 @@ trait VLsuBehavior_st_seg {
     def vLsuTest4(): Unit = {
         it should "pass: unit-stride segment store (uops=3, eew=8, vl=2, vstart=0, segments=2, stride=6)" in {
         test(new SmartVectorLsuTestWrapper(false)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            dut.clock.setTimeout(1000)
+            dut.clock.setTimeout(200)
             dut.clock.step(1)
 
             val stReqs = Seq(
