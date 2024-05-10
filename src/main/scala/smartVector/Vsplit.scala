@@ -214,6 +214,14 @@ class Vsplit(implicit p : Parameters) extends Module {
     val idxVdInc = Wire(Bool())
     val idxVs2Inc = Wire(Bool())
 
+    val expdWidth = 8 // 1~128
+    val expdLenReg  =  Reg(UInt(expdWidth.W))
+    val expdLenSeg  = Wire(UInt(expdWidth.W))
+    val expdLenIdx  = Wire(UInt(expdWidth.W))
+    val expdLenLdSt = Wire(UInt(expdWidth.W))
+    val expdLenIn   = Wire(UInt(expdWidth.W))
+    val expdLen     = Wire(UInt(expdWidth.W))
+
     //Due to the design of vmask, these instructions need to be split into lmul, 
     //but the same data must be sent each time
     val vcpop    = ctrl.mask && ctrl.funct6 === "b010000".U && ctrl.lsrc(0) === "b10000".U
@@ -369,7 +377,6 @@ class Vsplit(implicit p : Parameters) extends Module {
     val vs3Idx     = ctrl.ldest   + ldest_inc
     val needStall  = Wire(Bool())
     val hasRegConf = Wire(Vec(4,Bool()))
-    val expdLen    = Wire(UInt(7.W))
     
     io.scoreBoardReadIO.readAddr1    := vs1Idx
     io.scoreBoardReadIO.readAddr2    := vs2Idx
@@ -491,13 +498,6 @@ class Vsplit(implicit p : Parameters) extends Module {
     }.otherwise{
         io.out.mUop.valid := false.B
     }
-
-    val expdWidth = 8 // 1~128
-    val expdLenReg  =  Reg(UInt(expdWidth.W))
-    val expdLenSeg  = Wire(UInt(expdWidth.W))
-    val expdLenIdx  = Wire(UInt(expdWidth.W))
-    val expdLenLdSt = Wire(UInt(expdWidth.W))
-    val expdLenIn   = Wire(UInt(expdWidth.W))
 
     val ldStEmulVd  = eewEmulInfo1.emulVd
     val ldStEmulVs2 = eewEmulInfo1.emulVs2
