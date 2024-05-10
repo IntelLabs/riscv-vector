@@ -164,8 +164,8 @@ class SVVLsu(implicit p: Parameters) extends Module {
 
     when (io.dataExchange.resp.bits.nack && smallerNack) {
         issueLdstPtr := respLdstPtr
-    }.elsewhen (isNoXcptUop) {
-        issueLdstPtr := issueLdstPtr + 1.U // NOTE: exsits multiple issues for the same uop
+    }.elsewhen (isNoXcptUop && io.dataExchange.req.ready) {
+        issueLdstPtr := issueLdstPtr + 1.U
     }
 
     // TODO: store waiting resp
@@ -200,10 +200,11 @@ class SVVLsu(implicit p: Parameters) extends Module {
     // * BEGIN
     // * Recv Resp
 
-    when (io.dataExchange.resp.valid) {
+    val memXcpt = io.dataExchange.xcpt.asUInt.orR
+    when (io.dataExchange.resp.valid || memXcpt) {
         val isLoadResp = ldstUopQueue(respLdstPtr).memOp === VMemCmd.read
         val isLoadRespDataValid = io.dataExchange.resp.bits.has_data
-        val loadComplete  = isLoadResp && isLoadRespDataValid
+        val loadComplete  = isLoadResp && isLoadRespDataValid && !memXcpt
 
         val dataSz = (1.U << ldstUopQueue(respLdstPtr).size)
         val ldData = WireInit(0.U(64.W))
