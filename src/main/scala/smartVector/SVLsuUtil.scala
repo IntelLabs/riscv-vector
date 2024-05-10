@@ -68,8 +68,7 @@ object LdstUopXcptCause {
 
 object LdstUopStatus {
     val notReady = 0.U
-    val waitResp = 1.U
-    val ready    = 2.U
+    val ready    = 1.U
 }
 
 class CommitInfoRecorded extends Bundle {
@@ -84,7 +83,7 @@ class CommitInfoRecorded extends Bundle {
 
 class LdstUop extends Bundle {
     val valid       = Bool()
-    val status      = UInt(2.W)                     // ready to commit?
+    val status      = UInt(1.W)                     // ready to commit?
     val memOp       = Bool()                        // load or store
     val addr        = UInt(addrWidth.W)
     val pos         = UInt(bVL.W)                   // position in vl
@@ -93,7 +92,7 @@ class LdstUop extends Bundle {
 
 class SegLdstUop extends Bundle {
     val valid       = Bool()
-    val status      = UInt(2.W)                     // ready to commit?
+    val status      = UInt(1.W)                     // ready to commit?
     val memOp       = Bool()                        // load or store
     val size        = UInt(log2Ceil(dataWidth/8).W) // element size
     val addr        = UInt(addrWidth.W)             

@@ -152,30 +152,17 @@ class SVVLsu(implicit p: Parameters) extends Module {
 
     // * BEGIN
     // * Issue LdstUop
-    val (respLdstPtr, respData) = (io.dataExchange.resp.bits.idx(3, 0), io.dataExchange.resp.bits.data)
-
-    val allSent  = (issueLdstPtr === commitPtr) && ldstUopQueue(issueLdstPtr).status =/= LdstUopStatus.notReady
-    val stopSend = WireInit(false.B)
 
     val isNoXcptUop = ldstUopQueue(issueLdstPtr).valid && (ldstUopQueue(issueLdstPtr).commitInfo.xcpt.asUInt.orR === 0.U)
     
-    // nack index smaller than issuePtr can replay
-    val issue2CommitDist = Mux(allSent, vLdstUopQueueSize.U, 
-                            Mux(issueLdstPtr >= commitPtr, issueLdstPtr - commitPtr, issueLdstPtr + vLdstUopQueueSize.U - commitPtr))
-    val nack2CommitDist  = Mux(respLdstPtr >= commitPtr, respLdstPtr - commitPtr, respLdstPtr + vLdstUopQueueSize.U - commitPtr)
-    val smallerNack      = issue2CommitDist > nack2CommitDist
-
-    when (io.dataExchange.resp.bits.nack && smallerNack) { // nack replay
-        issueLdstPtr                     := respLdstPtr
-        ldstUopQueue(respLdstPtr).status := LdstUopStatus.notReady
-        stopSend                         := false.B
-    }.elsewhen (isNoXcptUop) { // when all req is sent, waiting for new req
-        issueLdstPtr                    := Mux(allSent, issueLdstPtr, issueLdstPtr + 1.U)
-        stopSend                        := allSent
+    when (io.dataExchange.resp.bits.nack && io.dataExchange.resp.bits.idx(3, 0) <= issueLdstPtr) {
+        issueLdstPtr := io.dataExchange.resp.bits.idx(3, 0)
+    }.elsewhen (isNoXcptUop) {
+        issueLdstPtr := issueLdstPtr + 1.U // NOTE: exsits multiple issues for the same uop
     }
 
     // TODO: store waiting resp
-    when (isNoXcptUop && !stopSend) {
+    when (isNoXcptUop) {
         val data    = ldstUopQueue(issueLdstPtr).data
         val dataSz  = (1.U << ldstUopQueue(issueLdstPtr).size)
         val offset  = ldstUopQueue(issueLdstPtr).offset
@@ -195,8 +182,6 @@ class SVVLsu(implicit p: Parameters) extends Module {
         io.dataExchange.req.bits.idx    := (1 << 4).U | issueLdstPtr // to figure out hlsu or vlsu
         io.dataExchange.req.bits.data   := Mux(memOp, wData, DontCare)
         io.dataExchange.req.bits.mask   := Mux(memOp, wMask.asUInt, DontCare)
-
-        ldstUopQueue(issueLdstPtr).status := LdstUopStatus.waitResp
     }.otherwise {
         io.dataExchange.req.valid       := false.B
         io.dataExchange.req.bits        := DontCare
@@ -207,6 +192,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
 
     // * BEGIN
     // * Recv Resp
+    val (respLdstPtr, respData) = (io.dataExchange.resp.bits.idx(3, 0), io.dataExchange.resp.bits.data)
 
     when (io.dataExchange.resp.valid) {
         val isLoadResp = ldstUopQueue(respLdstPtr).memOp === VMemCmd.read
