@@ -124,6 +124,8 @@ class Vsplit(implicit p : Parameters) extends Module {
         val vLSUXcpt = Input (new VLSUXcpt)
         val excpInfo = Output(new ExcpInfo)
     })
+
+    val expdWidth     = 8 // 1~128
     
     val vCtrl         = RegInit(VecInit(Seq.fill(1)(0.U.asTypeOf(new darecreek.VCtrl))))
     val vInfo         = Reg(Vec(1, new VInfo))
@@ -132,7 +134,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     val float_opnd_1  = Reg(Vec(1, UInt(64.W)))
     val uopRegInfo    = Reg(Vec(1, new UopRegInfo))
     val eewEmulInfo   = Reg(Vec(1, new VInfoAll))
-    val idx           = RegInit(UInt(7.W), 0.U)
+    val idx           = RegInit(UInt(expdWidth.W), 0.U)
     val floatRedReg   = Reg(Vec(1, Bool()))
 
     //vCtrl(0).illegal     := RegInit(false.B)
@@ -214,7 +216,6 @@ class Vsplit(implicit p : Parameters) extends Module {
     val idxVdInc = Wire(Bool())
     val idxVs2Inc = Wire(Bool())
 
-    val expdWidth = 8 // 1~128
     val expdLenReg  =  Reg(UInt(expdWidth.W))
     val expdLenSeg  = Wire(UInt(expdWidth.W))
     val expdLenIdx  = Wire(UInt(expdWidth.W))
