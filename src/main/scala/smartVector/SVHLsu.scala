@@ -52,6 +52,7 @@ class SVHLsu(implicit p: Parameters) extends Module {
 
     // xcpt info
     val xcptVlReg       = RegInit(0.U(bVL.W))
+    val xcptAddrReg     = RegInit(0.U(addrWidth.W))
     val hellaXcptReg    = RegInit(0.U.asTypeOf(new HellaCacheExceptions))
 
     // val hasXcptHappened
@@ -241,7 +242,8 @@ class SVHLsu(implicit p: Parameters) extends Module {
             ldstUopQueue(ldstEnqPtr).valid  := true.B
             ldstUopQueue(ldstEnqPtr).status := Mux(addrMisalign, LdstUopStatus.ready, LdstUopStatus.notReady)
             ldstUopQueue(ldstEnqPtr).memOp  := ldstCtrlReg.isStore
-            ldstUopQueue(ldstEnqPtr).addr   := alignedAddr
+            // NOTE: for misalign xcpt, put addr into ldstQueue, output directly to xcpt_addr
+            ldstUopQueue(ldstEnqPtr).addr   := Mux(addrMisalign, addr, alignedAddr)
             ldstUopQueue(ldstEnqPtr).pos    := curVl
             ldstUopQueue(ldstEnqPtr).xcpt   := misalignXcpt
             ldstEnqPtr  := ldstEnqPtr + 1.U
@@ -357,11 +359,13 @@ class SVHLsu(implicit p: Parameters) extends Module {
                 vregInfo(i).status := VRegSegmentStatus.xcpt
             } 
         }
-
+        val firstXcpt = PriorityEncoder(vregInfo.map(info => info.idx === commitPtr && info.idx < ldstUopQueueSize.U))
+        val offset = vregInfo(firstXcpt).offset
         // 1. clear ldstUopQueue
         ldstUopQueue.foreach(uop => uop.valid := false.B)
         // 2. update xcpt info
         xcptVlReg       := ldstUopQueue(commitPtr).pos
+        xcptAddrReg     := ldstUopQueue(commitPtr).addr + offset
         hellaXcptReg    := ldstUopQueue(commitPtr).xcpt
         hasXcpt         := true.B
     }.elsewhen (canCommit) {
@@ -433,6 +437,7 @@ class SVHLsu(implicit p: Parameters) extends Module {
         val fofValid = ldstCtrlReg.unitSMop === UnitStrideMop.fault_only_first && xcptVlReg > 0.U 
         io.lsuOut.bits.xcpt.exception_vld := ~fofValid
         io.lsuOut.bits.xcpt.xcpt_cause    := Mux(fofValid, 0.U.asTypeOf(new HellaCacheExceptions), hellaXcptReg)
+        io.lsuOut.bits.xcpt.xcpt_addr     := xcptAddrReg
         io.lsuOut.bits.xcpt.update_vl     := true.B
         io.lsuOut.bits.xcpt.update_data   := xcptVlReg
 

@@ -103,6 +103,7 @@ class ExcpInfo extends Bundle {
     val update_vl       = Bool()
     val update_data     = UInt(bVL.W)
     val xcpt_cause      = new HellaCacheExceptions()
+    val xcpt_addr       = UInt(addrWidth.W)
     val illegalInst     = Bool()
 }
 
@@ -564,6 +565,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.excpInfo.illegalInst   := ctrl.illegal
     io.excpInfo.update_vl     := io.vLSUXcpt.update_vl
     io.excpInfo.update_data   := io.vLSUXcpt.update_data
+    io.excpInfo.xcpt_addr     := io.vLSUXcpt.xcpt_addr
     io.excpInfo.xcpt_cause    := io.vLSUXcpt.xcpt_cause
 
 }

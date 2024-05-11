@@ -14,6 +14,7 @@ class VLSUXcpt extends Bundle {
     val update_vl       = Bool()
     val update_data     = UInt(bVL.W)
     val xcpt_cause      = new HellaCacheExceptions()
+    val xcpt_addr       = UInt(addrWidth.W)
 }
 
 class LsuOutput extends Bundle{
