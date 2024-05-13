@@ -261,7 +261,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
 
         io.lsuOut.bits.xcpt.exception_vld := ~fofValid
         io.lsuOut.bits.xcpt.xcpt_cause    := Mux(fofValid, 0.U.asTypeOf(new HellaCacheExceptions), ldstUopQueue(commitPtr).commitInfo.xcpt)
-        io.lsuOut.bits.xcpt.update_vl     := true.B
+        io.lsuOut.bits.xcpt.update_vl     := fofValid
         io.lsuOut.bits.xcpt.update_data   := xcptVl
         io.lsuOut.bits.xcpt.xcpt_addr     := ldstUopQueue(commitPtr).addr + ldstUopQueue(commitPtr).offset
 
