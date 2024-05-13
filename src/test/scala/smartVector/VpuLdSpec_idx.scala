@@ -23,29 +23,29 @@ trait SmartVectorBehavior_ld_idx {
     val ldstReqSrc_default  = SrcBundleLdst()
 
     // def VLE8_V             = BitPat("b???000?00000?????000?????0000111")
-    // vle8 v2, 0(x1), 0x0
-    def VLE8_V  = "b000_000_1_00000_00001_000_00010_0000111"
+    // vle8 v4, 0(x1), 0x0
+    def VLE8_V  = "b000_000_1_00000_00001_000_00100_0000111"
 
-    def VLE16_V = "b000_000_1_00000_00001_101_00010_0000111"
+    def VLE16_V = "b000_000_1_00000_00001_101_00100_0000111"
 
-    def VLE32_V = "b000_000_1_00000_00001_110_00010_0000111"
+    def VLE32_V = "b000_000_1_00000_00001_110_00100_0000111"
     
-    def VLE64_V = "b000_000_1_00000_00001_111_00010_0000111"
+    def VLE64_V = "b000_000_1_00000_00001_111_00100_0000111"
 
     // def VLSE8_V            = BitPat("b???010???????????000?????0000111")
-    def VLSE8_V  = "b000_010_1_00010_00001_000_00010_0000111"
+    def VLSE8_V  = "b000_010_1_00010_00001_000_00100_0000111"
 
-    def VLSE16_V = "b000_010_1_00010_00001_101_00010_0000111"
+    def VLSE16_V = "b000_010_1_00010_00001_101_00100_0000111"
 
-    def VLSE32_V = "b000_010_1_00010_00001_110_00010_0000111"
+    def VLSE32_V = "b000_010_1_00010_00001_110_00100_0000111"
     
-    def VLSE64_V = "b000_010_1_00010_00001_111_00010_0000111"
+    def VLSE64_V = "b000_010_1_00010_00001_111_00100_0000111"
 
     // BitPat("b???001???????????000?????0000111")
-    // vluexi8 v6, 0(x1), vs2
-    def VLUXEI8_V   = "b000_001_1_00010_00001_000_00110_0000111"
+    // vluexi8 v8, 0(x1), vs4
+    def VLUXEI8_V   = "b000_001_1_00100_00001_000_01000_0000111"
 
-    def VLUXEI16_V  = "b000_001_1_00010_00001_101_00110_0000111"
+    def VLUXEI16_V  = "b000_001_1_00100_00001_101_01000_0000111"
 
   
     def vLsuTest0(): Unit = {
@@ -69,7 +69,7 @@ trait SmartVectorBehavior_ld_idx {
             }
             dut.io.rvuCommit.commit_vld.expect(true.B)
             dut.clock.step(1)
-            dut.io.rfData(2).expect("h0807060504030201".U)
+            dut.io.rfData(4).expect("h0807060504030201".U)
 
             dut.io.rvuIssue.valid.poke(true.B)
             dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(1)._1, ldReqs(1)._2))
@@ -81,7 +81,7 @@ trait SmartVectorBehavior_ld_idx {
             }
             dut.io.rvuCommit.commit_vld.expect(true.B)
             dut.clock.step(1)
-            dut.io.rfData(6).expect("hff0123456789abcd".U)
+            dut.io.rfData(8).expect("hff0123456789abcd".U)
         }
         }
     }
@@ -107,7 +107,7 @@ trait SmartVectorBehavior_ld_idx {
             }
             dut.io.rvuCommit.commit_vld.expect(true.B)
             dut.clock.step(1)
-            dut.io.rfData(2).expect("h081814100c1c0004".U)
+            dut.io.rfData(4).expect("h081814100c1c0004".U)
 
             dut.io.rvuIssue.valid.poke(true.B)
             dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(1)._1, ldReqs(1)._2))
@@ -119,8 +119,8 @@ trait SmartVectorBehavior_ld_idx {
             }
             dut.io.rvuCommit.commit_vld.expect(true.B)
             dut.clock.step(1)
-            dut.io.rfData(6).expect("hfffffffffedcba9889abcdef01234567".U)
-            dut.io.rfData(7).expect("hffffffff765432100f0f0f0f0f0f0f0f".U)
+            dut.io.rfData(8).expect("hfffffffffedcba9889abcdef01234567".U)
+            dut.io.rfData(9).expect("hffffffff765432100f0f0f0f0f0f0f0f".U)
         }
         }
     }
@@ -146,7 +146,7 @@ trait SmartVectorBehavior_ld_idx {
             }
             dut.io.rvuCommit.commit_vld.expect(true.B)
             dut.clock.step(1)
-            dut.io.rfData(2).expect("h00080004001c00080000000c0004".U)
+            dut.io.rfData(4).expect("h00080004001c00080000000c0004".U)
 
             dut.io.rvuIssue.valid.poke(true.B)
             dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(1)._1, ldReqs(1)._2))
@@ -158,7 +158,7 @@ trait SmartVectorBehavior_ld_idx {
             }
             dut.io.rvuCommit.commit_vld.expect(true.B)
             dut.clock.step(1)
-            dut.io.rfData(6).expect("hcdefffff4567ba98ffffcdefffff4567".U)
+            dut.io.rfData(8).expect("hcdefffff4567ba98ffffcdefffff4567".U)
         }
         }
     }
@@ -184,8 +184,8 @@ trait SmartVectorBehavior_ld_idx {
             }
             dut.io.rvuCommit.commit_vld.expect(true.B)
             dut.clock.step(1)
-            dut.io.rfData(2).expect("h000000080004001c00080000000c0004".U)
-            dut.io.rfData(3).expect("h00380004000c002000080004000c0018".U)
+            dut.io.rfData(4).expect("h000000080004001c00080000000c0004".U)
+            dut.io.rfData(5).expect("h00380004000c002000080004000c0018".U)
 
             dut.io.rvuIssue.valid.poke(true.B)
             dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(1)._1, ldReqs(1)._2))
@@ -197,7 +197,7 @@ trait SmartVectorBehavior_ld_idx {
             }
             dut.io.rvuCommit.commit_vld.expect(true.B)
             dut.clock.step(1)
-            dut.io.rfData(6).expect("h1167ff56ff67ff10efff6798ffefff67".U)
+            dut.io.rfData(8).expect("h1167ff56ff67ff10efff6798ffefff67".U)
         }
         }
     }

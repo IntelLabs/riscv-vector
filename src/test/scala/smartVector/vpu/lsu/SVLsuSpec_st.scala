@@ -364,7 +364,7 @@ trait VLsuBehavior_st {
                     dut.clock.step(1)
                 }
                 dut.io.lsuOut.valid.expect(true.B)
-                dut.io.xcpt.update_vl.expect(true.B)
+                dut.io.xcpt.update_vl.expect(false.B)
                 dut.io.xcpt.update_data.expect(1.U)
                 dut.clock.step(1)
             }
@@ -381,7 +381,7 @@ trait VLsuBehavior_st {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsse16.copy(vl=10, uopIdx=0, uopEnd=true, isLoad=false), SrcBundleSt(scalar_opnd_2="h8")),
+                (vsse16.copy(vl=10, uopIdx=0, uopEnd=false, isLoad=false), SrcBundleSt(scalar_opnd_2="h8")),
                 (vsse16.copy(vl=10, uopIdx=1, uopEnd=true, isLoad=false), SrcBundleSt(scalar_opnd_2="h8"))
             )
 
@@ -416,7 +416,7 @@ trait VLsuBehavior_st {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsse16.copy(vm=false, vl=10, uopIdx=0, uopEnd=true, isLoad=false), SrcBundleSt(scalar_opnd_2="h8", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fefe")),
+                (vsse16.copy(vm=false, vl=10, uopIdx=0, uopEnd=false, isLoad=false), SrcBundleSt(scalar_opnd_2="h8", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fefe")),
                 (vsse16.copy(vm=false, vl=10, uopIdx=1, uopEnd=true, isLoad=false), SrcBundleSt(scalar_opnd_2="h8", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fefe"))
             )
 
@@ -515,17 +515,17 @@ trait VLsuBehavior_st {
 
 class VLsuSpec_st extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VLsuBehavior_st {
   behavior of "LSU test"
-    // it should behave like vLsuTest0()   // unit-stride store
-    // it should behave like vLsuTest1()   // unit-stride store
-    // it should behave like vLsuTest2()   // unit-stride store
-    // it should behave like vLsuTest3()   // unit-stride store
-    // it should behave like vLsuTest4()   // unit-stride store
-    // it should behave like vLsuTest5()   // unit-stride store 
-    // it should behave like vLsuTest6()   // unit-stride mask store
-    // it should behave like vLsuTest7()   // strided store
-    // it should behave like vLsuTest8()   // strided store
-    // it should behave like vLsuTest9()   // strided store
-    // it should behave like vLsuTest10()  // strided store with mask enabled
-    // it should behave like vLsuTest11()  // unit-stride exception
+    it should behave like vLsuTest0()   // unit-stride store
+    it should behave like vLsuTest1()   // unit-stride store
+    it should behave like vLsuTest2()   // unit-stride store
+    it should behave like vLsuTest3()   // unit-stride store
+    it should behave like vLsuTest4()   // unit-stride store
+    it should behave like vLsuTest5()   // unit-stride store 
+    it should behave like vLsuTest6()   // unit-stride mask store
+    it should behave like vLsuTest7()   // strided store
+    it should behave like vLsuTest8()   // strided store
+    it should behave like vLsuTest9()   // strided store
+    it should behave like vLsuTest10()  // strided store with mask enabled
+    it should behave like vLsuTest11()  // unit-stride exception
     it should behave like vLsuTest12()
 }

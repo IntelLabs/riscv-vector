@@ -9,30 +9,36 @@ import smartVector._
 import darecreek.ctrl.decode.VInstructions._
 import SmartParam._
 
-trait SmartVectorBehavior_ld_mata {
+trait SmartVectorBehavior_ld {
   this: AnyFlatSpec with ChiselScalatestTester with BundleGenHelper =>
 
     val ldstReqCtrl_default = CtrlBundle()
     val ldstReqSrc_default  = SrcBundleLdst()
 
     // def VLE8_V             = BitPat("b???000?00000?????000?????0000111")
-    // vle8 v2, 0(x1), 0x0
-    def VLE8_V  = "b000_000_1_00000_00001_000_00010_0000111"
+    // vle8 v4, 0(x1), 0x0
+    def VLE8_V  = "b000_000_1_00000_00001_000_00100_0000111"
 
-    def VLE16_V = "b000_000_1_00000_00001_101_00010_0000111"
+    def VLE16_V = "b000_000_1_00000_00001_101_00100_0000111"
 
-    def VLE32_V = "b000_000_1_00000_00001_110_00010_0000111"
+    def VLE32_V = "b000_000_1_00000_00001_110_00100_0000111"
     
-    def VLE64_V = "b000_000_1_00000_00001_111_00010_0000111"
+    def VLE64_V = "b000_000_1_00000_00001_111_00100_0000111"
 
     // def VLSE8_V            = BitPat("b???010???????????000?????0000111")
-    def VLSE8_V  = "b000_010_1_00010_00001_000_00010_0000111"
+    def VLSE8_V  = "b000_010_1_00010_00001_000_00100_0000111"
 
-    def VLSE16_V = "b000_010_1_00010_00001_101_00010_0000111"
+    def VLSE16_V = "b000_010_1_00010_00001_101_00100_0000111"
 
-    def VLSE32_V = "b000_010_1_00010_00001_110_00010_0000111"
+    def VLSE32_V = "b000_010_1_00010_00001_110_00100_0000111"
     
-    def VLSE64_V = "b000_010_1_00010_00001_111_00010_0000111"
+    def VLSE64_V = "b000_010_1_00010_00001_111_00100_0000111"
+
+    // BitPat("b???001???????????000?????0000111")
+    // vluexi8 v8, 0(x1), vs4
+    def VLUXEI8_V   = "b000_001_1_00100_00001_000_01000_0000111"
+
+    def VLUXEI16_V  = "b000_001_1_00100_00001_101_01000_0000111"
 
   
     def vLsuTest0(): Unit = {
@@ -41,7 +47,7 @@ trait SmartVectorBehavior_ld_mata {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (ldstReqCtrl_default.copy(instrn=VLE8_V, ma=true, ta=true), ldstReqSrc_default.copy()),
+                (ldstReqCtrl_default.copy(instrn=VLE8_V), ldstReqSrc_default.copy()),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
@@ -55,7 +61,7 @@ trait SmartVectorBehavior_ld_mata {
             dut.io.rvuCommit.commit_vld.expect(true.B)
             // dut.clock.step(100)
             dut.clock.step(1)
-            dut.io.rfData(2).expect("hffffffffffffffff0123456789abcdef".U)
+            dut.io.rfData(4).expect("hffffffffffffffff0123456789abcdef".U)
             dut.clock.step(100)
         }
         }
@@ -81,8 +87,8 @@ trait SmartVectorBehavior_ld_mata {
             dut.io.rvuCommit.commit_vld.expect(true.B)
             dut.clock.step(1)
             // dut.clock.step(100)
-            dut.io.rfData(2).expect("hffffffffffffffff0123456789abcdef".U)
-            dut.io.rfData(3).expect("hffffffffffffffffffffffffff0f0f0f".U)
+            dut.io.rfData(4).expect("hffffffffffffffff0123456789abcdef".U)
+            dut.io.rfData(5).expect("h000000000000000000000000000f0f0f".U)
         }
         }
     }
@@ -93,7 +99,7 @@ trait SmartVectorBehavior_ld_mata {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (ldstReqCtrl_default.copy(instrn=VLE16_V, vl=27, vlmul=2, vsew=1, ma=true, ta=true), ldstReqSrc_default.copy()),
+                (ldstReqCtrl_default.copy(instrn=VLE16_V, vl=27, vlmul=2, vsew=1), ldstReqSrc_default.copy()),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
@@ -107,10 +113,10 @@ trait SmartVectorBehavior_ld_mata {
             dut.io.rvuCommit.commit_vld.expect(true.B)
             dut.clock.step(1)
             // dut.clock.step(100)
-            dut.io.rfData(2).expect("hffffffffffffffff0123456789abcdef".U)
-            dut.io.rfData(3).expect("hfedcba98765432100f0f0f0f0f0f0f0f".U)
-            dut.io.rfData(4).expect("h01010101010101011234567890123456".U)
-            dut.io.rfData(5).expect("hffffffffffffffffffff678901234567".U)
+            dut.io.rfData(4).expect("hffffffffffffffff0123456789abcdef".U)
+            dut.io.rfData(5).expect("hfedcba98765432100f0f0f0f0f0f0f0f".U)
+            dut.io.rfData(6).expect("h01010101010101011234567890123456".U)
+            dut.io.rfData(7).expect("h00000000000000000000678901234567".U)
         }
         }
     }
@@ -121,7 +127,7 @@ trait SmartVectorBehavior_ld_mata {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (ldstReqCtrl_default.copy(instrn=VLE32_V, vl=10, vlmul=2, vsew=2, ma=true, ta=true), ldstReqSrc_default.copy()),
+                (ldstReqCtrl_default.copy(instrn=VLE32_V, vl=10, vlmul=2, vsew=2), ldstReqSrc_default.copy()),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
@@ -135,9 +141,9 @@ trait SmartVectorBehavior_ld_mata {
             dut.io.rvuCommit.commit_vld.expect(true.B)
             dut.clock.step(1)
             // dut.clock.step(100)
-            dut.io.rfData(2).expect("hffffffffffffffff0123456789abcdef".U)
-            dut.io.rfData(3).expect("hfedcba98765432100f0f0f0f0f0f0f0f".U)
-            dut.io.rfData(4).expect("hffffffffffffffff1234567890123456".U)
+            dut.io.rfData(4).expect("hffffffffffffffff0123456789abcdef".U)
+            dut.io.rfData(5).expect("hfedcba98765432100f0f0f0f0f0f0f0f".U)
+            dut.io.rfData(6).expect("h00000000000000001234567890123456".U)
         }
         }
     }
@@ -148,7 +154,7 @@ trait SmartVectorBehavior_ld_mata {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (ldstReqCtrl_default.copy(instrn=VLE64_V, vl=3, vlmul=1, vsew=3, ma=true, ta=true), ldstReqSrc_default.copy()),
+                (ldstReqCtrl_default.copy(instrn=VLE64_V, vl=3, vlmul=1, vsew=3), ldstReqSrc_default.copy()),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
@@ -162,8 +168,8 @@ trait SmartVectorBehavior_ld_mata {
             dut.io.rvuCommit.commit_vld.expect(true.B)
             dut.clock.step(1)
             // dut.clock.step(100)
-            dut.io.rfData(2).expect("hffffffffffffffff0123456789abcdef".U)
-            dut.io.rfData(3).expect("hffffffffffffffff0f0f0f0f0f0f0f0f".U)
+            dut.io.rfData(4).expect("hffffffffffffffff0123456789abcdef".U)
+            dut.io.rfData(5).expect("h00000000000000000f0f0f0f0f0f0f0f".U)
         }
         }
     }
@@ -174,7 +180,7 @@ trait SmartVectorBehavior_ld_mata {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (ldstReqCtrl_default.copy(instrn=VLE64_V, vl=3, vlmul=1, vstart=1, vsew=3, ma=true, ta=true), ldstReqSrc_default.copy()),
+                (ldstReqCtrl_default.copy(instrn=VLE64_V, vl=3, vlmul=1, vstart=1, vsew=3), ldstReqSrc_default.copy()),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
@@ -188,8 +194,8 @@ trait SmartVectorBehavior_ld_mata {
             dut.io.rvuCommit.commit_vld.expect(true.B)
             dut.clock.step(1)
             // dut.clock.step(100)
-            dut.io.rfData(2).expect("hffffffffffffffffffffffffffffffff".U)
-            dut.io.rfData(3).expect("hffffffffffffffff0f0f0f0f0f0f0f0f".U)
+            dut.io.rfData(4).expect("hffffffffffffffff0000000000000000".U)
+            dut.io.rfData(5).expect("h00000000000000000f0f0f0f0f0f0f0f".U)
         }
         }
     }
@@ -200,7 +206,7 @@ trait SmartVectorBehavior_ld_mata {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (ldstReqCtrl_default.copy(instrn=VLSE8_V, vl=6, vlmul=1, vsew=0, ma=true, ta=true), ldstReqSrc_default.copy(rs2="hffffffff_fffffffb")),
+                (ldstReqCtrl_default.copy(instrn=VLSE8_V, vl=6, vlmul=1, vsew=0), ldstReqSrc_default.copy(rs2="hffffffff_fffffffb")),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
@@ -214,7 +220,7 @@ trait SmartVectorBehavior_ld_mata {
             dut.io.rvuCommit.commit_vld.expect(true.B)
             dut.clock.step(1)
             // dut.clock.step(100)
-            dut.io.rfData(2).expect("hffffffffffffffffffff20103478eeef".U)
+            dut.io.rfData(4).expect("h0000000000000000000020103478eeef".U)
         }
         }
     }
@@ -225,7 +231,7 @@ trait SmartVectorBehavior_ld_mata {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (ldstReqCtrl_default.copy(instrn=VLSE32_V, vl=3, vlmul=1, vsew=2, ma=true, ta=true), ldstReqSrc_default.copy(rs2="hffffffff_ffffffff")),
+                (ldstReqCtrl_default.copy(instrn=VLSE32_V, vl=3, vlmul=1, vsew=2), ldstReqSrc_default.copy(rs2="hffffffff_ffffffff")),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
@@ -238,11 +244,12 @@ trait SmartVectorBehavior_ld_mata {
             }
 
             dut.io.rvuCommit.exception_vld.expect(true.B)
-            dut.io.rvuCommit.update_vl.expect(true.B)
+            dut.io.rvuCommit.xcpt_addr.expect("h0fff".U)
+            dut.io.rvuCommit.update_vl.expect(false.B)
             dut.io.rvuCommit.update_vl_data.expect(1.U)
             dut.clock.step(1)
             // dut.clock.step(100)
-            dut.io.rfData(2).expect("h00000000000000000000000089abcdef".U)
+            dut.io.rfData(4).expect("h89abcdef".U)
         }
         }
     }
@@ -253,7 +260,7 @@ trait SmartVectorBehavior_ld_mata {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (ldstReqCtrl_default.copy(instrn=VLSE16_V, vl=10, vlmul=1, vsew=1, ma=true, ta=true), ldstReqSrc_default.copy(rs2="h8")),
+                (ldstReqCtrl_default.copy(instrn=VLSE16_V, vl=10, vlmul=1, vsew=1), ldstReqSrc_default.copy(rs2="h8")),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
@@ -267,8 +274,8 @@ trait SmartVectorBehavior_ld_mata {
             dut.io.rvuCommit.commit_vld.expect(true.B)
             dut.clock.step(1)
             // dut.clock.step(100)
-            dut.io.rfData(2).expect("h111145670101345632100f0fffffcdef".U)
-            dut.io.rfData(3).expect("hffffffffffffffffffffffff33332222".U)
+            dut.io.rfData(4).expect("h111145670101345632100f0fffffcdef".U)
+            dut.io.rfData(5).expect("h00000000000000000000000033332222".U)
         }
         }
     }
@@ -279,7 +286,7 @@ trait SmartVectorBehavior_ld_mata {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (ldstReqCtrl_default.copy(instrn=VLE8_V, vl=19, vlmul=1, vstart=1, vsew=0, ma=true, ta=true), ldstReqSrc_default.copy(rs1="h1058")),
+                (ldstReqCtrl_default.copy(instrn=VLE8_V, vl=19, vlmul=1, vstart=1, vsew=0), ldstReqSrc_default.copy(rs1="h1058")),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
@@ -292,10 +299,10 @@ trait SmartVectorBehavior_ld_mata {
             }
 
             dut.io.rvuCommit.exception_vld.expect(true.B)
-            dut.io.rvuCommit.update_vl.expect(true.B)
+            dut.io.rvuCommit.update_vl.expect(false.B)
             dut.io.rvuCommit.update_vl_data.expect(8.U)
             dut.clock.step(1)
-            dut.io.rfData(2).expect("h000000000000000055555555555555ff".U)
+            dut.io.rfData(4).expect("h00000000000000005555555555555500".U)
         }
         }
     }
@@ -322,13 +329,13 @@ trait SmartVectorBehavior_ld_mata {
     //         dut.io.rvuCommit.update_vl.expect(true.B)
     //         dut.io.rvuCommit.update_vl_data.expect(8.U)
     //         dut.clock.step(1)
-    //         dut.io.rfData(2).expect("hffffffffffffffff55555555555555ff".U)
+    //         dut.io.rfData(4).expect("hffffffffffffffff55555555555555ff".U)
     //     }
     //     }
     // }
 }
 
-class VPULdSpec_mata extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with SmartVectorBehavior_ld_mata {
+class VPULdSpec extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with SmartVectorBehavior_ld {
   behavior of "SmartVector Load test"
     it should behave like vLsuTest0()   //
     it should behave like vLsuTest1()   //
@@ -340,5 +347,4 @@ class VPULdSpec_mata extends AnyFlatSpec with ChiselScalatestTester with BundleG
     it should behave like vLsuTest7()   //
     it should behave like vLsuTest8()   //
     it should behave like vLsuTest9()   //
-    // it should behave like vLsuTest10()  // error
 }

@@ -28,5 +28,6 @@ class VCommit extends Module {
     io.out.commitInfo.vxsat                  := io.in.commitInfo.bits.vxsat
     io.out.commitInfo.fflags                 := io.in.commitInfo.bits.fflags
     io.out.commitInfo.xcpt_cause             <> io.in.excpInfo.xcpt_cause
+    io.out.commitInfo.xcpt_addr              := io.in.excpInfo.xcpt_addr
 
 }

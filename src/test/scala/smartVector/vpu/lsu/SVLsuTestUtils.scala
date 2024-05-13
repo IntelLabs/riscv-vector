@@ -160,6 +160,10 @@ object DataTable {
       (0x1088.U, BigInt("000000080004001c", 16).U, false.B),
       (0x1090.U, BigInt("00080004000c0018", 16).U, false.B),
       (0x1098.U, BigInt("00380004000c0020", 16).U, false.B),
+      (0x1100.U, BigInt("00080001000c0004", 16).U, false.B),
+      (0x1108.U, BigInt("000000080004001c", 16).U, false.B),
+      (0x1110.U, BigInt("00080060000c0004", 16).U, false.B),
+      (0x1118.U, BigInt("000000080004001c", 16).U, false.B),
   )
 }
 
@@ -191,7 +195,7 @@ class LSUFakeDCache extends Module {
         s2_valid := false.B
     }
 
-    val noise = RegInit("b011000001".U(32.W))
+    val noise = RegInit("b011001001".U(32.W))
     noise := noise >> 1.U
     val miss = noise(0)
 
@@ -239,7 +243,6 @@ class LSUFakeDCache extends Module {
     }
 }
 
-
 class SmartVectorLsuTestWrapper(isLoad: Boolean) extends Module {
     val io = IO(new Bundle {
         val mUop = Input(ValidIO(new MuopTest))
@@ -255,7 +258,7 @@ class SmartVectorLsuTestWrapper(isLoad: Boolean) extends Module {
         case XSCoreParamsKey => XSCoreParameters()
     })
 
-    val vLsu = Module(new SVlsu()(p))
+    val vLsu = Module(new SVlsuWrapper()(p))
   
     io.lsuReady                             := vLsu.io.lsuReady
     vLsu.io.mUop.valid                      := io.mUop.valid
@@ -328,14 +331,19 @@ class SmartVectorLsuTestWrapper(isLoad: Boolean) extends Module {
     vLsu.io.mUopMergeAttr.bits.regWriteMuopIdx  := 0.U
     vLsu.io.mUopMergeAttr.bits.permExpdLen      := 0.U 
     vLsu.io.mUopMergeAttr.bits.regDstIdx        := 0.U
+    vLsu.io.mUopMergeAttr.bits.regCount         := 1.U
 
     io.lsuOut.valid                             := vLsu.io.lsuOut.valid
     io.lsuOut.bits.data                         := vLsu.io.lsuOut.bits.data
     io.lsuOut.bits.rfWriteEn                    := vLsu.io.lsuOut.bits.rfWriteEn
+    io.lsuOut.bits.rfWriteMask                  := vLsu.io.lsuOut.bits.rfWriteMask
     io.lsuOut.bits.rfWriteIdx                   := vLsu.io.lsuOut.bits.rfWriteIdx
     io.lsuOut.bits.muopEnd                      := vLsu.io.lsuOut.bits.muopEnd
-
-    io.xcpt <> vLsu.io.xcpt
+    io.lsuOut.bits.isSegLoad                    := vLsu.io.lsuOut.bits.isSegLoad
+    io.lsuOut.bits.regStartIdx                  := vLsu.io.lsuOut.bits.regStartIdx
+    io.lsuOut.bits.regCount                     := vLsu.io.lsuOut.bits.regCount
+    io.lsuOut.bits.xcpt                         := vLsu.io.lsuOut.bits.xcpt
+    io.xcpt                                     := vLsu.io.lsuOut.bits.xcpt
 
     val dcache = Module(new LSUFakeDCache)
     vLsu.io.dataExchange <> dcache.io.dataExchange

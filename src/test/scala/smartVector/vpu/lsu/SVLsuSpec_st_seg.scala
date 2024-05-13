@@ -77,13 +77,18 @@ trait VLsuBehavior_st_seg {
     val index1070 = addressMap("h1070")
 
     def vLsuTest0(): Unit = {
-        it should "pass: unit-stride segment store (uops=2, eew=8, vl=16, vstart=0, segments=2)" in {
+        it should "pass: unit-stride segment store (eew=8, vl=3, vstart=0, segments=2)" in {
         test(new SmartVectorLsuTestWrapper(false)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            dut.clock.setTimeout(1000)
+            dut.clock.setTimeout(200)
             dut.clock.step(1)
+
             val stReqs = Seq(
-                (vsseg2e8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1, segIdx=0, isLoad=false), stReqSrc_default),
-                (vsseg2e8.copy(vl=16, uopIdx=0, uopEnd=true , vsew=1, segIdx=1, isLoad=false), stReqSrc_default),
+                (vsseg2e8.copy(vl=3, segIdx=0, uopIdx=0, uopEnd=false, vsew=1, isLoad=false), stReqSrc_default),
+                (vsseg2e8.copy(vl=3, segIdx=1, uopIdx=0, uopEnd=false, vsew=1, isLoad=false), stReqSrc_default),
+                (vsseg2e8.copy(vl=3, segIdx=0, uopIdx=1, uopEnd=false, vsew=1, isLoad=false), stReqSrc_default),
+                (vsseg2e8.copy(vl=3, segIdx=1, uopIdx=1, uopEnd=false, vsew=1, isLoad=false), stReqSrc_default),
+                (vsseg2e8.copy(vl=3, segIdx=0, uopIdx=2, uopEnd=false, vsew=1, isLoad=false), stReqSrc_default),
+                (vsseg2e8.copy(vl=3, segIdx=1, uopIdx=2, uopEnd=true , vsew=1, isLoad=false), stReqSrc_default),
             )
 
             for ((c, s) <- stReqs) {
@@ -94,31 +99,31 @@ trait VLsuBehavior_st_seg {
                     dut.io.mUop.bits.poke(genStInput(c, s))
                     dut.clock.step(1)
                     dut.io.mUop.valid.poke(false.B)
-
-                    while (!dut.io.lsuOut.valid.peekBoolean()) {
-                        dut.clock.step(1)
-                    }
-                    dut.io.lsuOut.valid.expect(true.B)
-                    // dut.clock.step(100)
                     dut.clock.step(1)
             }
-            dut.io.memInfo(index1000).expect("h1414131312121111".U)
-            dut.io.memInfo(index1008).expect("h1818171716161515".U)
-            dut.io.memInfo(index1010).expect("h1c1c1b1b1a1a1919".U)
-            dut.io.memInfo(index1018).expect("h20201f1f1e1e1d1d".U)
+
+            dut.clock.step(10)
+            dut.io.memInfo(index1000).expect("h0123131312121111".U)
         }
         }
     }
 
     def vLsuTest1(): Unit = {
-        it should "pass: unit-stride segment store (uops=3, eew=8, vl=16, vstart=0, segments=3)" in {
+        it should "pass: unit-stride segment store (eew=16, vl=3, vstart=0, segments=3)" in {
         test(new SmartVectorLsuTestWrapper(false)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            dut.clock.setTimeout(1000)
+            dut.clock.setTimeout(200)
             dut.clock.step(1)
+
             val stReqs = Seq(
-                (vsseg3e8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1, segIdx=0, isLoad=false), stReqSrc_default),
-                (vsseg3e8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1, segIdx=1, isLoad=false), stReqSrc_default),
-                (vsseg3e8.copy(vl=16, uopIdx=0, uopEnd=true , vsew=1, segIdx=2, isLoad=false), stReqSrc_default),
+                (vsseg3e16.copy(vl=3, segIdx=0, uopIdx=0, uopEnd=false, vsew=1, isLoad=false), stReqSrc_default),
+                (vsseg3e16.copy(vl=3, segIdx=1, uopIdx=0, uopEnd=false, vsew=1, isLoad=false), stReqSrc_default),
+                (vsseg3e16.copy(vl=3, segIdx=2, uopIdx=0, uopEnd=false, vsew=1, isLoad=false), stReqSrc_default),
+                (vsseg3e16.copy(vl=3, segIdx=0, uopIdx=1, uopEnd=false, vsew=1, isLoad=false), stReqSrc_default),
+                (vsseg3e16.copy(vl=3, segIdx=1, uopIdx=1, uopEnd=false, vsew=1, isLoad=false), stReqSrc_default),
+                (vsseg3e16.copy(vl=3, segIdx=2, uopIdx=1, uopEnd=false, vsew=1, isLoad=false), stReqSrc_default),
+                (vsseg3e16.copy(vl=3, segIdx=0, uopIdx=2, uopEnd=false, vsew=1, isLoad=false), stReqSrc_default),
+                (vsseg3e16.copy(vl=3, segIdx=1, uopIdx=2, uopEnd=false, vsew=1, isLoad=false), stReqSrc_default),
+                (vsseg3e16.copy(vl=3, segIdx=2, uopIdx=2, uopEnd=true , vsew=1, isLoad=false), stReqSrc_default),
             )
 
             for ((c, s) <- stReqs) {
@@ -129,51 +134,10 @@ trait VLsuBehavior_st_seg {
                     dut.io.mUop.bits.poke(genStInput(c, s))
                     dut.clock.step(1)
                     dut.io.mUop.valid.poke(false.B)
-
-                    while (!dut.io.lsuOut.valid.peekBoolean()) {
-                        dut.clock.step(1)
-                    }
-                    dut.io.lsuOut.valid.expect(true.B)
-                    // dut.clock.step(100)
                     dut.clock.step(1)
             }
-            dut.io.memInfo(index1000).expect("h1313121212111111".U)
-            dut.io.memInfo(index1008).expect("h1615151514141413".U)
-            dut.io.memInfo(index1010).expect("h1818181717171616".U)
-            dut.io.memInfo(index1018).expect("h1b1b1a1a1a191919".U)
-            dut.io.memInfo(index1020).expect("h1e1d1d1d1c1c1c1b".U)
-            dut.io.memInfo(index1028).expect("h2020201f1f1f1e1e".U)
-        }
-        }
-    }
 
-    def vLsuTest2(): Unit = {
-        it should "pass: unit-stride segment store (uops=3, eew=16, vl=3, vstart=0, segments=3)" in {
-        test(new SmartVectorLsuTestWrapper(false)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            dut.clock.setTimeout(1000)
-            dut.clock.step(1)
-            val stReqs = Seq(
-                (vsseg3e16.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1, segIdx=0, isLoad=false), stReqSrc_default),
-                (vsseg3e16.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1, segIdx=1, isLoad=false), stReqSrc_default),
-                (vsseg3e16.copy(vl=3, uopIdx=0, uopEnd=true , vsew=1, segIdx=2, isLoad=false), stReqSrc_default),
-            )
-
-            for ((c, s) <- stReqs) {
-                    while (!dut.io.lsuReady.peekBoolean()) {
-                        dut.clock.step(1)
-                    }
-                    dut.io.mUop.valid.poke(true.B)
-                    dut.io.mUop.bits.poke(genStInput(c, s))
-                    dut.clock.step(1)
-                    dut.io.mUop.valid.poke(false.B)
-
-                    while (!dut.io.lsuOut.valid.peekBoolean()) {
-                        dut.clock.step(1)
-                    }
-                    dut.io.lsuOut.valid.expect(true.B)
-                    // dut.clock.step(100)
-                    dut.clock.step(1)
-            }
+            dut.clock.step(10)
             dut.io.memInfo(index1000).expect("h1413121112111211".U)
             dut.io.memInfo(index1008).expect("h1615161514131413".U)
             dut.io.memInfo(index1010).expect("h0f0f0f0f0f0f1615".U)
@@ -181,16 +145,18 @@ trait VLsuBehavior_st_seg {
         }
     }
 
-    def vLsuTest3(): Unit = {
-        it should "pass: unit-stride segment store (uops=4, eew=64, vl=3, vstart=0, segments=2)" in {
+    def vLsuTest2(): Unit = {
+        it should "pass: unit-stride segment store (eew=64, vl=3, vstart=0, segments=2)" in {
         test(new SmartVectorLsuTestWrapper(false)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            dut.clock.setTimeout(1000)
+            dut.clock.setTimeout(200)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsseg2e64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1, segIdx=0, isLoad=false), stReqSrc_default),
-                (vsseg2e64.copy(vl=3, uopIdx=1, uopEnd=false, vsew=1, segIdx=0, isLoad=false), stReqSrc_default),
-                (vsseg2e64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1, segIdx=1, isLoad=false), stReqSrc_default),
-                (vsseg2e64.copy(vl=3, uopIdx=1, uopEnd=true , vsew=1, segIdx=1, isLoad=false), stReqSrc_default),
+                (vsseg2e64.copy(vl=3, segIdx=0, uopIdx=0, uopEnd=false, vsew=1, isLoad=false), stReqSrc_default),
+                (vsseg2e64.copy(vl=3, segIdx=1, uopIdx=0, uopEnd=false, vsew=1, isLoad=false), stReqSrc_default),
+                (vsseg2e64.copy(vl=3, segIdx=0, uopIdx=1, uopEnd=false, vsew=1, isLoad=false), stReqSrc_default),
+                (vsseg2e64.copy(vl=3, segIdx=1, uopIdx=1, uopEnd=false, vsew=1, isLoad=false), stReqSrc_default),
+                (vsseg2e64.copy(vl=3, segIdx=0, uopIdx=2, uopEnd=false, vsew=1, isLoad=false), stReqSrc_default),
+                (vsseg2e64.copy(vl=3, segIdx=1, uopIdx=2, uopEnd=true , vsew=1, isLoad=false), stReqSrc_default),
             )
 
             for ((c, s) <- stReqs) {
@@ -201,14 +167,9 @@ trait VLsuBehavior_st_seg {
                     dut.io.mUop.bits.poke(genStInput(c, s))
                     dut.clock.step(1)
                     dut.io.mUop.valid.poke(false.B)
-
-                    while (!dut.io.lsuOut.valid.peekBoolean()) {
-                        dut.clock.step(1)
-                    }
-                    dut.io.lsuOut.valid.expect(true.B)
-                    // dut.clock.step(100)
                     dut.clock.step(1)
             }
+            dut.clock.step(10)
             dut.io.memInfo(index1000).expect("h1817161514131211".U)
             dut.io.memInfo(index1008).expect("h1817161514131211".U)
             dut.io.memInfo(index1010).expect("h201f1e1d1c1b1a19".U)
@@ -217,14 +178,20 @@ trait VLsuBehavior_st_seg {
         }
     }
 
-    def vLsuTest4(): Unit = {
-        it should "pass: unit-stride segment store (uops=2, eew=8, vl=4, vstart=0, segments=2, stride=-5)" in {
+    def vLsuTest3(): Unit = {
+        it should "pass: strided segment store (uops=2, eew=8, vl=4, vstart=0, segments=2, stride=-5)" in {
         test(new SmartVectorLsuTestWrapper(false)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            dut.clock.setTimeout(1000)
+            dut.clock.setTimeout(200)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vssseg2e8.copy(vl=4, uopIdx=0, uopEnd=false, vsew=1, segIdx=0, isLoad=false), SrcBundleSt(scalar_opnd_2="hffffffff_fffffffb")),
-                (vssseg2e8.copy(vl=4, uopIdx=0, uopEnd=true , vsew=1, segIdx=1, isLoad=false), SrcBundleSt(scalar_opnd_2="hffffffff_fffffffb")),
+                (vssseg2e8.copy(vl=4, segIdx=0, uopIdx=0, uopEnd=false, vsew=1, isLoad=false), SrcBundleSt(scalar_opnd_2="hffffffff_fffffffb")),
+                (vssseg2e8.copy(vl=4, segIdx=1, uopIdx=0, uopEnd=false, vsew=1, isLoad=false), SrcBundleSt(scalar_opnd_2="hffffffff_fffffffb")),
+                (vssseg2e8.copy(vl=4, segIdx=0, uopIdx=1, uopEnd=false, vsew=1, isLoad=false), SrcBundleSt(scalar_opnd_2="hffffffff_fffffffb")),
+                (vssseg2e8.copy(vl=4, segIdx=1, uopIdx=1, uopEnd=false, vsew=1, isLoad=false), SrcBundleSt(scalar_opnd_2="hffffffff_fffffffb")),
+                (vssseg2e8.copy(vl=4, segIdx=0, uopIdx=2, uopEnd=false, vsew=1, isLoad=false), SrcBundleSt(scalar_opnd_2="hffffffff_fffffffb")),
+                (vssseg2e8.copy(vl=4, segIdx=1, uopIdx=2, uopEnd=false, vsew=1, isLoad=false), SrcBundleSt(scalar_opnd_2="hffffffff_fffffffb")),
+                (vssseg2e8.copy(vl=4, segIdx=0, uopIdx=3, uopEnd=false, vsew=1, isLoad=false), SrcBundleSt(scalar_opnd_2="hffffffff_fffffffb")),
+                (vssseg2e8.copy(vl=4, segIdx=1, uopIdx=3, uopEnd=true , vsew=1, isLoad=false), SrcBundleSt(scalar_opnd_2="hffffffff_fffffffb")),
             )
 
             for ((c, s) <- stReqs) {
@@ -235,14 +202,10 @@ trait VLsuBehavior_st_seg {
                     dut.io.mUop.bits.poke(genStInput(c, s))
                     dut.clock.step(1)
                     dut.io.mUop.valid.poke(false.B)
-
-                    while (!dut.io.lsuOut.valid.peekBoolean()) {
-                        dut.clock.step(1)
-                    }
-                    dut.io.lsuOut.valid.expect(true.B)
-                    // dut.clock.step(100)
                     dut.clock.step(1)
             }
+
+            dut.clock.step(10)
             dut.io.memInfo(index1000).expect("h0123456789ab1111".U)
             dut.io.memInfo(index0ff8).expect("heeeeee1212eeeeee".U)
             dut.io.memInfo(index0ff0).expect("h1313901234141489".U)
@@ -250,15 +213,20 @@ trait VLsuBehavior_st_seg {
         }
     }
 
-    def vLsuTest5(): Unit = {
+    def vLsuTest4(): Unit = {
         it should "pass: unit-stride segment store (uops=3, eew=8, vl=2, vstart=0, segments=2, stride=6)" in {
         test(new SmartVectorLsuTestWrapper(false)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            dut.clock.setTimeout(1000)
+            dut.clock.setTimeout(200)
             dut.clock.step(1)
+
             val stReqs = Seq(
-                (vssseg3e16.copy(vl=2, uopIdx=0, uopEnd=false, vsew=1, segIdx=0, isLoad=false), SrcBundleSt(scalar_opnd_2="h06")),
-                (vssseg3e16.copy(vl=2, uopIdx=0, uopEnd=false, vsew=1, segIdx=1, isLoad=false), SrcBundleSt(scalar_opnd_2="h06")),
-                (vssseg3e16.copy(vl=2, uopIdx=0, uopEnd=true , vsew=1, segIdx=2, isLoad=false), SrcBundleSt(scalar_opnd_2="h06")),
+                (vssseg3e16.copy(vl=2, segIdx=0, uopIdx=0, uopEnd=false, vsew=1, isLoad=false), SrcBundleSt(scalar_opnd_2="h06")),
+                (vssseg3e16.copy(vl=2, segIdx=1, uopIdx=0, uopEnd=false, vsew=1, isLoad=false), SrcBundleSt(scalar_opnd_2="h06")),
+                (vssseg3e16.copy(vl=2, segIdx=2, uopIdx=0, uopEnd=false, vsew=1, isLoad=false), SrcBundleSt(scalar_opnd_2="h06")),
+                (vssseg3e16.copy(vl=2, segIdx=0, uopIdx=1, uopEnd=false, vsew=1, isLoad=false), SrcBundleSt(scalar_opnd_2="h06")),
+                (vssseg3e16.copy(vl=2, segIdx=1, uopIdx=1, uopEnd=false, vsew=1, isLoad=false), SrcBundleSt(scalar_opnd_2="h06")),
+                (vssseg3e16.copy(vl=2, segIdx=2, uopIdx=1, uopEnd=true,  vsew=1, isLoad=false), SrcBundleSt(scalar_opnd_2="h06")),
+
             )
 
             for ((c, s) <- stReqs) {
@@ -269,14 +237,10 @@ trait VLsuBehavior_st_seg {
                     dut.io.mUop.bits.poke(genStInput(c, s))
                     dut.clock.step(1)
                     dut.io.mUop.valid.poke(false.B)
-
-                    while (!dut.io.lsuOut.valid.peekBoolean()) {
-                        dut.clock.step(1)
-                    }
-                    dut.io.lsuOut.valid.expect(true.B)
-                    // dut.clock.step(100)
                     dut.clock.step(1)
             }
+
+            dut.clock.step(10)
             dut.io.memInfo(index1000).expect("h1413121112111211".U)
             dut.io.memInfo(index1008).expect("hffffffff14131413".U)
         }
@@ -291,6 +255,4 @@ class VLsuSpec_st_seg extends AnyFlatSpec with ChiselScalatestTester with Bundle
     it should behave like vLsuTest2()  
     it should behave like vLsuTest3() 
     it should behave like vLsuTest4()   
-    it should behave like vLsuTest5()  
-    // it should behave like vLsuTest6() 
 }

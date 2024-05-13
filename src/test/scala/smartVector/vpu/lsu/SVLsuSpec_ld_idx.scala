@@ -16,7 +16,7 @@ import darecreek._
 import darecreek.lsu._
 
 
-trait VLsuBehavior_ld_idx_mutu {
+trait VLsuBehavior_ld_idx {
   this: AnyFlatSpec with ChiselScalatestTester with BundleGenHelper =>
 
     val ldReqSrc_default = SrcBundleLd()
@@ -31,29 +31,34 @@ trait VLsuBehavior_ld_idx_mutu {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vluxei8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1), SrcBundleLd(vs2="h010004"), "h201f1e1d1c1b1a1918171615cdef4567".U),
+                (vluxei8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1), SrcBundleLd(vs2="h010004"), "h201f1e1d1c1b1a1918171615cdef4567".U, "hfff0".U),
                 // (vluxei8.copy(vl=16, uopIdx=1, uopEnd=true,  vsew=1), SrcBundleLd(vs2="h010004"), "hcdefcdefcdefcdefcdefcdefcdefcdef".U),
             )
 
-            for ((c, s, r) <- ldReqs) {
-                while (!dut.io.lsuReady.peekBoolean()) {
+            fork {
+                for ((c, s, r, m) <- ldReqs) {
+                    while (!dut.io.lsuReady.peekBoolean()) {
+                        dut.clock.step(1)
+                    }
+                    dut.io.mUop.valid.poke(true.B)
+                    dut.io.mUop.bits.poke(genLdInput(c, s))
+                    dut.clock.step(1)
+                    dut.io.mUop.valid.poke(false.B)
+                }
+            }.fork {
+                for ((c, s, r, m) <- ldReqs) {
+                    while (!dut.io.lsuOut.valid.peekBoolean()) {
+                        dut.clock.step(1)
+                    }
+                    dut.io.lsuOut.valid.expect(true.B)
+                    // dut.clock.step(100)
+                    dut.io.xcpt.update_vl.expect(false.B)
+                    dut.io.xcpt.update_data.expect(2.U)
+                    dut.io.lsuOut.bits.data.expect(r)
+                    dut.io.lsuOut.bits.rfWriteMask.expect(m)
                     dut.clock.step(1)
                 }
-                dut.io.mUop.valid.poke(true.B)
-                dut.io.mUop.bits.poke(genLdInput(c, s))
-                dut.clock.step(1)
-                dut.io.mUop.valid.poke(false.B)
-
-                while (!dut.io.lsuOut.valid.peekBoolean()) {
-                    dut.clock.step(1)
-                }
-                dut.io.lsuOut.valid.expect(true.B)
-                // dut.clock.step(100)
-                dut.io.xcpt.update_vl.expect(true.B)
-                dut.io.xcpt.update_data.expect(2.U)
-                dut.io.lsuOut.bits.data.expect(r)
-                dut.clock.step(4)
-            }
+            }.join()
         }
         }
     }
@@ -65,11 +70,12 @@ trait VLsuBehavior_ld_idx_mutu {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vluxei8.copy(vl=3, uopIdx=0, uopEnd=false, vsew=3), SrcBundleLd(vs2="h01000"), "h0f0f0f0f0f0f0f0f0123456789abcdef".U),
-                (vluxei8.copy(vl=3, uopIdx=1, uopEnd=true, vsew=3),  SrcBundleLd(vs2="h01000"), "h201f1e1d1c1b1a190123456789abcdef".U),
+                (vluxei8.copy(vl=3, uopIdx=0, uopEnd=false, vsew=3), SrcBundleLd(vs2="h01000"), "h0f0f0f0f0f0f0f0f0123456789abcdef".U, "h0000".U),
+                (vluxei8.copy(vl=3, uopIdx=1, uopEnd=true, vsew=3),  SrcBundleLd(vs2="h01000"), "h201f1e1d1c1b1a190123456789abcdef".U, "hff00".U),
             )
-
-            for ((c, s, r) <- ldReqs) {
+            
+            fork {
+                for ((c, s, r, m) <- ldReqs) {
                     while (!dut.io.lsuReady.peekBoolean()) {
                         dut.clock.step(1)
                     }
@@ -77,20 +83,18 @@ trait VLsuBehavior_ld_idx_mutu {
                     dut.io.mUop.bits.poke(genLdInput(c, s))
                     dut.clock.step(1)
                     dut.io.mUop.valid.poke(false.B)
-
+                }
+            }.fork {
+                for ((c, s, r, m) <- ldReqs) {
                     while (!dut.io.lsuOut.valid.peekBoolean()) {
                         dut.clock.step(1)
                     }
                     dut.io.lsuOut.valid.expect(true.B)
-                    if(dut.io.xcpt.update_vl.peekBoolean()) {
-                        dut.io.xcpt.update_vl.expect(true.B)
-                    }
-                    // dut.io.xcpt.update_data.expect(1.U)
-                    // dut.clock.step(100)
-
                     dut.io.lsuOut.bits.data.expect(r)
-                    dut.clock.step(4)
-            }
+                    dut.io.lsuOut.bits.rfWriteMask.expect(m)
+                    dut.clock.step(1)
+                }
+            }.join()
         }
         }
     }
@@ -101,12 +105,13 @@ trait VLsuBehavior_ld_idx_mutu {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vluxei16.copy(vl=5, uopIdx=0, uopEnd=false, vsew=3), SrcBundleLd(vs2="h000000180000001000080000"), "hffffffffffffffff0123456789abcdef".U),
-                (vluxei16.copy(vl=5, uopIdx=1, uopEnd=false, vsew=3), SrcBundleLd(vs2="h000000180000001000080000"), "h0123456789abcdef0f0f0f0f0f0f0f0f".U),
-                (vluxei16.copy(vl=5, uopIdx=2, uopEnd=true,  vsew=3), SrcBundleLd(vs2="h000000180000001000080000"), "h201f1e1d1c1b1a19fedcba9876543210".U),
+                (vluxei16.copy(vl=5, uopIdx=0, uopEnd=false, vsew=3), SrcBundleLd(vs2="h000000180000001000080000"), "hffffffffffffffff0123456789abcdef".U, "h0000".U),
+                (vluxei16.copy(vl=5, uopIdx=1, uopEnd=false, vsew=3), SrcBundleLd(vs2="h000000180000001000080000"), "h0123456789abcdef0f0f0f0f0f0f0f0f".U, "h0000".U),
+                (vluxei16.copy(vl=5, uopIdx=2, uopEnd=true,  vsew=3), SrcBundleLd(vs2="h000000180000001000080000"), "h201f1e1d1c1b1a19fedcba9876543210".U, "hff00".U),
             )
 
-            for ((c, s, r) <- ldReqs) {
+             fork {
+                for ((c, s, r, m) <- ldReqs) {
                     while (!dut.io.lsuReady.peekBoolean()) {
                         dut.clock.step(1)
                     }
@@ -114,15 +119,18 @@ trait VLsuBehavior_ld_idx_mutu {
                     dut.io.mUop.bits.poke(genLdInput(c, s))
                     dut.clock.step(1)
                     dut.io.mUop.valid.poke(false.B)
-
+                }
+            }.fork {
+                for ((c, s, r, m) <- ldReqs) {
                     while (!dut.io.lsuOut.valid.peekBoolean()) {
                         dut.clock.step(1)
                     }
                     dut.io.lsuOut.valid.expect(true.B)
-
                     dut.io.lsuOut.bits.data.expect(r)
-                    dut.clock.step(4)
-            }
+                    dut.io.lsuOut.bits.rfWriteMask.expect(m)
+                    dut.clock.step(1)
+                }
+            }.join()
         }
         }
     }
@@ -133,8 +141,8 @@ trait VLsuBehavior_ld_idx_mutu {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vluxei32.copy(vl=5, uopIdx=0, uopEnd=false, vsew=1), SrcBundleLd(vs2="h000000100000000000000008"), "h0".U),
-                (vluxei32.copy(vl=5, uopIdx=1, uopEnd=true, vsew=1),  SrcBundleLd(vs2="h08"), "h201f1e1d1c1bffffcdef0f0fcdefffff".U),
+                (vluxei32.copy(vl=5, uopIdx=0, uopEnd=false, vsew=1), SrcBundleLd(vs2="h000000100000000000000008"), "h0".U, "hffff".U),
+                (vluxei32.copy(vl=5, uopIdx=1, uopEnd=true, vsew=1),  SrcBundleLd(vs2="h08"), "h201f1e1d1c1bffffcdef0f0fcdefffff".U, "hfc00".U),
             )
 
             while (!dut.io.lsuReady.peekBoolean()) {
@@ -158,6 +166,7 @@ trait VLsuBehavior_ld_idx_mutu {
             }
             dut.io.lsuOut.valid.expect(true.B)
             dut.io.lsuOut.bits.data.expect(ldReqs(1)._3)
+            dut.io.lsuOut.bits.rfWriteMask.expect(ldReqs(1)._4)
         }
         }
     }
@@ -168,8 +177,8 @@ trait VLsuBehavior_ld_idx_mutu {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vluxei64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1), SrcBundleLd(vs2="h00010"), "h0".U),
-                (vluxei64.copy(vl=3, uopIdx=1, uopEnd=true,  vsew=1), SrcBundleLd(vs2="h00020"), "h201f1e1d1c1b1a1918173456cdef0f0f".U),
+                (vluxei64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1), SrcBundleLd(vs2="h00010"), "h0".U, "hffff".U),
+                (vluxei64.copy(vl=3, uopIdx=1, uopEnd=true,  vsew=1), SrcBundleLd(vs2="h00020"), "h201f1e1d1c1b1a1918173456cdef0f0f".U, "hffc0".U),
             )
 
             while (!dut.io.lsuReady.peekBoolean()) {
@@ -192,6 +201,7 @@ trait VLsuBehavior_ld_idx_mutu {
             }
             dut.io.lsuOut.valid.expect(true.B)
             dut.io.lsuOut.bits.data.expect(ldReqs(1)._3)
+            dut.io.lsuOut.bits.rfWriteMask.expect(ldReqs(1)._4)
         }
         }
     }
@@ -202,8 +212,8 @@ trait VLsuBehavior_ld_idx_mutu {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vluxei64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1), SrcBundleLd(vs2="hffff_ffff_ffff_fff0_ffff_ffff_ffff_fff8"), "h0".U),
-                (vluxei64.copy(vl=3, uopIdx=1, uopEnd=true,  vsew=1), SrcBundleLd(vs2="h00020"), "h201f1e1d1c1b1a19181734563489eeee".U),
+                (vluxei64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1), SrcBundleLd(vs2="hffff_ffff_ffff_fff0_ffff_ffff_ffff_fff8"), "h0".U, "hffff".U),
+                (vluxei64.copy(vl=3, uopIdx=1, uopEnd=true,  vsew=1), SrcBundleLd(vs2="h00020"), "h201f1e1d1c1b1a19181734563489eeee".U, "hffc0".U),
             )
 
             while (!dut.io.lsuReady.peekBoolean()) {
@@ -226,6 +236,7 @@ trait VLsuBehavior_ld_idx_mutu {
             }
             dut.io.lsuOut.valid.expect(true.B)
             dut.io.lsuOut.bits.data.expect(ldReqs(1)._3)
+            dut.io.lsuOut.bits.rfWriteMask.expect(ldReqs(1)._4)
         }
         }
     }
@@ -236,8 +247,8 @@ trait VLsuBehavior_ld_idx_mutu {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val ldReqs = Seq(
-                (vluxei32.copy(vl=5, uopIdx=0, uopEnd=false, vsew=1), SrcBundleLd(vs2="h000000100000000000000008"), "h0".U),
-                (vluxei32.copy(vl=5, uopIdx=1, uopEnd=true, vsew=1),  SrcBundleLd(vs2="h60"), "h201f1e1d1c1b1a19cdef0f0fcdefffff".U),
+                (vluxei32.copy(vl=5, uopIdx=0, uopEnd=false, vsew=1), SrcBundleLd(vs2="h000000100000000000000008"), "h0".U, "hffff".U),
+                (vluxei32.copy(vl=5, uopIdx=1, uopEnd=true, vsew=1),  SrcBundleLd(vs2="h60"), "h201f1e1d1c1b1a19cdef0f0fcdefffff".U, "hff00".U),
             )
 
             while (!dut.io.lsuReady.peekBoolean()) {
@@ -260,18 +271,17 @@ trait VLsuBehavior_ld_idx_mutu {
                 dut.clock.step(1)
             }
             dut.io.lsuOut.valid.expect(true.B)
-            if(dut.io.xcpt.update_vl.peekBoolean()) {
-                dut.io.xcpt.update_vl.expect(true.B)
-                dut.io.xcpt.update_data.expect(4.U)
-            } 
+            dut.io.xcpt.update_vl.expect(false.B)
+            dut.io.xcpt.update_data.expect(4.U)
 
             dut.io.lsuOut.bits.data.expect(ldReqs(1)._3)
+            dut.io.lsuOut.bits.rfWriteMask.expect(ldReqs(1)._4)
         }
         }
     }
 }
 
-class VLsuSpec_ld_idx_mutu extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VLsuBehavior_ld_idx_mutu {
+class VLsuSpec_ld_idx extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VLsuBehavior_ld_idx {
   behavior of "LSU test"
     it should behave like vLsuTest0() 
     it should behave like vLsuTest1() 
