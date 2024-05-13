@@ -364,7 +364,7 @@ trait VLsuBehavior_st {
                     dut.clock.step(1)
                 }
                 dut.io.lsuOut.valid.expect(true.B)
-                dut.io.xcpt.update_vl.expect(true.B)
+                dut.io.xcpt.update_vl.expect(false.B)
                 dut.io.xcpt.update_data.expect(1.U)
                 dut.clock.step(1)
             }

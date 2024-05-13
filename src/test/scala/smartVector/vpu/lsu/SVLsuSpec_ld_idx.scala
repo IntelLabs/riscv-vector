@@ -52,7 +52,7 @@ trait VLsuBehavior_ld_idx {
                     }
                     dut.io.lsuOut.valid.expect(true.B)
                     // dut.clock.step(100)
-                    dut.io.xcpt.update_vl.expect(true.B)
+                    dut.io.xcpt.update_vl.expect(false.B)
                     dut.io.xcpt.update_data.expect(2.U)
                     dut.io.lsuOut.bits.data.expect(r)
                     dut.io.lsuOut.bits.rfWriteMask.expect(m)
@@ -271,10 +271,8 @@ trait VLsuBehavior_ld_idx {
                 dut.clock.step(1)
             }
             dut.io.lsuOut.valid.expect(true.B)
-            if (dut.io.xcpt.update_vl.peekBoolean()) {
-                dut.io.xcpt.update_vl.expect(true.B)
-                dut.io.xcpt.update_data.expect(4.U)
-            } 
+            dut.io.xcpt.update_vl.expect(false.B)
+            dut.io.xcpt.update_data.expect(4.U)
 
             dut.io.lsuOut.bits.data.expect(ldReqs(1)._3)
             dut.io.lsuOut.bits.rfWriteMask.expect(ldReqs(1)._4)

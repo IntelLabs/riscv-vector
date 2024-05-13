@@ -303,6 +303,7 @@ trait VLsuBehavior_ld {
                 dut.io.xcpt.exception_vld.expect(false.B)
                 dut.io.xcpt.update_vl.expect(true.B)
                 dut.io.xcpt.xcpt_cause.ma.ld.expect(false.B)
+                dut.io.xcpt.xcpt_addr.expect("h1060".U)
                 dut.io.xcpt.update_data.expect(8.U)
                 dut.io.lsuOut.bits.data.expect(r)
                 dut.io.lsuOut.bits.rfWriteMask.expect(m)
@@ -334,8 +335,9 @@ trait VLsuBehavior_ld {
                 }
                 dut.io.lsuOut.valid.expect(true.B)
                 dut.io.xcpt.exception_vld.expect(true.B)
-                dut.io.xcpt.update_vl.expect(true.B)
+                dut.io.xcpt.update_vl.expect(false.B)
                 dut.io.xcpt.xcpt_cause.ma.ld.expect(true.B)
+                dut.io.xcpt.xcpt_addr.expect("h1060".U)
                 dut.io.xcpt.update_data.expect(0.U)
                 dut.io.lsuOut.bits.data.expect(r)
                 dut.io.lsuOut.bits.rfWriteMask.expect(m)
@@ -369,6 +371,7 @@ trait VLsuBehavior_ld {
                 dut.io.xcpt.exception_vld.expect(false.B)
                 dut.io.xcpt.update_vl.expect(true.B)
                 dut.io.xcpt.xcpt_cause.ma.ld.expect(false.B)
+                dut.io.xcpt.xcpt_addr.expect("h1060".U)
                 dut.io.xcpt.update_data.expect(1.U)
                 dut.io.lsuOut.bits.data.expect(r)
                 dut.io.lsuOut.bits.rfWriteMask.expect(m)
@@ -416,6 +419,7 @@ trait VLsuBehavior_ld {
             dut.io.xcpt.exception_vld.expect(false.B)
             dut.io.xcpt.update_vl.expect(true.B)
             dut.io.xcpt.xcpt_cause.ma.ld.expect(false.B)
+            dut.io.xcpt.xcpt_addr.expect("h1060".U)
             dut.io.xcpt.update_data.expect(2.U)
             dut.io.lsuOut.bits.data.expect(ldReqs(1)._3)
             dut.io.lsuOut.bits.rfWriteMask.expect(ldReqs(1)._4)
@@ -478,10 +482,7 @@ trait VLsuBehavior_ld {
                 }
                 dut.io.lsuOut.valid.expect(true.B)
 
-                dut.io.xcpt.update_vl.expect(true.B)
-                dut.io.xcpt.update_data.expect(1.U)
-
-                dut.io.xcpt.update_vl.expect(true.B)
+                dut.io.xcpt.update_vl.expect(false.B)
                 dut.io.xcpt.update_data.expect(1.U)
                 dut.io.lsuOut.bits.data.expect(r)
                 dut.io.lsuOut.bits.rfWriteMask.expect(m)
@@ -639,10 +640,7 @@ trait VLsuBehavior_ld {
                     dut.clock.step(1)
                 }
                 dut.io.lsuOut.valid.expect(true.B)
-                // dut.clock.step(100)
-                if (dut.io.xcpt.update_vl.peekBoolean()) {
-                    dut.io.xcpt.update_vl.expect(true.B)
-                } 
+                dut.io.xcpt.update_vl.expect(false.B)
                 dut.io.xcpt.update_data.expect(8.U)
                 dut.io.lsuOut.bits.data.expect(r)
                 dut.io.lsuOut.bits.rfWriteMask.expect(m)

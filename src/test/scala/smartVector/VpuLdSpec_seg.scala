@@ -233,9 +233,10 @@ trait SmartVectorBehavior_ld_seg {
                 dut.clock.step(1)
             }
             dut.io.rvuCommit.commit_vld.expect(true.B)
-            dut.io.rvuCommit.update_vl.expect(true.B)
+            dut.io.rvuCommit.update_vl.expect(false.B)
             dut.io.rvuCommit.update_vl_data.expect(2.U)    
             dut.io.rvuCommit.exception_vld.expect(true.B)
+            dut.io.rvuCommit.xcpt_addr.expect("h1001".U)
             dut.clock.step(1)
             dut.io.rfData(16).expect("hffff4567".U)
             dut.io.rfData(18).expect("hffff0123".U)
@@ -275,9 +276,10 @@ trait SmartVectorBehavior_ld_seg {
                 dut.clock.step(1)
             }
             dut.io.rvuCommit.commit_vld.expect(true.B)
-            dut.io.rvuCommit.update_vl.expect(true.B)
+            dut.io.rvuCommit.update_vl.expect(false.B)
             dut.io.rvuCommit.update_vl_data.expect(2.U)    
             dut.io.rvuCommit.exception_vld.expect(true.B)
+            dut.io.rvuCommit.xcpt_addr.expect("h1060".U)
             dut.clock.step(1)
             dut.io.rfData(16).expect("hffff4567".U)
             dut.io.rfData(18).expect("hffff0123".U)
@@ -330,7 +332,7 @@ trait SmartVectorBehavior_ld_seg {
                 dut.clock.step(1)
             }
             dut.io.rvuCommit.commit_vld.expect(true.B)
-            dut.io.rvuCommit.update_vl.expect(true.B)
+            dut.io.rvuCommit.update_vl.expect(false.B)
             dut.io.rvuCommit.update_vl_data.expect("hc".U)
             dut.clock.step(1)
             dut.io.rfData( 8).expect("h5544332211670156100fffef".U)

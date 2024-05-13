@@ -93,7 +93,7 @@ trait VLsuBehavior_st_idx {
                     dut.clock.step(1)
                 }
                 dut.io.lsuOut.valid.expect(true.B)
-                dut.io.xcpt.update_vl.expect(true.B)
+                dut.io.xcpt.update_vl.expect(false.B)
                 dut.io.xcpt.update_data.expect(2.U)
                 dut.clock.step(1)
             }
@@ -280,7 +280,7 @@ trait VLsuBehavior_st_idx {
                 dut.clock.step(1)
             }
             dut.io.lsuOut.valid.expect(true.B)
-            dut.io.xcpt.update_vl.expect(true.B)
+            dut.io.xcpt.update_vl.expect(false.B)
             dut.io.xcpt.update_data.expect(4.U)
             dut.clock.step(1)
 
