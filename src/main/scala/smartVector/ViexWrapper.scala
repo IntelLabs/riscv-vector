@@ -12,23 +12,56 @@ import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import chipsalliance.rocketchip.config
 import darecreek.Vlmul_to_lmul
 
+class IexOutput extends Bundle {
+  val vd = UInt(128.W)
+  val vxsat = Bool()
+  val fflags = UInt(5.W)
+}
+
+class VPermRegIn extends Bundle{
+  val rdata = UInt(128.W)
+  val rvalid = Bool()
+}
+
 class VIexWrapper(implicit p : Parameters) extends Module {
   
   val io = IO(new Bundle {
     val in = Input(ValidIO(new Muop))
     val out = ValidIO(new IexOutput)
+    val permOut = new(VPermOutput)
+    val permRegIn = Input(new(VPermRegIn))
     val iexNeedStall = Output(Bool())
   })
+
+  val SValu   = Module(new VAluWrapper()(p))
+  val SVMac   = Module(new VMacWrapper()(p))
+  val SVMask  = Module(new VMaskWrapper()(p))
+  val SVReduc = Module(new VReducWrapper()(p))
+  val SVDiv   = Module(new VDivWrapper()(p))
+  val SVPerm  = Module(new VPermWrapper()(p))
+  val SVFpu   = Module(new VSFPUWrapper()(p))
 
   val validReg = RegInit(false.B)
   val bitsReg  = RegInit(0.U.asTypeOf(new Muop))
   //val divNotReady  = io.in.bits.uop.ctrl.div  & ~SVDiv.io.in.ready
   //val fpuNotReady  = io.in.bits.uop.ctrl.fp   & ~SVFpu.io.in.ready
   //val permNotReady = io.in.bits.uop.ctrl.perm & SVPerm.io.out.perm_busy
-  val divNotReady  = ~SVDiv.io.in.ready
-  val fpuNotReady  = ~SVFpu.io.in.ready
-  val permNotReady = SVPerm.io.out.perm_busy
-  val ready    = ~(divNotReady || fpuNotReady || permNotReady)
+  val divReady   = SVDiv.io.in.ready
+  val fpuReady   = SVFpu.io.in.ready
+  val aluReady   = SValu.io.in.ready
+  val macReady   = SVMac.io.in.ready
+  val maskReady  = SVMask.io.in.ready
+  val reducReady = SVReduc.io.in.ready
+  val permReady  = ~SVPerm.io.out.perm_busy
+  //val ready    = ~(divNotReady || fpuNotReady || permNotReady)
+  val ready = io.in.valid & 
+              (io.in.bits.uop.ctrl.alu & aluReady) ||
+              (io.in.bits.uop.ctrl.mul & macReady) ||
+              (io.in.bits.uop.ctrl.mask & maskReady) ||
+              (io.in.bits.uop.ctrl.redu & reducReady) || 
+              (io.in.bits.uop.ctrl.div & divReady) ||
+              (io.in.bits.uop.ctrl.perm & permReady) ||
+              (io.in.bits.uop.ctrl.fp & fpuReady)
 
   when(!validReg || ready){
     validReg := io.in.valid && !io.in.bits.uop.ctrl.isLdst
@@ -38,12 +71,47 @@ class VIexWrapper(implicit p : Parameters) extends Module {
     bitsReg := io.in.bits
   }
 
-  val empty :: ongoing :: Nil = Enum(2)
-  val currentState = RegInit(empty)
-  val currentStateNext = WireDefault(empty) 
+  //val empty :: ongoing :: Nil = Enum(2)
+  //val currentState = RegInit(empty)
+  //val currentStateNext = WireDefault(empty) 
+//
+  //val outValid = SValu.io.out.valid || SVMac.io.out.valid || SVMask.io.out.valid || 
+  //               SVReduc.io.out.valid || SVDiv.io.out.valid || SVFpu.io.out.valid
 
-  val outValid = SValu.io.out.valid || SVMac.io.out.valid || SVMask.io.out.valid || 
-                 SVReduc.io.out.valid || SVDiv.io.out.valid || SVFpu.io.out.valid
+  val aluOutValid   = SValu.io.out.valid
+  val macOutValid   = SVMac.io.out.valid
+  val maskOutValid  = SVMask.io.out.valid
+  val reducOutValid = SVReduc.io.out.valid
+  val divOutValid   = SVDiv.io.out.valid
+  val fpuOutValid   = SVFpu.io.out.valid
+  
+  val shortValids = Vec(4, Bool())
+  shortValids :=VecInit(aluOutValid, macOutValid, maskOutValid, reducOutValid)
+  val shortAges = Vec(4, UInt(4.W))
+  shortAges :=VecInit(SValu.io.age, SVMac.io.age, SVMask.io.age, SVReduc.io.age)
+  val shortData = Vec(4, new VAluOutput)
+  shortData := VecInit(SValu.io.out, SVMac.io.out, SVMask.io.out, SVReduc.io.out)
+  val shortStall = Vec(4, Bool())
+
+  val oldestIdx = Wire(UInt(2.W))
+  val oldestAge = Wire(UInt(4.W))
+  oldestIdx := 0.U
+  oldestAge := 0.U
+
+  for(i <- 0 until 4){
+    when(shortValids(i) && shortAges(i) > oldestAge){
+      oldestIdx := i.U
+      oldestAge := shortAges(i)
+    }
+  }
+
+  val shortWriteData = shortData(oldestIdx)
+
+  for(i <- 0 until 4){
+    when(shortValids(i) /*&& (i != oldestIdx)*/) {
+      shortStall(i) := true.B
+    } 
+  }
 
   val permDone = Wire(Bool())
   val permWriteNum = RegInit(0.U(4.W))
@@ -56,6 +124,33 @@ class VIexWrapper(implicit p : Parameters) extends Module {
       permDone := true.B
   }.otherwise{
       permDone := false.B
+  }
+
+  val longValids = Vec(3, Bool())
+  longValids :=VecInit(divOutValid, fpuOutValid, permDone)
+  val longAges = Vec(3, UInt(4.W))
+  longAges :=VecInit(SVDiv.io.age, SVPerm.io.age, SVFpu.io.age)
+ 
+  val longStall = Vec(3, Bool())
+
+  val oldestLongIdx = Wire(UInt(2.W))
+  val oldestLongAge = Wire(UInt(4.W))
+  oldestLongIdx := 0.U
+  oldestLongAge := 0.U
+
+  for(i <- 0 until 3){
+    when(longValids(i) && longAges(i) > oldestLongAge){
+      oldestLongIdx := i.U
+      oldestLongAge := longAges(i)
+    }
+  }
+
+  
+
+  for(i <- 0 until 4){
+    when(shortValids(i) /*&& (i != oldestIdx)*/) {
+      shortStall(i) := true.B
+    } 
   }
 
   val oneCycleLatIn = validReg & (bitsReg.uop.ctrl.alu || bitsReg.uop.ctrl.mask)

@@ -23,8 +23,8 @@ class SVRegFileWrapper(implicit p : Parameters) extends Module{
         val rfData = Output(Vec(NVPhyRegs, UInt(VLEN.W)))
     })
 
-    val nVRFReadPorts = 5
-    val nVRFWritePorts = 1
+    val nVRFReadPorts = 4
+    val nVRFWritePorts = 2
   
     val regFile = Module(new SVRegFile(nVRFReadPorts, nVRFWritePorts))
 
@@ -36,23 +36,25 @@ class SVRegFileWrapper(implicit p : Parameters) extends Module{
         writeMask(i) := io.in.writeIn.rfWriteMask((i+1)*VLEN/NLanes/8-1, i*VLEN/NLanes/8)
     }
     
-    regFile.io.write(0).wen   := io.in.writeIn.rfWriteEn
-    regFile.io.write(0).addr  := io.in.writeIn.rfWriteIdx
-    regFile.io.write(0).data  := writeData
-    regFile.io.write(0).wmask := writeMask
+    regFile.io.write(0).wen   := io.in.writeIn.rfWriteEn(0)
+    regFile.io.write(0).addr  := io.in.writeIn.rfWriteIdx(0)
+    regFile.io.write(0).data  := writeData(0)
+    regFile.io.write(0).wmask := writeMask(0)
+    regFile.io.write(1).wen   := io.in.writeIn.rfWriteEn(1)
+    regFile.io.write(1).addr  := io.in.writeIn.rfWriteIdx(1)
+    regFile.io.write(1).data  := writeData(1)
+    regFile.io.write(1).wmask := writeMask(1)
 
     regFile.io.read(0).ren  := io.in.readIn.rfReadEn(0)
     regFile.io.read(1).ren  := io.in.readIn.rfReadEn(1)
     regFile.io.read(2).ren  := io.in.readIn.rfReadEn(2)
-    regFile.io.read(3).ren  := io.in.readIn.rfReadEn(3)
     regFile.io.read(0).addr := io.in.readIn.rfReadIdx(0)
     regFile.io.read(1).addr := io.in.readIn.rfReadIdx(1)
     regFile.io.read(2).addr := io.in.readIn.rfReadIdx(2)
-    regFile.io.read(3).addr := io.in.readIn.rfReadIdx(3)
 
     //permutation need to read register
-    regFile.io.read(4).ren  := io.in.permReadIn.rd_en
-    regFile.io.read(4).addr := io.in.permReadIn.rd_preg_idx
+    regFile.io.read(3).ren  := io.in.permReadIn.rd_en
+    regFile.io.read(3).addr := io.in.permReadIn.rd_preg_idx
     io.permReadOut.rvalid := regFile.io.read(4).ren
     io.permReadOut.rdata := Cat(regFile.io.read(4).data(1), regFile.io.read(4).data(0))
 
@@ -62,19 +64,26 @@ class SVRegFileWrapper(implicit p : Parameters) extends Module{
     regWriteDone := regFile.io.write(0).wen
 
     io.out.writeDone := regWriteDone
-    for (i <- 0 until nVRFReadPorts - 1) {
+    for (i <- 0 until nVRFReadPorts - 2) {
         io.out.readVld(i) := io.in.readIn.rfReadEn(i)
     }
 
     val readDataOut = Wire(Vec(4, UInt(VLEN.W)))
-    for (i <- 0 until nVRFReadPorts - 1) {
+    for (i <- 0 until nVRFReadPorts - 2) {
         readDataOut(i) := Cat(regFile.io.read(i).data(1), regFile.io.read(i).data(0))
     }
+    readDataOut(nVRFReadPorts - 2) := Cat(regFile.io.maskData(1), regFile.io.maskData(0))
 
     // Bypass
-    for (i <- 0 until nVRFReadPorts - 1) {
-        io.out.readData(i) := Mux(io.in.writeIn.rfWriteEn & (io.in.readIn.rfReadIdx(i) === io.in.writeIn.rfWriteIdx), io.in.writeIn.rfWriteData, readDataOut(i))
+    for (i <- 0 until nVRFReadPorts - 2) {
+        io.out.readData(i) := Mux(io.in.writeIn.rfWriteEn & (io.in.readIn.rfReadIdx(i) === io.in.writeIn.rfWriteIdx(0)), io.in.writeIn.rfWriteData(0), 
+                              Mux(io.in.writeIn.rfWriteEn & (io.in.readIn.rfReadIdx(i) === io.in.writeIn.rfWriteIdx(1)), io.in.writeIn.rfWriteData(1),
+                              readDataOut(i)))
     }
+    //mask data
+    io.out.readData(nVRFReadPorts - 2) := Mux(io.in.writeIn.rfWriteEn & (io.in.writeIn.rfWriteIdx(0) === 0.U), io.in.writeIn.rfWriteData(0), 
+                              Mux(io.in.writeIn.rfWriteEn & (io.in.writeIn.rfWriteIdx(1)), io.in.writeIn.rfWriteData(1),
+                              ))
 
     //TODO: This is reserved for verification, delete it later
     io.rfData := regFile.io.rfData

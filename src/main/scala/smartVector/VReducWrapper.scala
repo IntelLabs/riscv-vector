@@ -13,8 +13,9 @@ import darecreek.exu.vfu.reduction
 class VReducWrapper (implicit p : Parameters) extends Module {
 
   val io = IO(new Bundle {
-    val in = Input(ValidIO(new VFuInput))
+    val in = Flipped(DecoupledIO(new VFuInput))
     val out = ValidIO(new VAluOutput)
+    val age     = Output(UInt(4.W))
   })
 
   val vReduc = Module(new reduction.Reduction)

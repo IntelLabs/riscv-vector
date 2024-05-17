@@ -14,6 +14,7 @@ class VSFPUWrapper (implicit p : Parameters) extends VFuModule {
   val io = IO(new Bundle {
     val in  = Flipped(DecoupledIO(new VFuInput))
     val out = ValidIO(new VFpuOutput)
+    val age = Output(UInt(4.W))
   })
 
   val vFPu = Module(new fp.VFPUWrapper)

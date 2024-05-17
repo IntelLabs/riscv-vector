@@ -12,8 +12,9 @@ import firrtl.Utils
 class VAluWrapper (implicit p : Parameters) extends VFuModule {
 
   val io = IO(new Bundle {
-    val in      = Input(ValidIO(new VFuInput))
+    val in      = Flipped(DecoupledIO(new VFuInput))
     val out     = ValidIO(new VAluOutput)
+    val age     = Output(UInt(4.W))
   })
 
   val vAlu = Module(new VAlu)

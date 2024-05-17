@@ -17,6 +17,7 @@ class VPermWrapper (implicit p : Parameters) extends Module {
     val in = Input(new VPermInput)
     val redirect = Input(ValidIO(new Redirect))
     val out = Output(new VPermOutput)
+    val age = Output(UInt(4.W))
   })
 
   val vPerm = Module(new Permutation)

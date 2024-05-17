@@ -82,6 +82,7 @@ class VFuInput(implicit p: Parameters) extends VFuBundle {
 class VAluOutput extends Bundle {
   val vd = UInt(128.W)
   val vxsat = Bool()
+  val instIdx = UInt(4.W)
 }
 // class VFpuOutput extends Bundle {
 //   val vd = UInt(128.W)

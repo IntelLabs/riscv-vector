@@ -81,6 +81,7 @@ class VUop(implicit p: Parameters) extends Bundle {
   val uopEnd    = Bool()
   // Temp: system uop
   val sysUop    = new MicroOp
+  val instIdx   = UInt(4.W)
 }
 
 class UopRegInfo(implicit p : Parameters) extends Bundle {
@@ -180,8 +181,8 @@ class Vsplit(implicit p : Parameters) extends Module {
     //ALU will judge whether use the data, do not worry to send the wrong data 
     uopRegInfo(0).vs1       := Mux(io.in.regFileIn.readVld(0), io.in.regFileIn.readData(0), uopRegInfo(0).vs1)
     uopRegInfo(0).vs2       := Mux(io.in.regFileIn.readVld(1), io.in.regFileIn.readData(1), uopRegInfo(0).vs2)
-    uopRegInfo(0).mask      := Mux(io.in.regFileIn.readVld(2), io.in.regFileIn.readData(2), uopRegInfo(0).mask)
-    uopRegInfo(0).old_vd    := Mux(io.in.regFileIn.readVld(3), io.in.regFileIn.readData(3), uopRegInfo(0).old_vd)
+    uopRegInfo(0).old_vd    := Mux(io.in.regFileIn.readVld(2), io.in.regFileIn.readData(2), uopRegInfo(0).old_vd)
+    uopRegInfo(0).mask      := Mux(io.in.regFileIn.readVld(3), io.in.regFileIn.readData(3), uopRegInfo(0).mask)
 
     val ctrl = Mux(instFirstIn, io.in.decodeIn.bits.vCtrl,vCtrl(0))
     val info = Mux(instFirstIn, io.in.decodeIn.bits.vInfo,vInfo(0))
@@ -194,8 +195,8 @@ class Vsplit(implicit p : Parameters) extends Module {
     //Because the register file do not always read the register file when instFirstIn
     val vs1     = Mux(io.in.regFileIn.readVld(0), io.in.regFileIn.readData(0), uopRegInfo(0).vs1)
     val vs2     = Mux(io.in.regFileIn.readVld(1), io.in.regFileIn.readData(1), uopRegInfo(0).vs2)
-    val mask    = Mux(io.in.regFileIn.readVld(2), io.in.regFileIn.readData(2), uopRegInfo(0).mask)
-    val old_vd  = Mux(io.in.regFileIn.readVld(3), io.in.regFileIn.readData(3), uopRegInfo(0).old_vd)
+    val old_vd  = Mux(io.in.regFileIn.readVld(2), io.in.regFileIn.readData(2), uopRegInfo(0).old_vd)
+    val mask    = Mux(io.in.regFileIn.readVld(3), io.in.regFileIn.readData(3), uopRegInfo(0).mask)
     val v_ext_out = ctrl.alu && ctrl.funct3 === "b010".U && ctrl.funct6 === "b010010".U 
   
     val isfloat = !ctrl.isLdst && (ctrl.funct3 === "b101".U || ctrl.funct3 === "b001".U)
@@ -482,12 +483,10 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     io.out.toRegFileRead.rfReadEn(0)      := io.out.mUop.valid && ctrl.lsrcVal(0)
     io.out.toRegFileRead.rfReadEn(1)      := io.out.mUop.valid && ctrl.lsrcVal(1)
-    io.out.toRegFileRead.rfReadEn(2)      := io.out.mUop.valid && ~ctrl.vm
-    io.out.toRegFileRead.rfReadEn(3)      := io.out.mUop.valid && (ctrl.ldestVal || ctrl.store)
+    io.out.toRegFileRead.rfReadEn(2)      := io.out.mUop.valid && (ctrl.ldestVal || ctrl.store)
     io.out.toRegFileRead.rfReadIdx(0)     := ctrl.lsrc(0) + lsrc0_inc
     io.out.toRegFileRead.rfReadIdx(1)     := ctrl.lsrc(1) + lsrc1_inc
-    io.out.toRegFileRead.rfReadIdx(2)     := 0.U
-    io.out.toRegFileRead.rfReadIdx(3)     := ctrl.ldest + ldest_inc
+    io.out.toRegFileRead.rfReadIdx(2)     := ctrl.ldest + ldest_inc
 
     io.scoreBoardSetIO.setEn      := RegNext(io.out.mUop.valid && ctrl.ldestVal && (~ctrl.perm || ~(ldstCtrl.segment && segmentRegNotFirstElem)))
     io.scoreBoardSetIO.setMultiEn := RegNext(io.out.mUop.valid && ctrl.ldestVal && ctrl.perm)

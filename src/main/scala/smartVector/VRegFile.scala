@@ -28,6 +28,7 @@ class subVRegFile(numRead: Int, numWrite: Int, regLen: Int) extends Module {
   val io = IO(new Bundle {
     val read   = Vec(numRead, new subVRFReadPort(regLen))
     val write  = Vec(numWrite, new subVRFWritePort(regLen))
+    val maskData = Output(UInt(regLen.W))
     //TODO: This is reserved for verification, delete it later
     val rfData = Output(Vec(NVPhyRegs, UInt((VLEN/NLanes).W)))
   })
@@ -50,6 +51,7 @@ class subVRegFile(numRead: Int, numWrite: Int, regLen: Int) extends Module {
   for(i <- 0 until NVPhyRegs){
     io.rfData(i) := rf(i).asUInt
   }
+  io.maskData := rf(0).asUInt
 }
 
 class VRFReadPort(regLen: Int) extends Bundle {
@@ -72,6 +74,7 @@ class SVRegFile(numRead: Int, numWrite: Int) extends Module {
   val io = IO(new Bundle {
     val read  = Vec(numRead,  new VRFReadPort(LaneWidth))
     val write = Vec(numWrite, new VRFWritePort(LaneWidth))
+    val maskData = Output(UInt(regLen.W))
     //TODO: This is reserved for verification, delete it later
     val rfData = Output(Vec(NVPhyRegs, UInt(VLEN.W)))
   })
@@ -89,6 +92,7 @@ class SVRegFile(numRead: Int, numWrite: Int) extends Module {
       subRFs(laneIdx).io.write(i).addr  := io.write(i).addr
       subRFs(laneIdx).io.write(i).data  := io.write(i).data(laneIdx)
     }
+    io.maskData := subRFs(laneIdx).io.maskData
   }
 
   //TODO: This is reserved for verification, delete it later

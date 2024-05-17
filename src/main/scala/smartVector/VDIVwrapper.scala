@@ -15,6 +15,7 @@ class VDivWrapper (implicit p : Parameters) extends Module {
   val io = IO(new Bundle {
     val in  = Flipped(Decoupled((new VFuInput)))
     val out = ValidIO(new VFpuOutput)
+    val age = Output(UInt(4.W))
   })
 
   val vDiv = Module(new VDiv)
