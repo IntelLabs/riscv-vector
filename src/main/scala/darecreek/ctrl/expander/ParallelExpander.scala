@@ -99,12 +99,10 @@ class ParallelExpander extends Module {
       expdLen(i) := Mux(ldstCtrl(i).segment, expdLen_seg, expdLen_ldst) 
     }.elsewhen ((ldstCtrl(i).mask && ctrl(i).isLdst) || perm_vmv_vfmv || mask_onlyOneReg) {
       expdLen(i) := 1.U
-    }.elsewhen (ctrl(i).widen && !ctrl(i).redu || ctrl(i).widen2 || ctrl(i).narrow) {
+    }.elsewhen (ctrl(i).widen && !ctrl(i).redu || ctrl(i).widen2 || ctrl(i).narrow || gather16 && info(i).vsew === 0.U) {
       expdLen(i) := Mux(info(i).vlmul(2), 1.U, lmul(i) << 1)  // If lmul < 1, expdLen = 1 for widen/narrow
     }.elsewhen (ctrl(i).funct6 === "b100111".U && ctrl(i).funct3 === "b011".U) {//Whole register move
       expdLen(i) := ctrl(i).lsrc(0)(2, 0) +& 1.U
-    }.elsewhen (gather16 && info(i).vsew === 0.U) {
-      expdLen(i) := lmul(i) << 1
     }.otherwise {
       expdLen(i) := lmul(i)
     }
@@ -207,7 +205,7 @@ class ParallelExpander extends Module {
     
     // out lsrc(1), which is vs2
     val lsrc1_inc = Wire(UInt(3.W))
-    when (ctrl.widen && !ctrl.redu || v_ext_out(i) && ctrl.lsrc(0)(2,1) === 3.U) {
+    when (ctrl.widen && !ctrl.redu || v_ext_out(i) && ctrl.lsrc(0)(2,1) === 3.U || gather16 && sew.is8) {
       lsrc1_inc := expdIdx(i) >> 1
     }.elsewhen (v_ext_out(i) && ctrl.lsrc(0)(2,1) === 2.U) {
       lsrc1_inc := expdIdx(i) >> 2
@@ -240,16 +238,18 @@ class ParallelExpander extends Module {
       sew.is64 -> Cat(lmul, 0.U((log2Up(vlenb) -3).W)),
     ))
     val maskNeedOldVd = !ctrl.vm && !info.ma
-    val perm_vmvnrr = ctrl.perm && ctrl.funct6 === "b100111".U
-    val perm_vmvsx_vfmvsf = ctrl.perm && ctrl.funct6 === "b010000".U && ctrl.vx
+    val wholeRegMv = ctrl.funct6 === "b100111".U && ctrl.funct3 === "b011".U //Whole register move
+    val perm_vmvsx_vfmvsf = ctrl.funct6 === "b010000".U && (ctrl.funct3 === "b101".U || ctrl.funct3 === "b110".U)
     //vslideup: !!!! Lack of judgement of whether offset != 0, but rs1 is not visible here so far, and immediate of offset 0 seems meaningless
     val slideUpOffset = ctrl.funct6 === "b001110".U && (ctrl.funct3(0) === ctrl.funct3(1) && ctrl.funct3(1) =/= ctrl.funct3(2))
     val vcompress = ctrl.funct6 === "b010111".U && ctrl.funct3 === "b010".U
                                                     // mask   excludes viota/vid
     val mask_onlyOneReg = ctrl.mask && !(ctrl.funct6(3, 2) === "b01".U && ctrl.lsrc(0)(4))
     val tailIsAgnostic = ctrl.narrow_to_1 || mask_onlyOneReg || (ldstCtrlReg(i).mask && ctrl.isLdst)
-    val noTail = info.vl === vlMax && !ctrl.redu && !perm_vmvsx_vfmvsf && !vcompress || perm_vmvnrr || (ldstCtrlReg(i).wholeReg && ctrl.isLdst)
-    val tailNeedOldVd = !(info.ta || tailIsAgnostic || noTail)
+    val noTail = info.vl === vlMax && !ctrl.redu && !perm_vmvsx_vfmvsf && !vcompress || wholeRegMv || (ldstCtrlReg(i).wholeReg && ctrl.isLdst)
+    // Todo: this signal (thereMayBeTail) is temp! Need to be optimized off.
+    val thereMayBeTail = ctrl.isLdst && veew_minus_vsew(i) =/= 0.U && !ldstCtrlReg(i).wholeReg
+    val tailNeedOldVd = !(info.ta || tailIsAgnostic || noTail && !thereMayBeTail)
     val noWriteback = ctrl.store || ctrl.rdVal
     val needOldVd = (maskNeedOldVd || tailNeedOldVd || info.vstart =/= 0.U || slideUpOffset) && !noWriteback || info.vstart_gte_vl
 
@@ -269,7 +269,7 @@ class ParallelExpander extends Module {
     val ldest_inc = Wire(UInt(3.W))
     when (ldstCtrlReg(i).indexed && ctrl.isLdst) {
       ldest_inc := sewSide_inc
-    }.elsewhen (ctrl.narrow) {
+    }.elsewhen (ctrl.narrow || gather16 && sew.is8) {
       ldest_inc := expdIdx(i) >> 1
     }.elsewhen (ctrl.redu || ctrl.narrow_to_1) {
       ldest_inc := 0.U
@@ -284,7 +284,7 @@ class ParallelExpander extends Module {
       io.out(i).bits.ldestValExpd := sewSide_valid
     }.elsewhen (ctrl.narrow_to_1 || ctrl.redu) {
       io.out(i).bits.ldestValExpd := expdIdx(i) === io.out(i).bits.expdLen - 1.U
-    }.elsewhen (ctrl.narrow) {
+    }.elsewhen (ctrl.narrow || gather16 && sew.is8) {
       io.out(i).bits.ldestValExpd := expdIdx(i)(0) || io.out(i).bits.expdLen === 1.U
     }.otherwise {
       io.out(i).bits.ldestValExpd := ctrl.ldestVal
