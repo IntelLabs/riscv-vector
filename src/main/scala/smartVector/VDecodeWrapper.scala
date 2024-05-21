@@ -83,8 +83,8 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   vIllegalInstrn.io.extraInfo_for_VIllegal := infoCalc.io.extraInfo_for_VIllegal
   vIllegalInstrn.io.robPtrIn := 0.U.asTypeOf(new VRobPtr)
 
-  val VrgatherEi16VV = decode.io.out.funct3 === "b000".U && decode.io.out.funct6 === "001110".U
-  val vrgather16Illegal = VrgatherEi16VV && io.in.bits.vInfo.vlmul === "011".U && io.in.bits.vInfo.vsew === "00".U
+  val VrgatherEi16VV = decode.io.out.funct3 === "b000".U && decode.io.out.funct6 === "b001110".U
+  val vrgather16Illegal = VrgatherEi16VV && io.in.bits.vInfo.vlmul === "b011".U && io.in.bits.vInfo.vsew === "b00".U
 
   io.out.bits.vCtrl.illegal := vIllegalInstrn.io.ill.valid || vrgather16Illegal
 
