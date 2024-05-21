@@ -359,7 +359,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     val sameLdest = Wire(Bool())
     when(ldstCtrl.segment && segmentRegNotFirstElem) {
         sameLdest := true.B
-    }.elsewhen(ldstCtrl.indexed && ldest_inc === ldest_inc_last){
+    }.elsewhen(ldest_inc === ldest_inc_last){
         sameLdest := true.B
     }.otherwise{
         sameLdest := false.B
@@ -561,7 +561,7 @@ class Vsplit(implicit p : Parameters) extends Module {
         io.in.decodeIn.ready := true.B
     }
 
-    io.excpInfo.exception_vld := io.vLSUXcpt.exception_vld || ctrl.illegal
+    io.excpInfo.exception_vld := io.vLSUXcpt.exception_vld || (ctrl.illegal & instFirstIn)
     io.excpInfo.illegalInst   := ctrl.illegal
     io.excpInfo.update_vl     := io.vLSUXcpt.update_vl
     io.excpInfo.update_data   := io.vLSUXcpt.update_data
