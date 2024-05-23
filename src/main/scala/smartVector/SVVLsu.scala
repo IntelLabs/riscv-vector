@@ -116,7 +116,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
     // *          v0(i) = 1 => not masked
     // *          v0(i) = 0 => masked
     val isMasked = Mux(ldstCtrl.vm, false.B, !mUopInfo.mask(curVl))
-    canEnqueue  := validLdstSegReq && !isMasked && curVl >= vstart && curVl < vl
+    canEnqueue  := validLdstSegReq && !(isMasked && !uopEnd) && curVl >= vstart && curVl < vl
     
     val misalignXcpt        = 0.U.asTypeOf(new LdstXcpt)
     misalignXcpt.xcptValid := addrMisalign
@@ -124,8 +124,9 @@ class SVVLsu(implicit p: Parameters) extends Module {
 
     when (canEnqueue) {
         ldstUopQueue(ldstEnqPtr).valid                  := true.B
-        ldstUopQueue(ldstEnqPtr).status                 := Mux(addrMisalign, LdstUopStatus.ready, LdstUopStatus.notReady)
+        ldstUopQueue(ldstEnqPtr).status                 := Mux(addrMisalign || isMasked, LdstUopStatus.ready, LdstUopStatus.notReady)
         ldstUopQueue(ldstEnqPtr).memOp                  := ldstCtrl.isStore
+        ldstUopQueue(ldstEnqPtr).masked                 := isMasked
         ldstUopQueue(ldstEnqPtr).addr                   := addr
         ldstUopQueue(ldstEnqPtr).pos                    := curVl
         ldstUopQueue(ldstEnqPtr).size                   := ldstCtrl.log2Memwb
@@ -146,8 +147,8 @@ class SVVLsu(implicit p: Parameters) extends Module {
     // * BEGIN
     // * Issue LdstUop
     val (respLdstPtr, respData) = (io.dataExchange.resp.bits.idx(3, 0), io.dataExchange.resp.bits.data)
-
-    val isNoXcptUop = ldstUopQueue(issueLdstPtr).valid & (~ldstUopQueue(issueLdstPtr).commitInfo.xcpt.xcptValid)
+    val issueLdstUop = ldstUopQueue(issueLdstPtr)
+    val isNoXcptUop = issueLdstUop.valid & (~issueLdstUop.commitInfo.xcpt.xcptValid & (~issueLdstUop.masked))
     
     // nack index smaller than issuePtr can replay
     val issue2CommitDist = Mux(issueLdstPtr >= commitPtr, issueLdstPtr - commitPtr, issueLdstPtr + vLdstUopQueueSize.U - commitPtr)
@@ -162,9 +163,9 @@ class SVVLsu(implicit p: Parameters) extends Module {
 
     // TODO: store waiting resp
     when (isNoXcptUop) {
-        val data    = ldstUopQueue(issueLdstPtr).data
-        val dataSz  = (1.U << ldstUopQueue(issueLdstPtr).size)
-        val offset  = AddrUtil.getAlignedOffset(ldstUopQueue(issueLdstPtr).addr)
+        val data    = issueLdstUop.data
+        val dataSz  = (1.U << issueLdstUop.size)
+        val offset  = AddrUtil.getAlignedOffset(issueLdstUop.addr)
 
         val wData = data << (offset << 3.U)
         val wMask = VecInit(Seq.fill(8)(0.U(1.W)))
@@ -174,9 +175,9 @@ class SVVLsu(implicit p: Parameters) extends Module {
             wMask(i) := Mux(i.U >= offset && i.U < offset + dataSz, 1.U, 0.U)
         }
 
-        val memOp = ldstUopQueue(issueLdstPtr).memOp
+        val memOp = issueLdstUop.memOp
         io.dataExchange.req.valid       := true.B
-        io.dataExchange.req.bits.addr   := AddrUtil.getAlignedAddr(ldstUopQueue(issueLdstPtr).addr)
+        io.dataExchange.req.bits.addr   := AddrUtil.getAlignedAddr(issueLdstUop.addr)
         io.dataExchange.req.bits.cmd    := memOp
         io.dataExchange.req.bits.idx    := (1 << 4).U | issueLdstPtr // to figure out hlsu or vlsu
         io.dataExchange.req.bits.data   := Mux(memOp, wData, DontCare)
@@ -216,8 +217,9 @@ class SVVLsu(implicit p: Parameters) extends Module {
 
     // * BEGIN
     // * Commit
-    val canCommit  = ldstUopQueue(commitPtr).valid && ldstUopQueue(commitPtr).status === LdstUopStatus.ready
-    val commitXcpt = canCommit && ldstUopQueue(commitPtr).commitInfo.xcpt.xcptValid
+    val canCommit    = ldstUopQueue(commitPtr).valid && ldstUopQueue(commitPtr).status === LdstUopStatus.ready
+    val commitXcpt   = canCommit && ldstUopQueue(commitPtr).commitInfo.xcpt.xcptValid
+    val commitMasked = canCommit && ldstUopQueue(commitPtr).masked
     
 
     when (canCommit) {
@@ -230,7 +232,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
         val wMask       = VecInit(Seq.fill(vlenb)(0.U(1.W)))
 
         for (i <- 0 until vlenb) {
-            wMask(i) := ~(i.U >= (destElem << log2DataSz) && i.U < (destElem << log2DataSz) + dataSz)
+            wMask(i) := ~(i.U >= (destElem << log2DataSz) && i.U < (destElem << log2DataSz) + dataSz) & ~commitMasked
         }
 
         io.lsuOut.valid             := true.B

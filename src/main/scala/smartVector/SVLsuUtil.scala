@@ -123,6 +123,7 @@ class SegLdstUop extends Bundle {
     val valid       = Bool()
     val status      = UInt(1.W)                     // ready to commit?
     val memOp       = Bool()                        // load or store
+    val masked      = Bool()                        // masked load
     val size        = UInt(log2Ceil(dataWidth/8).W) // element size
     val addr        = UInt(addrWidth.W)             
     val pos         = UInt(bVL.W)                   // position in vl
