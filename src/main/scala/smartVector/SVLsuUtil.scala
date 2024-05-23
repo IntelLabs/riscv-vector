@@ -79,7 +79,35 @@ class CommitInfoRecorded extends Bundle {
     val rfWriteEn   = Bool()
     val rfWriteIdx  = UInt(5.W)
     val isFof       = Bool()
-    val xcpt        = new HellaCacheExceptions()
+    val xcpt        = new LdstXcpt()
+}
+
+class LdstXcpt extends Bundle {
+    val xcptValid  = Bool()
+    val ma         = Bool()
+    val pf         = Bool()
+    val ae         = Bool()
+    val gf         = Bool()
+
+    def generateHellaXcpt(isStore: Bool): HellaCacheExceptions = {
+        val xcpt = Wire(new HellaCacheExceptions)
+        xcpt.ma.ld := ma & !isStore
+        xcpt.ma.st := ma &  isStore
+        xcpt.pf.ld := pf & !isStore
+        xcpt.pf.st := pf &  isStore
+        xcpt.ae.ld := ae & !isStore
+        xcpt.ae.st := ae &  isStore
+        xcpt.gf.ld := gf & !isStore
+        xcpt.gf.st := gf &  isStore
+        xcpt
+    }
+
+    def fromHellaXcpt(xcpt: HellaCacheExceptions): Unit = {
+        ma := xcpt.ma.ld | xcpt.ma.st
+        pf := xcpt.pf.ld | xcpt.pf.st
+        ae := xcpt.ae.ld | xcpt.ae.st
+        gf := xcpt.gf.ld | xcpt.gf.st
+    }
 }
 
 class LdstUop extends Bundle {
@@ -88,16 +116,16 @@ class LdstUop extends Bundle {
     val memOp       = Bool()                        // load or store
     val addr        = UInt(addrWidth.W)
     val pos         = UInt(bVL.W)                   // position in vl
-    val xcpt        = new HellaCacheExceptions()
+    val xcpt        = new LdstXcpt()
 }
 
 class SegLdstUop extends Bundle {
     val valid       = Bool()
     val status      = UInt(1.W)                     // ready to commit?
     val memOp       = Bool()                        // load or store
+    val masked      = Bool()                        // masked load
     val size        = UInt(log2Ceil(dataWidth/8).W) // element size
     val addr        = UInt(addrWidth.W)             
-    val offset      = UInt(log2Ceil(dataWidth/8).W) // offset in byte
     val pos         = UInt(bVL.W)                   // position in vl
     val destElem    = UInt(bVL.W)                   // data position in vreg
     val data        = UInt(dataWidth.W)
@@ -216,5 +244,22 @@ object LSULdstDecoder {
         ctrl.log2MinLen := ctrl.log2Elen min ctrl.log2Mlen
         
         ctrl
+    }
+}
+
+object AddrUtil {
+    val addrOffsetHighIdx = log2Ceil(dataWidth/8) - 1
+
+    def isAddrMisalign(addr: UInt, size: UInt): Bool = {
+        val mask = (1.U << size) - 1.U
+        (addr & mask) =/= 0.U
+    }
+
+    def getAlignedAddr(addr: UInt): UInt = {
+        Cat(addr(addrWidth-1, addrOffsetHighIdx+1), 0.U((addrOffsetHighIdx+1).W))
+    }
+
+    def getAlignedOffset(addr: UInt): UInt = {
+        addr(addrOffsetHighIdx, 0)
     }
 }

@@ -280,7 +280,7 @@ trait VLsuBehavior_ld {
     }
 
     def vLsuTest7(): Unit = {
-        it should "pass: unit-strde fault-first-only (uops=1, eew=8, vl=19, vstart=1)" in {
+        it should "pass: unit-stride fault-only-first (uops=1, eew=8, vl=19, vstart=1)" in {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             dut.clock.step(1)
             val ldReqs = Seq(
@@ -314,7 +314,7 @@ trait VLsuBehavior_ld {
     }
 
     def vLsuTest8(): Unit = {
-        it should "pass: unit-strde fault-first-only (uops=1, eew=16, vl=4, vstart=0)" in {
+        it should "pass: unit-stride fault-only-first (uops=1, eew=16, vl=4, vstart=0)" in {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             dut.clock.step(1)
             val ldReqs = Seq(
@@ -348,7 +348,7 @@ trait VLsuBehavior_ld {
     }
 
     def vLsuTest9(): Unit = {
-        it should "pass: unit-strde fault-first-only (uops=1, eew=32, vl=7, vstart=0)" in {
+        it should "pass: unit-stride fault-only-first (uops=1, eew=32, vl=7, vstart=0)" in {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             dut.clock.step(1)
             val ldReqs = Seq(
@@ -382,7 +382,7 @@ trait VLsuBehavior_ld {
     }
 
     def vLsuTest10(): Unit = {
-        it should "pass: unit-strde fault-first-only (uops=1, eew=64, vl=3, vstart=0)" in {
+        it should "pass: unit-stride fault-only-first (uops=1, eew=64, vl=3, vstart=0)" in {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             dut.clock.step(1)
             val ldReqs = Seq(
@@ -619,7 +619,7 @@ trait VLsuBehavior_ld {
     }
 
     def vLsuTest17(): Unit = {
-        it should "pass: unit-strde exception" in {
+        it should "pass: unit-stride exception" in {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut => 
             dut.clock.step(1)
             val ldReqs = Seq(
@@ -651,7 +651,7 @@ trait VLsuBehavior_ld {
     }
 
     def vLsuTest18(): Unit = {
-        it should "pass: unit-strde whole register load" in {
+        it should "pass: unit-stride whole register load" in {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut => 
             dut.clock.step(1)
             val ldReqs = Seq(
@@ -722,10 +722,10 @@ class VLsuSpec_ld extends AnyFlatSpec with ChiselScalatestTester with BundleGenH
     it should behave like vLsuTest4()   // unit-stride load
     it should behave like vLsuTest5()   // unit-stride load
     it should behave like vLsuTest6()   // unit-stride mask load
-    it should behave like vLsuTest7()   // unit-strde fault-first-only
-    it should behave like vLsuTest8()   // unit-strde fault-first-only
-    it should behave like vLsuTest9()   // unit-strde fault-first-only
-    it should behave like vLsuTest10()  // unit-strde fault-first-only
+    it should behave like vLsuTest7()   // unit-stride fault-only-first
+    it should behave like vLsuTest8()   // unit-stride fault-only-first
+    it should behave like vLsuTest9()   // unit-stride fault-only-first
+    it should behave like vLsuTest10()  // unit-stride fault-only-first
     it should behave like vLsuTest11()  // strided load
     it should behave like vLsuTest12()  // strided load
     it should behave like vLsuTest13()  // strided load

@@ -447,7 +447,7 @@ trait VLsuBehavior_st {
     }
 
     def vLsuTest11(): Unit = {
-        it should "pass: unit-strde store exception" in {
+        it should "pass: unit-stride store exception" in {
         test(new SmartVectorLsuTestWrapper(false)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             dut.clock.setTimeout(1000)
             dut.clock.step(1)

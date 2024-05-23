@@ -35,6 +35,9 @@ trait SmartVectorBehavior_ld_seg {
 
     def VLOXSEG2EI16_V  = "b001_001_1_01000_00001_101_10000_0000111"
 
+    def VLM_V = "b000_000_1_01011_00001_000_00000_0000111" // vlm v0, 0(x1)
+    def VLSEG8E8_V_MASK = "b111_000_0_00000_00001_000_01000_0000111"
+
     def vLsuTest0(): Unit = {
         it should "pass: unit-stride segment load (eew=8, vl=16, vstart=0, segment=2)" in {
         test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
@@ -342,7 +345,45 @@ trait SmartVectorBehavior_ld_seg {
         }
         }
     }
+    def vLsuTest9(): Unit = {
+        it should "pass: unit-stride segment mask load (eew=8, vl=16, vstart=0, segment=8)" in {
+        test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            dut.clock.setTimeout(1000)
+            dut.clock.step(1)
+            val ldReqs = Seq(
+                (CtrlBundle(instrn=VLM_V, vlmul=0, vsew=0, vl=8), SrcBundleLdst(rs1="h1028")),
+                (CtrlBundle(instrn=VLSEG8E8_V_MASK, vlmul=0, vsew=0, vl=2), SrcBundleLdst(rs1="h0fe0")),
+            )
+            dut.io.rvuIssue.valid.poke(true.B)
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(0)._1, ldReqs(0)._2))
+            dut.clock.step(1)
+            dut.io.rvuIssue.valid.poke(false.B)
 
+            while (!dut.io.rvuCommit.commit_vld.peekBoolean()) {
+                dut.clock.step(1)
+            }
+            dut.io.rvuCommit.commit_vld.expect(true.B)
+            dut.clock.step(1)
+            dut.io.rfData(0).expect("h01".U)
+
+
+            dut.io.rvuIssue.valid.poke(true.B)
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(1)._1, ldReqs(1)._2))
+            dut.clock.step(1)
+            dut.io.rvuIssue.valid.poke(false.B)
+
+            while (!dut.io.rvuCommit.commit_vld.peekBoolean()) {
+                dut.clock.step(1)
+            }
+            dut.io.rvuCommit.commit_vld.expect(true.B)
+
+            dut.io.rfData( 8).expect("h20".U)
+            dut.io.rfData(15).expect("h20".U)
+
+            dut.clock.step(1)
+        }
+        }
+    }
 }
 
 class VPULdSpec_seg extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with SmartVectorBehavior_ld_seg {
@@ -356,4 +397,5 @@ class VPULdSpec_seg extends AnyFlatSpec with ChiselScalatestTester with BundleGe
     it should behave like vLsuTest6()   //
     it should behave like vLsuTest7()   //
     it should behave like vLsuTest8()   //
+    it should behave like vLsuTest9()   //
 }
