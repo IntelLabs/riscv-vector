@@ -211,10 +211,9 @@ class SVHLsu(implicit p: Parameters) extends Module {
         ))
     }
 
-    addrMask     := (("h1".asUInt(addrWidth.W) << ldstCtrlReg.log2Memwb) - 1.U)
-    addrMisalign := (addr & addrMask).orR  // align addr to memwb ?
-    alignedAddr  := (addr >> (log2Ceil(dataWidth / 8)).U) << (log2Ceil(dataWidth / 8)).U // align addr to 64 bits
-    offset       := addr - alignedAddr 
+    addrMisalign := AddrUtil.isAddrMisalign(addr, ldstCtrlReg.log2Memwb)
+    alignedAddr  := AddrUtil.getAlignedAddr(addr)
+    offset       := AddrUtil.getAlignedOffset(addr)
 
     val startElemPos  = (curVl - ((curVl >> ldstCtrlReg.log2Mlen) << ldstCtrlReg.log2Mlen)) 
     val startVRegIdx  = startElemPos << ldstCtrlReg.log2Memwb

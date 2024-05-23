@@ -125,7 +125,6 @@ class SegLdstUop extends Bundle {
     val memOp       = Bool()                        // load or store
     val size        = UInt(log2Ceil(dataWidth/8).W) // element size
     val addr        = UInt(addrWidth.W)             
-    val offset      = UInt(log2Ceil(dataWidth/8).W) // offset in byte
     val pos         = UInt(bVL.W)                   // position in vl
     val destElem    = UInt(bVL.W)                   // data position in vreg
     val data        = UInt(dataWidth.W)
@@ -244,5 +243,22 @@ object LSULdstDecoder {
         ctrl.log2MinLen := ctrl.log2Elen min ctrl.log2Mlen
         
         ctrl
+    }
+}
+
+object AddrUtil {
+    val addrOffsetHighIdx = log2Ceil(dataWidth/8) - 1
+
+    def isAddrMisalign(addr: UInt, size: UInt): Bool = {
+        val mask = (1.U << size) - 1.U
+        (addr & mask) =/= 0.U
+    }
+
+    def getAlignedAddr(addr: UInt): UInt = {
+        Cat(addr(addrWidth-1, addrOffsetHighIdx+1), 0.U((addrOffsetHighIdx+1).W))
+    }
+
+    def getAlignedOffset(addr: UInt): UInt = {
+        addr(addrOffsetHighIdx, 0)
     }
 }

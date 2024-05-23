@@ -43,9 +43,6 @@ class SVVLsu(implicit p: Parameters) extends Module {
     // * BEGIN
     // * Calculate Addr
     val addr        = WireInit(0.U(addrWidth.W))
-    val addrMask    = WireInit(0.U(addrWidth.W))
-    val alignedAddr = WireInit(0.U(addrWidth.W))
-    val offset      = WireInit(0.U(log2Ceil(addrWidth / 8).W))
 
     val curVl       = uopIdx
     val baseAddr    = mUopInfo.rs1Val
@@ -99,12 +96,8 @@ class SVVLsu(implicit p: Parameters) extends Module {
     }.otherwise {
         addr := 0.U
     }
-
-    addrMask     := (("h1".asUInt(addrWidth.W) << ldstCtrl.log2Memwb) - 1.U)
-    alignedAddr  := (addr >> (log2Ceil(dataWidth / 8)).U) << (log2Ceil(dataWidth / 8)).U // align addr to 64 bits
-    offset       := addr - alignedAddr
-   
-    val addrMisalign = (addr & addrMask).orR  // align addr to memwb ?
+ 
+    val addrMisalign = AddrUtil.isAddrMisalign(addr, ldstCtrl.log2Memwb)
     
     // * Calculate Addr
     // * END
@@ -133,9 +126,8 @@ class SVVLsu(implicit p: Parameters) extends Module {
         ldstUopQueue(ldstEnqPtr).valid                  := true.B
         ldstUopQueue(ldstEnqPtr).status                 := Mux(addrMisalign, LdstUopStatus.ready, LdstUopStatus.notReady)
         ldstUopQueue(ldstEnqPtr).memOp                  := ldstCtrl.isStore
-        ldstUopQueue(ldstEnqPtr).addr                   := alignedAddr
+        ldstUopQueue(ldstEnqPtr).addr                   := addr
         ldstUopQueue(ldstEnqPtr).pos                    := curVl
-        ldstUopQueue(ldstEnqPtr).offset                 := offset
         ldstUopQueue(ldstEnqPtr).size                   := ldstCtrl.log2Memwb
         ldstUopQueue(ldstEnqPtr).destElem               := destElem
         ldstUopQueue(ldstEnqPtr).data                   := Mux(ldstCtrl.isStore, destData, ldstUopQueue(ldstEnqPtr).data)
@@ -172,7 +164,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
     when (isNoXcptUop) {
         val data    = ldstUopQueue(issueLdstPtr).data
         val dataSz  = (1.U << ldstUopQueue(issueLdstPtr).size)
-        val offset  = ldstUopQueue(issueLdstPtr).offset
+        val offset  = AddrUtil.getAlignedOffset(ldstUopQueue(issueLdstPtr).addr)
 
         val wData = data << (offset << 3.U)
         val wMask = VecInit(Seq.fill(8)(0.U(1.W)))
@@ -184,7 +176,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
 
         val memOp = ldstUopQueue(issueLdstPtr).memOp
         io.dataExchange.req.valid       := true.B
-        io.dataExchange.req.bits.addr   := ldstUopQueue(issueLdstPtr).addr
+        io.dataExchange.req.bits.addr   := AddrUtil.getAlignedAddr(ldstUopQueue(issueLdstPtr).addr)
         io.dataExchange.req.bits.cmd    := memOp
         io.dataExchange.req.bits.idx    := (1 << 4).U | issueLdstPtr // to figure out hlsu or vlsu
         io.dataExchange.req.bits.data   := Mux(memOp, wData, DontCare)
@@ -208,7 +200,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
 
         val dataSz = (1.U << ldstUopQueue(respLdstPtr).size)
         val ldData = WireInit(0.U(64.W))
-        val offset = ldstUopQueue(respLdstPtr).offset
+        val offset = AddrUtil.getAlignedOffset(ldstUopQueue(respLdstPtr).addr)
         // ldData := io.dataExchange.resp.bits.data((offset + dataSz) << 3.U - 1.U, offset << 3.U)
         ldData := (respData >> (offset << 3.U)) & ((1.U << (dataSz << 3.U)) - 1.U)
 
@@ -267,7 +259,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
         io.lsuOut.bits.xcpt.xcpt_cause    := Mux(fofValid, 0.U.asTypeOf(new HellaCacheExceptions), hellaXcpt)
         io.lsuOut.bits.xcpt.update_vl     := fofValid
         io.lsuOut.bits.xcpt.update_data   := xcptVl
-        io.lsuOut.bits.xcpt.xcpt_addr     := ldstUopQueue(commitPtr).addr + ldstUopQueue(commitPtr).offset
+        io.lsuOut.bits.xcpt.xcpt_addr     := ldstUopQueue(commitPtr).addr
 
         // clear ldstUop Queue
         for (i <- 0 until vLdstUopQueueSize) {
