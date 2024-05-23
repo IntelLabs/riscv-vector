@@ -281,7 +281,7 @@ trait SmartVectorBehavior_ld {
     }
 
     def vLsuTest9(): Unit = {
-        it should "pass: unit-strde exception" in {
+        it should "pass: unit-stride exception" in {
         test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
@@ -308,7 +308,7 @@ trait SmartVectorBehavior_ld {
     }
 
     // def vLsuTest10(): Unit = {
-    //     it should "pass: unit-strde vstart >= vl" in {
+    //     it should "pass: unit-stride vstart >= vl" in {
     //     test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
     //         dut.clock.setTimeout(1000)
     //         dut.clock.step(1)
