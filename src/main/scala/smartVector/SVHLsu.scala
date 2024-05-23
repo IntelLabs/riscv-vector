@@ -232,9 +232,9 @@ class SVHLsu(implicit p: Parameters) extends Module {
     val elemMaskVec = VecInit(Seq.fill(vlenb)(false.B))
     val isNotMasked = elemMaskVec.asUInt =/= 0.U
 
-    val misalignXcpt    = 0.U.asTypeOf(new HellaCacheExceptions)
-    misalignXcpt.ma.ld := ldstCtrlReg.isLoad  && addrMisalign
-    misalignXcpt.ma.st := ldstCtrlReg.isStore && addrMisalign
+    val misalignXcpt        = 0.U.asTypeOf(new LdstXcpt)
+    misalignXcpt.xcptValid := addrMisalign
+    misalignXcpt.ma        := addrMisalign
 
     when (uopState === uop_split && !memXcpt && curSplitIdx < splitCount) {
         canEnqueue := (ldstCtrlReg.vm || isNotMasked) && (curSplitIdx + canLoadElemCnt >= splitStart)
@@ -281,7 +281,7 @@ class SVHLsu(implicit p: Parameters) extends Module {
     // * BEGIN
     // * Issue LdstUop
 
-    val isNoXcptUop = ldstUopQueue(issueLdstPtr).valid && (ldstUopQueue(issueLdstPtr).xcpt.asUInt.orR === 0.U)
+    val isNoXcptUop = ldstUopQueue(issueLdstPtr).valid & (~ldstUopQueue(issueLdstPtr).xcpt.xcptValid)
     
     // non store waiting code
     when (io.dataExchange.resp.bits.nack && io.dataExchange.resp.bits.idx <= issueLdstPtr) {
@@ -324,7 +324,8 @@ class SVHLsu(implicit p: Parameters) extends Module {
 
     when (io.dataExchange.resp.valid || memXcpt) {
         ldstUopQueue(respLdstPtr).status := LdstUopStatus.ready
-        ldstUopQueue(respLdstPtr).xcpt   := io.dataExchange.xcpt
+        ldstUopQueue(respLdstPtr).xcpt.xcptValid := memXcpt
+        ldstUopQueue(respLdstPtr).xcpt.fromHellaXcpt(io.dataExchange.xcpt)
     }
 
     when (io.dataExchange.resp.valid) {
@@ -351,7 +352,7 @@ class SVHLsu(implicit p: Parameters) extends Module {
     // * BEGIN
     // * Commit to VRegIngo
     val canCommit  = ldstUopQueue(commitPtr).valid && ldstUopQueue(commitPtr).status === LdstUopStatus.ready
-    val commitXcpt = canCommit && ldstUopQueue(commitPtr).xcpt.asUInt.orR =/= 0.U
+    val commitXcpt = canCommit && ldstUopQueue(commitPtr).xcpt.xcptValid
 
     when(commitXcpt) {
         (0 until vlenb).foreach { i =>
@@ -359,14 +360,15 @@ class SVHLsu(implicit p: Parameters) extends Module {
                 vregInfo(i).status := VRegSegmentStatus.xcpt
             } 
         }
-        val firstXcpt = PriorityEncoder(vregInfo.map(info => info.idx === commitPtr && info.idx < ldstUopQueueSize.U))
-        val offset = vregInfo(firstXcpt).offset
         // 1. clear ldstUopQueue
         ldstUopQueue.foreach(uop => uop.valid := false.B)
         // 2. update xcpt info
         xcptVlReg       := ldstUopQueue(commitPtr).pos
-        xcptAddrReg     := ldstUopQueue(commitPtr).addr + offset
-        hellaXcptReg    := ldstUopQueue(commitPtr).xcpt
+        xcptAddrReg     := ldstUopQueue(commitPtr).addr
+        
+        val commitUop = ldstUopQueue(commitPtr)
+        hellaXcptReg := commitUop.xcpt.generateHellaXcpt(commitUop.memOp)
+
         hasXcpt         := true.B
     }.elsewhen (canCommit) {
         ldstUopQueue(commitPtr).valid := false.B

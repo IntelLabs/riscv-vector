@@ -125,9 +125,9 @@ class SVVLsu(implicit p: Parameters) extends Module {
     val isMasked = Mux(ldstCtrl.vm, false.B, !mUopInfo.mask(curVl))
     canEnqueue  := validLdstSegReq && !isMasked && curVl >= vstart && curVl < vl
     
-    val misalignXcpt    = 0.U.asTypeOf(new HellaCacheExceptions)
-    misalignXcpt.ma.ld := ldstCtrl.isLoad  && addrMisalign
-    misalignXcpt.ma.st := ldstCtrl.isStore && addrMisalign
+    val misalignXcpt        = 0.U.asTypeOf(new LdstXcpt)
+    misalignXcpt.xcptValid := addrMisalign
+    misalignXcpt.ma        := addrMisalign
 
     when (canEnqueue) {
         ldstUopQueue(ldstEnqPtr).valid                  := true.B
@@ -155,7 +155,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
     // * Issue LdstUop
     val (respLdstPtr, respData) = (io.dataExchange.resp.bits.idx(3, 0), io.dataExchange.resp.bits.data)
 
-    val isNoXcptUop = ldstUopQueue(issueLdstPtr).valid && (ldstUopQueue(issueLdstPtr).commitInfo.xcpt.asUInt.orR === 0.U)
+    val isNoXcptUop = ldstUopQueue(issueLdstPtr).valid & (~ldstUopQueue(issueLdstPtr).commitInfo.xcpt.xcptValid)
     
     // nack index smaller than issuePtr can replay
     val issue2CommitDist = Mux(issueLdstPtr >= commitPtr, issueLdstPtr - commitPtr, issueLdstPtr + vLdstUopQueueSize.U - commitPtr)
@@ -214,7 +214,8 @@ class SVVLsu(implicit p: Parameters) extends Module {
 
         ldstUopQueue(respLdstPtr).data   := Mux(loadComplete, ldData, ldstUopQueue(respLdstPtr).data)
         ldstUopQueue(respLdstPtr).status := LdstUopStatus.ready
-        ldstUopQueue(respLdstPtr).commitInfo.xcpt := io.dataExchange.xcpt
+        ldstUopQueue(respLdstPtr).commitInfo.xcpt.xcptValid := memXcpt  // misalign xcpt wont get resp
+        ldstUopQueue(respLdstPtr).commitInfo.xcpt.fromHellaXcpt(io.dataExchange.xcpt)
     }
 
     // * Recv Resp
@@ -224,7 +225,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
     // * BEGIN
     // * Commit
     val canCommit  = ldstUopQueue(commitPtr).valid && ldstUopQueue(commitPtr).status === LdstUopStatus.ready
-    val commitXcpt = canCommit && ldstUopQueue(commitPtr).commitInfo.xcpt.asUInt.orR
+    val commitXcpt = canCommit && ldstUopQueue(commitPtr).commitInfo.xcpt.xcptValid
     
 
     when (canCommit) {
@@ -259,8 +260,11 @@ class SVVLsu(implicit p: Parameters) extends Module {
         val xcptVl   = ldstUopQueue(commitPtr).pos
         val fofValid = ldstUopQueue(commitPtr).commitInfo.isFof && xcptVl > 0.U
 
+        val commitUop = ldstUopQueue(commitPtr)
+        val hellaXcpt = commitUop.commitInfo.xcpt.generateHellaXcpt(commitUop.memOp)
+
         io.lsuOut.bits.xcpt.exception_vld := ~fofValid
-        io.lsuOut.bits.xcpt.xcpt_cause    := Mux(fofValid, 0.U.asTypeOf(new HellaCacheExceptions), ldstUopQueue(commitPtr).commitInfo.xcpt)
+        io.lsuOut.bits.xcpt.xcpt_cause    := Mux(fofValid, 0.U.asTypeOf(new HellaCacheExceptions), hellaXcpt)
         io.lsuOut.bits.xcpt.update_vl     := fofValid
         io.lsuOut.bits.xcpt.update_data   := xcptVl
         io.lsuOut.bits.xcpt.xcpt_addr     := ldstUopQueue(commitPtr).addr + ldstUopQueue(commitPtr).offset
