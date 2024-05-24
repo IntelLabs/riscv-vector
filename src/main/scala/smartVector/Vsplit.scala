@@ -7,6 +7,7 @@ import darecreek.exu.vfu.VUopInfo
 
 import chipsalliance.rocketchip.config
 import chipsalliance.rocketchip.config.{Config, Field, Parameters}
+import freechips.rocketchip.rocket._ 
 import xiangshan.MicroOp
 import SmartParam._
 import darecreek.lsu.LdstDecoder
