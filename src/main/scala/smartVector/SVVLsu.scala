@@ -235,7 +235,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
         val wMask       = VecInit(Seq.fill(vlenb)(0.U(1.W)))
 
         for (i <- 0 until vlenb) {
-            wMask(i) := ~(i.U >= (destElem << log2DataSz) && i.U < (destElem << log2DataSz) + dataSz) & ~commitMasked
+            wMask(i) := ~(i.U >= (destElem << log2DataSz) && i.U < (destElem << log2DataSz) + dataSz)
         }
 
         io.lsuOut.valid             := true.B
@@ -243,7 +243,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
         io.lsuOut.bits.rfWriteEn    := Mux(commitXcpt, false.B, ldstUopQueue(commitPtr).commitInfo.rfWriteEn)
         io.lsuOut.bits.rfWriteIdx   := ldstUopQueue(commitPtr).commitInfo.rfWriteIdx
         io.lsuOut.bits.data         := wData
-        io.lsuOut.bits.rfWriteMask  := wMask.asUInt
+        io.lsuOut.bits.rfWriteMask  := Mux(commitMasked, Fill(vlenb, 1.U), wMask.asUInt)
         io.lsuOut.bits.isSegLoad    := ldstUopQueue(commitPtr).memOp === VMemCmd.read
         io.lsuOut.bits.regCount     := ldstUopQueue(commitPtr).commitInfo.regCount
         io.lsuOut.bits.regStartIdx  := ldstUopQueue(commitPtr).commitInfo.regStartIdx
