@@ -147,8 +147,9 @@ class SVVLsu(implicit p: Parameters) extends Module {
     // * BEGIN
     // * Issue LdstUop
     val (respLdstPtr, respData) = (io.dataExchange.resp.bits.idx(3, 0), io.dataExchange.resp.bits.data)
-    val issueLdstUop = ldstUopQueue(issueLdstPtr)
-    val isNoXcptUop = issueLdstUop.valid & (~issueLdstUop.commitInfo.xcpt.xcptValid & (~issueLdstUop.masked))
+    val issueLdstUop    = ldstUopQueue(issueLdstPtr)
+    val isNoXcptMaskUop = issueLdstUop.valid & (~issueLdstUop.commitInfo.xcpt.xcptValid) & (~issueLdstUop.masked)
+    val isMaskedUop     = issueLdstUop.valid & issueLdstUop.masked
     
     // nack index smaller than issuePtr can replay
     val issue2CommitDist = Mux(issueLdstPtr >= commitPtr, issueLdstPtr - commitPtr, issueLdstPtr + vLdstUopQueueSize.U - commitPtr)
@@ -157,12 +158,14 @@ class SVVLsu(implicit p: Parameters) extends Module {
 
     when (io.dataExchange.resp.bits.nack && smallerNack) {
         issueLdstPtr := respLdstPtr
-    }.elsewhen (isNoXcptUop && io.dataExchange.req.ready) {
+    }.elsewhen(isMaskedUop) {
+        issueLdstPtr := issueLdstPtr + 1.U
+    }.elsewhen (isNoXcptMaskUop && io.dataExchange.req.ready) {
         issueLdstPtr := issueLdstPtr + 1.U
     }
 
     // TODO: store waiting resp
-    when (isNoXcptUop) {
+    when (isNoXcptMaskUop) {
         val data    = issueLdstUop.data
         val dataSz  = (1.U << issueLdstUop.size)
         val offset  = AddrUtil.getAlignedOffset(issueLdstUop.addr)
