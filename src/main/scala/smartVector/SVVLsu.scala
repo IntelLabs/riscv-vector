@@ -116,7 +116,8 @@ class SVVLsu(implicit p: Parameters) extends Module {
     // *          v0(i) = 1 => not masked
     // *          v0(i) = 0 => masked
     val isMasked = Mux(ldstCtrl.vm, false.B, !mUopInfo.mask(curVl))
-    canEnqueue  := validLdstSegReq && !(isMasked && !uopEnd) && curVl >= vstart && curVl < vl
+    val isVlEq0  = (vl === 0.U)
+    canEnqueue  := (validLdstSegReq && !(isMasked && !uopEnd) && curVl >= vstart && curVl < vl) | isVlEq0
     
     val misalignXcpt        = 0.U.asTypeOf(new LdstXcpt)
     misalignXcpt.xcptValid := addrMisalign
@@ -124,9 +125,9 @@ class SVVLsu(implicit p: Parameters) extends Module {
 
     when (canEnqueue) {
         ldstUopQueue(ldstEnqPtr).valid                  := true.B
-        ldstUopQueue(ldstEnqPtr).status                 := Mux(addrMisalign || isMasked, LdstUopStatus.ready, LdstUopStatus.notReady)
+        ldstUopQueue(ldstEnqPtr).status                 := Mux(addrMisalign | isMasked | isVlEq0, LdstUopStatus.ready, LdstUopStatus.notReady)
         ldstUopQueue(ldstEnqPtr).memOp                  := ldstCtrl.isStore
-        ldstUopQueue(ldstEnqPtr).masked                 := isMasked
+        ldstUopQueue(ldstEnqPtr).masked                 := isMasked | isVlEq0
         ldstUopQueue(ldstEnqPtr).addr                   := addr
         ldstUopQueue(ldstEnqPtr).pos                    := curVl
         ldstUopQueue(ldstEnqPtr).size                   := ldstCtrl.log2Memwb

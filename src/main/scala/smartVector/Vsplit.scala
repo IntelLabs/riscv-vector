@@ -346,7 +346,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     //Just for perm instruction
     io.out.mUopMergeAttr.bits.permExpdLen      := lmul
     io.out.mUopMergeAttr.bits.regDstIdx        := ctrl.ldest
-    io.out.mUopMergeAttr.bits.regCount         := nfield << log2EmulVd
+    io.out.mUopMergeAttr.bits.regCount         := Mux(info.vl === 0.U, 1.U, nfield << log2EmulVd)
 
     // * organize muop merge attr
     // * END
