@@ -504,8 +504,8 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     val ldStEmulVd  = eewEmulInfo1.emulVd
     val ldStEmulVs2 = eewEmulInfo1.emulVs2
-
-    expdLenSeg  := info.vl * nfield
+  
+    expdLenSeg  := Mux(1.U >= info.vl * nfield, 1.U, info.vl * nfield)
     expdLenIdx  := Mux(ldStEmulVd >= ldStEmulVs2, ldStEmulVd, ldStEmulVs2)
     expdLenLdSt := Mux(ldst && ldstCtrl.segment, expdLenSeg,
                         Mux(ldstCtrl.wholeReg, eewEmulInfo1.emulVd,
