@@ -355,6 +355,7 @@ trait SmartVectorBehavior_ld_seg {
                 (CtrlBundle(instrn=VLM_V, vlmul=0, vsew=0, vl=8), SrcBundleLdst(rs1="h1028")),
                 (CtrlBundle(instrn=VLSEG8E8_V_MASK, vlmul=0, vsew=0, vl=2), SrcBundleLdst(rs1="h0fe0")),
                 (CtrlBundle(instrn=VLSEG2E8_V), SrcBundleLdst()),
+                (CtrlBundle(instrn=VLSEG2E8_V, vl=0), SrcBundleLdst()),
             )
             dut.io.rvuIssue.valid.poke(true.B)
             dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(0)._1, ldReqs(0)._2))
@@ -386,6 +387,22 @@ trait SmartVectorBehavior_ld_seg {
 
             dut.io.rvuIssue.valid.poke(true.B)
             dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(2)._1, ldReqs(2)._2))
+            dut.clock.step(1)
+            dut.io.rvuIssue.valid.poke(false.B)
+
+            while (!dut.io.rvuCommit.commit_vld.peekBoolean()) {
+                dut.clock.step(1)
+            }
+            dut.io.rvuCommit.commit_vld.expect(true.B)
+            dut.clock.step(1)
+            dut.io.rfData( 8).expect("hdc9854100f0f0f0fffffffff2367abef".U)
+            dut.io.rfData( 9).expect("h20".U)
+            dut.io.rfData(10).expect("hfeba76320f0f0f0fffffffff014589cd".U)
+            dut.io.rfData(11).expect("h20".U)
+            dut.clock.step(1)
+
+            dut.io.rvuIssue.valid.poke(true.B)
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(3)._1, ldReqs(3)._2))
             dut.clock.step(1)
             dut.io.rvuIssue.valid.poke(false.B)
 
