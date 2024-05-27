@@ -133,9 +133,12 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   //TODO: when id float inst, the rs1 should read from float register file
   SVPerm.io.in.rs1 := bitsReg.scalar_opnd_1 // || float
 
-  SVPerm.io.in.vs1_preg_idx    := VecInit(Seq.tabulate(8)(i => bitsReg.uop.ctrl.lsrc(0) + Mux(io.in.bits.uop.ctrl.vGatherEi16EEW32, i.U >> 1, Mux(io.in.bits.uop.ctrl.vGatherEi16EEW64, i.U >> 2, i.U))))
+  SVPerm.io.in.vs1_preg_idx    := VecInit(Seq.tabulate(8)(i => bitsReg.uop.ctrl.lsrc(0) +
+                                  Mux(io.in.bits.uop.ctrl.vGatherEi16EEW32, i.U >> 1, 
+                                  Mux(io.in.bits.uop.ctrl.vGatherEi16EEW64, i.U >> 2, i.U))))
   SVPerm.io.in.vs2_preg_idx    := VecInit(Seq.tabulate(8)(i => bitsReg.uop.ctrl.lsrc(1) + i.U))
-  SVPerm.io.in.old_vd_preg_idx := VecInit(Seq.tabulate(8)(i => bitsReg.uop.ctrl.ldest   + Mux(io.in.bits.uop.ctrl.vGatherEi16EEW8, i.U >> 1, i.U)))
+  SVPerm.io.in.old_vd_preg_idx := VecInit(Seq.tabulate(8)(i => bitsReg.uop.ctrl.ldest   + 
+                                  Mux(io.in.bits.uop.ctrl.vGatherEi16EEW8, i.U >> 1, i.U)))
   SVPerm.io.in.mask_preg_idx := 0.U
   SVPerm.io.in.uop_valid := validReg & bitsReg.uop.ctrl.perm
   SVPerm.io.in.rdata := io.permRegIn.rdata
