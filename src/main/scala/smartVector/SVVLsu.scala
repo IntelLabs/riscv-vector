@@ -120,8 +120,8 @@ class SVVLsu(implicit p: Parameters) extends Module {
     canEnqueue  := (validLdstSegReq && !(isMasked && !uopEnd) && curVl >= vstart && curVl < vl) | isVlEq0
     
     val misalignXcpt        = 0.U.asTypeOf(new LdstXcpt)
-    misalignXcpt.xcptValid := addrMisalign
-    misalignXcpt.ma        := addrMisalign
+    misalignXcpt.xcptValid := addrMisalign & ~(isMasked | isVlEq0)
+    misalignXcpt.ma        := addrMisalign & ~(isMasked | isVlEq0)
 
     when (canEnqueue) {
         ldstUopQueue(ldstEnqPtr).valid                  := true.B
