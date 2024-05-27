@@ -51,7 +51,7 @@ class VIllegalInstrn extends Module {
   // vlmul
   val ill_vlmul = vlmul === "b100".U
   // widen/narrow, illegal when lmul = 8 or sew = 64
-  val ill_widenNarrow = (vlmul === 3.U || vsew === 3.U) && (ctrl.widen || ctrl.narrow)
+  val ill_widenNarrow = (vlmul === 3.U || vsew === 3.U) && (ctrl.widen || ctrl.narrow || ctrl.widen2)
   // vstart: non-zero vstart for arithmetic instrns
   val ill_vstart = csr.vstart =/= 0.U && ctrl.arith
 
@@ -91,7 +91,7 @@ class VIllegalInstrn extends Module {
   // invalid rounding mode
   val ill_frm = csr.frm(2) && csr.frm(1, 0) =/= 0.U && ctrl.fp
   // invalid SEW of FP
-  val ill_sewFP = !vsew(1) && ctrl.fp
+  val ill_sewFP = !vsew(1) && (ctrl.fp || (ctrl.redu && ctrl.funct3 === "b001".U)) 
 
   // Illegal start number of register group
   def regGroup_start_illegal(vemul: UInt, startReg: UInt) = {
