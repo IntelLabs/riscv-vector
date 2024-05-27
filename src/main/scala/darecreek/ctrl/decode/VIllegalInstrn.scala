@@ -54,6 +54,8 @@ class VIllegalInstrn extends Module {
   val ill_widenNarrow = (vlmul === 3.U || vsew === 3.U) && (ctrl.widen || ctrl.narrow || ctrl.widen2)
   // vstart: non-zero vstart for arithmetic instrns
   val ill_vstart = csr.vstart =/= 0.U && ctrl.arith
+  //VrgatherEi16VV, when lmul =8, sew can not be 32
+  val ill_gatherE16 = (ctrl.funct3 === 0.U && ctrl.funct6 === "b001110".U && vlmul === 3.U && vsew === 0.U)
 
   /**
    * Load/Store
@@ -160,7 +162,7 @@ class VIllegalInstrn extends Module {
                   ctrl.funct6(5, 3) === "b011".U ||  //compare
                   ctrl.funct6(5, 2) === "b0100".U && ctrl.funct6(0) && ctrl.opi) //vmadc/vmsbc
 
-  val illFinal = ill_vsew || ill_vlmul || ill_widenNarrow || ill_vstart ||
+  val illFinal = ill_vsew || ill_vlmul || ill_widenNarrow || ill_vstart || ill_gatherE16 ||
                ill_ldstEmul || ill_seg || ill_seg_past31 || ill_nfield ||
                ill_ext || ill_nreg || ill_frm || ill_sewFP ||
                ill_reg || ill_regGrpEnd || ill_regOverlap || ill_segOverlap ||
