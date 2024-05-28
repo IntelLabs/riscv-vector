@@ -122,7 +122,7 @@ class Vsplit(implicit p : Parameters) extends Module {
         val scoreBoardSetIO = Flipped(new ScoreboardSetIO)
         val scoreBoardReadIO = Flipped(new ScoreboardReadIO)
         val lsuStallSplit = Input(Bool()) 
-        val iexReady  = Input(Bool())
+        val iexNeedStall  = Input(Bool())
         val vLSUXcpt = Input (new VLSUXcpt)
         val excpInfo = Output(new ExcpInfo)
     })
@@ -329,7 +329,7 @@ class Vsplit(implicit p : Parameters) extends Module {
         io.out.mUopMergeAttr.bits.regWriteMuopIdx  := 0.U       
     }
 
-    val mUopIn = ValidIO(new Muop)
+    val mUopIn = Wire(ValidIO(new Muop))
     
     io.out.mUopMergeAttr.valid                 := mUopIn.valid
     io.out.mUopMergeAttr.bits.scalarRegWriteEn := ctrl.rdVal && !isfloat  
@@ -558,7 +558,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     
     val validReg = RegInit(false.B)
     val bitsReg = RegInit(0.U.asTypeOf(new Muop))
-    val ready = bitsReg.uop.ctrl.isLdst || (~bitsReg.uop.ctrl.isLdst && io.iexReady)
+    val ready = (bitsReg.uop.ctrl.isLdst && ~io.lsuStallSplit) || (~bitsReg.uop.ctrl.isLdst && ~io.iexNeedStall)
 
     when(!validReg || ready){
         validReg := mUopIn.valid
@@ -567,7 +567,7 @@ class Vsplit(implicit p : Parameters) extends Module {
         bitsReg := mUopIn.bits
     }
 
-    io.out.mUop.valid := validReg
+    io.out.mUop.valid := validReg && ~(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl)
     io.out.mUop.bits := bitsReg
 
     when(ctrl.illegal || io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl){

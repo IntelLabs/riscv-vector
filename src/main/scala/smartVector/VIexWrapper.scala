@@ -41,17 +41,15 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   val SVPerm  = Module(new VPermWrapper()(p))
   val SVFpu   = Module(new VSFPUWrapper()(p))
 
-  val bitsReg = io.in.bits
   val validReg = io.in.valid
-  val divReady  = SVDiv.io.in.ready & bitsReg.uop.ctrl.div
-  val fpuReady  = SVFpu.io.in.ready & bitsReg.uop.ctrl.fp
-  val permReady = ~SVPerm.io.out.perm_busy & bitsReg.uop.ctrl.perm
-
-  //when last unit is two cycle, and this cycle is two cycle, can ready
-  val lastUnitTwoCycle = Reg(Bool())
-  val twocycleReady = (bitsReg.uop.ctrl.mul || bitsReg.uop.ctrl.redu) & lastUnitTwoCycle
-  val onecyleReady  = bitsReg.uop.ctrl.alu || bitsReg.uop.ctrl.mask
-  val ready    = divReady || fpuReady || permReady || twocycleReady || onecyleReady
+  val bitsReg  = io.in.bits
+  //val divNotReady  = io.in.bits.uop.ctrl.div  & ~SVDiv.io.in.ready
+  //val fpuNotReady  = io.in.bits.uop.ctrl.fp   & ~SVFpu.io.in.ready
+  //val permNotReady = io.in.bits.uop.ctrl.perm & SVPerm.io.out.perm_busy
+  val divNotReady  = ~SVDiv.io.in.ready
+  val fpuNotReady  = ~SVFpu.io.in.ready
+  val permNotReady = SVPerm.io.out.perm_busy
+  val ready    = ~(divNotReady || fpuNotReady || permNotReady)
 
   val empty :: ongoing :: Nil = Enum(2)
   val currentState = RegInit(empty)
@@ -88,7 +86,8 @@ class VIexWrapper(implicit p : Parameters) extends Module {
       }
     }
     is(ongoing){
-      when(twoCycleReg || fixLatVld || bitsReg.uop.ctrl.floatRed && SVFpu.io.in.ready && ~bitsReg.uop.uopEnd){
+      when(twoCycleReg || fixLatVld){
+      //when(twoCycleReg || fixLatVld || bitsReg.uop.ctrl.floatRed && SVFpu.io.in.ready && ~bitsReg.uop.uopEnd){
           currentStateNext := empty
       }.otherwise{
           currentStateNext := ongoing
@@ -97,15 +96,15 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   } 
 
   currentState := currentStateNext
-  val iexNeedStallTmp = (currentStateNext === ongoing) || ~ready
+  io.iexNeedStall := (currentStateNext === ongoing) || ~ready
 
   //if is floatRed, when is ready, the next uop valid will be high in same cycle.
   //and the first's ready match the second's valid, it will cause second's ready invalid
-  io.iexNeedStall := Mux(bitsReg.uop.ctrl.floatRed && !iexNeedStallTmp , RegNext(iexNeedStallTmp) , iexNeedStallTmp)
+  //io.iexNeedStall := Mux(bitsReg.uop.ctrl.floatRed && !iexNeedStallTmp , RegNext(iexNeedStallTmp) , iexNeedStallTmp)
   //assert(!(currentState === ongoing && validFinal), "when current state is ongoing, should not has new inst in")
   //assert(!(!SVDiv.io.in.ready && validFinal), "when div is not ready, should not has new inst in")
   //assert(!(SVPerm.io.out.perm_busy && validFinal), "when perm is busy, should not has new inst in")
-
+  
   SValu.io.in.valid   := validReg && bitsReg.uop.ctrl.alu
   SVMac.io.in.valid   := validReg && bitsReg.uop.ctrl.mul
   SVMask.io.in.valid  := validReg && bitsReg.uop.ctrl.mask
@@ -173,7 +172,6 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   }
   io.out.valid := outValid
 }
-
 
 
 
