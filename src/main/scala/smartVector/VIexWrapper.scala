@@ -41,23 +41,17 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   val SVPerm  = Module(new VPermWrapper()(p))
   val SVFpu   = Module(new VSFPUWrapper()(p))
 
-  val validReg = RegInit(false.B)
-  val bitsReg  = RegInit(0.U.asTypeOf(new Muop))
-  //val divNotReady  = io.in.bits.uop.ctrl.div  & ~SVDiv.io.in.ready
-  //val fpuNotReady  = io.in.bits.uop.ctrl.fp   & ~SVFpu.io.in.ready
-  //val permNotReady = io.in.bits.uop.ctrl.perm & SVPerm.io.out.perm_busy
-  val divNotReady  = ~SVDiv.io.in.ready
-  val fpuNotReady  = ~SVFpu.io.in.ready
-  val permNotReady = SVPerm.io.out.perm_busy
-  val ready    = ~(divNotReady || fpuNotReady || permNotReady)
+  val bitsReg = io.in.bits
+  val validReg = io.in.valid
+  val divReady  = SVDiv.io.in.ready & bitsReg.uop.ctrl.div
+  val fpuReady  = SVFpu.io.in.ready & bitsReg.uop.ctrl.fp
+  val permReady = ~SVPerm.io.out.perm_busy & bitsReg.uop.ctrl.perm
 
-  when(!validReg || ready){
-    validReg := io.in.valid && !io.in.bits.uop.ctrl.isLdst
-  }
-
-  when(io.in.valid){
-    bitsReg := io.in.bits
-  }
+  //when last unit is two cycle, and this cycle is two cycle, can ready
+  val lastUnitTwoCycle = Reg(Bool())
+  val twocycleReady = (bitsReg.uop.ctrl.mul || bitsReg.uop.ctrl.redu) & lastUnitTwoCycle
+  val onecyleReady  = bitsReg.uop.ctrl.alu || bitsReg.uop.ctrl.mask
+  val ready    = divReady || fpuReady || permReady || twocycleReady || onecyleReady
 
   val empty :: ongoing :: Nil = Enum(2)
   val currentState = RegInit(empty)
@@ -111,7 +105,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   //assert(!(currentState === ongoing && validFinal), "when current state is ongoing, should not has new inst in")
   //assert(!(!SVDiv.io.in.ready && validFinal), "when div is not ready, should not has new inst in")
   //assert(!(SVPerm.io.out.perm_busy && validFinal), "when perm is busy, should not has new inst in")
-  
+
   SValu.io.in.valid   := validReg && bitsReg.uop.ctrl.alu
   SVMac.io.in.valid   := validReg && bitsReg.uop.ctrl.mul
   SVMask.io.in.valid  := validReg && bitsReg.uop.ctrl.mask
