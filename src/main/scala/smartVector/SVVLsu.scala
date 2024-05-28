@@ -271,6 +271,9 @@ class SVVLsu(implicit p: Parameters) extends Module {
         for (i <- 0 until vLdstUopQueueSize) {
             ldstUopQueue(i) := 0.U.asTypeOf(new SegLdstUop)
         }
+        ldstEnqPtr   := 0.U
+        issueLdstPtr := 0.U
+        commitPtr    := 0.U
     }.otherwise {
         io.lsuOut.bits.xcpt := 0.U.asTypeOf(new VLSUXcpt)
     }
