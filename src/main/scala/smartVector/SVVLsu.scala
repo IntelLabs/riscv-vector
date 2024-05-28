@@ -115,19 +115,20 @@ class SVVLsu(implicit p: Parameters) extends Module {
     // * if vm=0 =>
     // *          v0(i) = 1 => not masked
     // *          v0(i) = 0 => masked
-    val isMasked = Mux(ldstCtrl.vm, false.B, !mUopInfo.mask(curVl))
+    // * vl = 0 => dummy masked req
     val isVlEq0  = (vl === 0.U)
-    canEnqueue  := (validLdstSegReq && !(isMasked && !uopEnd) && curVl >= vstart && curVl < vl) | isVlEq0
+    val isMasked = Mux(ldstCtrl.vm, false.B, !mUopInfo.mask(curVl)) | isVlEq0
+    canEnqueue  := validLdstSegReq && ((curVl >= vstart && curVl < vl) || uopEnd)
     
     val misalignXcpt        = 0.U.asTypeOf(new LdstXcpt)
-    misalignXcpt.xcptValid := addrMisalign & ~(isMasked | isVlEq0)
-    misalignXcpt.ma        := addrMisalign & ~(isMasked | isVlEq0)
+    misalignXcpt.xcptValid := addrMisalign & ~isMasked
+    misalignXcpt.ma        := addrMisalign & ~isMasked
 
     when (canEnqueue) {
         ldstUopQueue(ldstEnqPtr).valid                  := true.B
-        ldstUopQueue(ldstEnqPtr).status                 := Mux(addrMisalign | isMasked | isVlEq0, LdstUopStatus.ready, LdstUopStatus.notReady)
+        ldstUopQueue(ldstEnqPtr).status                 := Mux(addrMisalign | isMasked, LdstUopStatus.ready, LdstUopStatus.notReady)
         ldstUopQueue(ldstEnqPtr).memOp                  := ldstCtrl.isStore
-        ldstUopQueue(ldstEnqPtr).masked                 := isMasked | isVlEq0
+        ldstUopQueue(ldstEnqPtr).masked                 := isMasked
         ldstUopQueue(ldstEnqPtr).addr                   := addr
         ldstUopQueue(ldstEnqPtr).pos                    := curVl
         ldstUopQueue(ldstEnqPtr).size                   := ldstCtrl.log2Memwb
@@ -266,23 +267,25 @@ class SVVLsu(implicit p: Parameters) extends Module {
         io.lsuOut.bits.xcpt.update_vl     := fofValid
         io.lsuOut.bits.xcpt.update_data   := xcptVl
         io.lsuOut.bits.xcpt.xcpt_addr     := ldstUopQueue(commitPtr).addr
-
-        // clear ldstUop Queue
-        for (i <- 0 until vLdstUopQueueSize) {
-            ldstUopQueue(i) := 0.U.asTypeOf(new SegLdstUop)
-        }
-        ldstEnqPtr   := 0.U
-        issueLdstPtr := 0.U
-        commitPtr    := 0.U
     }.otherwise {
         io.lsuOut.bits.xcpt := 0.U.asTypeOf(new VLSUXcpt)
     }
 
 
     when (io.lsuOut.fire) {
-        commitPtr                      := commitPtr + 1.U
-        ldstUopQueue(commitPtr).status := LdstUopStatus.notReady
-        ldstUopQueue(commitPtr).valid  := false.B
+        when (commitXcpt) {
+            // clear ldstUop Queue
+            for (i <- 0 until vLdstUopQueueSize) {
+                ldstUopQueue(i) := 0.U.asTypeOf(new SegLdstUop)
+            }
+            ldstEnqPtr   := 0.U
+            issueLdstPtr := 0.U
+            commitPtr    := 0.U
+        }.otherwise {
+            commitPtr                      := commitPtr + 1.U
+            ldstUopQueue(commitPtr).status := LdstUopStatus.notReady
+            ldstUopQueue(commitPtr).valid  := false.B
+        }
     }
     // * Commit
     // * END

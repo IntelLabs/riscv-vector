@@ -429,7 +429,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     val narrowTo1NoStall = ctrl.narrow_to_1 
     needStall := hasRegConf(0) || hasRegConf(1) || hasRegConf(2) || hasRegConf(3) || 
                  io.lsuStallSplit || io.iexNeedStall && ~narrowTo1NoStall ||
-                 ctrl.illegal || io.vLSUXcpt.exception_vld
+                 ctrl.illegal || io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl
 
     io.out.mUop.bits.uop.uopIdx   := uopIdx
     io.out.mUop.bits.uop.segIndex := segIndex
@@ -556,7 +556,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     
     //assert(io.in.valid && currentState === ongoing, "when has ongoing inst, can not accept a new one")
 
-    when(ctrl.illegal || io.vLSUXcpt.exception_vld){
+    when(ctrl.illegal || io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl){
         currentStateNext := empty
         idx := 0.U
         io.in.decodeIn.ready := true.B
