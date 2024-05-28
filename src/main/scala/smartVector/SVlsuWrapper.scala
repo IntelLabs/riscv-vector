@@ -25,8 +25,16 @@ class SVlsuWrapper(implicit p: Parameters) extends Module {
     vLsu.io.mUop            <> io.mUop
     vLsu.io.mUopMergeAttr   <> io.mUopMergeAttr
 
+    val validReq = io.mUop.valid && io.lsuReady
+    val validMerge = io.mUopMergeAttr.valid && io.lsuReady
+    hLsu.io.mUop.valid := validReq
+    vLsu.io.mUop.valid := validReq
+    hLsu.io.mUopMergeAttr.valid := validMerge
+    vLsu.io.mUopMergeAttr.valid := validMerge
+    
+
     val ldstXcpt = io.lsuOut.bits.xcpt.exception_vld || io.lsuOut.bits.xcpt.update_vl
-    when (io.mUop.valid && io.mUop.bits.uop.uopEnd && io.mUop.bits.uop.ctrl.isLdst) {
+    when (validReq && io.mUop.bits.uop.uopEnd && io.mUop.bits.uop.ctrl.isLdst) {
         uopEndInQ := true.B
     } .elsewhen (io.lsuOut.valid && (io.lsuOut.bits.muopEnd || ldstXcpt)) {
         uopEndInQ := false.B

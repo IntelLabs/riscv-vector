@@ -320,35 +320,36 @@ class Vsplit(implicit p : Parameters) extends Module {
     // * BEGIN
     // * organize muop merge attr
     //ToDo: redu, widen2,narrow_to_1 need to be add
+    val mUopIn = Wire(ValidIO(new Muop))
+    val mUopMergeAttrIn = Wire(ValidIO(new MuopMergeAttr))
+
     val regBackWidth = UInt(3.W)
     when(ctrl.narrow) {
-        io.out.mUopMergeAttr.bits.regBackWidth := "b11".U
-        io.out.mUopMergeAttr.bits.regWriteMuopIdx  := idx(0)
+        mUopMergeAttrIn.bits.regBackWidth := "b11".U
+        mUopMergeAttrIn.bits.regWriteMuopIdx  := idx(0)
     }.otherwise{
-        io.out.mUopMergeAttr.bits.regBackWidth := "b111".U
-        io.out.mUopMergeAttr.bits.regWriteMuopIdx  := 0.U       
+        mUopMergeAttrIn.bits.regBackWidth := "b111".U
+        mUopMergeAttrIn.bits.regWriteMuopIdx  := 0.U       
     }
-
-    val mUopIn = Wire(ValidIO(new Muop))
     
-    io.out.mUopMergeAttr.valid                 := mUopIn.valid
-    io.out.mUopMergeAttr.bits.scalarRegWriteEn := ctrl.rdVal && !isfloat  
-    io.out.mUopMergeAttr.bits.floatRegWriteEn  := ctrl.rdVal && isfloat
-    io.out.mUopMergeAttr.bits.ldest            := ctrl.ldest + ldest_inc
-    io.out.mUopMergeAttr.bits.rfWriteEn        := ctrl.ldestVal
-    io.out.mUopMergeAttr.bits.muopEnd          := mUopIn.bits.uop.uopEnd
-    io.out.mUopMergeAttr.bits.alu              := ctrl.alu
-    io.out.mUopMergeAttr.bits.mul              := ctrl.mul 
-    io.out.mUopMergeAttr.bits.fp               := ctrl.fp  
-    io.out.mUopMergeAttr.bits.div              := ctrl.div 
-    io.out.mUopMergeAttr.bits.fixP             := ctrl.fixP
-    io.out.mUopMergeAttr.bits.redu             := ctrl.redu
-    io.out.mUopMergeAttr.bits.mask             := ctrl.mask
-    io.out.mUopMergeAttr.bits.perm             := ctrl.perm
+    mUopMergeAttrIn.valid                 := mUopIn.valid
+    mUopMergeAttrIn.bits.scalarRegWriteEn := ctrl.rdVal && !isfloat  
+    mUopMergeAttrIn.bits.floatRegWriteEn  := ctrl.rdVal && isfloat
+    mUopMergeAttrIn.bits.ldest            := ctrl.ldest + ldest_inc
+    mUopMergeAttrIn.bits.rfWriteEn        := ctrl.ldestVal
+    mUopMergeAttrIn.bits.muopEnd          := mUopIn.bits.uop.uopEnd
+    mUopMergeAttrIn.bits.alu              := ctrl.alu
+    mUopMergeAttrIn.bits.mul              := ctrl.mul 
+    mUopMergeAttrIn.bits.fp               := ctrl.fp  
+    mUopMergeAttrIn.bits.div              := ctrl.div 
+    mUopMergeAttrIn.bits.fixP             := ctrl.fixP
+    mUopMergeAttrIn.bits.redu             := ctrl.redu
+    mUopMergeAttrIn.bits.mask             := ctrl.mask
+    mUopMergeAttrIn.bits.perm             := ctrl.perm
     //Just for perm instruction
-    io.out.mUopMergeAttr.bits.permExpdLen      := lmul
-    io.out.mUopMergeAttr.bits.regDstIdx        := ctrl.ldest
-    io.out.mUopMergeAttr.bits.regCount         := Mux(info.vl === 0.U, 1.U, nfield << log2EmulVd)
+    mUopMergeAttrIn.bits.permExpdLen      := lmul
+    mUopMergeAttrIn.bits.regDstIdx        := ctrl.ldest
+    mUopMergeAttrIn.bits.regCount         := Mux(info.vl === 0.U, 1.U, nfield << log2EmulVd)
 
     // * organize muop merge attr
     // * END
@@ -495,7 +496,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.scoreBoardSetIO.setEn      := RegNext(mUopIn.valid && ctrl.ldestVal && (~ctrl.perm || ~(ldstCtrl.segment && segmentRegNotFirstElem)))
     io.scoreBoardSetIO.setMultiEn := RegNext(mUopIn.valid && ctrl.ldestVal && ctrl.perm)
     io.scoreBoardSetIO.setNum     := RegNext(emulVd)
-    io.scoreBoardSetIO.setAddr    := RegNext(io.out.mUopMergeAttr.bits.ldest)
+    io.scoreBoardSetIO.setAddr    := RegNext(mUopMergeAttrIn.bits.ldest)
 
     when((instFirstIn || currentState === ongoing) & ~needStall){
         mUopIn.valid := true.B
@@ -558,6 +559,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     
     val validReg = RegInit(false.B)
     val bitsReg = RegInit(0.U.asTypeOf(new Muop))
+    val mergeAttrReg = RegInit(0.U.asTypeOf(new MuopMergeAttr))
     val ready = (bitsReg.uop.ctrl.isLdst && ~io.lsuStallSplit) || (~bitsReg.uop.ctrl.isLdst && ~io.iexNeedStall)
 
     when(!validReg || ready){
@@ -565,10 +567,14 @@ class Vsplit(implicit p : Parameters) extends Module {
     }
     when(mUopIn.valid) {
         bitsReg := mUopIn.bits
+        mergeAttrReg := mUopMergeAttrIn.bits
     }
 
-    io.out.mUop.valid := validReg && ~(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl)
-    io.out.mUop.bits := bitsReg
+    val muopOutValid             = validReg && ~(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl)
+    io.out.mUop.valid           := muopOutValid
+    io.out.mUopMergeAttr.valid  := muopOutValid
+    io.out.mUop.bits            := bitsReg
+    io.out.mUopMergeAttr.bits   := mergeAttrReg
 
     when(ctrl.illegal || io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl){
         currentStateNext := empty
