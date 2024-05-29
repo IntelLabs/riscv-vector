@@ -570,6 +570,10 @@ class Vsplit(implicit p : Parameters) extends Module {
         mergeAttrReg := mUopMergeAttrIn.bits
     }
 
+    when(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl){
+        validReg := false.B
+    }
+
     val muopOutValid             = validReg && ~(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl)
     io.out.mUop.valid           := muopOutValid
     io.out.mUopMergeAttr.valid  := muopOutValid
