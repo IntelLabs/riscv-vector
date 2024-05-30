@@ -200,6 +200,8 @@ class LSUFakeDCache extends Module {
     val miss = noise(0)
 
     io.dataExchange.resp.bits.idx        := s2_req.idx
+    io.dataExchange.resp.bits.flag       := s2_req.flag
+    io.dataExchange.resp.bits.srcId      := s2_req.srcId
     io.dataExchange.req.ready            := true.B
     io.dataExchange.xcpt                 := 0.U.asTypeOf(new HellaCacheExceptions())
     io.dataExchange.resp.bits.mask       := 0.U

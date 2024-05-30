@@ -120,31 +120,10 @@ class SmartVector extends Module {
     //TODO: This is reserved for verification, delete it later
     io.rfData := regFile.io.rfData
 
-    io.rvuMemory.req.valid      := svlsuWrapper.io.dataExchange.req.valid
-    io.rvuMemory.req.bits.idx   := svlsuWrapper.io.dataExchange.req.bits.idx
-    io.rvuMemory.req.bits.addr  := svlsuWrapper.io.dataExchange.req.bits.addr
-    io.rvuMemory.req.bits.cmd   := svlsuWrapper.io.dataExchange.req.bits.cmd
-    io.rvuMemory.req.bits.data  := svlsuWrapper.io.dataExchange.req.bits.data
-    io.rvuMemory.req.bits.mask  := svlsuWrapper.io.dataExchange.req.bits.mask
+    io.rvuMemory.req <> svlsuWrapper.io.dataExchange.req
+    io.rvuMemory.resp <> svlsuWrapper.io.dataExchange.resp
+    svlsuWrapper.io.dataExchange.xcpt := io.rvuMemory.xcpt
 
-    // io.rvuMemory.resp.ready := svlsuWrapper.io.dataExchange.resp.ready
-    svlsuWrapper.io.dataExchange.req.ready             := io.rvuMemory.req.ready
-    svlsuWrapper.io.dataExchange.resp.valid            := io.rvuMemory.resp.valid
-    svlsuWrapper.io.dataExchange.resp.bits.idx         := io.rvuMemory.resp.bits.idx
-    svlsuWrapper.io.dataExchange.resp.bits.data        := io.rvuMemory.resp.bits.data
-    svlsuWrapper.io.dataExchange.resp.bits.has_data    := io.rvuMemory.resp.bits.has_data
-    svlsuWrapper.io.dataExchange.resp.bits.mask        := io.rvuMemory.resp.bits.mask
-    svlsuWrapper.io.dataExchange.resp.bits.nack        := io.rvuMemory.resp.bits.nack
-
-    svlsuWrapper.io.dataExchange.xcpt.ma.ld := io.rvuMemory.xcpt.ma.ld
-    svlsuWrapper.io.dataExchange.xcpt.ma.st := io.rvuMemory.xcpt.ma.st
-    svlsuWrapper.io.dataExchange.xcpt.pf.ld := io.rvuMemory.xcpt.pf.ld
-    svlsuWrapper.io.dataExchange.xcpt.pf.st := io.rvuMemory.xcpt.pf.st
-    svlsuWrapper.io.dataExchange.xcpt.gf.ld := io.rvuMemory.xcpt.gf.ld
-    svlsuWrapper.io.dataExchange.xcpt.gf.st := io.rvuMemory.xcpt.gf.st
-    svlsuWrapper.io.dataExchange.xcpt.ae.ld := io.rvuMemory.xcpt.ae.ld
-    svlsuWrapper.io.dataExchange.xcpt.ae.st := io.rvuMemory.xcpt.ae.st
-    
     val sboard  = new Scoreboard(NVPhyRegs, false)
     sboard.clear(merge.io.scoreBoardCleanIO.clearEn, merge.io.scoreBoardCleanIO.clearAddr)
     sboard.clearN(merge.io.scoreBoardCleanIO.clearMultiEn, merge.io.scoreBoardCleanIO.clearAddr, merge.io.scoreBoardCleanIO.clearNum)

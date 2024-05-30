@@ -44,7 +44,7 @@ trait SmartVectorBehavior_ld {
     def vLsuTest0(): Unit = {
         it should "pass: unit-stride load (uops=1, eew=8, vl=16, vstart=0)" in {
         test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            dut.clock.setTimeout(1000)
+            dut.clock.setTimeout(200)
             dut.clock.step(1)
             val ldReqs = Seq(
                 (ldstReqCtrl_default.copy(instrn=VLE8_V), ldstReqSrc_default.copy()),
@@ -70,7 +70,7 @@ trait SmartVectorBehavior_ld {
     def vLsuTest1(): Unit = {
         it should "pass: unit-stride load (uops=2, eew=8, vl=19, vstart=0)" in {
         test(new SmartVectorTestWrapper).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            dut.clock.setTimeout(1000)
+            dut.clock.setTimeout(200)
             dut.clock.step(1)
             val ldReqs = Seq(
                 (ldstReqCtrl_default.copy(instrn=VLE8_V, vl=19, vlmul=2, ma=true, ta=true), ldstReqSrc_default.copy()),

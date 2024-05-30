@@ -37,6 +37,8 @@ class LdstIO(implicit p: Parameters) extends ParameterizedBundle()(p) {
     val lsuReady        = Output(Bool())
 }
 
+class HLSUPtr extends CircularQueuePtr[HLSUPtr](ldstUopQueueSize)
+
 object VRegSegmentStatus {
     //     0          1          2           3           4          5        6
     val invalid :: srcData :: agnostic :: needLdst :: notReady :: ready :: xcpt :: Nil = Enum(7)
@@ -136,7 +138,7 @@ class VRegSegmentInfo extends Bundle {
     // VRegSegmentStatus
     val status  = UInt(3.W)
     // corresponding ldstuop idx of current vreg segement
-    val idx     = UInt(ldstUopQueueWidth.W)
+    val idx     = new HLSUPtr
     // offset of writeback valid data for current vreg segement
     val offset  = UInt(log2Ceil(8).W)
     // data of current vreg segement

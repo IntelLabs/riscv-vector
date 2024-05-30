@@ -30,6 +30,8 @@ class RVUissue extends Bundle {
 class RVUMemoryReq extends Bundle {
     // ldst queue index
     val idx     = UInt(ldstUopQueueWidth.W)
+    val flag    = Bool()
+    val srcId   = UInt(1.W)
     // memop
     val addr    = UInt(addrWidth.W)
     // 0 for load; 1 for store
@@ -41,7 +43,9 @@ class RVUMemoryReq extends Bundle {
 
 class RVUMemoryResp extends Bundle {
     // ldst queue index
-    val idx      = UInt(ldstUopQueueWidth.W)
+    val idx     = UInt(ldstUopQueueWidth.W)
+    val flag    = Bool()
+    val srcId   = UInt(1.W)
     // load result
     val data     = UInt(dataWidth.W)
     val mask     = UInt((dataWidth / 8).W)

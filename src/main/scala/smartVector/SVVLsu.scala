@@ -9,7 +9,7 @@ import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import xiangshan.MicroOp
 import SmartParam._
 
-class SVVLsu(implicit p: Parameters) extends Module {
+class SVVLsu(implicit p: Parameters) extends Module with HasCircularQueuePtrHelper {
     val io = IO(new LdstIO())
 
     // * BEGIN
@@ -19,14 +19,15 @@ class SVVLsu(implicit p: Parameters) extends Module {
     val addrReg = RegInit(0.U(addrWidth.W))
 
     // ldQueue
-    val canEnqueue      = WireInit(false.B)
-    val ldstEnqPtr      = RegInit(0.U(vLdstUopQueueWidth.W))
-    val issueLdstPtr    = RegInit(0.U(vLdstUopQueueWidth.W))
-    val commitPtr       = RegInit(0.U(vLdstUopQueueWidth.W))
-    val ldstUopQueue    = RegInit(VecInit(Seq.fill(vLdstUopQueueSize)(0.U.asTypeOf(new SegLdstUop))))
+    class VLSUPtr extends CircularQueuePtr[VLSUPtr](vLdstUopQueueSize)
 
-    val ldstQueueCnt   = Mux(ldstEnqPtr >= commitPtr, ldstEnqPtr - commitPtr, ldstEnqPtr + vLdstUopQueueSize.U - commitPtr)
-    val ldstQueueFull  = ldstQueueCnt >= (vLdstUopQueueSize - 1).U
+    val canEnqueue      = WireInit(false.B)
+    val enqPtr          = RegInit(0.U.asTypeOf(new VLSUPtr))
+    val issuePtr        = RegInit(0.U.asTypeOf(new VLSUPtr))
+    val deqPtr          = RegInit(0.U.asTypeOf(new VLSUPtr))
+    val ldstUopQueue    = RegInit(VecInit(Seq.fill(vLdstUopQueueSize)(0.U.asTypeOf(new SegLdstUop))))
+    val ldstQueueCnt    = distanceBetween(enqPtr, deqPtr)
+    val ldstQueueFull   = isFull(enqPtr, deqPtr)
 
     // * signal define
     // * END
@@ -124,45 +125,44 @@ class SVVLsu(implicit p: Parameters) extends Module {
     misalignXcpt.ma        := addrMisalign & ~(isMasked | isVlEq0)
 
     when (canEnqueue) {
-        ldstUopQueue(ldstEnqPtr).valid                  := true.B
-        ldstUopQueue(ldstEnqPtr).status                 := Mux(addrMisalign | isMasked | isVlEq0, LdstUopStatus.ready, LdstUopStatus.notReady)
-        ldstUopQueue(ldstEnqPtr).memOp                  := ldstCtrl.isStore
-        ldstUopQueue(ldstEnqPtr).masked                 := isMasked | isVlEq0
-        ldstUopQueue(ldstEnqPtr).addr                   := addr
-        ldstUopQueue(ldstEnqPtr).pos                    := curVl
-        ldstUopQueue(ldstEnqPtr).size                   := ldstCtrl.log2Memwb
-        ldstUopQueue(ldstEnqPtr).destElem               := destElem
-        ldstUopQueue(ldstEnqPtr).data                   := Mux(ldstCtrl.isStore, destData, ldstUopQueue(ldstEnqPtr).data)
-        ldstUopQueue(ldstEnqPtr).commitInfo.muopEnd     := uopEnd
-        ldstUopQueue(ldstEnqPtr).commitInfo.rfWriteEn   := mUopInfo.rfWriteEn
-        ldstUopQueue(ldstEnqPtr).commitInfo.rfWriteIdx  := mUopInfo.ldest
-        ldstUopQueue(ldstEnqPtr).commitInfo.isFof       := ldstCtrl.unitSMop === UnitStrideMop.fault_only_first
-        ldstUopQueue(ldstEnqPtr).commitInfo.xcpt        := misalignXcpt
-        ldstUopQueue(ldstEnqPtr).commitInfo.regCount    := regCount
-        ldstUopQueue(ldstEnqPtr).commitInfo.regStartIdx := regStartIdx
+        ldstUopQueue(enqPtr.value).valid                  := true.B
+        ldstUopQueue(enqPtr.value).status                 := Mux(addrMisalign | isMasked | isVlEq0, LdstUopStatus.ready, LdstUopStatus.notReady)
+        ldstUopQueue(enqPtr.value).memOp                  := ldstCtrl.isStore
+        ldstUopQueue(enqPtr.value).masked                 := isMasked | isVlEq0
+        ldstUopQueue(enqPtr.value).addr                   := addr
+        ldstUopQueue(enqPtr.value).pos                    := curVl
+        ldstUopQueue(enqPtr.value).size                   := ldstCtrl.log2Memwb
+        ldstUopQueue(enqPtr.value).destElem               := destElem
+        ldstUopQueue(enqPtr.value).data                   := Mux(ldstCtrl.isStore, destData, ldstUopQueue(enqPtr.value).data)
+        ldstUopQueue(enqPtr.value).commitInfo.muopEnd     := uopEnd
+        ldstUopQueue(enqPtr.value).commitInfo.rfWriteEn   := mUopInfo.rfWriteEn
+        ldstUopQueue(enqPtr.value).commitInfo.rfWriteIdx  := mUopInfo.ldest
+        ldstUopQueue(enqPtr.value).commitInfo.isFof       := ldstCtrl.unitSMop === UnitStrideMop.fault_only_first
+        ldstUopQueue(enqPtr.value).commitInfo.xcpt        := misalignXcpt
+        ldstUopQueue(enqPtr.value).commitInfo.regCount    := regCount
+        ldstUopQueue(enqPtr.value).commitInfo.regStartIdx := regStartIdx
 
-        ldstEnqPtr  := ldstEnqPtr + 1.U
+        enqPtr  := enqPtr + 1.U
     }
 
 
     // * BEGIN
     // * Issue LdstUop
-    val (respLdstPtr, respData) = (io.dataExchange.resp.bits.idx(3, 0), io.dataExchange.resp.bits.data)
-    val issueLdstUop    = ldstUopQueue(issueLdstPtr)
+    val respLdstPtr    = 0.U.asTypeOf(new VLSUPtr)
+    respLdstPtr.value := io.dataExchange.resp.bits.idx(3, 0)
+    respLdstPtr.flag  := io.dataExchange.resp.bits.flag
+    val respData       = io.dataExchange.resp.bits.data
+
+    val issueLdstUop    = ldstUopQueue(issuePtr.value)
     val isNoXcptMaskUop = issueLdstUop.valid & (~issueLdstUop.commitInfo.xcpt.xcptValid) & (~issueLdstUop.masked)
     val isMaskedUop     = issueLdstUop.valid & issueLdstUop.masked
-    
-    // nack index smaller than issuePtr can replay
-    val issue2CommitDist = Mux(issueLdstPtr >= commitPtr, issueLdstPtr - commitPtr, issueLdstPtr + vLdstUopQueueSize.U - commitPtr)
-    val nack2CommitDist  = Mux(respLdstPtr  >= commitPtr, respLdstPtr  - commitPtr, respLdstPtr  + vLdstUopQueueSize.U - commitPtr)
-    val smallerNack      = issue2CommitDist > nack2CommitDist
 
-    when (io.dataExchange.resp.bits.nack && smallerNack) {
-        issueLdstPtr := respLdstPtr
+    when (io.dataExchange.resp.bits.nack && (respLdstPtr < issuePtr)) {
+        issuePtr := respLdstPtr
     }.elsewhen(isMaskedUop) {
-        issueLdstPtr := issueLdstPtr + 1.U
+        issuePtr := issuePtr + 1.U
     }.elsewhen (isNoXcptMaskUop && io.dataExchange.req.ready) {
-        issueLdstPtr := issueLdstPtr + 1.U
+        issuePtr := issuePtr + 1.U
     }
 
     // TODO: store waiting resp
@@ -183,7 +183,9 @@ class SVVLsu(implicit p: Parameters) extends Module {
         io.dataExchange.req.valid       := true.B
         io.dataExchange.req.bits.addr   := AddrUtil.getAlignedAddr(issueLdstUop.addr)
         io.dataExchange.req.bits.cmd    := memOp
-        io.dataExchange.req.bits.idx    := (1 << 4).U | issueLdstPtr // to figure out hlsu or vlsu
+        io.dataExchange.req.bits.srcId  := 1.U
+        io.dataExchange.req.bits.flag   := issuePtr.flag
+        io.dataExchange.req.bits.idx    := issuePtr.value
         io.dataExchange.req.bits.data   := Mux(memOp, wData, DontCare)
         io.dataExchange.req.bits.mask   := Mux(memOp, wMask.asUInt, DontCare)
     }.otherwise {
@@ -199,20 +201,20 @@ class SVVLsu(implicit p: Parameters) extends Module {
 
     val memXcpt = io.dataExchange.xcpt.asUInt.orR
     when (io.dataExchange.resp.valid || memXcpt) {
-        val isLoadResp = ldstUopQueue(respLdstPtr).memOp === VMemCmd.read
+        val isLoadResp = ldstUopQueue(respLdstPtr.value).memOp === VMemCmd.read
         val isLoadRespDataValid = io.dataExchange.resp.bits.has_data
         val loadComplete  = isLoadResp && isLoadRespDataValid && !memXcpt
 
-        val dataSz = (1.U << ldstUopQueue(respLdstPtr).size)
+        val dataSz = (1.U << ldstUopQueue(respLdstPtr.value).size)
         val ldData = WireInit(0.U(64.W))
-        val offset = AddrUtil.getAlignedOffset(ldstUopQueue(respLdstPtr).addr)
+        val offset = AddrUtil.getAlignedOffset(ldstUopQueue(respLdstPtr.value).addr)
         // ldData := io.dataExchange.resp.bits.data((offset + dataSz) << 3.U - 1.U, offset << 3.U)
         ldData := (respData >> (offset << 3.U)) & ((1.U << (dataSz << 3.U)) - 1.U)
 
-        ldstUopQueue(respLdstPtr).data   := Mux(loadComplete, ldData, ldstUopQueue(respLdstPtr).data)
-        ldstUopQueue(respLdstPtr).status := LdstUopStatus.ready
-        ldstUopQueue(respLdstPtr).commitInfo.xcpt.xcptValid := memXcpt  // misalign xcpt wont get resp
-        ldstUopQueue(respLdstPtr).commitInfo.xcpt.fromHellaXcpt(io.dataExchange.xcpt)
+        ldstUopQueue(respLdstPtr.value).data   := Mux(loadComplete, ldData, ldstUopQueue(respLdstPtr.value).data)
+        ldstUopQueue(respLdstPtr.value).status := LdstUopStatus.ready
+        ldstUopQueue(respLdstPtr.value).commitInfo.xcpt.xcptValid := memXcpt  // misalign xcpt wont get resp
+        ldstUopQueue(respLdstPtr.value).commitInfo.xcpt.fromHellaXcpt(io.dataExchange.xcpt)
     }
 
     // * Recv Resp
@@ -221,16 +223,16 @@ class SVVLsu(implicit p: Parameters) extends Module {
 
     // * BEGIN
     // * Commit
-    val canCommit    = ldstUopQueue(commitPtr).valid && ldstUopQueue(commitPtr).status === LdstUopStatus.ready
-    val commitXcpt   = canCommit && ldstUopQueue(commitPtr).commitInfo.xcpt.xcptValid
-    val commitMasked = canCommit && ldstUopQueue(commitPtr).masked
+    val canCommit    = ldstUopQueue(deqPtr.value).valid && ldstUopQueue(deqPtr.value).status === LdstUopStatus.ready
+    val commitXcpt   = canCommit && ldstUopQueue(deqPtr.value).commitInfo.xcpt.xcptValid
+    val commitMasked = canCommit && ldstUopQueue(deqPtr.value).masked
     
 
     when (canCommit) {
-        val destElem    = ldstUopQueue(commitPtr).destElem
-        val data        = ldstUopQueue(commitPtr).data
-        val dataSz      = (1.U << ldstUopQueue(commitPtr).size)
-        val log2DataSz  = ldstUopQueue(commitPtr).size
+        val destElem    = ldstUopQueue(deqPtr.value).destElem
+        val data        = ldstUopQueue(deqPtr.value).data
+        val dataSz      = (1.U << ldstUopQueue(deqPtr.value).size)
+        val log2DataSz  = ldstUopQueue(deqPtr.value).size
     
         val wData       = data << ((destElem << log2DataSz) << 3.U)
         val wMask       = VecInit(Seq.fill(vlenb)(0.U(1.W)))
@@ -240,14 +242,14 @@ class SVVLsu(implicit p: Parameters) extends Module {
         }
 
         io.lsuOut.valid             := true.B
-        io.lsuOut.bits.muopEnd      := ldstUopQueue(commitPtr).commitInfo.muopEnd
-        io.lsuOut.bits.rfWriteEn    := Mux(commitXcpt, false.B, ldstUopQueue(commitPtr).commitInfo.rfWriteEn)
-        io.lsuOut.bits.rfWriteIdx   := ldstUopQueue(commitPtr).commitInfo.rfWriteIdx
+        io.lsuOut.bits.muopEnd      := ldstUopQueue(deqPtr.value).commitInfo.muopEnd
+        io.lsuOut.bits.rfWriteEn    := Mux(commitXcpt, false.B, ldstUopQueue(deqPtr.value).commitInfo.rfWriteEn)
+        io.lsuOut.bits.rfWriteIdx   := ldstUopQueue(deqPtr.value).commitInfo.rfWriteIdx
         io.lsuOut.bits.data         := wData
         io.lsuOut.bits.rfWriteMask  := Mux(commitMasked, Fill(vlenb, 1.U), wMask.asUInt)
-        io.lsuOut.bits.isSegLoad    := ldstUopQueue(commitPtr).memOp === VMemCmd.read
-        io.lsuOut.bits.regCount     := ldstUopQueue(commitPtr).commitInfo.regCount
-        io.lsuOut.bits.regStartIdx  := ldstUopQueue(commitPtr).commitInfo.regStartIdx
+        io.lsuOut.bits.isSegLoad    := ldstUopQueue(deqPtr.value).memOp === VMemCmd.read
+        io.lsuOut.bits.regCount     := ldstUopQueue(deqPtr.value).commitInfo.regCount
+        io.lsuOut.bits.regStartIdx  := ldstUopQueue(deqPtr.value).commitInfo.regStartIdx
     }.otherwise {
         io.lsuOut.valid             := false.B
         io.lsuOut.bits              := DontCare
@@ -255,17 +257,17 @@ class SVVLsu(implicit p: Parameters) extends Module {
     }
 
     when (commitXcpt) {
-        val xcptVl   = ldstUopQueue(commitPtr).pos
-        val fofValid = ldstUopQueue(commitPtr).commitInfo.isFof && xcptVl > 0.U
+        val xcptVl   = ldstUopQueue(deqPtr.value).pos
+        val fofValid = ldstUopQueue(deqPtr.value).commitInfo.isFof && xcptVl > 0.U
 
-        val commitUop = ldstUopQueue(commitPtr)
+        val commitUop = ldstUopQueue(deqPtr.value)
         val hellaXcpt = commitUop.commitInfo.xcpt.generateHellaXcpt(commitUop.memOp)
 
         io.lsuOut.bits.xcpt.exception_vld := ~fofValid
         io.lsuOut.bits.xcpt.xcpt_cause    := Mux(fofValid, 0.U.asTypeOf(new HellaCacheExceptions), hellaXcpt)
         io.lsuOut.bits.xcpt.update_vl     := fofValid
         io.lsuOut.bits.xcpt.update_data   := xcptVl
-        io.lsuOut.bits.xcpt.xcpt_addr     := ldstUopQueue(commitPtr).addr
+        io.lsuOut.bits.xcpt.xcpt_addr     := ldstUopQueue(deqPtr.value).addr
 
         // clear ldstUop Queue
         for (i <- 0 until vLdstUopQueueSize) {
@@ -277,9 +279,9 @@ class SVVLsu(implicit p: Parameters) extends Module {
 
 
     when (io.lsuOut.fire) {
-        commitPtr                      := commitPtr + 1.U
-        ldstUopQueue(commitPtr).status := LdstUopStatus.notReady
-        ldstUopQueue(commitPtr).valid  := false.B
+        deqPtr                            := deqPtr + 1.U
+        ldstUopQueue(deqPtr.value).status := LdstUopStatus.notReady
+        ldstUopQueue(deqPtr.value).valid  := false.B
     }
     // * Commit
     // * END
