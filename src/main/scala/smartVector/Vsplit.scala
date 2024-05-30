@@ -562,7 +562,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     val mergeAttrReg = RegInit(0.U.asTypeOf(new MuopMergeAttr))
     val ready = (bitsReg.uop.ctrl.isLdst && ~io.lsuStallSplit) || (~bitsReg.uop.ctrl.isLdst && ~io.iexNeedStall)
 
-    when(!validReg || ready){
+    when(!validReg || ready){  
         validReg := mUopIn.valid
     }
     when(mUopIn.valid) {
