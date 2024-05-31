@@ -38,8 +38,8 @@ class LdstIO(implicit p: Parameters) extends ParameterizedBundle()(p) {
 }
 
 object VRegSegmentStatus {
-    //     0          1          2           3           4          5        6
-    val invalid :: srcData :: agnostic :: needLdst :: notReady :: ready :: xcpt :: Nil = Enum(7)
+    //     0          1          2           3          4       5
+    val invalid :: srcData :: needLdst :: notReady :: ready :: xcpt :: Nil = Enum(6)
 }
 
 object Mop {
@@ -60,11 +60,6 @@ object UnitStrideMop {
 object VMemCmd {
     val read  = false.B
     val write = true.B
-}
-
-object LdstUopXcptCause {
-    val misalign = 1.U
-    val mem_xcpt = 2.U
 }
 
 object LdstUopStatus {
