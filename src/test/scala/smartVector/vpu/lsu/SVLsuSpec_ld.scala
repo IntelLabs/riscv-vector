@@ -711,6 +711,37 @@ trait VLsuBehavior_ld {
         }
         }
     }
+
+    def vLsuTest20(): Unit = {
+        it should "pass: unit-stride load (uops=2, eew=8, vl=0)" in {
+        test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            dut.clock.step(1)
+            val ldReqs = Seq(
+                (vle8.copy(vl=0, uopIdx=0, uopEnd=true, vstart=0), ldReqSrc_default, "h201f1e1d1c1b1a191817161514131211".U, "hffff".U),
+                (vl2re16.copy(vl=0, uopIdx=0, uopEnd=false, vstart=1), ldReqSrc_default, "hffffffffffffffff0123456789ab1211".U, "h0003".U),
+            )
+            
+            for ((c, s, r, m) <- ldReqs) {
+                while (!dut.io.lsuReady.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.mUop.valid.poke(true.B)
+                dut.io.mUop.bits.poke(genLdInput(c, s))
+                dut.clock.step(1)
+                dut.io.mUop.valid.poke(false.B)
+
+                while (!dut.io.lsuOut.valid.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.lsuOut.valid.expect(true.B)
+                // dut.clock.step(50)
+                dut.io.lsuOut.bits.data.expect(r)
+                dut.io.lsuOut.bits.rfWriteMask.expect(m)
+                dut.clock.step(4)
+            }
+        }
+        }
+    }
 }
 
 class VLsuSpec_ld extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VLsuBehavior_ld {
@@ -734,4 +765,5 @@ class VLsuSpec_ld extends AnyFlatSpec with ChiselScalatestTester with BundleGenH
     it should behave like vLsuTest16()  // strided load with mask enabled
     it should behave like vLsuTest17()  // unit-stride exception
     it should behave like vLsuTest18()  // unit-stride whole register load
+    it should behave like vLsuTest20()
 }

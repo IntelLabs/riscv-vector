@@ -28,7 +28,7 @@ trait VLsuBehavior_ld_idx {
     def vLsuTest0(): Unit = {
         it should "pass: indexed load (uops=2, eew=8, sew=16, vl=16, vstart=0)" in {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            dut.clock.setTimeout(1000)
+            dut.clock.setTimeout(200)
             dut.clock.step(1)
             val ldReqs = Seq(
                 (vluxei8.copy(vl=16, uopIdx=0, uopEnd=false, vsew=1), SrcBundleLd(vs2="h010004"), "h201f1e1d1c1b1a1918171615cdef4567".U, "hfff0".U),
@@ -67,7 +67,7 @@ trait VLsuBehavior_ld_idx {
     def vLsuTest1(): Unit = {
         it should "pass: indexed load (uops=2, eew=8, sew=64, vl=3, vstart=0)" in {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            dut.clock.setTimeout(1000)
+            dut.clock.setTimeout(200)
             dut.clock.step(1)
             val ldReqs = Seq(
                 (vluxei8.copy(vl=3, uopIdx=0, uopEnd=false, vsew=3), SrcBundleLd(vs2="h01000"), "h0f0f0f0f0f0f0f0f0123456789abcdef".U, "h0000".U),
@@ -102,7 +102,7 @@ trait VLsuBehavior_ld_idx {
     def vLsuTest2(): Unit = {
         it should "pass: indexed load (uops=3, eew=16, sew=64, vl=5, vstart=0)" in {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            dut.clock.setTimeout(1000)
+            dut.clock.setTimeout(200)
             dut.clock.step(1)
             val ldReqs = Seq(
                 (vluxei16.copy(vl=5, uopIdx=0, uopEnd=false, vsew=3), SrcBundleLd(vs2="h000000180000001000080000"), "hffffffffffffffff0123456789abcdef".U, "h0000".U),
@@ -138,7 +138,7 @@ trait VLsuBehavior_ld_idx {
     def vLsuTest3(): Unit = {
         it should "pass: indexed load (uops=2, eew=32, sew=16, vl=5, vstart=0)" in {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            dut.clock.setTimeout(1000)
+            dut.clock.setTimeout(200)
             dut.clock.step(1)
             val ldReqs = Seq(
                 (vluxei32.copy(vl=5, uopIdx=0, uopEnd=false, vsew=1), SrcBundleLd(vs2="h000000100000000000000008"), "h0".U, "hffff".U),
@@ -174,7 +174,7 @@ trait VLsuBehavior_ld_idx {
     def vLsuTest4(): Unit = {
         it should "pass: indexed load (uops=2, eew=64, sew=16, vl=3, vstart=0)" in {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            dut.clock.setTimeout(1000)
+            dut.clock.setTimeout(200)
             dut.clock.step(1)
             val ldReqs = Seq(
                 (vluxei64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1), SrcBundleLd(vs2="h00010"), "h0".U, "hffff".U),
@@ -209,7 +209,7 @@ trait VLsuBehavior_ld_idx {
     def vLsuTest5(): Unit = {
         it should "pass: indexed load (uops=2, eew=64, sew=16, vl=3, vstart=0) neg index value" in {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            dut.clock.setTimeout(1000)
+            dut.clock.setTimeout(200)
             dut.clock.step(1)
             val ldReqs = Seq(
                 (vluxei64.copy(vl=3, uopIdx=0, uopEnd=false, vsew=1), SrcBundleLd(vs2="hffff_ffff_ffff_fff0_ffff_ffff_ffff_fff8"), "h0".U, "hffff".U),
@@ -244,7 +244,7 @@ trait VLsuBehavior_ld_idx {
     def vLsuTest6(): Unit = {
         it should "pass: indexed load (uops=2, eew=32, sew=16, vl=5, vstart=0) exception" in {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-            dut.clock.setTimeout(1000)
+            dut.clock.setTimeout(200)
             dut.clock.step(1)
             val ldReqs = Seq(
                 (vluxei32.copy(vl=5, uopIdx=0, uopEnd=false, vsew=1), SrcBundleLd(vs2="h000000100000000000000008"), "h0".U, "hffff".U),
