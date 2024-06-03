@@ -127,16 +127,17 @@ class SegLdstUop extends Bundle {
     val commitInfo  = new CommitInfoRecorded()
 }
 
-class VRegSegmentInfo extends Bundle {
-    // VRegSegmentStatus
-    val status  = UInt(3.W)
-    // corresponding ldstuop idx of current vreg segement
-    val idx     = UInt(ldstUopQueueWidth.W)
-    // offset of writeback valid data for current vreg segement
-    val offset  = UInt(log2Ceil(8).W)
-    // data of current vreg segement
-    val data    = UInt(8.W)
-}
+// class VRegSegmentInfo extends Bundle {
+//     // VRegSegmentStatus
+//     val status  = UInt(3.W)
+//     // corresponding ldstuop idx of current vreg segement
+//     val idx     = UInt(ldstUopQueueWidth.W)
+//     // offset of writeback valid data for current vreg segement
+//     val offset  = UInt(log2Ceil(8).W)
+//     // data of current vreg segement
+//     val data    = UInt(8.W)
+// }
+
 
 class mUopInfo extends Bundle {
     val uopIdx      = UInt(6.W)
