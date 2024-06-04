@@ -187,7 +187,7 @@ class SVHLsu(implicit p: Parameters) extends Module {
     }
 
     val accelerateStride = Cat(strideAbs === 4.U, strideAbs === 2.U, strideAbs === 1.U)
-    val canAccelerate = accelerateStride =/= 0.U || strideAbs === 0.U
+    val canAccelerate = (accelerateStride =/= 0.U || strideAbs === 0.U) && ~AddrUtil.isAddrMisalign(strideAbs, ldstCtrlReg.log2Memwb)
     val log2Stride = Mux(canAccelerate, Mux1H(accelerateStride, Seq(0.U, 1.U, 2.U)), 0.U)
 
     val curStridedAddr = Mux(
