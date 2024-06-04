@@ -79,7 +79,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
 
   switch(currentState){
     is(empty){
-      when(validReg && ~bitsReg.uop.ctrl.alu && ~bitsReg.uop.ctrl.isLdst && ~bitsReg.uop.ctrl.mask){
+      when(validReg && ~bitsReg.uop.ctrl.alu && ~bitsReg.uop.ctrl.isLdst && ~bitsReg.uop.ctrl.mask && ~(bitsReg.uop.ctrl.narrow_to_1 && ~bitsReg.uop.uopEnd)){
         currentStateNext := ongoing
       }.otherwise{
         currentStateNext := empty
@@ -96,7 +96,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   } 
 
   currentState := currentStateNext
-  io.iexNeedStall := (currentStateNext === ongoing) || ~ready
+  io.iexNeedStall := (currentState === ongoing) || ~ready
 
   //if is floatRed, when is ready, the next uop valid will be high in same cycle.
   //and the first's ready match the second's valid, it will cause second's ready invalid
