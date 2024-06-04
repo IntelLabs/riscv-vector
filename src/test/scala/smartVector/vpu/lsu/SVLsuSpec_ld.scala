@@ -711,6 +711,40 @@ trait VLsuBehavior_ld {
         }
         }
     }
+
+    def vLsuTest20(): Unit = {
+        it should "pass: strided load (uops=2, eew=16, vl=10, vstart=0, stride=8) with mask exception" in {
+        test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            dut.clock.step(1)
+            val ldReqs = Seq(
+                // 1000~1001(cdef), 1008~1009(ffff), 1010~1011(0f0f), 1018~1019(3210)
+                // 1020~1021(3456), 1028~1029(0101), 1030~1031(4567), 1038~1039(1111)
+                (vlse16.copy(vm=false, vl=10, uopIdx=0, uopEnd=false), SrcBundleLd(scalar_opnd_2="h1", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fefe"), "h201f1e1d1c1b1a191817161514131211".U, "hffff".U),
+            )
+
+            for ((c, s, r, m) <- ldReqs) {
+                while (!dut.io.lsuReady.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.mUop.valid.poke(true.B)
+                dut.io.mUop.bits.poke(genLdInput(c, s))
+                dut.clock.step(1)
+                dut.io.mUop.valid.poke(false.B)
+
+                while (!dut.io.lsuOut.valid.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.lsuOut.valid.expect(true.B)
+                dut.io.xcpt.exception_vld.expect(true.B)
+                dut.io.xcpt.update_vl.expect(false.B)
+                dut.io.xcpt.update_data.expect(1.U)
+                dut.io.lsuOut.bits.data.expect(r)
+                dut.io.lsuOut.bits.rfWriteMask.expect(m)
+                dut.clock.step(4)
+            }
+        }
+        }
+    }
 }
 
 class VLsuSpec_ld extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VLsuBehavior_ld {
@@ -734,4 +768,5 @@ class VLsuSpec_ld extends AnyFlatSpec with ChiselScalatestTester with BundleGenH
     it should behave like vLsuTest16()  // strided load with mask enabled
     it should behave like vLsuTest17()  // unit-stride exception
     it should behave like vLsuTest18()  // unit-stride whole register load
+    it should behave like vLsuTest20()
 }
