@@ -3,6 +3,7 @@ package coincreekDCache
 import chisel3._
 import chisel3.util._
 
+
 class simSRAM_noMask(num: Int, width: Int) extends Module(){
     val io = IO(new Bundle{
         val r_ena  = Input(Bool())
@@ -24,3 +25,4 @@ class simSRAM_noMask(num: Int, width: Int) extends Module(){
     mem.writePorts(0).address := io.w_addr
     mem.writePorts(0).data := io.w_data
 }
+
