@@ -1,5 +1,6 @@
 
 BUILD_DIR = ./build
+CHISEL_VERSION = chisel
 
 PRJ = coincreekDCache
 
@@ -8,7 +9,7 @@ test:
 
 dcache:
 	mkdir -p $(BUILD_DIR)
-	mill -i $(PRJ).runMain coincreekDCache.Main --target-dir $(BUILD_DIR)
+	mill -i $(PRJ)[$(CHISEL_VERSION)].runMain coincreekDCache.Main --target-dir $(BUILD_DIR)
 
 help:
 	mill -i $(PRJ).runMain coincreekDCache.DCache --help
