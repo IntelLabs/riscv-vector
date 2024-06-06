@@ -3,124 +3,145 @@ package coincreekDCache
 import chisel3._
 import chisel3.util._
 import util._
+import java.rmi.server.UID
 
-class cachepipeMSHRFileIO extends Bundle(){
-    // val mshr_add_valid = Bool()
-    val mshr_add_tag   = UInt(addrWidth.W)
-    val mshr_add_type  = UInt(1.W) // 1 for write && 0 for read
-    val mshr_add_mask  = UInt(mshrEntryMaskWidth.W)
-    val mshr_add_data  = UInt(mshrEntryDataWidth.W)
+class ioCachepipeMSHRFile extends Bundle() {
+  // val allocate_valid = Bool()
+  val allocate_tag  = UInt(addrWidth.W)
+  val allocate_type = UInt(1.W) // 1 for write && 0 for read
+  val allocate_mask = UInt(mshrEntryMaskWidth.W)
+  val allocate_data = UInt(mshrEntryDataWidth.W)
 }
 
-class mshr_IO extends Bundle(){
-    // mshr entry search & add new request IO  
-    val mshr_req  = Input(Bool())
-    val mshr_type = Input(UInt(1.W))
-    val mshr_tag  = Input(UInt(tagWidth.W))
+class ioMSHR extends Bundle() {
+  // mshr entry search & add new request inst
+  val allocateReq  = Input(Bool())
+  val allocateType = Input(UInt(1.W))
+  val tag          = Input(UInt(tagWidth.W))
 
-    val mshr_match = Output(Bool()) // mshr add match
-    val mshr_full  = Output(Bool()) // mshr add full -> need stall outside
-    
-    // mshr sender port
-    val mshr_sender_req  = Output(Bool()) // req to send this entry
-    
-    val mshr_sender_resp = Input(Bool()) // permitted to send this entry now
-    val mshr_sender_priv = Output(Bool()) // 1 for write, 0 for read
-    val mshr_sender_tag  = Output(UInt(tagWidth.W))
+  val tagMatch = Output(Bool())                   // mshr allocate match
+  val isEmpty  = Output(Bool())
+  val isFull   = Output(Bool())                   // mshr allocate full -> need stall outside
+  val wrLineOH = Output(UInt(mshrEntryDataNum.W)) // new inst data write to which line of current mshr entry
+
+  // mshr sender port
+  val senderReq = Output(Bool()) // req to send this entry
+
+  val senderResp = Input(Bool())  // permitted to send this entry now
+  val senderPriv = Output(Bool()) // 1 for write, 0 for read
+  val senderTag  = Output(UInt(tagWidth.W))
 }
 
-class MSHR(id: Int) extends Module(){
-    val io = IO(new mshr_IO)
+class MSHR(id: Int) extends Module() {
+  val io = IO(new ioMSHR)
 
-    val mode_idle :: mode_req_enqueue :: mode_resp_wait :: mode_partial_replay :: mode_replay :: mode_refill :: Nil = Enum(6)
-    val state = RegInit(mode_idle)
+  val mode_idle :: mode_req_enqueue :: mode_resp_wait :: mode_partial_replay :: mode_replay :: mode_refill :: Nil =
+    Enum(6)
 
-    // info regs
-    val currentPermission = RegInit(0.U(1.W)) // 1 for write, 0 for read
-    val upgradeRequest    = RegInit(0.U(1.W))
+  val state = RegInit(mode_idle)
 
-    val mshr_type_list    = RegInit(0.U(mshrEntryDataNum.W))
-    val mshr_tag_reg      = RegInit(0.U(addrWidth.W))
-    
-    val totalCounter      = RegInit(0.U((log2Up(mshrEntryDataNum)).W))
-    val pReplayCounter    = RegInit(0.U((log2Up(mshrEntryDataNum)).W))
-    
-    // match & output
-    val mshr_match = mshr_req && (mshr_tag_reg === io.mshr_tag)
-    val mshr_full  = mshr_req && (totalCounter >= mshrEntryDataNum.asUInt)
-    io.mshr_match := mshr_match
-    io.mshr_full  := mshr_full
-    
-    // info regs update
-    currentPermission := Mux((state > mode_req_enqueue), 
-        currentPermission, 
-        mshr_type_list.orR
+  // info regs
+  val currentPermission = RegInit(0.U(1.W)) // 1 for write, 0 for read
+  val upgradeRequest    = RegInit(0.U(1.W))
+
+  val typeList = RegInit(0.U(mshrEntryDataNum.W))
+  val tagReg   = RegInit(0.U(addrWidth.W))
+
+  val totalCounter   = RegInit(0.U(log2Up(mshrEntryDataNum).W))
+  val pReplayCounter = RegInit(0.U(log2Up(mshrEntryDataNum).W))
+
+  // match & output
+  val tagMatch = io.allocateReq && tagReg === io.tag
+  val isFull   = io.allocateReq && totalCounter >= mshrEntryDataNum.asUInt
+  io.tagMatch := tagMatch
+  io.isFull   := isFull
+  io.isEmpty  := state === mode_idle
+
+  io.wrLineOH := Mux(io.allocateReq, UIntToOH(totalCounter, mshrEntryDataNum), 0.U)
+
+  // info regs update
+  currentPermission := Mux(state > mode_req_enqueue, currentPermission, typeList.orR)
+
+  upgradeRequest := Mux(state <= mode_req_enqueue, 0.U, Mux(currentPermission, 0.U, typeList.orR))
+
+  typeList := Mux(
+    state === mode_refill,
+    0.U,
+    Mux(tagMatch && !isFull, typeList | (Cat(0.U((mshrEntryDataNum - 1).W), io.allocateType) << totalCounter), typeList)
+  )
+
+  tagReg := Mux(state === mode_idle, Mux(tagMatch, io.tag, 0.U), tagReg)
+
+  totalCounter := Mux(state === mode_refill, 0.U, Mux(tagMatch && !isFull, totalCounter + 1.U, totalCounter))
+
+  pReplayCounter := Mux(
+    state === mode_refill,
+    0.U,
+    Mux(
+      pReplayCounter =/= totalCounter,
+      pReplayCounter,
+      Mux(
+        tagMatch && !isFull,
+        Mux(state <= mode_req_enqueue || typeList.orR === currentPermission, pReplayCounter + 1.U, pReplayCounter),
+        pReplayCounter
+      )
     )
+  )
 
-    upgradeRequest := Mux((state <= mode_req_enqueue),
-        0.U,
-        Mux(currentPermission, 0.U, mshr_type_list.orR)
+  // FSM
+  state := MuxLookup(state, state)(
+    Seq(
+      mode_idle -> Mux(tagMatch, mode_req_enqueue, state),
+      mode_req_enqueue ->
     )
-
-    mshr_type_list := Mux(state === mode_refill,
-        0.U,
-        Mux(mshr_match && !mshr_full,
-            mshr_type_list | (Cat(0.U((mshrEntryDataNum-1).W), io.mshr_type) << totalCounter),
-            mshr_type_list
-        )
-    )
-
-    mshr_tag_reg := Mux(state === mode_idle,
-        Mux(mshr_match, io.mshr_tag, 0.U),
-        mshr_tag_reg
-    )
-
-    totalCounter := Mux(state === mode_refill,
-        0.U,
-        Mux(mshr_match && !mshr_full,
-            totalCounter + 1.U,
-            totalCounter
-        )
-    )
-
-    pReplayCounter := Mux(state === mode_refill,
-        0.U,
-        Mux(pReplayCounter =/= totalCounter,
-            pReplayCounter,
-            Mux(mshr_match && !mshr_full,
-                Mux(state <= mode_req_enqueue || mshr_type_list.orR === currentPermission, 
-                    pReplayCounter + 1.U,
-                    pReplayCounter
-                ),
-                pReplayCounter
-            )
-        )
-    )
-
-    
-
-    // FSM
-    state := MuxLookup(state, state)(
-        Seq(
-            mode_idle -> Mux(io.mshr_match, mode_req_enqueue, state),
-            mode_req_enqueue -> 
-        )
-    )
-
+  )
 
 }
 
-class mshrFile extends Module(){
-    val io = IO(new Bundle(
-        val pipeline_req = Flipped(Decoupled(new cachePipe_mshrFile_IO))
-        )
-    )
+class MSHRFile extends Module() {
 
-    val mshr_mem = Module( // To store mask & data in sram
-        new simSRAM_noMask(
-            len = mshrEntryNum * mshrEntryDataNum
-            width = mshrEntryMaskWidth + mshrEntryDataWidth
-        ))
-    
-    
+  val io = IO(
+    new Bundle(
+      pipeline_req = Flipped(Decoupled(new ioCachepipeMSHRFile))
+    )
+  )
+
+  val array4MaskAndData = Module(
+    new SRAMWrapper(
+      gen = UInt((mshrEntryMaskWidth + mshrEntryDataWidth).W),
+      set = mshrEntryDataNum * mshrEntryDataNum
+    )
+  )
+
+  val allocateArb = Module(new Arbiter(UInt(), mshrEntryNum))
+  alloc_arb.io.in.foreach(_.bits := DontCare)
+
+  val tagMatchList   = Wire(Vec(mshrEntryNum, Bool()))
+  val entryFullList  = Wire(Vec(mshrEntryNum, Bool()))
+  val sramWriteIdxOH = Wire(Vec(mshrEntryNum, UInt(mshrEntryDataNum.W)))
+
+  val needStall = (tagMatchList & entryFullList).orR
+
+  val mshrs = (0 until mshrEntryNum) map {
+    i =>
+      val mshr = Module(new MSHR(i))
+
+      allocateArb.io.in(i).valid := mshr.io.isEmpty
+      mshr.io.allocateReq        := allocateArb.io.in(i).ready
+
+      tagMatchList(i)   := mshr.io.tagMatch
+      entryFullList(i)  := mshr.io.isFull
+      sramWriteIdxOH(i) := mshr.io.wrLineOH
+
+  }
+
+  // Write Mask & Data SRAM
+  array4MaskAndData.io.w.req.valid := Mux(!needStall && io.pipeline_req.valid, True.B, False.B)
+
+  array4MaskAndData.io.w.bits.apply(
+    setIdx  := OHToUInt(sramAccessIdxOH.asTypeOf(UInt)),
+    data    := Cat(io.pipeline_req.allocate_mask, io.pipeline_req.allocate_data),
+    waymask := 1
+  )
+
 }
