@@ -546,8 +546,6 @@ class Vsplit(implicit p : Parameters) extends Module {
     }
 
     currentState := currentStateNext
-
-    io.in.decodeIn.ready := (currentState === empty)
     
     val validReg = RegInit(false.B)
     val bitsReg = RegInit(0.U.asTypeOf(new Muop))
@@ -557,10 +555,12 @@ class Vsplit(implicit p : Parameters) extends Module {
     when(!validReg || ready){
         validReg := mUopIn.valid
     }
-    when(mUopIn.valid) {
+    when(mUopIn.valid & (!validReg || ready)) {
         bitsReg := mUopIn.bits
         mergeAttrReg := mUopMergeAttrIn.bits
     }
+
+    io.in.decodeIn.ready := (currentStateNext === empty) & ready
 
     //when(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl){
     //    validReg := false.B
