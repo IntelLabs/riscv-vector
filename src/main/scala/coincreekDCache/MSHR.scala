@@ -22,6 +22,7 @@ class ioMSHR extends Bundle() {
   val tagMatch = Output(Bool())                   // mshr allocate match
   val isEmpty  = Output(Bool())
   val isFull   = Output(Bool())                   // mshr allocate full -> need stall outside
+  val privErr  = 
   val wrLineOH = Output(UInt(mshrEntryDataNum.W)) // new inst data write to which line of current mshr entry
 
   // mshr sender port
@@ -35,58 +36,46 @@ class ioMSHR extends Bundle() {
 class MSHR(id: Int) extends Module() {
   val io = IO(new ioMSHR)
 
-  val mode_idle :: mode_req_enqueue :: mode_resp_wait :: mode_partial_replay :: mode_replay :: mode_refill :: Nil =
-    Enum(6)
+  val mode_idle :: mode_req_enqueue :: mode_resp_wait :: mode_replay :: mode_refill :: Nil = Enum(5)
 
   val state = RegInit(mode_idle)
 
-  // info regs
-  val currentPermission = RegInit(0.U(1.W)) // 1 for write, 0 for read
-  val upgradeRequest    = RegInit(0.U(1.W))
+  // info regs & wires
+  val sendedPermission = Wire(1.W) // 1 for write, 0 for read
 
   val typeList = RegInit(0.U(mshrEntryDataNum.W))
   val tagReg   = RegInit(0.U(addrWidth.W))
 
-  val totalCounter   = RegInit(0.U(log2Up(mshrEntryDataNum).W))
-  val pReplayCounter = RegInit(0.U(log2Up(mshrEntryDataNum).W))
+  val totalCounter = RegInit(0.U(log2Up(mshrEntryDataNum).W))
 
   // match & output
   val tagMatch = io.allocateReq && tagReg === io.tag
+  val privErr  = tagMatch && (state > mode_req_enqueue) && !sendedPermission && io.allocateType
   val isFull   = io.allocateReq && totalCounter >= mshrEntryDataNum.asUInt
   io.tagMatch := tagMatch
   io.isFull   := isFull
   io.isEmpty  := state === mode_idle
+  io.privErr  := privErr
 
   io.wrLineOH := Mux(io.allocateReq, UIntToOH(totalCounter, mshrEntryDataNum), 0.U)
 
-  // info regs update
-  currentPermission := Mux(state > mode_req_enqueue, currentPermission, typeList.orR)
+  // info regs & wires update
+  sendedPermission := typeList.orR
 
-  upgradeRequest := Mux(state <= mode_req_enqueue, 0.U, Mux(currentPermission, 0.U, typeList.orR))
-
-  typeList := Mux(
-    state === mode_refill,
+  typeList := Mux(state === mode_refill,
     0.U,
-    Mux(tagMatch && !isFull, typeList | (Cat(0.U((mshrEntryDataNum - 1).W), io.allocateType) << totalCounter), typeList)
-  )
-
-  tagReg := Mux(state === mode_idle, Mux(tagMatch, io.tag, 0.U), tagReg)
-
-  totalCounter := Mux(state === mode_refill, 0.U, Mux(tagMatch && !isFull, totalCounter + 1.U, totalCounter))
-
-  pReplayCounter := Mux(
-    state === mode_refill,
-    0.U,
-    Mux(
-      pReplayCounter =/= totalCounter,
-      pReplayCounter,
-      Mux(
-        tagMatch && !isFull,
-        Mux(state <= mode_req_enqueue || typeList.orR === currentPermission, pReplayCounter + 1.U, pReplayCounter),
-        pReplayCounter
-      )
+    Mux(tagMatch && !isFull && , 
+      typeList | (Cat(0.U((mshrEntryDataNum - 1).W), io.allocateType) << totalCounter), 
+      typeList
     )
   )
+
+  tagReg := Mux(state === mode_idle, 
+    Mux(tagMatch, io.tag, 0.U), 
+    tagReg
+  )
+
+  totalCounter := Mux(state === mode_refill, 0.U, Mux(tagMatch && !isFull, totalCounter + 1.U, totalCounter))
 
   // FSM
   state := MuxLookup(state, state)(
@@ -112,6 +101,12 @@ class MSHRFile extends Module() {
       set = mshrEntryDataNum * mshrEntryDataNum
     )
   )
+
+  val senderQueue = Module(new Queue(UInt(log2Up(mshrEntryNum).W), mshrEntryNum))
+
+  senderQueue.io.enq.valid :=
+    senderQueue.io.enq.bits :=
+    senderQueue.io.deq.ready :=
 
   val allocateArb = Module(new Arbiter(UInt(), mshrEntryNum))
   alloc_arb.io.in.foreach(_.bits := DontCare)
