@@ -1,0 +1,2 @@
+test_dcache:
+	mill -i $(PRJ)[$(CHISEL_VERSION)].test.testOnly $(PROJ).DCacheSpec
