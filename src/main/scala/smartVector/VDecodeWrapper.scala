@@ -35,8 +35,26 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
     //val iexNeedStall = Input(Bool())
   })
 
+  val bufferReg = RegInit(0.U.asTypeOf(new RVUissue))
+  val bufferValidReg = RegInit(false.B)
+
+  when(!io.out.ready & !bufferValidReg){
+    bufferReg := io.in.bits
+    bufferValidReg := io.in.valid
+  }
+
+  when(io.out.ready){
+    bufferValidReg := false.B
+  }
+
+  val muxData = Wire(new RVUissue)
+  val muxValid = Wire(Bool())
+
+  muxData := Mux(bufferValidReg, bufferReg, io.in.bits)
+  muxValid := Mux(bufferValidReg, bufferValidReg, io.in.valid)
+
   val decode = Module(new VDecode)
-  decode.io.in := io.in.bits.inst
+  decode.io.in := muxData.inst
 
   val isFloatRedu =  decode.io.out.redu === true.B && decode.io.out.funct3 === "b001".U
   
@@ -52,35 +70,35 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   val bitsIn = Wire(new VDecodeOutput)
 
   bitsIn.vCtrl         := decodeOut
-  bitsIn.scalar_opnd_1 := io.in.bits.rs1
-  bitsIn.scalar_opnd_2 := io.in.bits.rs2
-  bitsIn.float_opnd_1  := io.in.bits.frs1
+  bitsIn.scalar_opnd_1 := muxData.rs1
+  bitsIn.scalar_opnd_2 := muxData.rs2
+  bitsIn.float_opnd_1  := muxData.frs1
   bitsIn.floatRed      := isFloatRedu
   
   val infoCalc = Module(new VInfoCalc)
   infoCalc.io.ctrl       := decode.io.out
-  infoCalc.io.csr.frm    := io.in.bits.vInfo.frm   
-  infoCalc.io.csr.vxrm   := io.in.bits.vInfo.vxrm  
-  infoCalc.io.csr.vl     := io.in.bits.vInfo.vl    
-  infoCalc.io.csr.vstart := io.in.bits.vInfo.vstart
-  infoCalc.io.csr.vsew   := io.in.bits.vInfo.vsew  
+  infoCalc.io.csr.frm    := muxData.vInfo.frm   
+  infoCalc.io.csr.vxrm   := muxData.vInfo.vxrm  
+  infoCalc.io.csr.vl     := muxData.vInfo.vl    
+  infoCalc.io.csr.vstart := muxData.vInfo.vstart
+  infoCalc.io.csr.vsew   := muxData.vInfo.vsew  
   infoCalc.io.csr.vill   := decode.io.out.illegal  
-  infoCalc.io.csr.ma     := io.in.bits.vInfo.vma    
-  infoCalc.io.csr.ta     := io.in.bits.vInfo.vta    
-  infoCalc.io.csr.vlmul  := io.in.bits.vInfo.vlmul 
+  infoCalc.io.csr.ma     := muxData.vInfo.vma    
+  infoCalc.io.csr.ta     := muxData.vInfo.vta    
+  infoCalc.io.csr.vlmul  := muxData.vInfo.vlmul 
 
   val vIllegalInstrn = Module(new VIllegalInstrn)
-  vIllegalInstrn.io.validIn    := io.in.valid
+  vIllegalInstrn.io.validIn    := muxValid
   vIllegalInstrn.io.ctrl       := decode.io.out
-  vIllegalInstrn.io.csr.frm    := io.in.bits.vInfo.frm   
-  vIllegalInstrn.io.csr.vxrm   := io.in.bits.vInfo.vxrm  
-  vIllegalInstrn.io.csr.vl     := io.in.bits.vInfo.vl    
-  vIllegalInstrn.io.csr.vstart := io.in.bits.vInfo.vstart
-  vIllegalInstrn.io.csr.vsew   := io.in.bits.vInfo.vsew  
+  vIllegalInstrn.io.csr.frm    := muxData.vInfo.frm   
+  vIllegalInstrn.io.csr.vxrm   := muxData.vInfo.vxrm  
+  vIllegalInstrn.io.csr.vl     := muxData.vInfo.vl    
+  vIllegalInstrn.io.csr.vstart := muxData.vInfo.vstart
+  vIllegalInstrn.io.csr.vsew   := muxData.vInfo.vsew  
   vIllegalInstrn.io.csr.vill   := decode.io.out.illegal  
-  vIllegalInstrn.io.csr.ma     := io.in.bits.vInfo.vma    
-  vIllegalInstrn.io.csr.ta     := io.in.bits.vInfo.vta    
-  vIllegalInstrn.io.csr.vlmul  := io.in.bits.vInfo.vlmul 
+  vIllegalInstrn.io.csr.ma     := muxData.vInfo.vma    
+  vIllegalInstrn.io.csr.ta     := muxData.vInfo.vta    
+  vIllegalInstrn.io.csr.vlmul  := muxData.vInfo.vlmul 
 
   vIllegalInstrn.io.infoAll := infoCalc.io.infoAll
   vIllegalInstrn.io.extraInfo_for_VIllegal := infoCalc.io.extraInfo_for_VIllegal
@@ -88,16 +106,16 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
 
   bitsIn.vCtrl.illegal := false.B
 
-  val decodeInValid = io.in.valid
+  val decodeInValid = muxValid
 
-  bitsIn.vInfo.vstart  := io.in.bits.vInfo.vstart
-  bitsIn.vInfo.vl      := io.in.bits.vInfo.vl    
-  bitsIn.vInfo.vlmul   := io.in.bits.vInfo.vlmul 
-  bitsIn.vInfo.vsew    := io.in.bits.vInfo.vsew  
-  bitsIn.vInfo.vma     := io.in.bits.vInfo.vma    
-  bitsIn.vInfo.vta     := io.in.bits.vInfo.vta   
-  bitsIn.vInfo.vxrm    := io.in.bits.vInfo.vxrm  
-  bitsIn.vInfo.frm     := io.in.bits.vInfo.frm   
+  bitsIn.vInfo.vstart  := muxData.vInfo.vstart
+  bitsIn.vInfo.vl      := muxData.vInfo.vl    
+  bitsIn.vInfo.vlmul   := muxData.vInfo.vlmul 
+  bitsIn.vInfo.vsew    := muxData.vInfo.vsew  
+  bitsIn.vInfo.vma     := muxData.vInfo.vma    
+  bitsIn.vInfo.vta     := muxData.vInfo.vta   
+  bitsIn.vInfo.vxrm    := muxData.vInfo.vxrm  
+  bitsIn.vInfo.frm     := muxData.vInfo.frm   
 
   bitsIn.eewEmulInfo := infoCalc.io.infoAll
 
@@ -127,5 +145,7 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
 
   io.out.bits.vCtrl.illegal := Mux(RegNext(fire), vIllegalInstrn.io.ill.valid, bitsReg.vCtrl.illegal)
 
-  io.in.ready := io.out.ready || !validReg
+  io.out.bits.vCtrl.illegal := Mux(RegNext(fire), vIllegalInstrn.io.ill.valid, bitsReg.vCtrl.illegal)
+
+  io.in.ready := !bufferValidReg
 }
