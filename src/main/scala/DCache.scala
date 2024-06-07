@@ -9,7 +9,7 @@ class DCache extends Module {
   val io = IO(new DataExchangeIO())
 
   io.req.ready        := true.B
-  io.resp.valid       := false.B
+  io.resp.valid       := RegNext(io.req.valid)
   io.resp.bits.source := RegNext(io.req.bits.source)
   io.resp.bits.data   := DontCare
 

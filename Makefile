@@ -5,7 +5,7 @@ CHISEL_VERSION = chisel
 PRJ = coincreekDCache
 
 test:
-	mill -i $(PRJ).test
+	mill -i $(PRJ)[$(CHISEL_VERSION)].test
 
 dcache:
 	mkdir -p $(BUILD_DIR)
@@ -22,5 +22,7 @@ checkformat:
 
 clean:
 	-rm -rf $(BUILD_DIR)
+
+include Makefile.test
 
 .PHONY: test verilog help reformat checkformat clean
