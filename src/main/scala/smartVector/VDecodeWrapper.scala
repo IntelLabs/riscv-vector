@@ -30,12 +30,16 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   val io = IO(new Bundle {
     val in  = Flipped(Decoupled(new RVUissue))
     val out = Decoupled(new VDecodeOutput)
-    //val decode_ready = Output(Bool())
-    //val iexNeedStall = Input(Bool())
   })
 
+  // To fix timing, add buffer, when needStall, the data is saved in buffer
+  // when buffer is valid, decode output choose buffer
+  // when buffer is valid, the ready to Rocket is false. 
+  // It means the data in pipe is not ready to be dealt, so the new data can not reg in
   val bufferReg = RegInit(0.U.asTypeOf(new RVUissue))
   val bufferValidReg = RegInit(false.B)
+
+  //!io.out.ready means needStall
 
   when(!io.out.ready & !bufferValidReg){
     bufferReg := io.in.bits
