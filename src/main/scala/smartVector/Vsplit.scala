@@ -143,7 +143,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     val currentState = RegInit(empty)
     val currentStateNext = WireDefault(empty) 
 
-    val fire = io.in.decodeIn.valid & io.in.decodeIn.ready
+    val instDecodeIn = io.in.decodeIn.valid
 
 
     //when (instFirstIn){       
@@ -487,15 +487,15 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.scoreBoardSetIO.setNum     := RegNext(emulVd)
     io.scoreBoardSetIO.setAddr    := RegNext(mUopMergeAttrIn.bits.ldest)
 
-    when((fire || currentState === ongoing) & ~regConf & ~hasExcp){
+    when((instDecodeIn || currentState === ongoing) & ~regConf & ~hasExcp){
         mUopIn.valid := true.B   
     }.otherwise{
         mUopIn.valid := false.B
     }
 
-    when((fire || currentState === ongoing) & ~regConf & ~iexNotReady & ~hasExcp){
+    when((instDecodeIn || currentState === ongoing) & ~regConf & ~iexNotReady & ~hasExcp){
         idx := idx + 1.U    
-    }.elsewhen((fire || currentState === ongoing) & hasExcp){
+    }.elsewhen((instDecodeIn || currentState === ongoing) & hasExcp){
         idx := 0.U
     }   
 
@@ -515,19 +515,19 @@ class Vsplit(implicit p : Parameters) extends Module {
     expdLenIn := Mux(ldst, expdLenLdSt,
                     Mux(ctrl.perm || vmv_vfmv, 1.U, (Mux(vcpop || viota || vid, lmul, maxOfVs12Vd))))
     
-    when(fire){
+    when(instDecodeIn){
         expdLenReg := expdLenIn
     }
-    expdLen := Mux(fire, expdLenIn, expdLenReg)
+    expdLen := Mux(instDecodeIn, expdLenIn, expdLenReg)
 
     switch(currentState){
         is(empty){
-            when(fire && regConf){
+            when(instDecodeIn && regConf){
                 currentStateNext := ongoing
-            }.elsewhen(fire && (expdLen === 1.U || hasExcp)){
+            }.elsewhen(instDecodeIn && (expdLen === 1.U || hasExcp)){
                 currentStateNext := empty
                 idx := 0.U              
-            }.elsewhen(fire && expdLen =/= 1.U){
+            }.elsewhen(instDecodeIn && expdLen =/= 1.U){
                 currentStateNext := ongoing
             }.otherwise{
                 currentStateNext := empty
@@ -578,7 +578,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     //    io.in.decodeIn.ready := true.B
     //}
 
-    io.excpInfo.exception_vld := io.vLSUXcpt.exception_vld || (ctrl.illegal & fire)
+    io.excpInfo.exception_vld := io.vLSUXcpt.exception_vld || (ctrl.illegal & instDecodeIn)
     io.excpInfo.illegalInst   := ctrl.illegal
     io.excpInfo.update_vl     := io.vLSUXcpt.update_vl
     io.excpInfo.update_data   := io.vLSUXcpt.update_data
