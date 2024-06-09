@@ -534,7 +534,7 @@ class Vsplit(implicit p : Parameters) extends Module {
             }
         }
         is(ongoing){
-            when(regConf){
+            when(regConf || iexNotReady){
                 currentStateNext := ongoing
             }.elsewhen(((idx + 1.U) === expdLen || hasExcp)){
                 currentStateNext := empty
