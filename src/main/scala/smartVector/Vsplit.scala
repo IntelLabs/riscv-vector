@@ -143,7 +143,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     val currentState = RegInit(empty)
     val currentStateNext = WireDefault(empty) 
 
-    val instDecodeIn = io.in.decodeIn.valid
+    val instDecodeIn = io.in.decodeIn.valid && currentState === empty
 
 
     //when (instFirstIn){       

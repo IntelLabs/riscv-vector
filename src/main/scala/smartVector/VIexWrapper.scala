@@ -41,8 +41,12 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   val SVPerm  = Module(new VPermWrapper()(p))
   val SVFpu   = Module(new VSFPUWrapper()(p))
 
-  val validReg = io.in.valid
   val bitsReg  = io.in.bits
+  val empty :: ongoing :: Nil = Enum(2)
+  val currentState = RegInit(empty)
+  val type1 = bitsReg.uop.ctrl.alu || bitsReg.uop.ctrl.mul || bitsReg.uop.ctrl.mask || bitsReg.uop.ctrl.redu
+  val validReg = (io.in.valid && currentState === empty && type1) ||
+                 (io.in.valid && ~type1)
   //val divNotReady  = io.in.bits.uop.ctrl.div  & ~SVDiv.io.in.ready
   //val fpuNotReady  = io.in.bits.uop.ctrl.fp   & ~SVFpu.io.in.ready
   //val permNotReady = io.in.bits.uop.ctrl.perm & SVPerm.io.out.perm_busy
@@ -51,8 +55,6 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   val permNotReady = SVPerm.io.out.perm_busy
   val ready    = ~(divNotReady || fpuNotReady || permNotReady)
 
-  val empty :: ongoing :: Nil = Enum(2)
-  val currentState = RegInit(empty)
   val currentStateNext = WireDefault(empty) 
 
   val outValid = SValu.io.out.valid || SVMac.io.out.valid || SVMask.io.out.valid || 
@@ -96,7 +98,8 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   } 
 
   currentState := currentStateNext
-  io.iexNeedStall := (currentStateNext === ongoing) || ~ready
+  //io.iexNeedStall := (currentStateNext === ongoing) || ~ready
+  io.iexNeedStall := (currentStateNext === ongoing)
 
   //if is floatRed, when is ready, the next uop valid will be high in same cycle.
   //and the first's ready match the second's valid, it will cause second's ready invalid
