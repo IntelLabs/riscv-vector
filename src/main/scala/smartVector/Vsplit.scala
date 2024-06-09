@@ -319,6 +319,7 @@ class Vsplit(implicit p : Parameters) extends Module {
         mUopMergeAttrIn.bits.regBackWidth := "b111".U
         mUopMergeAttrIn.bits.regWriteMuopIdx  := 0.U       
     }
+    val fire = Wire(Bool())
     
     mUopMergeAttrIn.valid                 := mUopIn.valid
     mUopMergeAttrIn.bits.scalarRegWriteEn := ctrl.rdVal && !isfloat  
@@ -357,10 +358,10 @@ class Vsplit(implicit p : Parameters) extends Module {
         sameLdest := false.B
     }
 
-    when(~mUopIn.bits.uop.uopEnd & mUopIn.valid){ 
+    when(~mUopIn.bits.uop.uopEnd & fire){ 
         ldest_inc_last := ldest_inc
     }
-    when(mUopIn.bits.uop.uopEnd & mUopIn.valid){
+    when(mUopIn.bits.uop.uopEnd & fire){
         ldest_inc_last := 15.U
     }
 
@@ -473,17 +474,17 @@ class Vsplit(implicit p : Parameters) extends Module {
     mUopIn.bits.uopRegInfo.old_vd    := old_vd
     mUopIn.bits.uopRegInfo.mask      := mask
 
-    io.out.toRegFileRead.rfReadEn(0)      := mUopIn.valid && ctrl.lsrcVal(0)
-    io.out.toRegFileRead.rfReadEn(1)      := mUopIn.valid && ctrl.lsrcVal(1)
-    io.out.toRegFileRead.rfReadEn(2)      := mUopIn.valid && ~ctrl.vm
-    io.out.toRegFileRead.rfReadEn(3)      := mUopIn.valid && (ctrl.ldestVal || ctrl.store)
+    io.out.toRegFileRead.rfReadEn(0)      := fire && ctrl.lsrcVal(0)
+    io.out.toRegFileRead.rfReadEn(1)      := fire && ctrl.lsrcVal(1)
+    io.out.toRegFileRead.rfReadEn(2)      := fire && ~ctrl.vm
+    io.out.toRegFileRead.rfReadEn(3)      := fire && (ctrl.ldestVal || ctrl.store)
     io.out.toRegFileRead.rfReadIdx(0)     := ctrl.lsrc(0) + lsrc0_inc
     io.out.toRegFileRead.rfReadIdx(1)     := ctrl.lsrc(1) + lsrc1_inc
     io.out.toRegFileRead.rfReadIdx(2)     := 0.U
     io.out.toRegFileRead.rfReadIdx(3)     := ctrl.ldest + ldest_inc
 
-    io.scoreBoardSetIO.setEn      := RegNext(mUopIn.valid && ctrl.ldestVal && (~ctrl.perm || ~(ldstCtrl.segment && segmentRegNotFirstElem)))
-    io.scoreBoardSetIO.setMultiEn := RegNext(mUopIn.valid && ctrl.ldestVal && ctrl.perm)
+    io.scoreBoardSetIO.setEn      := RegNext(fire && ctrl.ldestVal && (~ctrl.perm || ~(ldstCtrl.segment && segmentRegNotFirstElem)))
+    io.scoreBoardSetIO.setMultiEn := RegNext(fire && ctrl.ldestVal && ctrl.perm)
     io.scoreBoardSetIO.setNum     := RegNext(emulVd)
     io.scoreBoardSetIO.setAddr    := RegNext(mUopMergeAttrIn.bits.ldest)
 
@@ -555,7 +556,8 @@ class Vsplit(implicit p : Parameters) extends Module {
     when(!validReg || ready){
         validReg := mUopIn.valid
     }
-    when(mUopIn.valid & (!validReg || ready)) {
+    fire := mUopIn.valid & (!validReg || ready)
+    when(fire) {
         bitsReg := mUopIn.bits
         mergeAttrReg := mUopMergeAttrIn.bits
     }
