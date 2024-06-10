@@ -17,27 +17,6 @@ class VSFPUWrapper (implicit p : Parameters) extends VFuModule {
   })
 
   val vFPu = Module(new fp.VFPUWrapper)
-
-  //val validReg = RegInit(false.B)
-  //val bitsReg = RegInit(0.U.asTypeOf(new VFuInput))
-  //
-  //when(io.in.valid && vFPu.io.in.ready){
-  //  vFPu.io.in.valid := true.B
-  //  vFPu.io.in.bits  := io.in.bits
-  //}.elsewhen(io.in.valid && ~vFPu.io.in.ready){
-  //  vFPu.io.in.valid := false.B
-  //  vFPu.io.in.bits  := io.in.bits
-  //  validReg := true.B
-  //  bitsReg := io.in.bits
-  //}.elsewhen(~io.in.valid && validReg && vFPu.io.in.ready){
-  //  vFPu.io.in.valid := true.B
-  //  vFPu.io.in.bits  := bitsReg
-  //  validReg := false.B
-  //}.otherwise{
-  //  vFPu.io.in.valid := false.B
-  //  vFPu.io.in.bits  := io.in.bits
-  //  validReg := false.B
-  //}
   
   vFPu.io.in.valid := io.in.valid 
   vFPu.io.in.bits  := io.in.bits
