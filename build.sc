@@ -87,13 +87,27 @@ trait RocketChip extends millbuild.`rocket-chip`.common.RocketChipModule with Ha
 
 }
 
+object utility extends Cross[Utility]("chisel", "chisel3")
+
+trait Utility extends HasChisel {
+
+  override def millSourcePath = os.pwd / "utility"
+
+  override def moduleDeps = super.moduleDeps ++ Seq(
+    rocketchip(crossValue)
+  )
+
+}
+
 // extends this trait to use coincreekDCache in other projects
 trait coincreekDCacheModule extends ScalaModule {
 
   def rocketModule: ScalaModule
+  def utilityModule: ScalaModule
 
   override def moduleDeps = super.moduleDeps ++ Seq(
-    rocketModule
+    rocketModule,
+    utilityModule
   )
 
   val resourcesPATH = os.pwd.toString() + "/src/main/resources"
@@ -108,7 +122,8 @@ trait coincreekDCache extends coincreekDCacheModule with HasChisel {
 
   override def millSourcePath = os.pwd
 
-  def rocketModule = rocketchip(crossValue)
+  def rocketModule  = rocketchip(crossValue)
+  def utilityModule = utility(crossValue)
 
   override def forkArgs = Seq("-Xmx40G", "-Xss256m")
 
@@ -124,7 +139,7 @@ trait coincreekDCache extends coincreekDCacheModule with HasChisel {
     override def forkArgs = Seq("-Xmx40G", "-Xss256m")
 
     override def sources = T.sources {
-      super.sources() ++ Seq(PathRef(millSourcePath / "src" / "test" / "scala"))
+      super.sources() ++ Seq(PathRef(this.millSourcePath / "src" / "test" / "scala"))
     }
 
     override def ivyDeps = super.ivyDeps() ++ Agg(

@@ -1,9 +1,7 @@
-package util
+package coincreekDCache.util
 
 import chisel3._
 import chisel3.util._
-import freechips.rocketchip.util.Pow2ClockDivider
-import utility.ClockGate
 
 class SRAMWrapper[T <: Data](
   gen: T,
@@ -35,17 +33,9 @@ class SRAMWrapper[T <: Data](
           innerSet,
           1,
           singlePort = true,
-          input_clk_div_by_2 = clk_div_by_2
+          clk_div_by_2 = clk_div_by_2
         )
       )
-
-      // val clk_en = RegInit(false.B)
-      // clk_en := ~clk_en
-      // val masked_clock = ClockGate(false.B, clk_en, clock)
-
-      // if (clk_div_by_2) {
-      //   sram.clock := masked_clock
-      // }
       sram.io.r.req.valid := io.r.req.valid && ren
       sram.io.r.req.bits.apply(r_setIdx)
       sram.io.w.req.valid := io.w.req.valid && wen
