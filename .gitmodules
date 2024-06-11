@@ -1,3 +1,6 @@
 [submodule "rocket-chip"]
 	path = rocket-chip
 	url = https://github.com/OpenXiangShan/rocket-chip
+[submodule "utility"]
+	path = utility
+	url = https://github.com/OpenXiangShan/utility

@@ -4,7 +4,6 @@ import chisel3._
 import chisel3.util._
 
 import MemoryOpConstants._
-import DCacheParams._
 
 class DataExchangeReq extends Bundle {
   val source = UInt(srcWidth.W)
