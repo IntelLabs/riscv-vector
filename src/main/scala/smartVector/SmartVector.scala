@@ -28,6 +28,7 @@ class ScoreboardClearIO extends Bundle {
     val clearAddr     = Input(UInt(log2Ceil(NVPhyRegs).W))
     val clearMultiEn  = Input(Bool())
     val clearNum      = Input(UInt(4.W))
+    val clearAll      = Input(Bool())
 }
 
 class ScoreboardReadIO extends Bundle {
@@ -150,6 +151,7 @@ class SmartVector extends Module {
     sboard.clearN(merge.io.scoreBoardCleanIO.clearMultiEn, merge.io.scoreBoardCleanIO.clearAddr, merge.io.scoreBoardCleanIO.clearNum)
     sboard.set(split.io.scoreBoardSetIO.setEn, split.io.scoreBoardSetIO.setAddr)
     sboard.setN(split.io.scoreBoardSetIO.setMultiEn, split.io.scoreBoardSetIO.setAddr, split.io.scoreBoardSetIO.setNum)
+    sboard.clearAll(merge.io.scoreBoardCleanIO.clearAll)
     split.io.scoreBoardReadIO.readBypassed1 := sboard.readBypassed(split.io.scoreBoardReadIO.readAddr1)
     split.io.scoreBoardReadIO.readBypassed2 := sboard.readBypassed(split.io.scoreBoardReadIO.readAddr2)
     split.io.scoreBoardReadIO.readBypassed3 := sboard.readBypassed(split.io.scoreBoardReadIO.readAddr3)
