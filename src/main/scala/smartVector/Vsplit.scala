@@ -555,7 +555,12 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     when(!validReg || ready){
         validReg := mUopIn.valid
+    }   
+
+    when(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl){
+        validReg := false.B
     }
+
     fire := mUopIn.valid & (!validReg || ready)
     when(fire) {
         bitsReg := mUopIn.bits
