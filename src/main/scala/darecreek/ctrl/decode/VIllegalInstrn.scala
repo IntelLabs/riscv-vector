@@ -93,7 +93,8 @@ class VIllegalInstrn extends Module {
   // invalid rounding mode
   val ill_frm = csr.frm(2) && csr.frm(1, 0) =/= 0.U && ctrl.fp
   // invalid SEW of FP
-  val ill_sewFP = !vsew(1) && (ctrl.fp || (ctrl.redu && ctrl.funct3 === "b001".U)) 
+  val ill_sewFP = !vsew(1) && (ctrl.fp || (ctrl.redu && ctrl.funct3 === "b001".U) || 
+                                          (ctrl.div && ((ctrl.funct3 === "b001".U) || ctrl.funct3 === "b101".U))) 
 
   // Illegal start number of register group
   def regGroup_start_illegal(vemul: UInt, startReg: UInt) = {
