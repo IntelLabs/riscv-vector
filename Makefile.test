@@ -3,3 +3,6 @@ test_dcache:
 
 test_meta:
 	mill -i $(PRJ)[$(CHISEL_VERSION)].test.testOnly $(PRJ).MetaArrayTest
+
+test_data:
+	mill -i $(PRJ)[$(CHISEL_VERSION)].test.testOnly $(PRJ).DataArrayTest
