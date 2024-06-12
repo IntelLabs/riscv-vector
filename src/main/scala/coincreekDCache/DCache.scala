@@ -21,7 +21,7 @@ object Main extends App {
     "--lowering-options=" + List(
       "disallowLocalVariables",
       "disallowPackedArrays",
-      "locationInfoStyle=wrapInAtSquareBracket"
+      "locationInfoStyle=wrapInAtSquareBracket",
     ).reduce(_ + "," + _)
   )
 
