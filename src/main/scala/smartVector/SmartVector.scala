@@ -89,6 +89,8 @@ class SmartVector extends Module {
     
     decoder.io.in.bits  := io.in.bits
     decoder.io.in.valid := io.in.valid & io.in.ready
+    decoder.io.vLSUXcpt := Mux(svlsuWrapper.io.lsuOut.valid, 
+    svlsuWrapper.io.lsuOut.bits.xcpt, 0.U.asTypeOf(new VLSUXcpt))
     split.io.in.decodeIn <> decoder.io.out
     split.io.in.regFileIn <> regFile.io.out
     iex.io.in <> split.io.out.mUop

@@ -30,6 +30,7 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   val io = IO(new Bundle {
     val in  = Flipped(Decoupled(new RVUissue))
     val out = Decoupled(new VDecodeOutput)
+    val vLSUXcpt = Input (new VLSUXcpt)
     //val decode_ready = Output(Bool())
     //val iexNeedStall = Input(Bool())
   })
@@ -122,6 +123,12 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
 
   io.out.bits.vCtrl.illegal := Mux(RegNext(fire), vIllegalInstrn.io.ill.valid, bitsReg.vCtrl.illegal)
 
+  val hasExcp = io.out.bits.vCtrl.illegal || io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl
+
+  when(hasExcp){
+    validReg := false.B
+  }
+  
   io.in.ready := io.out.ready || !validReg
 }
 

@@ -523,12 +523,14 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     switch(currentState){
         is(empty){
-            when(instDecodeIn && regConf){
+            when(instDecodeIn && hasExcp){
+                currentStateNext := empty
+            }.elsewhen(instDecodeIn && regConf){
                 currentStateNext := ongoing
-            }.elsewhen(instDecodeIn && (expdLen === 1.U || hasExcp)){
+            }.elsewhen(instDecodeIn && expdLen === 1.U && ~ctrl.isLdst){
                 currentStateNext := empty
                 idx := 0.U              
-            }.elsewhen(instDecodeIn && expdLen =/= 1.U){
+            }.elsewhen(instDecodeIn && (expdLen =/= 1.U || ctrl.isLdst)){
                 currentStateNext := ongoing
             }.otherwise{
                 currentStateNext := empty
