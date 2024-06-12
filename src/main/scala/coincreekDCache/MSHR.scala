@@ -13,6 +13,7 @@ class ioMSHR extends Bundle() {
   val tagMatch = Output(Bool())                           // mshr allocate match
   val isEmpty  = Output(Bool())
   val isFull   = Output(Bool())                           // mshr allocate full -> need stall outside
+  val typeErr  = Output(Bool())
   val privErr  = Output(Bool())
   val wrLine   = Output(UInt(log2Up(mshrEntryDataNum).W)) // new inst data write to which line of current mshr entry
 
@@ -26,21 +27,20 @@ class MSHR(id: Int) extends Module() {
   val io = IO(new ioMSHR)
 
   val mode_idle :: mode_req_enqueue :: mode_resp_wait :: mode_replay :: mode_refill :: Nil = Enum(5)
-
-  val state = RegInit(mode_idle)
+  val state                                                                                = RegInit(mode_idle)
 
   // info regs & wires
-  val sendedPermission = Wire(1.W) // 1 for write, 0 for read
+  val sendedPermission = Wire(UInt(1.W)) // 1 for write, 0 for read
 
-  val isVector = RegInit(False.B)
+  val isVector = RegInit(false.B)
   val typeList = RegInit(0.U(mshrEntryDataNum.W))
-  val tagReg   = RegInit(0.U(addrWidth.W))
+  val tagReg   = RegInit(0.U(tagWidth.W))
 
   val totalCounter = RegInit(0.U(log2Up(mshrEntryDataNum).W))
 
   // match & output
-  val tagMatch = io.allocateReq && tagReg === io.tag
-  val privErr  = tagMatch && (state > mode_req_enqueue) && !sendedPermission && io.allocateType
+  val tagMatch = io.allocateReq && (tagReg === io.tag)
+  val privErr  = tagMatch && (state > mode_req_enqueue) && (!sendedPermission) && io.allocateType(0)
   val typeErr  = tagMatch && (isVector =/= io.allocateType(1))
   // vector 9(mask+512data) & scalar write 2(mask+64data) & scalar read 1(mask)
   val reqDataNum = Mux(io.allocateType(1), 9.U, Mux(io.allocateType(0), 2.U, 1.U))
@@ -49,6 +49,7 @@ class MSHR(id: Int) extends Module() {
   io.isFull   := isFull
   io.isEmpty  := state === mode_idle
   io.privErr  := privErr
+  io.typeErr  := typeErr
 
   io.wrLine := Mux(io.allocateReq, totalCounter, 0.U)
 
@@ -57,8 +58,8 @@ class MSHR(id: Int) extends Module() {
 
   isVector := Mux(
     state === mode_refill,
-    Fasle.B,
-    Mux(state === mode_idle && tagMatch, io.allocateType(1).asBool(), isVector)
+    false.B,
+    Mux(state === mode_idle && tagMatch, io.allocateType(1).asBool, isVector)
   )
 
   typeList := Mux(
@@ -66,7 +67,7 @@ class MSHR(id: Int) extends Module() {
     0.U,
     Mux(
       tagMatch && !isFull && state <= mode_req_enqueue,
-      typeList | (Cat(0.U((mshrEntryDataNum - 1).W), io.allocateType(0)) << totalCounter),
+      typeList | (Mux(io.allocateType(0), UIntToOH(totalCounter, mshrEntryDataNum), 0.U)),
       typeList
     )
   )
@@ -82,8 +83,8 @@ class MSHR(id: Int) extends Module() {
   state := MuxLookup(state, state)(
     Seq(
       mode_idle        -> Mux(tagMatch, mode_req_enqueue, state),
-      mode_req_enqueue -> Mux(io.senderResp, mode_resp_wait, state),
-      mode_resp_wait   -> Mux()
+      mode_req_enqueue -> Mux(io.senderResp, mode_resp_wait, state)
+//      mode_resp_wait   -> Mux()
     )
   )
 
@@ -97,7 +98,7 @@ class ioCachepipeMSHRFile extends Bundle() {
 }
 
 class ioMSHRL2 extends Bundle() {
-  val priv = UInt(Bool())
+  val priv = Bool()
   val tag  = UInt(tagWidth.W)
 }
 
@@ -120,14 +121,15 @@ class MSHRFile extends Module() {
   val senderIdxList  = Wire(Vec(mshrEntryNum, UInt(mshrEntryDataNum.W)))
 
   val allocateArb = Module(new Arbiter(UInt(), mshrEntryNum))
-  alloc_arb.io.in.foreach(_.bits := DontCare)
+  allocateArb.io.in.foreach(_.bits := DontCare)
 
   val tagMatchList      = Wire(Vec(mshrEntryNum, Bool()))
+  val entryFullList     = Wire(Vec(mshrEntryNum, Bool()))
   val entryStallList    = Wire(Vec(mshrEntryNum, Bool()))
   val entryChooseList   = Wire(Vec(mshrEntryNum, Bool()))
   val arrayWriteIdxList = Wire(Vec(mshrEntryNum, UInt(mshrEntryDataNum.W)))
 
-  val needStall     = (tagMatchList & entryFullList).orR
+  val needStall     = (tagMatchList.asUInt & entryFullList.asUInt).orR
   val choosedEntry  = OHToUInt(entryChooseList.asUInt, log2Up(mshrEntryNum))
   val arrayWriteIdx = arrayWriteIdxList.reduce(_ | _)
 
@@ -140,7 +142,7 @@ class MSHRFile extends Module() {
 
       allocateArb.io.in(i).valid := mshr.io.isEmpty
       mshr.io.allocateReq        := allocateArb.io.in(i).ready
-      entryChooseList(i)         := Mux(allocateArb.io.in(i).ready, True.B, False.B)
+      entryChooseList(i)         := Mux(allocateArb.io.in(i).ready, true.B, false.B)
 
       tagMatchList(i)      := mshr.io.tagMatch
       entryFullList(i)     := mshr.io.isFull | mshr.io.privErr | mshr.io.typeErr
@@ -154,31 +156,31 @@ class MSHRFile extends Module() {
   }
 
   // Write Mask & Data SRAM
-  when(io.pipelineReq.valid && !needStall) {
-    val data2Vec = io.pipelineReq.allocateData.asTypeOf(Vec(mshrEntryDataNum, UInt(mshrEntryDataWidth.W)))
+  when(io.pipelineReq.valid && (!needStall)) {
+    val data2Vec = io.pipelineReq.bits.allocateData.asTypeOf(Vec(mshrEntryDataNum, UInt(mshrEntryDataWidth.W)))
     for (i <- 0 until mshrEntryDataNum)
-      when(io.pipelineReq.allocateType(1)) {
+      when(io.pipelineReq.bits.allocateType(1)) {
         array4MaskAndDatas(choosedEntry)(i) := data2Vec(i)
-      }.elsewhen(io.pipelineReq.allocateType(0)) {
+      }.elsewhen(io.pipelineReq.bits.allocateType(0)) {
         when(i.asUInt === arrayWriteIdx) {
-          array4MaskAndDatas(choosedEntry)(i) := io.pipelineReq.allocateMask
+          array4MaskAndDatas(choosedEntry)(i) := io.pipelineReq.bits.allocateMask
         }.elsewhen(i.asUInt === arrayWriteIdx + 1.U) {
           array4MaskAndDatas(choosedEntry)(i) := data2Vec(0)
         }
       }.otherwise {
         when(i.asUInt === arrayWriteIdx) {
-          array4MaskAndDatas(choosedEntry)(i) := io.pipelineReq.allocateMask
+          array4MaskAndDatas(choosedEntry)(i) := io.pipelineReq.bits.allocateMask
         }
       }
   }
 
   // sender queue
-  senderQueue.io.enq.valid := io.pipelineReq.valid && senderReqList.orR
+  senderQueue.io.enq.valid := io.pipelineReq.valid && senderReqList.asUInt.orR
   senderQueue.io.enq.bits  := senderIdxList.reduce(_ | _)
 
   senderQueue.io.deq.ready := io.toL2Req.valid
-  io.toL2Req.priv          := senderPrivList(senderQueue.io.deq.bits)
-  io.toL2Req.tag           := tagList(senderQueue.io.deq.bits)
+  io.toL2Req.bits.priv     := senderPrivList(senderQueue.io.deq.bits)
+  io.toL2Req.bits.tag      := tagList(senderQueue.io.deq.bits)
   senderRespList           := UIntToOH(senderQueue.io.deq.bits, mshrEntryNum)
 
 }
