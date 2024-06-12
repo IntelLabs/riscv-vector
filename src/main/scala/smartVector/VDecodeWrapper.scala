@@ -85,7 +85,7 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   vIllegalInstrn.io.extraInfo_for_VIllegal := infoCalc.io.extraInfo_for_VIllegal
   vIllegalInstrn.io.robPtrIn := 0.U.asTypeOf(new VRobPtr)
 
-  bitsIn.vCtrl.illegal := vIllegalInstrn.io.ill.valid
+  bitsIn.vCtrl.illegal := false.B
 
   val decodeInValid = io.in.valid
 
@@ -106,12 +106,21 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   when(!validReg || io.out.ready){
       validReg := decodeInValid
   }
+  
   when(decodeInValid & (!validReg || io.out.ready)) {
       bitsReg := bitsIn
   }
-
+  
+  val fire = decodeInValid & (!validReg || io.out.ready)
+ 
+  when(RegNext(fire)){
+    bitsReg.vCtrl.illegal := vIllegalInstrn.io.ill.valid
+  }
+  
   io.out.valid := validReg
   io.out.bits  := bitsReg
+
+  io.out.bits.vCtrl.illegal := Mux(RegNext(fire), vIllegalInstrn.io.ill.valid, bitsReg.vCtrl.illegal)
 
   io.in.ready := io.out.ready || !validReg
 }
