@@ -1,2 +1,5 @@
 test_dcache:
-	mill -i $(PRJ)[$(CHISEL_VERSION)].test.testOnly $(PROJ).DCacheSpec
+	mill -i $(PRJ)[$(CHISEL_VERSION)].test.testOnly $(PRJ).DCacheSpec
+
+test_meta:
+	mill -i $(PRJ)[$(CHISEL_VERSION)].test.testOnly $(PRJ).MetaArrayTest
