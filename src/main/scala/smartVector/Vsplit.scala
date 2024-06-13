@@ -121,11 +121,10 @@ class Vsplit(implicit p : Parameters) extends Module {
         }
         val scoreBoardSetIO = Flipped(new ScoreboardSetIO)
         val scoreBoardReadIO = Flipped(new ScoreboardReadIO)
-        //val lsuStallSplit = Input(Bool()) 
+        val lsuStallSplit = Input(Bool()) 
         val iexNeedStall  = Input(Bool())
         val vLSUXcpt = Input (new VLSUXcpt)
         val excpInfo = Output(new ExcpInfo)
-        val vLsuIn   = Input (ValidIO(new LsuOutput))
     })
 
     val expdWidth     = 8 // 1~128
@@ -422,8 +421,8 @@ class Vsplit(implicit p : Parameters) extends Module {
     //narrowTo1NoStall need to deal with
     //val narrowTo1NoStall = ctrl.narrow_to_1 
     val regConf = hasRegConf(0) || hasRegConf(1) || hasRegConf(2) || hasRegConf(3) 
-    val lsuStallSplit = RegInit(false.B)
-    val iexNotReady = lsuStallSplit || io.iexNeedStall
+    val lsuStallSplit = Wire(Bool())
+    val iexNotReady = lsuStallSplit || io.lsuStallSplit || io.iexNeedStall
     val hasExcp = ctrl.illegal || io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl    
 
     mUopIn.bits.uop.uopIdx   := uopIdx
@@ -559,7 +558,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     val bitsReg = RegInit(0.U.asTypeOf(new Muop))
     val mergeAttrReg = RegInit(0.U.asTypeOf(new MuopMergeAttr))
     //val ready = (bitsReg.uop.ctrl.isLdst && ~io.lsuStallSplit) || (~bitsReg.uop.ctrl.isLdst && ~io.iexNeedStall)
-    val ready = (~io.iexNeedStall && ~lsuStallSplit) || (io.vLsuIn.bits.muopEnd && io.vLsuIn.valid)
+    val ready = ~io.lsuStallSplit && ~io.iexNeedStall && ~lsuStallSplit
 
     when(!validReg || ready){
         validReg := mUopIn.valid
@@ -577,12 +576,7 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     //lsuStallSplit will be high in the cycle after receving the valid, but it should be high on the cycle 
     //when receiving the valid
-    when(fire && mUopIn.bits.uop.ctrl.isLdst){
-        lsuStallSplit := true.B
-    }
-    when(io.vLsuIn.bits.muopEnd && io.vLsuIn.valid){
-        lsuStallSplit := false.B
-    }
+    lsuStallSplit := RegNext(fire) & bitsReg.uop.ctrl.isLdst
 
     io.in.decodeIn.ready := (currentStateNext === empty) & ready
 

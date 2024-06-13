@@ -105,9 +105,8 @@ class SmartVector extends Module {
     split.io.vLSUXcpt := Mux(svlsuWrapper.io.lsuOut.valid, svlsuWrapper.io.lsuOut.bits.xcpt, 0.U.asTypeOf(new VLSUXcpt))
 
     //ChenLu change
-    //split.io.lsuStallSplit := ~svlsuWrapper.io.lsuReady
+    split.io.lsuStallSplit := ~svlsuWrapper.io.lsuReady
     merge.io.in.lsuIn <> svlsuWrapper.io.lsuOut
-    split.io.vLsuIn <> svlsuWrapper.io.lsuOut
     
     merge.io.in.mergeInfo <> split.io.out.mUopMergeAttr  
     regFile.io.in.readIn  <> split.io.out.toRegFileRead
