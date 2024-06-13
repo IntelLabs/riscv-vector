@@ -108,7 +108,7 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
       validReg := decodeInValid
   }
 
-  when(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl|| io.out.bits.vCtrl.illegal){
+  when(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl || io.out.bits.vCtrl.illegal){
       validReg := false.B
   }
   
@@ -127,6 +127,23 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
 
   io.out.bits.vCtrl.illegal := Mux(RegNext(fire), vIllegalInstrn.io.ill.valid, bitsReg.vCtrl.illegal)
 
-  io.in.ready := io.out.ready || !validReg
+  val illegal = io.out.bits.vCtrl.illegal
+  val counter = RegInit(0.U(3.W)) // 计数器，计数到4需要3位
+  val tempReg = RegInit(false.B) // 寄存器，共用来存储信号状态
+  val prev_illgal = RegNext(illegal) // 用于检测上升沿
+
+  when(illegal && !prev_illgal) { // 检测输入信号的上升沿
+    tempReg := true.B
+    counter := 0.U
+  }.elsewhen(tempReg) {
+    counter := counter + 1.U
+    when(counter === 3.U) {
+      tempReg := false.B
+    }
+  }
+
+  io.out.bits.vCtrl.illegal := tempReg
+  
+  io.in.ready := (io.out.ready && ~io.out.bits.vCtrl.illegal) || !validReg 
 }
 
