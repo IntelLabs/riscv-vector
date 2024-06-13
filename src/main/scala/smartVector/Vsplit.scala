@@ -421,8 +421,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     //narrowTo1NoStall need to deal with
     //val narrowTo1NoStall = ctrl.narrow_to_1 
     val regConf = hasRegConf(0) || hasRegConf(1) || hasRegConf(2) || hasRegConf(3) 
-    val lsuStallSplit = Wire(Bool())
-    val iexNotReady = lsuStallSplit || io.lsuStallSplit || io.iexNeedStall
+    val iexNotReady = io.lsuStallSplit || io.iexNeedStall
     val hasExcp = ctrl.illegal || io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl    
 
     mUopIn.bits.uop.uopIdx   := uopIdx
@@ -528,10 +527,10 @@ class Vsplit(implicit p : Parameters) extends Module {
                 currentStateNext := empty
             }.elsewhen(instDecodeIn && regConf){
                 currentStateNext := ongoing
-            }.elsewhen(instDecodeIn && expdLen === 1.U){
+            }.elsewhen(instDecodeIn && expdLen === 1.U && ~ctrl.isLdst){
                 currentStateNext := empty
                 idx := 0.U              
-            }.elsewhen(instDecodeIn && expdLen =/= 1.U){
+            }.elsewhen(instDecodeIn && (expdLen =/= 1.U || ctrl.isLdst)){
                 currentStateNext := ongoing
             }.otherwise{
                 currentStateNext := empty
@@ -558,7 +557,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     val bitsReg = RegInit(0.U.asTypeOf(new Muop))
     val mergeAttrReg = RegInit(0.U.asTypeOf(new MuopMergeAttr))
     //val ready = (bitsReg.uop.ctrl.isLdst && ~io.lsuStallSplit) || (~bitsReg.uop.ctrl.isLdst && ~io.iexNeedStall)
-    val ready = ~io.lsuStallSplit && ~io.iexNeedStall && ~lsuStallSplit
+    val ready = ~io.lsuStallSplit && ~io.iexNeedStall
 
     when(!validReg || ready){
         validReg := mUopIn.valid
@@ -573,10 +572,6 @@ class Vsplit(implicit p : Parameters) extends Module {
         bitsReg := mUopIn.bits
         mergeAttrReg := mUopMergeAttrIn.bits
     }
-
-    //lsuStallSplit will be high in the cycle after receving the valid, but it should be high on the cycle 
-    //when receiving the valid
-    lsuStallSplit := RegNext(fire) & bitsReg.uop.ctrl.isLdst
 
     io.in.decodeIn.ready := (currentStateNext === empty) & ready
 
