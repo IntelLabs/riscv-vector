@@ -421,7 +421,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     //narrowTo1NoStall need to deal with
     //val narrowTo1NoStall = ctrl.narrow_to_1 
     val regConf = hasRegConf(0) || hasRegConf(1) || hasRegConf(2) || hasRegConf(3) 
-    val iexNotReady = io.lsuStallSplit || io.iexNeedStall
+    val iexNotReady = (ctrl.isLdst && io.lsuStallSplit) || (~ctrl.isLdst && io.iexNeedStall)
     val hasExcp = ctrl.illegal || io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl    
 
     mUopIn.bits.uop.uopIdx   := uopIdx
@@ -554,8 +554,8 @@ class Vsplit(implicit p : Parameters) extends Module {
     val validReg = RegInit(false.B)
     val bitsReg = RegInit(0.U.asTypeOf(new Muop))
     val mergeAttrReg = RegInit(0.U.asTypeOf(new MuopMergeAttr))
-    //val ready = (bitsReg.uop.ctrl.isLdst && ~io.lsuStallSplit) || (~bitsReg.uop.ctrl.isLdst && ~io.iexNeedStall)
-    val ready = ~io.lsuStallSplit && ~io.iexNeedStall
+    val ready = (bitsReg.uop.ctrl.isLdst && ~io.lsuStallSplit) || (~bitsReg.uop.ctrl.isLdst && ~io.iexNeedStall)
+    //val ready = ~io.lsuStallSplit && ~io.iexNeedStall
 
     when(!validReg || ready){
         validReg := mUopIn.valid
@@ -571,7 +571,8 @@ class Vsplit(implicit p : Parameters) extends Module {
         mergeAttrReg := mUopMergeAttrIn.bits
     }
 
-    io.in.decodeIn.ready := (currentStateNext === empty) & ready
+    val readyToDecode = ~io.lsuStallSplit && ~io.iexNeedStall
+    io.in.decodeIn.ready := (currentStateNext === empty) & readyToDecode
 
     //when(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl){
     //    validReg := false.B
