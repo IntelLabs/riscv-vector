@@ -28,7 +28,7 @@ class ScoreboardClearIO extends Bundle {
     val clearAddr     = Input(UInt(log2Ceil(NVPhyRegs).W))
     val clearMultiEn  = Input(Bool())
     val clearNum      = Input(UInt(4.W))
-    val clearAll      = Input(Bool())
+    //val clearAll      = Input(Bool())
 }
 
 class ScoreboardReadIO extends Bundle {
@@ -89,8 +89,6 @@ class SmartVector extends Module {
     
     decoder.io.in.bits  := io.in.bits
     decoder.io.in.valid := io.in.valid & io.in.ready
-    decoder.io.vLSUXcpt := Mux(svlsuWrapper.io.lsuOut.valid, 
-    svlsuWrapper.io.lsuOut.bits.xcpt, 0.U.asTypeOf(new VLSUXcpt))
     split.io.in.decodeIn <> decoder.io.out
     split.io.in.regFileIn <> regFile.io.out
     iex.io.in <> split.io.out.mUop
@@ -103,7 +101,7 @@ class SmartVector extends Module {
     svlsuWrapper.io.mUop <> split.io.out.mUop
     svlsuWrapper.io.mUopMergeAttr <> split.io.out.mUopMergeAttr
     split.io.vLSUXcpt := Mux(svlsuWrapper.io.lsuOut.valid, svlsuWrapper.io.lsuOut.bits.xcpt, 0.U.asTypeOf(new VLSUXcpt))
-
+    decoder.io.vLSUXcpt := Mux(svlsuWrapper.io.lsuOut.valid, svlsuWrapper.io.lsuOut.bits.xcpt, 0.U.asTypeOf(new VLSUXcpt))
     //ChenLu change
     split.io.lsuStallSplit := ~svlsuWrapper.io.lsuReady
     merge.io.in.lsuIn <> svlsuWrapper.io.lsuOut
@@ -151,9 +149,9 @@ class SmartVector extends Module {
     val sboard  = new Scoreboard(NVPhyRegs, false)
     sboard.clear(merge.io.scoreBoardCleanIO.clearEn, merge.io.scoreBoardCleanIO.clearAddr)
     sboard.clearN(merge.io.scoreBoardCleanIO.clearMultiEn, merge.io.scoreBoardCleanIO.clearAddr, merge.io.scoreBoardCleanIO.clearNum)
+    //sboard.clearAll(merge.io.scoreBoardCleanIO.clearAll)
     sboard.set(split.io.scoreBoardSetIO.setEn, split.io.scoreBoardSetIO.setAddr)
     sboard.setN(split.io.scoreBoardSetIO.setMultiEn, split.io.scoreBoardSetIO.setAddr, split.io.scoreBoardSetIO.setNum)
-    sboard.clearAll(merge.io.scoreBoardCleanIO.clearAll)
     split.io.scoreBoardReadIO.readBypassed1 := sboard.readBypassed(split.io.scoreBoardReadIO.readAddr1)
     split.io.scoreBoardReadIO.readBypassed2 := sboard.readBypassed(split.io.scoreBoardReadIO.readAddr2)
     split.io.scoreBoardReadIO.readBypassed3 := sboard.readBypassed(split.io.scoreBoardReadIO.readAddr3)
@@ -169,4 +167,3 @@ object Main extends App {
   println("Generating the VPU Core hardware")
   emitVerilog(new SmartVector(), Array("--target-dir", "generated"))
 }
-

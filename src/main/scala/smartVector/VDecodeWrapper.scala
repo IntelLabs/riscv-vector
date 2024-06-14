@@ -107,6 +107,10 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   when(!validReg || io.out.ready){
       validReg := decodeInValid
   }
+
+  when(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl|| io.out.bits.vCtrl.illegal){
+      validReg := false.B
+  }
   
   when(decodeInValid & (!validReg || io.out.ready)) {
       bitsReg := bitsIn
@@ -123,12 +127,5 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
 
   io.out.bits.vCtrl.illegal := Mux(RegNext(fire), vIllegalInstrn.io.ill.valid, bitsReg.vCtrl.illegal)
 
-  val hasExcp = io.out.bits.vCtrl.illegal || io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl
-
-  when(hasExcp){
-    validReg := false.B
-  }
-  
   io.in.ready := io.out.ready || !validReg
 }
-
