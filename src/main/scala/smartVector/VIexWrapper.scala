@@ -46,23 +46,14 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   val currentState = RegInit(empty)
   val currentStateNext = WireDefault(empty) 
 
-
   // IEX input source
-  val isIexValid = io.in.valid && !(io.iexNeedStall) && (
-              io.in.bits.uop.ctrl.alu || io.in.bits.uop.ctrl.mul || io.in.bits.uop.ctrl.mask || 
-              io.in.bits.uop.ctrl.redu || io.in.bits.uop.ctrl.div || io.in.bits.uop.ctrl.perm || io.in.bits.uop.ctrl.fp)
-  
-  val mUopReg = RegNext(io.in.bits)
-  val mUopValidReg = RegNext(isIexValid)
+  val mUop = io.in.bits
+  val mUopValid = io.in.valid && ~io.in.bits.uop.ctrl.isLdst
 
-  val mUop = Mux(io.in.valid && !io.iexNeedStall, io.in.bits, mUopReg)
-  
-  val mUopValid = Mux(isIexValid, true.B, mUopValidReg)
-
-  val divNotReady  = ~SVDiv.io.in.ready
-  val fpuNotReady  = ~SVFpu.io.in.ready
-  val permNotReady = SVPerm.io.out.perm_busy
-  val ready    = ~(divNotReady || fpuNotReady || permNotReady)
+  // val divNotReady  = ~SVDiv.io.in.ready
+  // val fpuNotReady  = ~SVFpu.io.in.ready
+  // val permNotReady = SVPerm.io.out.perm_busy
+  // val ready    = ~(divNotReady || fpuNotReady || permNotReady)
 
   val outValid = SValu.io.out.valid || SVMac.io.out.valid || SVMask.io.out.valid || 
                  SVReduc.io.out.valid || SVDiv.io.out.valid || SVFpu.io.out.valid
@@ -115,35 +106,35 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   //assert(!(!SVDiv.io.in.ready && validFinal), "when div is not ready, should not has new inst in")
   //assert(!(SVPerm.io.out.perm_busy && validFinal), "when perm is busy, should not has new inst in")
   
-  val fpFire = RegInit(false.B) 
-  val divFire = RegInit(false.B)
-  val perFire = RegInit(false.B)
+  // val fpFire = RegInit(false.B) 
+  // val divFire = RegInit(false.B)
+  // val perFire = RegInit(false.B)
 
-  when(mUopValid && mUop.uop.ctrl.fp && SVFpu.io.in.ready){
-    fpFire := true.B
-  }
+  // when(mUopValid && mUop.uop.ctrl.fp && SVFpu.io.in.ready){
+  //   fpFire := true.B
+  // }
 
-  when(mUopValid && mUop.uop.ctrl.div && SVDiv.io.in.ready){
-    divFire := true.B
-  }
+  // when(mUopValid && mUop.uop.ctrl.div && SVDiv.io.in.ready){
+  //   divFire := true.B
+  // }
 
-  when(mUopValid && mUop.uop.ctrl.perm && ~SVPerm.io.out.perm_busy){
-    perFire := true.B
-  }
+  // when(mUopValid && mUop.uop.ctrl.perm && ~SVPerm.io.out.perm_busy){
+  //   perFire := true.B
+  // }
 
-  when(currentStateNext === empty){
-    fpFire := false.B
-    divFire := false.B
-    perFire := false.B
-  }
+  // when(currentStateNext === empty){
+  //   fpFire := false.B
+  //   divFire := false.B
+  //   perFire := false.B
+  // }
  
   SValu.io.in.valid   := mUopValid && mUop.uop.ctrl.alu
   SVMac.io.in.valid   := mUopValid && mUop.uop.ctrl.mul
   SVMask.io.in.valid  := mUopValid && mUop.uop.ctrl.mask
   SVReduc.io.in.valid := mUopValid && mUop.uop.ctrl.redu
-  SVDiv.io.in.valid   := mUopValid && mUop.uop.ctrl.div && ~divFire
-  SVPerm.io.in.rvalid := mUopValid && mUop.uop.ctrl.perm && ~perFire
-  SVFpu.io.in.valid   := mUopValid && mUop.uop.ctrl.fp && ~fpFire
+  SVDiv.io.in.valid   := mUopValid && mUop.uop.ctrl.div
+  SVPerm.io.in.rvalid := mUopValid && mUop.uop.ctrl.perm
+  SVFpu.io.in.valid   := mUopValid && mUop.uop.ctrl.fp
 
   Seq(SValu.io.in.bits, SVMac.io.in.bits, SVMask.io.in.bits, SVReduc.io.in.bits, SVDiv.io.in.bits, SVFpu.io.in.bits).foreach {iex =>
     iex.uop   := mUop.uop

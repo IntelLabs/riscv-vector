@@ -531,7 +531,7 @@ class Vsplit(implicit p : Parameters) extends Module {
         is(empty){
             when(hasExcp){
                 currentStateNext := empty
-            }.elsewhen(instDecodeIn && regConf){
+            }.elsewhen(instDecodeIn && (regConf || ~pipeRegReady)){
                 currentStateNext := ongoing
             }.elsewhen(instDecodeIn && expdLen === 1.U){
                 currentStateNext := empty            
@@ -562,7 +562,7 @@ class Vsplit(implicit p : Parameters) extends Module {
         idx := idx + 1.U    
     }
 
-    io.in.decodeIn.ready := (currentState === empty) & exuReady
+    io.in.decodeIn.ready := currentStateNext === empty
 
     // * Split FSM
     // * END
@@ -573,7 +573,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     val validReg        = RegInit(false.B)
     val bitsReg         = RegInit(0.U.asTypeOf(new Muop))
     val mergeAttrReg    = RegInit(0.U.asTypeOf(new MuopMergeAttr))
-    
+
     pipeRegReady        := exuReady || (!validReg)
     fire2PipeReg        := pipeRegReady && mUopIn.valid
     fire2Exu            := exuReady && validReg
