@@ -2,6 +2,7 @@ package coincreekDCache
 
 import chisel3._
 import chisel3.util._
+import scala.math.max
 
 trait DCacheParams {
   // {{{
@@ -16,10 +17,12 @@ trait DCacheParams {
 
   // {{{
   val XLEN       = 64
+  val VLEN       = 512
   val vaddrWidth = 39
   val paddrWidth = 39
   val srcWidth   = 8
-  val dataWidth  = 64
+
+  val dataWidth = max(XLEN, VLEN)
   // }}}
 
   val rowBytes     = rowBits / 8
@@ -27,11 +30,11 @@ trait DCacheParams {
   val blockOffBits = log2Up(blockBytes)
   val setIdxBits   = log2Up(nSets)
   val bankIdxBits  = log2Up(nBanks)
-  val wordIdxBits  = blockOffBits - (bankIdxBits + rowOffBits)
+  val rowIdxBits   = blockOffBits - (bankIdxBits + rowOffBits)
   val untagBits    = blockOffBits + setIdxBits
 
   val rowWords = rowBits / XLEN
 
-  assert(wordIdxBits >= 0)
+  assert(rowIdxBits >= 0)
 
 }
