@@ -86,8 +86,8 @@ class VIexWrapper(implicit p : Parameters) extends Module {
       }
     }
     is(ongoing){
-      when(twoCycleReg || fixLatVld){
-      //when(twoCycleReg || fixLatVld || bitsReg.uop.ctrl.floatRed && SVFpu.io.in.ready && ~bitsReg.uop.uopEnd){
+      //when(twoCycleReg || fixLatVld){
+      when(twoCycleReg || fixLatVld || mUop.uop.ctrl.floatRed && SVFpu.io.in.ready && ~mUop.uop.uopEnd){
           currentStateNext := empty
       }.otherwise{
           currentStateNext := ongoing
