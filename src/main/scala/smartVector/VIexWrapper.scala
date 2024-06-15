@@ -88,7 +88,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
     is(ongoing){
       //when(twoCycleReg || fixLatVld){
       //when(twoCycleReg || fixLatVld || mUop.uop.ctrl.floatRed && SVFpu.io.in.ready && ~mUop.uop.uopEnd){
-      when(twoCycleReg || fixLatVld){
+      when(twoCycleReg || fixLatVld  || (mUop.uop.ctrl.floatRed && SVFpu.io.in.ready && ~(mUop.uop.uopIdx === 0.U))){
           currentStateNext := empty
       }.otherwise{
           currentStateNext := ongoing
@@ -99,7 +99,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   currentState := currentStateNext
   //io.iexNeedStall := (currentStateNext === ongoing) || ~ready
   //val ready = currentState === empty || (mUop.uop.ctrl.floatRed && SVFpu.io.in.ready && ~(mUop.uop.uopIdx === 0.U))
-  io.iexNeedStall := (currentState === ongoing) && ~(mUop.uop.ctrl.floatRed && SVFpu.io.in.ready && ~(mUop.uop.uopIdx === 0.U))
+  io.iexNeedStall := (currentState === ongoing)
 
   //if is floatRed, when is ready, the next uop valid will be high in same cycle.
   //and the first's ready match the second's valid, it will cause second's ready invalid
