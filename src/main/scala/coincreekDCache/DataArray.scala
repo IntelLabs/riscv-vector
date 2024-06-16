@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import utility.SRAMTemplate
 
-// {{{ Single DataBank
+// * Single DataBank
 
 class DataBankReadReq extends Bundle {
   val setIdx = UInt(setIdxBits.W)
@@ -53,9 +53,7 @@ class DataSRAMBank extends Module {
   io.resp := dataBank.map(_.io.r.resp.data(0))
 }
 
-// }}}
-
-// {{{ DataArray Constructed By DataBanks
+// * DataArray Constructed By DataBanks
 
 class DataReadReq extends Bundle {
   val setIdx = UInt(setIdxBits.W)
@@ -99,5 +97,3 @@ class DataArray extends Module {
   io.read.ready  := true.B
   io.write.ready := true.B
 }
-
-// }}}

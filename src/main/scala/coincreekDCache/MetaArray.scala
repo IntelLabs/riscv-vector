@@ -69,7 +69,7 @@ class MetaArray[T <: Metadata](onReset: () => T) extends Module with DCacheParam
     rstCnt := rstCnt + 1.U
   }
 
-  // {{{ tag write
+  // * Tag Write Begin
   val wen = rst || io.write.fire
   tagArray.io.w.req.valid := wen
   tagArray.io.w.req.bits.apply(
@@ -77,14 +77,14 @@ class MetaArray[T <: Metadata](onReset: () => T) extends Module with DCacheParam
     data = wdata,
     waymask = VecInit(wmask).asUInt,
   )
-  // }}}
+  // * Tag Write End
 
-  // {{{ tag read
+  // * Tag Read Begin
   val ren = io.read.fire
   tagArray.io.r.req.valid := ren
   tagArray.io.r.req.bits.apply(setIdx = io.read.bits.setIdx)
   io.resp := tagArray.io.r.resp.data.map(_.asTypeOf(chiselTypeOf(rstVal)))
-  // }}}
+  // * Tag Read End
 
   io.read.ready  := !rst
   io.write.ready := !rst
