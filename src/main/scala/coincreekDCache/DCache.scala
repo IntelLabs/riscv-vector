@@ -18,15 +18,15 @@ class DCache extends Module {
    */
 
   // read tag array
-  metaArray.io.read.valid    := io.req.valid
-  metaArray.io.read.bits.idx := AddrDecoder.getSetIdx(io.req.bits.paddr)
-  metaArray.io.read.bits.way := Mux(io.req.bits.specifyValid, UIntToOH(io.req.bits.specifyWay), Fill(nWays, true.B))
+  metaArray.io.read.valid       := io.req.valid
+  metaArray.io.read.bits.setIdx := AddrDecoder.getSetIdx(io.req.bits.paddr)
+  metaArray.io.read.bits.wayEn  := Mux(io.req.bits.specifyValid, UIntToOH(io.req.bits.specifyWay), Fill(nWays, true.B))
 
   // read data array
-  dataArray.io.read.valid     := io.req.valid
-  dataArray.io.read.bits.idx  := AddrDecoder.getSetIdx(io.req.bits.paddr)
-  dataArray.io.read.bits.bank := UIntToOH(AddrDecoder.getBankIdx(io.req.bits.paddr))
-  dataArray.io.read.bits.way  := Mux(io.req.bits.specifyValid, UIntToOH(io.req.bits.specifyWay), Fill(nWays, true.B))
+  dataArray.io.read.valid       := io.req.valid
+  dataArray.io.read.bits.setIdx := AddrDecoder.getSetIdx(io.req.bits.paddr)
+  dataArray.io.read.bits.bankEn := UIntToOH(AddrDecoder.getBankIdx(io.req.bits.paddr))
+  dataArray.io.read.bits.wayEn  := Mux(io.req.bits.specifyValid, UIntToOH(io.req.bits.specifyWay), Fill(nWays, true.B))
 
   // }}}
 
@@ -62,24 +62,21 @@ class DCache extends Module {
   val s2_valid   = RegNext(s1_valid & s1_needWrite)
   val s2_req     = RegNext(s1_req)
   val storeWayEn = Mux(s1_hit, s1_tagMatchWay, VecInit(UIntToOH(s1_req.specifyWay).asBools)).asUInt
+  val s2_wdata   = VecInit((0 until nBanks).map(i => s2_req.wdata((i + 1) * rowBits - 1, i * rowBits)))
 
+  // meta write
   metaArray.io.write.valid         := s2_valid
-  metaArray.io.write.bits.idx      := AddrDecoder.getSetIdx(s2_req.paddr)
-  metaArray.io.write.bits.way      := storeWayEn
+  metaArray.io.write.bits.setIdx   := AddrDecoder.getSetIdx(s2_req.paddr)
+  metaArray.io.write.bits.wayEn    := storeWayEn
   metaArray.io.write.bits.data.tag := AddrDecoder.getTag(s2_req.paddr)
   metaArray.io.write.bits.data.coh := 0.U
-
-  dataArray.io.write.valid     := s2_valid
-  dataArray.io.write.bits.idx  := AddrDecoder.getSetIdx(s2_req.paddr)
-  dataArray.io.write.bits.bank := UIntToOH(AddrDecoder.getBankIdx(s2_req.paddr))
-  dataArray.io.write.bits.way  := storeWayEn
-
-  val s2_wdata = VecInit((0 until nBanks).map(i => s2_req.wdata((i + 1) * rowBits - 1, i * rowBits)))
-
-  dataArray.io.write.bits.data := s2_wdata
-  dataArray.io.write.bits.wmask := VecInit((0 until nBanks).map(i =>
-    0.U
-  ))
+  // data write
+  dataArray.io.write.valid       := s2_valid
+  dataArray.io.write.bits.setIdx := AddrDecoder.getSetIdx(s2_req.paddr)
+  dataArray.io.write.bits.bankEn := UIntToOH(AddrDecoder.getBankIdx(s2_req.paddr))
+  dataArray.io.write.bits.wayEn  := storeWayEn
+  dataArray.io.write.bits.data   := s2_wdata
+  dataArray.io.write.bits.mask   := VecInit(Seq.fill(nBanks)(0.U)) // TODO
 
   // }}}
 

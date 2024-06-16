@@ -7,14 +7,14 @@ import utility.SRAMTemplate
 // {{{ Single DataBank
 
 class DataBankReadReq extends Bundle {
-  val idx = UInt(setIdxBits.W)
-  val way = UInt(nWays.W)
+  val setIdx = UInt(setIdxBits.W)
+  val wayEn  = UInt(nWays.W)
 }
 
 class DataBankWriteReq extends Bundle {
-  val idx  = UInt(setIdxBits.W)
-  val way  = UInt(nWays.W)
-  val data = UInt(rowBits.W)
+  val setIdx = UInt(setIdxBits.W)
+  val wayEn  = UInt(nWays.W)
+  val data   = UInt(rowBits.W)
 }
 
 class DataSRAMBank extends Module {
@@ -38,16 +38,16 @@ class DataSRAMBank extends Module {
   }
 
   for (w <- 0 until nWays) {
-    val wen = io.write.valid && io.write.bits.way(w)
+    val wen = io.write.valid && io.write.bits.wayEn(w)
     dataBank(w).io.w.req.valid := wen
     dataBank(w).io.w.req.bits.apply(
-      setIdx = io.write.bits.idx,
+      setIdx = io.write.bits.setIdx,
       data = io.write.bits.data,
       waymask = 1.U,
     )
 
     dataBank(w).io.r.req.valid := io.read.valid
-    dataBank(w).io.r.req.bits.apply(setIdx = io.read.bits.idx)
+    dataBank(w).io.r.req.bits.apply(setIdx = io.read.bits.setIdx)
   }
 
   io.resp := dataBank.map(_.io.r.resp.data(0))
@@ -58,17 +58,17 @@ class DataSRAMBank extends Module {
 // {{{ DataArray Constructed By DataBanks
 
 class DataReadReq extends Bundle {
-  val idx  = UInt(setIdxBits.W)
-  val way  = UInt(nWays.W)
-  val bank = UInt(nBanks.W)
+  val setIdx = UInt(setIdxBits.W)
+  val wayEn  = UInt(nWays.W)
+  val bankEn = UInt(nBanks.W)
 }
 
 class DataWriteReq extends Bundle {
-  val idx   = UInt(setIdxBits.W)
-  val way   = UInt(nWays.W)
-  val bank  = UInt(nBanks.W)
-  val wmask = Vec(nBanks, UInt(rowWords.W))
-  val data  = Vec(nBanks, UInt(rowBits.W))
+  val setIdx = UInt(setIdxBits.W)
+  val wayEn  = UInt(nWays.W)
+  val bankEn = UInt(nBanks.W)
+  val mask   = Vec(nBanks, UInt(rowWords.W))
+  val data   = Vec(nBanks, UInt(rowBits.W))
 }
 
 class DataArray extends Module {
@@ -81,15 +81,15 @@ class DataArray extends Module {
   val dataBanks = List.tabulate(nBanks)(i => Module(new DataSRAMBank()))
 
   for (b <- 0 until nBanks) {
-    val wen = io.write.valid && io.write.bits.bank(b)
-    dataBanks(b).io.write.valid     := wen
-    dataBanks(b).io.write.bits.idx  := io.write.bits.idx
-    dataBanks(b).io.write.bits.way  := io.write.bits.way
-    dataBanks(b).io.write.bits.data := io.write.bits.data(b)
+    val wen = io.write.valid && io.write.bits.bankEn(b)
+    dataBanks(b).io.write.valid       := wen
+    dataBanks(b).io.write.bits.setIdx := io.write.bits.setIdx
+    dataBanks(b).io.write.bits.wayEn  := io.write.bits.wayEn
+    dataBanks(b).io.write.bits.data   := io.write.bits.data(b)
 
-    dataBanks(b).io.read.valid    := io.read.valid
-    dataBanks(b).io.read.bits.idx := io.read.bits.idx
-    dataBanks(b).io.read.bits.way := io.read.bits.way
+    dataBanks(b).io.read.valid       := io.read.valid
+    dataBanks(b).io.read.bits.setIdx := io.read.bits.setIdx
+    dataBanks(b).io.read.bits.wayEn  := io.read.bits.wayEn
   }
 
   for (w <- 0 until nWays) {

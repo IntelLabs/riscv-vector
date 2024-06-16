@@ -20,8 +20,8 @@ class MetaArrayTest extends AnyFlatSpec with ChiselScalatestTester {
         dut.clock.step(150)
 
         dut.io.write.valid.poke(true.B)
-        dut.io.write.bits.idx.poke(10.U)
-        dut.io.write.bits.way.poke(2.U)
+        dut.io.write.bits.setIdx.poke(10.U)
+        dut.io.write.bits.wayEn.poke(2.U)
         // Assuming MetaWriteReq has a 'data' field of type Metadata or similar
         dut.io.write.bits.data.tag.poke(42.U)
         dut.io.write.bits.data.coh.poke(3.U)
@@ -31,8 +31,8 @@ class MetaArrayTest extends AnyFlatSpec with ChiselScalatestTester {
         dut.clock.step(10)
         // Simulate a read operation
         dut.io.read.valid.poke(true.B)
-        dut.io.read.bits.idx.poke(10.U)
-        dut.io.read.bits.way.poke(2.U)
+        dut.io.read.bits.setIdx.poke(10.U)
+        dut.io.read.bits.wayEn.poke(2.U)
 
         dut.clock.step(1)
         dut.io.read.valid.poke(false.B)
@@ -51,16 +51,16 @@ class MetaArrayTest extends AnyFlatSpec with ChiselScalatestTester {
         dut.clock.step(150)
 
         dut.io.write.valid.poke(true.B)
-        dut.io.write.bits.idx.poke(10.U)
-        dut.io.write.bits.way.poke(2.U)
+        dut.io.write.bits.setIdx.poke(10.U)
+        dut.io.write.bits.wayEn.poke(2.U)
         // Assuming MetaWriteReq has a 'data' field of type Metadata or similar
         dut.io.write.bits.data.tag.poke(42.U)
         dut.io.write.bits.data.coh.poke(3.U)
 
         // Simulate a read operation
         dut.io.read.valid.poke(true.B)
-        dut.io.read.bits.idx.poke(10.U)
-        dut.io.read.bits.way.poke(2.U)
+        dut.io.read.bits.setIdx.poke(10.U)
+        dut.io.read.bits.wayEn.poke(2.U)
 
         dut.clock.step(1)
         dut.io.write.valid.poke(false.B)

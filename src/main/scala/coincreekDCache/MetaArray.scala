@@ -21,19 +21,19 @@ object Metadata {
   }
 
   def onReset(): Metadata =
-    Metadata(10.U, 0.U)
+    Metadata(0.U, 0.U)
 
 }
 
 class MetaReadReq extends Bundle {
-  val idx = UInt(log2Ceil(nSets).W)
-  val way = UInt(nWays.W)
+  val setIdx = UInt(setIdxBits.W)
+  val wayEn  = UInt(nWays.W)
 }
 
 class MetaWriteReq extends Bundle {
-  val idx  = UInt(log2Ceil(nSets).W)
-  val way  = UInt(nWays.W)
-  val data = new Metadata
+  val setIdx = UInt(setIdxBits.W)
+  val wayEn  = UInt(nWays.W)
+  val data   = new Metadata
 }
 
 class MetaArray[T <: Metadata](onReset: () => T) extends Module with DCacheParams {
@@ -61,20 +61,17 @@ class MetaArray[T <: Metadata](onReset: () => T) extends Module with DCacheParam
 
   val rstCnt = RegInit(0.U(log2Up(nSets + 1).W))
   val rst    = rstCnt < nSets.U
-  val waddr  = Mux(rst, rstCnt, io.write.bits.idx)
+  val waddr  = Mux(rst, rstCnt, io.write.bits.setIdx)
   val wdata  = Mux(rst, rstVal, io.write.bits.data).asUInt
-  val wmask  = Mux(rst || (nWays == 1).B, -1.S, io.write.bits.way.asSInt).asBools
-  val rmask  = Mux(rst || (nWays == 1).B, -1.S, io.read.bits.way.asSInt).asBools
+  val wmask  = Mux(rst || (nWays == 1).B, -1.S, io.write.bits.wayEn.asSInt).asBools
 
   when(rst) {
     rstCnt := rstCnt + 1.U
   }
 
   // {{{ tag write
-  val wen = rst || io.write.valid
-
+  val wen = rst || io.write.fire
   tagArray.io.w.req.valid := wen
-
   tagArray.io.w.req.bits.apply(
     setIdx = waddr,
     data = wdata,
@@ -85,7 +82,7 @@ class MetaArray[T <: Metadata](onReset: () => T) extends Module with DCacheParam
   // {{{ tag read
   val ren = io.read.fire
   tagArray.io.r.req.valid := ren
-  tagArray.io.r.req.bits.apply(setIdx = io.read.bits.idx)
+  tagArray.io.r.req.bits.apply(setIdx = io.read.bits.setIdx)
   io.resp := tagArray.io.r.resp.data.map(_.asTypeOf(chiselTypeOf(rstVal)))
   // }}}
 
