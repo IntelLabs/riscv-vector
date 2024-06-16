@@ -104,12 +104,12 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   val validReg = RegInit(false.B)
   val bitsReg = RegInit(0.U.asTypeOf(new VDecodeOutput))
 
-  when(!validReg || io.out.ready){
-      validReg := decodeInValid
+  when(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl || io.out.bits.vCtrl.illegal){
+    validReg := false.B
   }
 
-  when(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl|| io.out.bits.vCtrl.illegal){
-      validReg := false.B
+  when(!validReg || io.out.ready){
+      validReg := decodeInValid
   }
   
   when(decodeInValid & (!validReg || io.out.ready)) {
