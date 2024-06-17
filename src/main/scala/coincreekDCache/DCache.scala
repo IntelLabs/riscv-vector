@@ -59,6 +59,18 @@ class DCache extends Module {
   val s1_mask           = FillInterleaved(8, s1_maskInBytes)
   val s1_mergeStoreData = s1_req.wdata & s1_mask | s1_data & ~s1_mask
   // TODO: PWR assertion
+  // TODO: Merge Store & AMO Store
+
+  // amo store data
+  val amoalu          = Module(new AMOALU(dataWidth))
+  val s1_amoStoreData = amoalu.io.out
+
+  amoalu.io.mask := s1_maskInBytes
+  amoalu.io.cmd  := s1_req.cmd
+  amoalu.io.lhs  := s1_data
+  amoalu.io.rhs  := s1_req.wdata
+
+  val s1_storeData = Mux(MemoryOpConstants.isAMO(s1_req.cmd), s1_amoStoreData, s1_mergeStoreData)
 
   // return resp
   io.resp.valid       := s1_valid
@@ -79,7 +91,7 @@ class DCache extends Module {
   when(s1_valid && s1_needWrite) {
     s2_req       := s1_req
     s2_wayEn     := Mux(s1_hit, s1_tagMatchWay, VecInit(UIntToOH(s1_req.specifyWay).asBools)).asUInt
-    s2_req.wdata := s1_mergeStoreData
+    s2_req.wdata := s1_storeData
   }
 
   // meta write
@@ -107,7 +119,7 @@ class DCache extends Module {
   // *  Store -> Load Bypassing Begin
   // bypass list (valid, req, data)
   val bypassDataList = List(
-    (s1_valid, s1_req, s1_mergeStoreData),
+    (s1_valid, s1_req, s1_storeData),
     (s2_valid, s2_req, s2_req.wdata),
     (s3_valid, s3_req, s3_req.wdata),
   ).map(r =>

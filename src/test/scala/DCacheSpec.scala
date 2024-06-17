@@ -93,7 +93,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
     }
   }
 
-  it should "Load different size" in {
+  it should "Load different sizes" in {
     test(new DCache()).withAnnotations(
       Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
     ) { dut =>
@@ -136,6 +136,68 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.resp.bits.data.expect(
         "hffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffbbaa9988".U
       )
+      dut.io.resp.bits.hit.expect(true.B)
+      dut.clock.step(10)
+    }
+  }
+
+  it should "pass AMOSWAP" in {
+    test(new DCache()).withAnnotations(
+      Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
+    ) { dut =>
+      initializeDut(dut)
+
+      // AMOSWAP
+      dut.io.req.valid.poke(true.B)
+      dut.io.req.bits.size.poke(3.U)
+      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XA_SWAP)
+      dut.io.req.bits.paddr.poke(0x1234000.U)
+      dut.io.req.bits.wdata.poke(0x7890.U)
+
+      dut.clock.step(1)
+
+      dut.io.req.valid.poke(true.B)
+      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
+      dut.io.req.bits.paddr.poke(0x1234000.U)
+
+      dut.io.resp.valid.expect(true.B)
+      dut.io.resp.bits.data.expect("h2323232323232323".U)
+      dut.io.resp.bits.hit.expect(true.B)
+      dut.clock.step(1)
+
+      dut.io.resp.valid.expect(true.B)
+      dut.io.resp.bits.data.expect(0x7890.U)
+      dut.io.resp.bits.hit.expect(true.B)
+      dut.clock.step(10)
+    }
+  }
+
+  it should "pass AMOADD" in {
+    test(new DCache()).withAnnotations(
+      Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
+    ) { dut =>
+      initializeDut(dut)
+
+      // AMOSWAP
+      dut.io.req.valid.poke(true.B)
+      dut.io.req.bits.size.poke(3.U)
+      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XA_ADD)
+      dut.io.req.bits.paddr.poke(0x1234000.U)
+      dut.io.req.bits.wdata.poke("h0101010101010101".U)
+
+      dut.clock.step(1)
+
+      dut.io.req.valid.poke(true.B)
+      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
+      dut.io.req.bits.paddr.poke(0x1234000.U)
+
+      dut.io.resp.valid.expect(true.B)
+      dut.io.resp.bits.data.expect("h2323232323232323".U)
+      dut.io.resp.bits.hit.expect(true.B)
+      dut.clock.step(1)
+
+      dut.io.resp.valid.expect(true.B)
+      dut.io.resp.bits.data.expect("h2424242424242424".U)
       dut.io.resp.bits.hit.expect(true.B)
       dut.clock.step(10)
     }
