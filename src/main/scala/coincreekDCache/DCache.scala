@@ -18,7 +18,7 @@ class DCache extends Module {
   // * Signal Define End
 
   // * pipeline stage 0 Begin
-  // * Read Tag Array & Read Data Array
+
   // read tag array
   metaArray.io.read.valid       := io.req.valid
   metaArray.io.read.bits.setIdx := AddrDecoder.getSetIdx(io.req.bits.paddr)
@@ -38,29 +38,37 @@ class DCache extends Module {
   val s1_valid = RegNext(io.req.valid)
   val s1_req   = RegNext(io.req.bits)
 
-  val s1_dataArrayResp = dataArray.io.resp // nways meta
-  val s1_metaArrayResp = metaArray.io.resp // nways nbanks data
+  // meta & data resp
+  val s1_dataArrayResp = dataArray.io.resp // nways nbanks data
+  val s1_metaArrayResp = metaArray.io.resp // nways meta
 
   // tag & coh match
   val s1_tagEqWay    = VecInit((0 until nWays).map(w => s1_metaArrayResp(w).tag === AddrDecoder.getTag(s1_req.paddr)))
   val s1_tagMatch    = s1_tagEqWay.asUInt.orR
   val s1_tagMatchWay = s1_tagEqWay
-
-  // hit / miss
-  val s1_hit = s1_valid && s1_tagMatch
+  val s1_hit         = s1_valid && s1_tagMatch
 
   // organize read data
-  val s1_dataPreBypass = Mux1H(s1_tagMatchWay, s1_dataArrayResp).asUInt // TODO: AMOALU
+  val s1_dataPreBypass = Mux1H(s1_tagMatchWay, s1_dataArrayResp).asUInt
   val s1_data          = Mux(s1_storeBypass, s1_storeBypassData, s1_dataPreBypass)
+  val loadGen          = new LoadGen(s1_req.size, s1_req.signed, s1_req.paddr, s1_data, false.B, dataBytes)
+
+  // organize store data
+  val s1_storeGenMask   = new StoreGen(s1_req.size, s1_req.paddr, 0.U, dataBytes).mask
+  val s1_maskInBytes    = Mux(s1_req.cmd === MemoryOpConstants.M_PWR, s1_req.wmask, s1_storeGenMask)
+  val s1_mask           = FillInterleaved(8, s1_maskInBytes)
+  val s1_mergeStoreData = s1_req.wdata & s1_mask | s1_data & ~s1_mask
+  // TODO: PWR assertion
 
   // return resp
   io.resp.valid       := s1_valid
   io.resp.bits.hit    := s1_hit
   io.resp.bits.source := RegNext(s1_req.source)
-  io.resp.bits.data   := s1_data
+  io.resp.bits.data   := loadGen.data
 
   val s1_needWrite =
     s1_hit & MemoryOpConstants.isWrite(s1_req.cmd) || (s1_valid & s1_req.cmd === MemoryOpConstants.M_FILL) // TODO
+
   // * pipeline stage 1 End
 
   // * pipeline stage 2 Begin
@@ -69,8 +77,9 @@ class DCache extends Module {
   val s2_wayEn = RegInit(0.U(nWays.W))
 
   when(s1_valid && s1_needWrite) {
-    s2_req   := s1_req
-    s2_wayEn := Mux(s1_hit, s1_tagMatchWay, VecInit(UIntToOH(s1_req.specifyWay).asBools)).asUInt
+    s2_req       := s1_req
+    s2_wayEn     := Mux(s1_hit, s1_tagMatchWay, VecInit(UIntToOH(s1_req.specifyWay).asBools)).asUInt
+    s2_req.wdata := s1_mergeStoreData
   }
 
   // meta write
@@ -79,13 +88,15 @@ class DCache extends Module {
   metaArray.io.write.bits.wayEn    := s2_wayEn
   metaArray.io.write.bits.data.tag := AddrDecoder.getTag(s2_req.paddr)
   metaArray.io.write.bits.data.coh := 0.U
+
   // data write
   dataArray.io.write.valid       := s2_valid
   dataArray.io.write.bits.setIdx := AddrDecoder.getSetIdx(s2_req.paddr)
-  dataArray.io.write.bits.bankEn := UIntToOH(AddrDecoder.getBankIdx(s2_req.paddr))
+  dataArray.io.write.bits.bankEn := Fill(nBanks, true.B).asUInt
   dataArray.io.write.bits.wayEn  := s2_wayEn
   dataArray.io.write.bits.data   := VecInit((0 until nBanks).map(i => s2_req.wdata((i + 1) * rowBits - 1, i * rowBits)))
   dataArray.io.write.bits.mask   := VecInit(Seq.fill(nBanks)(0.U)) // TODO
+
   // * pipeline stage 2 End
 
   // * pipeline stage 3 Begin
@@ -96,7 +107,7 @@ class DCache extends Module {
   // *  Store -> Load Bypassing Begin
   // bypass list (valid, req, data)
   val bypassDataList = List(
-    (s1_valid, s1_req, s1_req.wdata), // TODO: AMOALU Output
+    (s1_valid, s1_req, s1_mergeStoreData),
     (s2_valid, s2_req, s2_req.wdata),
     (s3_valid, s3_req, s3_req.wdata),
   ).map(r =>

@@ -11,94 +11,133 @@ import chiseltest.{VerilatorBackendAnnotation, WriteVcdAnnotation}
 class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
   behavior.of("DCache")
 
+  val initilizeData =
+    "h0123456789abcdef_fedcba9876543210_0011223344556677_8899aabbccddeeff_7766554433221100_ffeeddccbbaa9988_1010101010101010_2323232323232323"
+
+  def initializeDut(dut: DCache): Unit = {
+    dut.io.req.valid.poke(false.B)
+    dut.clock.step(150)
+
+    dut.io.req.valid.poke(true.B)
+    dut.io.req.bits.source.poke(1.U)
+    dut.io.req.bits.size.poke(6.U)
+    dut.io.req.bits.signed.poke(false.B)
+    dut.io.req.bits.cmd.poke(MemoryOpConstants.M_FILL)
+    dut.io.req.bits.paddr.poke(0x1234000.U)
+    dut.io.req.bits.wdata.poke(initilizeData.U)
+    dut.io.req.bits.specifyValid.poke(true.B)
+    dut.io.req.bits.specifyWay.poke(1.U)
+
+    dut.clock.step(1)
+    dut.io.req.valid.poke(false.B)
+    dut.io.req.bits.specifyValid.poke(false.B)
+    dut.clock.step(5)
+  }
+
   it should "DCache hit" in {
     test(new DCache()).withAnnotations(
       Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
-    ) {
-      dut =>
-        dut.clock.step(150)
+    ) { dut =>
+      initializeDut(dut)
 
-        dut.io.req.valid.poke(true.B)
-        dut.io.req.bits.source.poke(1.U)
-        dut.io.req.bits.cmd.poke(MemoryOpConstants.M_FILL)
-        dut.io.req.bits.paddr.poke(0x1234000.U)
-        dut.io.req.bits.wdata.poke(0x5678.U)
-        dut.io.req.bits.specifyValid.poke(true.B)
-        dut.io.req.bits.specifyWay.poke(1.U)
+      // read hit
+      dut.io.req.valid.poke(true.B)
+      dut.io.req.bits.signed.poke(false.B)
+      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
+      dut.io.req.bits.paddr.poke(0x1234000.U)
 
-        dut.clock.step(1)
-        dut.io.req.valid.poke(false.B)
-        dut.clock.step(5)
-        // dut.io.resp.valid.expect(true.B)
+      dut.clock.step(1)
+      dut.io.req.valid.poke(false.B)
+      dut.io.resp.valid.expect(true.B)
+      dut.io.resp.bits.data.expect(initilizeData.U)
+      dut.io.resp.bits.hit.expect(true.B)
+      dut.clock.step(10)
 
-        // read hit
-        dut.io.req.valid.poke(true.B)
-        dut.io.req.bits.source.poke(1.U)
-        dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-        dut.io.req.bits.paddr.poke(0x1234000.U)
-        dut.io.req.bits.wdata.poke(0x5678.U)
+      // read miss
+      dut.io.req.valid.poke(true.B)
 
-        dut.clock.step(1)
-        dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.data.expect(0x5678.U)
-        dut.io.resp.bits.hit.expect(true.B)
-        dut.clock.step(10)
+      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
+      dut.io.req.bits.paddr.poke(0x2234000.U)
 
-        // read miss
-        dut.io.req.valid.poke(true.B)
-        dut.io.req.bits.source.poke(1.U)
-        dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-        dut.io.req.bits.paddr.poke(0x2234000.U)
-        dut.io.req.bits.wdata.poke(0x5678.U)
-
-        dut.clock.step(1)
-        dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.hit.expect(false.B)
-        dut.clock.step(10)
-
+      dut.clock.step(1)
+      dut.io.resp.valid.expect(true.B)
+      dut.io.resp.bits.hit.expect(false.B)
+      dut.clock.step(10)
     }
   }
+
   it should "Store -> Load Bypassing" in {
     test(new DCache()).withAnnotations(
       Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
-    ) {
-      dut =>
-        dut.clock.step(150)
+    ) { dut =>
+      initializeDut(dut)
 
-        dut.io.req.valid.poke(true.B)
-        dut.io.req.bits.source.poke(1.U)
-        dut.io.req.bits.cmd.poke(MemoryOpConstants.M_FILL)
-        dut.io.req.bits.paddr.poke(0x1234000.U)
-        dut.io.req.bits.wdata.poke(0x5678.U)
-        dut.io.req.bits.specifyValid.poke(true.B)
-        dut.io.req.bits.specifyWay.poke(1.U)
+      // write hit
+      dut.io.req.valid.poke(true.B)
+      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XWR)
+      dut.io.req.bits.paddr.poke(0x1234000.U)
+      dut.io.req.bits.wdata.poke(0x7890.U)
 
-        dut.clock.step(1)
-        dut.io.req.valid.poke(false.B)
-        dut.clock.step(5)
-        // dut.io.resp.valid.expect(true.B)
+      dut.clock.step(1)
+      // read hit
+      dut.io.req.valid.poke(true.B)
+      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
+      dut.io.req.bits.paddr.poke(0x1234000.U)
+      dut.io.req.bits.wdata.poke(0x7890.U)
 
-        // write hit
-        dut.io.req.valid.poke(true.B)
-        dut.io.req.bits.source.poke(1.U)
-        dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XWR)
-        dut.io.req.bits.paddr.poke(0x1234000.U)
-        dut.io.req.bits.wdata.poke(0x7890.U)
+      dut.clock.step(1)
+      dut.io.resp.valid.expect(true.B)
+      dut.io.resp.bits.data.expect(0x7890.U)
+      dut.io.resp.bits.hit.expect(true.B)
+      dut.clock.step(10)
+    }
+  }
 
-        dut.clock.step(1)
-        // read hit
-        dut.io.req.valid.poke(true.B)
-        dut.io.req.bits.source.poke(1.U)
-        dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-        dut.io.req.bits.paddr.poke(0x1234000.U)
-        dut.io.req.bits.wdata.poke(0x7890.U)
+  it should "Load different size" in {
+    test(new DCache()).withAnnotations(
+      Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
+    ) { dut =>
+      initializeDut(dut)
 
-        dut.clock.step(1)
-        dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.data.expect(0x7890.U)
-        dut.io.resp.bits.hit.expect(true.B)
-        dut.clock.step(10)
+      dut.clock.step(1)
+      // read hit 512
+      dut.io.req.valid.poke(true.B)
+      dut.io.req.bits.size.poke(6.U)
+      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
+      dut.io.req.bits.paddr.poke(0x1234000.U)
 
+      dut.clock.step(1)
+      dut.io.resp.valid.expect(true.B)
+      dut.io.resp.bits.data.expect(initilizeData.U)
+      dut.io.resp.bits.hit.expect(true.B)
+      dut.clock.step(10)
+
+      // read hit 64
+      dut.io.req.valid.poke(true.B)
+      dut.io.req.bits.size.poke(3.U)
+      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
+      dut.io.req.bits.paddr.poke(0x1234000.U)
+
+      dut.clock.step(1)
+      dut.io.resp.valid.expect(true.B)
+      dut.io.resp.bits.data.expect("h2323232323232323".U)
+      dut.io.resp.bits.hit.expect(true.B)
+      dut.clock.step(10)
+
+      // read hit 32
+      dut.io.req.valid.poke(true.B)
+      dut.io.req.bits.size.poke(2.U)
+      dut.io.req.bits.signed.poke(true.B)
+      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
+      dut.io.req.bits.paddr.poke(0x1234010.U)
+
+      dut.clock.step(1)
+      dut.io.resp.valid.expect(true.B)
+      dut.io.resp.bits.data.expect(
+        "hffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffbbaa9988".U
+      )
+      dut.io.resp.bits.hit.expect(true.B)
+      dut.clock.step(10)
     }
   }
 }

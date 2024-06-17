@@ -23,6 +23,7 @@ trait DCacheParams {
   val srcWidth   = 8
 
   val dataWidth = max(XLEN, VLEN)
+  val dataBytes = dataWidth / 8
   // }}}
 
   val rowBytes     = rowBits / 8
