@@ -72,11 +72,36 @@ class DCache extends Module {
 
   val s1_storeData = Mux(MemoryOpConstants.isAMO(s1_req.cmd), s1_amoStoreData, s1_mergeStoreData)
 
+  // lrsc
+  val lrscCount = RegInit(0.U)
+  val lrscValid = lrscCount > lrscBackoff.U
+
+  val s1_lr = s1_valid && (s1_req.cmd === MemoryOpConstants.M_XLR)
+  val s1_sc = s1_valid && (s1_req.cmd === MemoryOpConstants.M_XSC)
+
+  val lrscAddr         = RegEnable(s1_req.paddr >> blockOffBits, s1_lr)
+  val s1_lrscAddrMatch = lrscValid && (s1_req.paddr >> blockOffBits === lrscAddr)
+
+  // FIXME: s1 sc miss?
+  val s1_scFail = s1_sc && (!s1_lrscAddrMatch || !s1_hit)
+
+  lrscCount := MuxCase(
+    lrscCount,
+    Seq(
+      // (lr | sc | other cmd) after lr hit
+      (s1_valid & lrscCount > 0.U) -> 0.U,
+      // lr hit
+      (s1_hit && s1_lr) -> (lrscCycles - 1).U,
+      // no cmd after lr hit
+      (lrscCount > 0.U) -> (lrscCount - 1.U),
+    ),
+  )
+
   // return resp
   io.resp.valid       := s1_valid
   io.resp.bits.hit    := s1_hit
   io.resp.bits.source := RegNext(s1_req.source)
-  io.resp.bits.data   := loadGen.data
+  io.resp.bits.data   := Mux(s1_sc, s1_scFail, loadGen.data)
 
   val s1_needWrite =
     s1_hit & MemoryOpConstants.isWrite(s1_req.cmd) || (s1_valid & s1_req.cmd === MemoryOpConstants.M_FILL) // TODO
@@ -84,7 +109,7 @@ class DCache extends Module {
   // * pipeline stage 1 End
 
   // * pipeline stage 2 Begin
-  val s2_valid = RegNext(s1_valid & s1_needWrite)
+  val s2_valid = RegNext(s1_valid & !s1_scFail & s1_needWrite)
   val s2_req   = Reg(new DataExchangeReq)
   val s2_wayEn = RegInit(0.U(nWays.W))
 
@@ -119,7 +144,7 @@ class DCache extends Module {
   // *  Store -> Load Bypassing Begin
   // bypass list (valid, req, data)
   val bypassDataList = List(
-    (s1_valid, s1_req, s1_storeData),
+    (s1_valid && !s1_scFail, s1_req, s1_storeData),
     (s2_valid, s2_req, s2_req.wdata),
     (s3_valid, s3_req, s3_req.wdata),
   ).map(r =>

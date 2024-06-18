@@ -15,6 +15,12 @@ trait DCacheParams {
   val replacementPolicy = "plru"
   // }}}
 
+  // lrsc params
+  // {{{
+  val lrscCycles  = 80
+  val lrscBackoff = 3
+  // }}}
+
   // {{{
   val XLEN       = 64
   val VLEN       = 512

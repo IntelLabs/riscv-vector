@@ -202,4 +202,96 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.clock.step(10)
     }
   }
+
+  it should "lrsc success" in {
+    test(new DCache()).withAnnotations(
+      Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
+    ) { dut =>
+      initializeDut(dut)
+
+      // XLR
+      dut.io.req.valid.poke(true.B)
+      dut.io.req.bits.size.poke(3.U)
+      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XLR)
+      dut.io.req.bits.paddr.poke(0x1234000.U)
+
+      dut.clock.step(1)
+      dut.io.req.valid.poke(false.B)
+      dut.io.resp.valid.expect(true.B)
+      dut.io.resp.bits.data.expect("h2323232323232323".U)
+      dut.io.resp.bits.hit.expect(true.B)
+      dut.clock.step(10)
+
+      // XSC
+      dut.io.req.valid.poke(true.B)
+      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XSC)
+      dut.io.req.bits.wdata.poke("h0101010101010101".U)
+      dut.io.req.bits.paddr.poke(0x1234000.U)
+
+      dut.clock.step(1)
+      dut.io.req.valid.poke(false.B)
+      dut.io.resp.valid.expect(true.B)
+      dut.io.resp.bits.hit.expect(true.B)
+
+      // read hit 64
+      dut.io.req.valid.poke(true.B)
+      dut.io.req.bits.size.poke(3.U)
+      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
+      dut.io.req.bits.paddr.poke(0x1234000.U)
+
+      dut.clock.step(1)
+      dut.io.req.valid.poke(false.B)
+      dut.io.resp.valid.expect(true.B)
+      dut.io.resp.bits.data.expect("h101010101010101".U)
+      dut.io.resp.bits.hit.expect(true.B)
+      dut.clock.step(10)
+    }
+  }
+
+  it should "lrsc fail" in {
+    test(new DCache()).withAnnotations(
+      Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
+    ) { dut =>
+      initializeDut(dut)
+
+      // XLR
+      dut.io.req.valid.poke(true.B)
+      dut.io.req.bits.size.poke(3.U)
+      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XLR)
+      dut.io.req.bits.paddr.poke(0x1234000.U)
+
+      dut.clock.step(1)
+      dut.io.req.valid.poke(false.B)
+      dut.io.resp.valid.expect(true.B)
+      dut.io.resp.bits.data.expect("h2323232323232323".U)
+      dut.io.resp.bits.hit.expect(true.B)
+
+      dut.clock.step(80) // time out
+
+      // XSC
+      dut.io.req.valid.poke(true.B)
+      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XSC)
+      dut.io.req.bits.wdata.poke("h0101010101010101".U)
+      dut.io.req.bits.paddr.poke(0x1234000.U)
+
+      dut.clock.step(1)
+      dut.io.req.valid.poke(false.B)
+      dut.io.resp.valid.expect(true.B)
+      dut.io.resp.bits.data.expect("h1".U)
+      dut.io.resp.bits.hit.expect(true.B)
+
+      // read hit 64
+      dut.io.req.valid.poke(true.B)
+      dut.io.req.bits.size.poke(3.U)
+      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
+      dut.io.req.bits.paddr.poke(0x1234000.U)
+
+      dut.clock.step(1)
+      dut.io.req.valid.poke(false.B)
+      dut.io.resp.valid.expect(true.B)
+      dut.io.resp.bits.data.expect("h2323232323232323".U)
+      dut.io.resp.bits.hit.expect(true.B)
+      dut.clock.step(10)
+    }
+  }
 }
