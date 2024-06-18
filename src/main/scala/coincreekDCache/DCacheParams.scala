@@ -3,6 +3,7 @@ package coincreekDCache
 import chisel3._
 import chisel3.util._
 import scala.math.max
+import freechips.rocketchip.tilelink._
 
 trait DCacheParams {
   // {{{
@@ -30,6 +31,8 @@ trait DCacheParams {
 
   val dataWidth = max(XLEN, VLEN)
   val dataBytes = dataWidth / 8
+
+  val cohWidth = ClientStates.width // tilelink
   // }}}
 
   val rowBytes     = rowBits / 8

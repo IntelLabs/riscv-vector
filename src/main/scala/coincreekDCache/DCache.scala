@@ -2,14 +2,16 @@ package coincreekDCache
 
 import chisel3._
 import chisel3.util._
+import freechips.rocketchip.tilelink._
 import _root_.circt.stage.ChiselStage
 
 class DCache extends Module {
 
   val io = IO(new DataExchangeIO())
 
+  def onReset   = Metadata(0.U, ClientMetadata.onReset.state)
+  val metaArray = Module(new MetaArray[Metadata](() => onReset))
   val dataArray = Module(new DataArray())
-  val metaArray = Module(new MetaArray[Metadata](Metadata.onReset))
 
   // * Signal Define Begin
   // Store -> Load Bypassing
@@ -43,10 +45,16 @@ class DCache extends Module {
   val s1_metaArrayResp = metaArray.io.resp // nways meta
 
   // tag & coh match
-  val s1_tagEqWay    = VecInit((0 until nWays).map(w => s1_metaArrayResp(w).tag === AddrDecoder.getTag(s1_req.paddr)))
-  val s1_tagMatch    = s1_tagEqWay.asUInt.orR
-  val s1_tagMatchWay = s1_tagEqWay
-  val s1_hit         = s1_valid && s1_tagMatch
+  val s1_tagMatchWay = VecInit((0 until nWays).map(w =>
+    // tag match & coh valid
+    s1_metaArrayResp(w).tag === AddrDecoder.getTag(s1_req.paddr) && s1_metaArrayResp(w).coh > 0.U
+  ))
+  val s1_tagMatch = s1_tagMatchWay.asUInt.orR
+
+  val s1_cohMeta                        = ClientMetadata(Mux1H(s1_tagMatchWay, s1_metaArrayResp.map(_.coh)))
+  val (s1_hasPerm, _, s1_newHitCohMeta) = s1_cohMeta.onAccess(s1_req.cmd)
+  // special case: trunk -> dirty, has perm but not hit
+  val s1_hit = s1_valid && s1_tagMatch && s1_hasPerm && (s1_cohMeta === s1_newHitCohMeta)
 
   // organize read data
   val s1_dataPreBypass = Mux1H(s1_tagMatchWay, s1_dataArrayResp).asUInt
@@ -120,11 +128,12 @@ class DCache extends Module {
   }
 
   // meta write
-  metaArray.io.write.valid         := s2_valid
+  // FIXME
+  metaArray.io.write.valid         := s2_valid && s2_req.cmd === MemoryOpConstants.M_FILL
   metaArray.io.write.bits.setIdx   := AddrDecoder.getSetIdx(s2_req.paddr)
   metaArray.io.write.bits.wayEn    := s2_wayEn
   metaArray.io.write.bits.data.tag := AddrDecoder.getTag(s2_req.paddr)
-  metaArray.io.write.bits.data.coh := 0.U
+  metaArray.io.write.bits.data.coh := ClientStates.Dirty
 
   // data write
   dataArray.io.write.valid       := s2_valid

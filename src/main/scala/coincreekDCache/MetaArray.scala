@@ -8,7 +8,7 @@ import _root_.circt.stage.ChiselStage
 
 class Metadata extends Bundle {
   val tag = UInt(tagWidth.W)
-  val coh = UInt(3.W) // TODO
+  val coh = UInt(cohWidth.W)
 }
 
 object Metadata {
