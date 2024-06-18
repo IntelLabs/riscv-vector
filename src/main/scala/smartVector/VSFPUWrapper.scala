@@ -21,7 +21,7 @@ class VSFPUWrapper (implicit p : Parameters) extends VFuModule {
   val fpuReqReg = RegInit(0.U.asTypeOf(new VFuInput))
   val fpuReqValidReg = RegInit(false.B)
 
-  when(io.in.valid && ~fpuReqValidReg) {
+  when(io.in.valid){
     fpuReqValidReg := true.B
     fpuReqReg := io.in.bits
   }.elsewhen(vFPu.io.in.ready && fpuReqValidReg) {
