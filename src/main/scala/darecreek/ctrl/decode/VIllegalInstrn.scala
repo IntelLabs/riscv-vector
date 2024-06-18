@@ -94,10 +94,21 @@ class VIllegalInstrn extends Module {
 
   //**FixMeWQW **/
   val isFp = ctrl.fp || ctrl.funct3 === "b001".U || (ctrl.funct3 === "b101".U && ~ctrl.isLdst)
+  val vfncvt_xu_f = ctrl.fp && ctrl.funct6 === "b010010".U && ctrl.lsrc(0) === "b10000".U
+  val vfncvt_x_f  = ctrl.fp && ctrl.funct6 === "b010010".U && ctrl.lsrc(0) === "b10001".U
+  val vfncvt_rtz_xu_f = ctrl.fp && ctrl.funct6 === "b010010".U && ctrl.lsrc(0) === "b10110".U
+  val vfncvt_rtz_x_f  = ctrl.fp && ctrl.funct6 === "b010010".U && ctrl.lsrc(0) === "b10111".U
+  val vfncvt_f_xu = ctrl.fp && ctrl.funct6 === "b010010".U && ctrl.lsrc(0) === "b10010".U
+  val vfncvt_f_x  = ctrl.fp && ctrl.funct6 === "b010010".U && ctrl.lsrc(0) === "b10011".U
+  //val vfncvt_f_f = ctrl.fp && ctrl.funct6 === "b010010".U && ctrl.lsrc(0) === "b10100".U
+  //val vfncvt_rod_f_f = ctrl.fp && ctrl.funct6 === "b010010".U && ctrl.lsrc(0) === "b10101".U
+
+  val convertToInt = vfncvt_xu_f || vfncvt_x_f || vfncvt_rtz_xu_f || vfncvt_rtz_x_f || vfncvt_f_xu || vfncvt_f_x
+
 
   val ill_frm = csr.frm(2) && csr.frm(1, 0) =/= 0.U && isFp
   // invalid SEW of FP
-  val ill_sewFP = !vsew(1) && (isFp) 
+  val ill_sewFP = (vsew === 0.U && (isFp)) || (vsew === 1.U && (isFp && ~convertToInt))
 
   // Illegal start number of register group
   def regGroup_start_illegal(vemul: UInt, startReg: UInt) = {
