@@ -83,7 +83,7 @@ class DCache extends Module {
   val s1_lrscAddrMatch = lrscValid && (s1_req.paddr >> blockOffBits === lrscAddr)
 
   // FIXME: s1 sc miss?
-  val s1_scFail = s1_sc && (!s1_lrscAddrMatch || !s1_hit)
+  val s1_scFail = s1_sc && !s1_lrscAddrMatch
 
   lrscCount := MuxCase(
     lrscCount,
