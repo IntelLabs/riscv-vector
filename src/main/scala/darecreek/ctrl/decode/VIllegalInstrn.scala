@@ -93,7 +93,7 @@ class VIllegalInstrn extends Module {
   // invalid rounding mode
 
   //**FixMeWQW **/
-  val isFp = ctrl.fp || ctrl.funct3 === "b001".U || ctrl.funct3 === "b101".U
+  val isFp = ctrl.fp || ctrl.funct3 === "b001".U || (ctrl.funct3 === "b101".U && ~ctrl.isLdst)
 
   val ill_frm = csr.frm(2) && csr.frm(1, 0) =/= 0.U && isFp
   // invalid SEW of FP
