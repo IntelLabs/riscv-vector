@@ -2,12 +2,17 @@ package coincreekDCache
 
 import chisel3._
 import chisel3.util._
+import org.chipsalliance.cde.config.{Parameters, Field}
+import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
-import _root_.circt.stage.ChiselStage
 
-class DCache extends Module {
+class CCDCache()(
+    implicit p: Parameters
+) extends BaseDCache {
+  override lazy val module = new CCDCacheImp(this)
+}
 
-  val io = IO(new DataExchangeIO())
+class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   def onReset   = Metadata(0.U, ClientMetadata.onReset.state)
   val metaArray = Module(new MetaArray[Metadata](() => onReset))
@@ -166,17 +171,13 @@ class DCache extends Module {
 
   io.req.ready := true.B
 
-}
+  // FIXME
+  // test tilelink
+  tl_out.a.valid := RegNext(s1_valid && ~s1_hit)
+  tl_out.a.bits := edge.Get(
+    fromSource = 0.U,
+    toAddress = s1_req.paddr,
+    lgSize = log2Up(blockBytes).U,
+  )._2
 
-object Main extends App {
-
-  val firtoolOptions = Array(
-    "--lowering-options=" + List(
-      "disallowLocalVariables",
-      "disallowPackedArrays",
-      "locationInfoStyle=wrapInAtSquareBracket",
-    ).reduce(_ + "," + _)
-  )
-
-  ChiselStage.emitSystemVerilogFile(new DCache(), args, firtoolOptions)
 }

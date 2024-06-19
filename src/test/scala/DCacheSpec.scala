@@ -7,14 +7,17 @@ import org.scalatest.flatspec.AnyFlatSpec
 import chisel3.experimental.BundleLiterals._
 import org.scalatest.matchers.must.Matchers
 import chiseltest.{VerilatorBackendAnnotation, WriteVcdAnnotation}
+import org.chipsalliance.cde.config.{Parameters, Field}
+import freechips.rocketchip.diplomacy._
+import freechips.rocketchip.tilelink._
 
 class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
-  behavior.of("DCache")
+  behavior.of("DCacheWrapper")
 
   val initilizeData =
     "h0123456789abcdef_fedcba9876543210_0011223344556677_8899aabbccddeeff_7766554433221100_ffeeddccbbaa9988_1010101010101010_2323232323232323"
 
-  def initializeDut(dut: DCache): Unit = {
+  def initializeDut(dut: CCDCacheImp): Unit = {
     dut.io.req.valid.poke(false.B)
     dut.clock.step(150)
 
@@ -35,7 +38,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
   }
 
   it should "DCache hit" in {
-    test(new DCache()).withAnnotations(
+    test(LazyModule(new DCacheWrapper()(Parameters.empty)).dcacheClient.module).withAnnotations(
       Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
     ) { dut =>
       initializeDut(dut)
@@ -67,7 +70,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
   }
 
   it should "Store -> Load Bypassing" in {
-    test(new DCache()).withAnnotations(
+    test(LazyModule(new DCacheWrapper()(Parameters.empty)).dcacheClient.module).withAnnotations(
       Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
     ) { dut =>
       initializeDut(dut)
@@ -94,7 +97,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
   }
 
   it should "Load different sizes" in {
-    test(new DCache()).withAnnotations(
+    test(LazyModule(new DCacheWrapper()(Parameters.empty)).dcacheClient.module).withAnnotations(
       Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
     ) { dut =>
       initializeDut(dut)
@@ -142,7 +145,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
   }
 
   it should "pass AMOSWAP" in {
-    test(new DCache()).withAnnotations(
+    test(LazyModule(new DCacheWrapper()(Parameters.empty)).dcacheClient.module).withAnnotations(
       Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
     ) { dut =>
       initializeDut(dut)
@@ -173,7 +176,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
   }
 
   it should "pass AMOADD" in {
-    test(new DCache()).withAnnotations(
+    test(LazyModule(new DCacheWrapper()(Parameters.empty)).dcacheClient.module).withAnnotations(
       Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
     ) { dut =>
       initializeDut(dut)
@@ -204,7 +207,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
   }
 
   it should "lrsc success" in {
-    test(new DCache()).withAnnotations(
+    test(LazyModule(new DCacheWrapper()(Parameters.empty)).dcacheClient.module).withAnnotations(
       Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
     ) { dut =>
       initializeDut(dut)
@@ -249,7 +252,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
   }
 
   it should "lrsc fail" in {
-    test(new DCache()).withAnnotations(
+    test(LazyModule(new DCacheWrapper()(Parameters.empty)).dcacheClient.module).withAnnotations(
       Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
     ) { dut =>
       initializeDut(dut)
