@@ -20,14 +20,14 @@ class ScoreboardSetIO extends Bundle {
     val setEn         = Input(Bool())
     val setAddr       = Input(UInt(log2Ceil(NVPhyRegs).W))
     val setMultiEn    = Input(Bool())
-    val setNum        = Input(UInt(4.W))
+    val setNum        = Input(UInt(log2Ceil(NVPhyRegs).W))
 }
 
 class ScoreboardClearIO extends Bundle {
     val clearEn       = Input(Bool())
     val clearAddr     = Input(UInt(log2Ceil(NVPhyRegs).W))
     val clearMultiEn  = Input(Bool())
-    val clearNum      = Input(UInt(4.W))
+    val clearNum      = Input(UInt(log2Ceil(NVPhyRegs).W))
     //val clearAll      = Input(Bool())
 }
 
