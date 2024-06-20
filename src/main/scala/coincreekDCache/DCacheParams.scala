@@ -12,9 +12,10 @@ trait DCacheParams {
   val nBanks            = 8
   val rowBits           = 64
   val blockBytes        = 64
-  val nMSHRs            = 0
+  val nMSHRs            = 4
   val nMMIOs            = 0
   val replacementPolicy = "plru"
+  val beatBytes         = 64
   // }}}
 
   // lrsc params

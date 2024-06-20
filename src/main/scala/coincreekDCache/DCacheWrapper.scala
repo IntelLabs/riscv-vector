@@ -7,17 +7,56 @@ import freechips.rocketchip.tilelink._
 import freechips.rocketchip.devices.tilelink._
 import _root_.circt.stage.ChiselStage
 
+class TLCManager()(
+    implicit p: Parameters
+) extends LazyModule {
+  val access = TransferSizes(1, blockBytes)
+  val xfer   = TransferSizes(blockBytes, blockBytes)
+  val atom   = TransferSizes(1, beatBytes)
+
+  val node = TLManagerNode(Seq(TLManagerPortParameters(
+    managers = Seq(TLManagerParameters(
+      address = Seq(AddressSet(0x80000000L, 0xffffL)),
+      resources = (new SimpleDevice("tlc-manager", Seq("example,tlcmanager"))).reg,
+      regionType = RegionType.CACHED,
+      supportsAcquireB = xfer,
+      supportsAcquireT = xfer,
+      supportsGet = atom,
+      supportsPutFull = atom,
+      supportsPutPartial = atom,
+      supportsArithmetic = atom,
+      supportsLogical = atom,
+      supportsHint = access,
+      mayDenyGet = true,
+      mayDenyPut = true,
+      alwaysGrantsT = true,
+      fifoId = None,
+    )),
+    beatBytes = beatBytes,
+    endSinkId = nMSHRs,
+    minLatency = 2,
+  )))
+
+  lazy val module = new LazyModuleImp(this) {
+    val (in, _) = node.in(0)
+    in.a.ready := false.B
+    in.b.valid := false.B
+    in.c.ready := false.B
+    in.d.valid := false.B
+    in.e.ready := false.B
+  }
+}
+
 class DCacheWrapper()(
     implicit p: Parameters
 ) extends LazyModule {
 
   val dcacheClient = LazyModule(new CCDCache()(p))
-  val zeroDevice = LazyModule(new TLZero(
-    address = AddressSet(0x2000, 0xff),
-    beatBytes = 64,
-  ))
+  val manager      = LazyModule(new TLCManager()(p))
+  val tlXbar       = LazyModule(new TLXbar)
 
-  zeroDevice.node := dcacheClient.node
+  tlXbar.node  := TLWidthWidget(64) := dcacheClient.node
+  manager.node := tlXbar.node
 
   lazy val module = new LazyModuleImp(this) {
     val io = IO(new DataExchangeIO())
@@ -36,5 +75,5 @@ object Main extends App {
   )
 
   lazy val dcacheWrapper = LazyModule(new DCacheWrapper()(Parameters.empty))
-  ChiselStage.emitSystemVerilogFile(dcacheWrapper.module, args, firtoolOptions)
+  ChiselStage.emitSystemVerilogFile(dcacheWrapper.dcacheClient.module, args, firtoolOptions)
 }
