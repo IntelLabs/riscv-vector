@@ -28,6 +28,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
     dut.io.req.bits.cmd.poke(MemoryOpConstants.M_FILL)
     dut.io.req.bits.paddr.poke(0x1234000.U)
     dut.io.req.bits.wdata.poke(initilizeData.U)
+    dut.io.req.bits.noAlloc.poke(false.B)
     dut.io.req.bits.specifyValid.poke(true.B)
     dut.io.req.bits.specifyWay.poke(1.U)
 

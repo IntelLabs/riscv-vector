@@ -25,25 +25,26 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // * Signal Define End
 
   // * pipeline stage 0 Begin
-
+  val s0_valid = io.req.valid & ~io.s0_kill
+  val s0_req   = io.req.bits
   // read tag array
-  metaArray.io.read.valid       := io.req.valid
-  metaArray.io.read.bits.setIdx := AddrDecoder.getSetIdx(io.req.bits.paddr)
-  metaArray.io.read.bits.wayEn  := Mux(io.req.bits.specifyValid, UIntToOH(io.req.bits.specifyWay), Fill(nWays, true.B))
+  metaArray.io.read.valid       := s0_valid
+  metaArray.io.read.bits.setIdx := AddrDecoder.getSetIdx(s0_req.paddr)
+  metaArray.io.read.bits.wayEn  := Mux(s0_req.specifyValid, UIntToOH(s0_req.specifyWay), Fill(nWays, true.B))
 
   // read data array
-  dataArray.io.read.valid       := io.req.valid
-  dataArray.io.read.bits.setIdx := AddrDecoder.getSetIdx(io.req.bits.paddr)
-  dataArray.io.read.bits.bankEn := UIntToOH(AddrDecoder.getBankIdx(io.req.bits.paddr))
-  dataArray.io.read.bits.wayEn  := Mux(io.req.bits.specifyValid, UIntToOH(io.req.bits.specifyWay), Fill(nWays, true.B))
+  dataArray.io.read.valid       := s0_valid
+  dataArray.io.read.bits.setIdx := AddrDecoder.getSetIdx(s0_req.paddr)
+  dataArray.io.read.bits.bankEn := UIntToOH(AddrDecoder.getBankIdx(s0_req.paddr))
+  dataArray.io.read.bits.wayEn  := Mux(s0_req.specifyValid, UIntToOH(s0_req.specifyWay), Fill(nWays, true.B))
   // * pipeline stage 0 End
 
   // * pipeline stage 1 Begin
   // 1. Judge Tag & Meta
   // 2. Organize Data
   // 3. Return Resp
-  val s1_valid = RegNext(io.req.valid)
-  val s1_req   = RegNext(io.req.bits)
+  val s1_valid = RegNext(s0_valid) & !io.s1_kill
+  val s1_req   = RegNext(s0_req)
 
   // meta & data resp
   val s1_dataArrayResp = dataArray.io.resp // nways nbanks data
@@ -110,11 +111,16 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     ),
   )
 
-  // return resp
-  io.resp.valid       := s1_valid
-  io.resp.bits.hit    := s1_hit
-  io.resp.bits.source := RegNext(s1_req.source)
-  io.resp.bits.data   := Mux(s1_sc, s1_scFail, loadGen.data)
+  //  s1 resp
+  val s1_cacheResp = Wire(Valid(new DataExchangeResp))
+
+  s1_cacheResp.valid            := s1_valid
+  s1_cacheResp.bits.hit         := s1_hit
+  s1_cacheResp.bits.source      := RegNext(s1_req.source)
+  s1_cacheResp.bits.data        := Mux(s1_sc, s1_scFail, loadGen.data)
+  s1_cacheResp.bits.hasData     := MemoryOpConstants.isRead(s1_req.cmd)
+  s1_cacheResp.bits.replay      := false.B
+  s1_cacheResp.bits.nextCycleWb := false.B
 
   val s1_needWrite =
     s1_hit & MemoryOpConstants.isWrite(s1_req.cmd) || (s1_valid & s1_req.cmd === MemoryOpConstants.M_FILL) // TODO
@@ -168,6 +174,9 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   s1_storeBypass     := bypassDataList.map(_._1).reduce(_ || _)
   s1_storeBypassData := PriorityMux(bypassDataList)
   // * Store -> Load Bypassing End
+
+  // return resp
+  io.resp <> s1_cacheResp
 
   io.req.ready := true.B
 
