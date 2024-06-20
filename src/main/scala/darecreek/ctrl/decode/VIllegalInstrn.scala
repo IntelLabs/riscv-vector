@@ -51,7 +51,9 @@ class VIllegalInstrn extends Module {
   // vlmul
   val ill_vlmul = vlmul === "b100".U
   // widen/narrow, illegal when lmul = 8 or sew = 64
-  val ill_widenNarrow = (vlmul === 3.U || vsew === 3.U) && (ctrl.widen || ctrl.narrow || ctrl.widen2)
+  val ill_widenNarrow_sew = (vsew === 3.U) && (ctrl.widen || ctrl.narrow || ctrl.widen2)
+  val ill_widenNarrow_lmul = (vlmul === 3.U)  && (ctrl.widen || ctrl.narrow || ctrl.widen2) && ~(ctrl.redu && ctrl.funct3 === "b000".U)
+  val ill_widenNarrow = ill_widenNarrow_sew || ill_widenNarrow_lmul
   // vstart: non-zero vstart for arithmetic instrns
   val ill_vstart = csr.vstart =/= 0.U && ctrl.arith
   //VrgatherEi16VV, when lmul =8, sew can not be 32

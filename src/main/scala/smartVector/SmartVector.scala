@@ -27,7 +27,7 @@ class ScoreboardClearIO extends Bundle {
     val clearEn       = Input(Bool())
     val clearAddr     = Input(UInt(log2Ceil(NVPhyRegs).W))
     val clearMultiEn  = Input(Bool())
-    val clearNum      = Input(UInt(log2Ceil(NVPhyRegs).W))
+    val clearNum      = Input(UInt((log2Ceil(NVPhyRegs)+1).W))
     //val clearAll      = Input(Bool())
 }
 
