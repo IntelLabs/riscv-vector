@@ -17,30 +17,22 @@ class VSFPUWrapper (implicit p : Parameters) extends VFuModule {
   })
 
   val vFPu = Module(new fp.VFPUWrapper)
-
-  //val validReg = RegInit(false.B)
-  //val bitsReg = RegInit(0.U.asTypeOf(new VFuInput))
-  //
-  //when(io.in.valid && vFPu.io.in.ready){
-  //  vFPu.io.in.valid := true.B
-  //  vFPu.io.in.bits  := io.in.bits
-  //}.elsewhen(io.in.valid && ~vFPu.io.in.ready){
-  //  vFPu.io.in.valid := false.B
-  //  vFPu.io.in.bits  := io.in.bits
-  //  validReg := true.B
-  //  bitsReg := io.in.bits
-  //}.elsewhen(~io.in.valid && validReg && vFPu.io.in.ready){
-  //  vFPu.io.in.valid := true.B
-  //  vFPu.io.in.bits  := bitsReg
-  //  validReg := false.B
-  //}.otherwise{
-  //  vFPu.io.in.valid := false.B
-  //  vFPu.io.in.bits  := io.in.bits
-  //  validReg := false.B
-  //}
   
-  vFPu.io.in.valid := io.in.valid 
-  vFPu.io.in.bits  := io.in.bits
+  val fpuReqReg = RegInit(0.U.asTypeOf(new VFuInput))
+  val fpuReqValidReg = RegInit(false.B)
+
+  when(io.in.valid){
+    fpuReqValidReg := true.B
+    fpuReqReg := io.in.bits
+  }.elsewhen(vFPu.io.in.ready && fpuReqValidReg) {
+    fpuReqValidReg := false.B
+  }
+
+  val fpuValid = fpuReqValidReg
+  val fpuReq = fpuReqReg
+
+  vFPu.io.in.valid := fpuValid
+  vFPu.io.in.bits  := fpuReq
   vFPu.io.redirect.valid := false.B 
   vFPu.io.redirect.bits := DontCare
   vFPu.io.out.ready := true.B

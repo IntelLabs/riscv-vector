@@ -33,17 +33,6 @@ class VMerge (implicit p : Parameters) extends Module {
     val vxsatBufferIn = Wire(Bool())
     val fflagsBuffer   = RegInit(0.U(5.W))
     val fflagsBufferIn = Wire(UInt(5.W))
-
-    //val rfWriteEn         = Reg(Bool())
-    //val rfWriteIdx        = Reg(UInt(5.W))
-    //val regBackWidth      = Reg(UInt(3.W))
-    //val regWriteMuopIdx   = Reg(UInt(4.W))
-    //val scalarRegWriteEn  = Reg(Bool())
-    //val floatRegWriteEn   = Reg(Bool())
-    //val scalarRegWriteIdx = Reg(UInt(5.W))
-    //val muopEnd           = Reg(Bool())
-    //val permExpdLen       = Reg(UInt(4.W))
-    //val regDstIdx         = Reg(UInt(5.W))
   
     val rfWriteEn         = RegEnable(io.in.mergeInfo.bits.rfWriteEn,        io.in.mergeInfo.valid)
     val rfWriteIdx        = RegEnable(io.in.mergeInfo.bits.ldest,            io.in.mergeInfo.valid)
@@ -147,13 +136,16 @@ class VMerge (implicit p : Parameters) extends Module {
     
     // xcpt occurs or is fault-only-first
     val ldstXcpt = (io.in.lsuIn.bits.xcpt.exception_vld || io.in.lsuIn.bits.xcpt.update_vl)
-    // for load, when muopEnd or xcpt occurs, clear scoreboard
-    val sboardClearMulti = io.in.lsuIn.valid && (io.in.lsuIn.bits.muopEnd || ldstXcpt) && io.in.lsuIn.bits.isSegLoad
 
-    io.scoreBoardCleanIO.clearEn        := io.out.toRegFileWrite.rfWriteEn && !(io.in.lsuIn.valid && io.in.lsuIn.bits.isSegLoad)
-    io.scoreBoardCleanIO.clearAddr      := Mux(sboardClearMulti, 
-                                                io.in.lsuIn.bits.regStartIdx, 
-                                                io.out.toRegFileWrite.rfWriteIdx)
-    io.scoreBoardCleanIO.clearMultiEn   := sboardClearMulti
-    io.scoreBoardCleanIO.clearNum       := io.in.lsuIn.bits.regCount
+    // for load, when muopEnd or xcpt occurs, clear scoreboard
+    val sboardClearMulti = io.in.lsuIn.valid && io.in.lsuIn.bits.muopEnd && io.in.lsuIn.bits.isSegLoad
+    val sboardClearAll = io.in.lsuIn.valid && ldstXcpt
+
+    io.scoreBoardCleanIO.clearEn        := io.out.toRegFileWrite.rfWriteEn && !(io.in.lsuIn.valid && io.in.lsuIn.bits.isSegLoad)                                          
+    io.scoreBoardCleanIO.clearAddr      := Mux(sboardClearMulti, io.in.lsuIn.bits.regStartIdx, 
+                                           Mux(sboardClearAll, 0.U(4.W), 
+                                            io.out.toRegFileWrite.rfWriteIdx))
+    io.scoreBoardCleanIO.clearMultiEn   := sboardClearMulti || sboardClearAll
+    io.scoreBoardCleanIO.clearNum       := Mux(sboardClearAll, 32.U(6.W), io.in.lsuIn.bits.regCount)
+    //io.scoreBoardCleanIO.clearAll       := sboardClearAll
 }

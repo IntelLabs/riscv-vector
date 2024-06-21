@@ -157,7 +157,7 @@ class SVHLsu(implicit p: Parameters) extends Module {
     val baseAddr    = mUopInfoReg.rs1Val
 
     val curVl       = (mUopInfoReg.uopIdx << ldstCtrlReg.log2MinLen) + curSplitIdx
-    val validAddr   = (uopState === uop_split && !hasXcpt && curSplitIdx < splitCount)
+    val isValidAddr = (uopState === uop_split && !hasXcpt && curSplitIdx < splitCount)
 
 
     // indexed addr
@@ -181,7 +181,7 @@ class SVHLsu(implicit p: Parameters) extends Module {
     }
 
     val accelerateStride = Cat(strideAbs === 4.U, strideAbs === 2.U, strideAbs === 1.U)
-    val canAccelerate = accelerateStride =/= 0.U || strideAbs === 0.U
+    val canAccelerate = (accelerateStride =/= 0.U || strideAbs === 0.U) && ~AddrUtil.isAddrMisalign(strideAbs, ldstCtrlReg.log2Memwb)
     val log2Stride = Mux(canAccelerate, Mux1H(accelerateStride, Seq(0.U, 1.U, 2.U)), 0.U)
 
     val curStridedAddr = Mux(
@@ -217,7 +217,7 @@ class SVHLsu(implicit p: Parameters) extends Module {
     val endElemPos      = startElemPos + canLoadElemCnt
     val endVRegIdx      = Mux(canAccelerate, endElemPos << ldstCtrlReg.log2Memwb, startVRegIdx)
     
-    when (validAddr) {
+    when (isValidAddr) {
         curSplitIdx := curSplitIdx + canLoadElemCnt
         addrReg     := Mux(canAccelerate && strideAbs =/= 0.U, 
                         Mux(negStride, addr - (canLoadElemCnt << log2Stride), addr + (canLoadElemCnt << log2Stride)), addr)
@@ -226,20 +226,20 @@ class SVHLsu(implicit p: Parameters) extends Module {
     // * Calculate Addr
     // * END
 
-    // pipeline stage s2
+    // pipeline stage 1
 
-    val s1_validAddr        = RegNext(validAddr)
-    val s1_strideAbs        = RegNext(strideAbs)
-    val s1_negStride        = RegNext(negStride)
-    val s1_log2Stride       = RegNext(log2Stride)
-    val s1_addr             = RegNext(addr)
-    val s1_startElemPos     = RegNext(startElemPos)
-    val s1_endElemPos       = RegNext(endElemPos)
-    val s1_startVRegIdx     = RegNext(startVRegIdx)
-    val s1_endVRegIdx       = RegNext(endVRegIdx)
-    val s1_canLoadElemCnt   = RegNext(canLoadElemCnt)
-    val s1_curSplitIdx      = RegNext(curSplitIdx)
-    val s1_curVl            = RegNext(curVl)
+    val s1_isValidAddr      = RegNext(isValidAddr)
+    val s1_strideAbs        = RegEnable(strideAbs, isValidAddr)
+    val s1_negStride        = RegEnable(negStride, isValidAddr)
+    val s1_log2Stride       = RegEnable(log2Stride, isValidAddr)
+    val s1_addr             = RegEnable(addr, isValidAddr)
+    val s1_startElemPos     = RegEnable(startElemPos, isValidAddr)
+    val s1_endElemPos       = RegEnable(endElemPos, isValidAddr)
+    val s1_startVRegIdx     = RegEnable(startVRegIdx, isValidAddr)
+    val s1_endVRegIdx       = RegEnable(endVRegIdx, isValidAddr)
+    val s1_canLoadElemCnt   = RegEnable(canLoadElemCnt, isValidAddr)
+    val s1_curSplitIdx      = RegEnable(curSplitIdx, isValidAddr)
+    val s1_curVl            = RegEnable(curVl, isValidAddr)
 
     val s1_addrMisalign     = AddrUtil.isAddrMisalign(s1_addr, ldstCtrlReg.log2Memwb)
     val s1_alignedAddr      = AddrUtil.getAlignedAddr(s1_addr)
@@ -253,7 +253,7 @@ class SVHLsu(implicit p: Parameters) extends Module {
     misalignXcpt.xcptValid := s1_addrMisalign
     misalignXcpt.ma        := s1_addrMisalign
 
-    when (s1_validAddr) {
+    when (s1_isValidAddr) {
         canEnqueue := (ldstCtrlReg.vm || isNotMasked) && (s1_curSplitIdx + s1_canLoadElemCnt >= splitStart)
 
         ldstUopQueue(ldstEnqPtr).valid  := canEnqueue

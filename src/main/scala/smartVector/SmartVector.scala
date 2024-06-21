@@ -20,14 +20,15 @@ class ScoreboardSetIO extends Bundle {
     val setEn         = Input(Bool())
     val setAddr       = Input(UInt(log2Ceil(NVPhyRegs).W))
     val setMultiEn    = Input(Bool())
-    val setNum        = Input(UInt(4.W))
+    val setNum        = Input(UInt(log2Ceil(NVPhyRegs).W))
 }
 
 class ScoreboardClearIO extends Bundle {
     val clearEn       = Input(Bool())
     val clearAddr     = Input(UInt(log2Ceil(NVPhyRegs).W))
     val clearMultiEn  = Input(Bool())
-    val clearNum      = Input(UInt(4.W))
+    val clearNum      = Input(UInt((log2Ceil(NVPhyRegs)+1).W))
+    //val clearAll      = Input(Bool())
 }
 
 class ScoreboardReadIO extends Bundle {
@@ -100,7 +101,7 @@ class SmartVector extends Module {
     svlsuWrapper.io.mUop <> split.io.out.mUop
     svlsuWrapper.io.mUopMergeAttr <> split.io.out.mUopMergeAttr
     split.io.vLSUXcpt := Mux(svlsuWrapper.io.lsuOut.valid, svlsuWrapper.io.lsuOut.bits.xcpt, 0.U.asTypeOf(new VLSUXcpt))
-
+    decoder.io.vLSUXcpt := Mux(svlsuWrapper.io.lsuOut.valid, svlsuWrapper.io.lsuOut.bits.xcpt, 0.U.asTypeOf(new VLSUXcpt))
     //ChenLu change
     split.io.lsuStallSplit := ~svlsuWrapper.io.lsuReady
     merge.io.in.lsuIn <> svlsuWrapper.io.lsuOut
@@ -148,6 +149,7 @@ class SmartVector extends Module {
     val sboard  = new Scoreboard(NVPhyRegs, false)
     sboard.clear(merge.io.scoreBoardCleanIO.clearEn, merge.io.scoreBoardCleanIO.clearAddr)
     sboard.clearN(merge.io.scoreBoardCleanIO.clearMultiEn, merge.io.scoreBoardCleanIO.clearAddr, merge.io.scoreBoardCleanIO.clearNum)
+    //sboard.clearAll(merge.io.scoreBoardCleanIO.clearAll)
     sboard.set(split.io.scoreBoardSetIO.setEn, split.io.scoreBoardSetIO.setAddr)
     sboard.setN(split.io.scoreBoardSetIO.setMultiEn, split.io.scoreBoardSetIO.setAddr, split.io.scoreBoardSetIO.setNum)
     split.io.scoreBoardReadIO.readBypassed1 := sboard.readBypassed(split.io.scoreBoardReadIO.readAddr1)
@@ -165,4 +167,3 @@ object Main extends App {
   println("Generating the VPU Core hardware")
   emitVerilog(new SmartVector(), Array("--target-dir", "generated"))
 }
-

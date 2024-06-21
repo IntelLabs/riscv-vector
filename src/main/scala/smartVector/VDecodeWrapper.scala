@@ -30,6 +30,7 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   val io = IO(new Bundle {
     val in  = Flipped(Decoupled(new RVUissue))
     val out = Decoupled(new VDecodeOutput)
+    val vLSUXcpt = Input (new VLSUXcpt)
     //val decode_ready = Output(Bool())
     //val iexNeedStall = Input(Bool())
   })
@@ -48,11 +49,13 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
     decodeOut := decode.io.out
   }
 
-  io.out.bits.vCtrl         := RegEnable(decodeOut, io.in.valid & io.in.ready)
-  io.out.bits.scalar_opnd_1 := RegEnable(io.in.bits.rs1, io.in.valid)
-  io.out.bits.scalar_opnd_2 := RegEnable(io.in.bits.rs2, io.in.valid)
-  io.out.bits.float_opnd_1  := RegEnable(io.in.bits.frs1, io.in.valid)
-  io.out.bits.floatRed      := RegEnable(isFloatRedu, io.in.valid)
+  val bitsIn = Wire(new VDecodeOutput)
+
+  bitsIn.vCtrl         := decodeOut
+  bitsIn.scalar_opnd_1 := io.in.bits.rs1
+  bitsIn.scalar_opnd_2 := io.in.bits.rs2
+  bitsIn.float_opnd_1  := io.in.bits.frs1
+  bitsIn.floatRed      := isFloatRedu
   
   val infoCalc = Module(new VInfoCalc)
   infoCalc.io.ctrl       := decode.io.out
@@ -83,30 +86,46 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   vIllegalInstrn.io.extraInfo_for_VIllegal := infoCalc.io.extraInfo_for_VIllegal
   vIllegalInstrn.io.robPtrIn := 0.U.asTypeOf(new VRobPtr)
 
-  io.out.bits.vCtrl.illegal := vIllegalInstrn.io.ill.valid
+  bitsIn.vCtrl.illegal := false.B
 
-  //val validTmp = Reg(Bool())
-  //when (RegNext(io.in.valid) & (~io.out.ready || io.iexNeedStall)){
-  //  validTmp := true.B
-  //}.otherwise{
-  //  validTmp := false.B 
-  //}
-  //io.out.valid := Mux(RegNext(io.in.valid) & io.out.ready, true.B, validTmp & io.out.ready)
-  io.out.valid := RegNext(io.in.valid) 
+  val decodeInValid = io.in.valid
 
-  io.out.bits.vInfo.vstart  := RegEnable(io.in.bits.vInfo.vstart, io.in.valid)
-  io.out.bits.vInfo.vl      := RegEnable(io.in.bits.vInfo.vl    , io.in.valid)
-  io.out.bits.vInfo.vlmul   := RegEnable(io.in.bits.vInfo.vlmul , io.in.valid)
-  io.out.bits.vInfo.vsew    := RegEnable(io.in.bits.vInfo.vsew  , io.in.valid)
-  io.out.bits.vInfo.vma     := RegEnable(io.in.bits.vInfo.vma   , io.in.valid)  
-  io.out.bits.vInfo.vta     := RegEnable(io.in.bits.vInfo.vta   , io.in.valid) 
-  io.out.bits.vInfo.vxrm    := RegEnable(io.in.bits.vInfo.vxrm  , io.in.valid)
-  io.out.bits.vInfo.frm     := RegEnable(io.in.bits.vInfo.frm   , io.in.valid)
+  bitsIn.vInfo.vstart  := io.in.bits.vInfo.vstart
+  bitsIn.vInfo.vl      := io.in.bits.vInfo.vl    
+  bitsIn.vInfo.vlmul   := io.in.bits.vInfo.vlmul 
+  bitsIn.vInfo.vsew    := io.in.bits.vInfo.vsew  
+  bitsIn.vInfo.vma     := io.in.bits.vInfo.vma    
+  bitsIn.vInfo.vta     := io.in.bits.vInfo.vta   
+  bitsIn.vInfo.vxrm    := io.in.bits.vInfo.vxrm  
+  bitsIn.vInfo.frm     := io.in.bits.vInfo.frm   
 
+  bitsIn.eewEmulInfo := infoCalc.io.infoAll
 
+  val validReg = RegInit(false.B)
+  val bitsReg = RegInit(0.U.asTypeOf(new VDecodeOutput))
 
-  io.out.bits.eewEmulInfo := RegEnable(infoCalc.io.infoAll, io.in.valid)
+  when(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl || io.out.bits.vCtrl.illegal){
+    validReg := false.B
+  }
 
-  io.in.ready := io.out.ready
+  when(!validReg || io.out.ready){
+      validReg := decodeInValid
+  }
+  
+  when(decodeInValid & (!validReg || io.out.ready)) {
+      bitsReg := bitsIn
+  }
+  
+  val fire = decodeInValid & (!validReg || io.out.ready)
+ 
+  when(RegNext(fire)){
+    bitsReg.vCtrl.illegal := vIllegalInstrn.io.ill.valid
+  }
+  
+  io.out.valid := validReg
+  io.out.bits  := bitsReg
+
+  io.out.bits.vCtrl.illegal := Mux(RegNext(fire), vIllegalInstrn.io.ill.valid, bitsReg.vCtrl.illegal)
+
+  io.in.ready := io.out.ready || !validReg
 }
-

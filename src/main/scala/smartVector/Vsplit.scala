@@ -53,7 +53,7 @@ class VUopCtrlW extends Bundle {
   val narrow_to_1 = Bool()
   val load        = Bool()
   val store       = Bool()
-  val alu         = Bool() // All low-latency operations
+  val alu         = Bool() 
   val mul         = Bool()
   val fp          = Bool()
   val div         = Bool()
@@ -106,6 +106,8 @@ class ExcpInfo extends Bundle {
     val xcpt_cause      = new HellaCacheExceptions()
     val xcpt_addr       = UInt(addrWidth.W)
     val illegalInst     = Bool()
+    val update_float    = Bool()
+    val reg_idx         = UInt(5.W)
 }
 
 class Vsplit(implicit p : Parameters) extends Module {
@@ -129,53 +131,37 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     val expdWidth     = 8 // 1~128
     
-    val vCtrl         = RegInit(VecInit(Seq.fill(1)(0.U.asTypeOf(new darecreek.VCtrl))))
-    val vInfo         = Reg(Vec(1, new VInfo))
-    val scalar_opnd_1 = Reg(Vec(1, UInt(64.W)))
-    val scalar_opnd_2 = Reg(Vec(1, UInt(64.W)))
-    val float_opnd_1  = Reg(Vec(1, UInt(64.W)))
+    //val vCtrl         = RegInit(VecInit(Seq.fill(1)(0.U.asTypeOf(new darecreek.VCtrl))))
+    //val vInfo         = Reg(Vec(1, new VInfo))
+    //val scalar_opnd_1 = Reg(Vec(1, UInt(64.W)))
+    //val scalar_opnd_2 = Reg(Vec(1, UInt(64.W)))
+    //val float_opnd_1  = Reg(Vec(1, UInt(64.W)))
     val uopRegInfo    = Reg(Vec(1, new UopRegInfo))
-    val eewEmulInfo   = Reg(Vec(1, new VInfoAll))
+    //val eewEmulInfo   = Reg(Vec(1, new VInfoAll))
     val idx           = RegInit(UInt(expdWidth.W), 0.U)
-    val floatRedReg   = Reg(Vec(1, Bool()))
-
-    //vCtrl(0).illegal     := RegInit(false.B)
-    //vCtrl(0).lsrcVal     := RegInit(VecInit(Seq.fill(3)(false.B)))
-    //vCtrl(0).ldestVal    := RegInit(false.B)
-    //vCtrl(0).rdVal       := RegInit(false.B)
-    //vCtrl(0).load        := RegInit(false.B)
-    //vCtrl(0).store       := RegInit(false.B)
-    //vCtrl(0).arith       := RegInit(false.B)
-    //vCtrl(0).crossLane   := RegInit(false.B)
-    //vCtrl(0).alu         := RegInit(false.B)
-    //vCtrl(0).mul         := RegInit(false.B)
-    //vCtrl(0).fp          := RegInit(false.B)
-    //vCtrl(0).div         := RegInit(false.B)
-    //vCtrl(0).fixP        := RegInit(false.B)
-    //vCtrl(0).redu        := RegInit(false.B)
-    //vCtrl(0).mask        := RegInit(false.B)
-    //vCtrl(0).perm        := RegInit(false.B)
-    //vCtrl(0).widen       := RegInit(false.B)
-    //vCtrl(0).widen2      := RegInit(false.B)
-    //vCtrl(0).narrow      := RegInit(false.B)
-    //vCtrl(0).narrow_to_1 := RegInit(false.B)
+    //val floatRedReg   = Reg(Vec(1, Bool()))
 
     val empty :: ongoing :: Nil = Enum(2)
     val currentState = RegInit(empty)
     val currentStateNext = WireDefault(empty) 
 
-    val instFirstIn = (currentState === empty && io.in.decodeIn.valid)
+    val instDecodeIn = io.in.decodeIn.valid && currentState === empty
+    val fire2Exu = Wire(Bool())
+    val fire2PipeReg = Wire(Bool())
 
-    when (instFirstIn){       
-        vCtrl(0)            := io.in.decodeIn.bits.vCtrl
-        vInfo(0)            := io.in.decodeIn.bits.vInfo
-        scalar_opnd_1(0)    := io.in.decodeIn.bits.scalar_opnd_1
-        scalar_opnd_2(0)    := io.in.decodeIn.bits.scalar_opnd_2
-        float_opnd_1(0)     := io.in.decodeIn.bits.float_opnd_1
-        eewEmulInfo(0)      := io.in.decodeIn.bits.eewEmulInfo
-        uopRegInfo(0).vxsat := false.B
-        floatRedReg(0)      := io.in.decodeIn.bits.floatRed
-    }
+    val pipeRegReady    = WireInit(false.B)
+    val exuReady        = ~io.lsuStallSplit && ~io.iexNeedStall
+
+    //when (instFirstIn){       
+    //    vCtrl(0)            := io.in.decodeIn.bits.vCtrl
+    //    vInfo(0)            := io.in.decodeIn.bits.vInfo
+    //    scalar_opnd_1(0)    := io.in.decodeIn.bits.scalar_opnd_1
+    //    scalar_opnd_2(0)    := io.in.decodeIn.bits.scalar_opnd_2
+    //    float_opnd_1(0)     := io.in.decodeIn.bits.float_opnd_1
+    //    eewEmulInfo(0)      := io.in.decodeIn.bits.eewEmulInfo
+    //    uopRegInfo(0).vxsat := false.B
+    //    floatRedReg(0)      := io.in.decodeIn.bits.floatRed
+    //}
 
     //To save power, when do not need to update the vs1, keep it unchanged. 
     //ALU will judge whether use the data, do not worry to send the wrong data 
@@ -184,13 +170,21 @@ class Vsplit(implicit p : Parameters) extends Module {
     uopRegInfo(0).mask      := Mux(io.in.regFileIn.readVld(2), io.in.regFileIn.readData(2), uopRegInfo(0).mask)
     uopRegInfo(0).old_vd    := Mux(io.in.regFileIn.readVld(3), io.in.regFileIn.readData(3), uopRegInfo(0).old_vd)
 
-    val ctrl = Mux(instFirstIn, io.in.decodeIn.bits.vCtrl,vCtrl(0))
-    val info = Mux(instFirstIn, io.in.decodeIn.bits.vInfo,vInfo(0))
-    val scalarOpnd1  = Mux(instFirstIn, io.in.decodeIn.bits.scalar_opnd_1, scalar_opnd_1(0))
-    val scalarOpnd2  = Mux(instFirstIn, io.in.decodeIn.bits.scalar_opnd_2, scalar_opnd_2(0))
-    val floatOpnd1   = Mux(instFirstIn, io.in.decodeIn.bits.float_opnd_1 , float_opnd_1(0))
-    val floatRed     = Mux(instFirstIn, io.in.decodeIn.bits.floatRed     , floatRedReg(0))
-    val eewEmulInfo1 = Mux(instFirstIn, io.in.decodeIn.bits.eewEmulInfo  , eewEmulInfo(0))
+    //val ctrl = Mux(instFirstIn, io.in.decodeIn.bits.vCtrl, vCtrl(0))
+    //val info = Mux(instFirstIn, io.in.decodeIn.bits.vInfo, vInfo(0))
+    //val scalarOpnd1  = Mux(instFirstIn, io.in.decodeIn.bits.scalar_opnd_1, scalar_opnd_1(0))
+    //val scalarOpnd2  = Mux(instFirstIn, io.in.decodeIn.bits.scalar_opnd_2, scalar_opnd_2(0))
+    //val floatOpnd1   = Mux(instFirstIn, io.in.decodeIn.bits.float_opnd_1 , float_opnd_1(0))
+    //val floatRed     = Mux(instFirstIn, io.in.decodeIn.bits.floatRed     , floatRedReg(0))
+    //val eewEmulInfo1 = Mux(instFirstIn, io.in.decodeIn.bits.eewEmulInfo  , eewEmulInfo(0))
+
+    val ctrl         = io.in.decodeIn.bits.vCtrl
+    val info         = io.in.decodeIn.bits.vInfo
+    val scalarOpnd1  = io.in.decodeIn.bits.scalar_opnd_1
+    val scalarOpnd2  = io.in.decodeIn.bits.scalar_opnd_2
+    val floatOpnd1   = io.in.decodeIn.bits.float_opnd_1 
+    val floatRed     = io.in.decodeIn.bits.floatRed     
+    val eewEmulInfo1 = io.in.decodeIn.bits.eewEmulInfo  
 
     //Because the register file do not always read the register file when instFirstIn
     val vs1     = Mux(io.in.regFileIn.readVld(0), io.in.regFileIn.readData(0), uopRegInfo(0).vs1)
@@ -354,6 +348,9 @@ class Vsplit(implicit p : Parameters) extends Module {
     // * organize muop merge attr
     // * END
     
+
+    // * BEGIN
+    // * read & write scoreboard
     val vs1ReadEn  = ctrl.lsrcVal(0)
     val vs2ReadEn  = ctrl.lsrcVal(1)
     
@@ -369,10 +366,10 @@ class Vsplit(implicit p : Parameters) extends Module {
         sameLdest := false.B
     }
 
-    when(~mUopIn.bits.uop.uopEnd & mUopIn.valid){ 
+    when(~mUopIn.bits.uop.uopEnd & fire2PipeReg){ 
         ldest_inc_last := ldest_inc
     }
-    when(mUopIn.bits.uop.uopEnd & mUopIn.valid){
+    when(mUopIn.bits.uop.uopEnd & fire2PipeReg){
         ldest_inc_last := 15.U
     }
 
@@ -381,7 +378,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     val vs1Idx     = ctrl.lsrc(0) + lsrc0_inc
     val vs2Idx     = ctrl.lsrc(1) + lsrc1_inc
     val vs3Idx     = ctrl.ldest   + ldest_inc
-    val needStall  = Wire(Bool())
+    //val needStall  = Wire(Bool())
     val hasRegConf = Wire(Vec(4,Bool()))
     
     io.scoreBoardReadIO.readAddr1    := vs1Idx
@@ -429,10 +426,28 @@ class Vsplit(implicit p : Parameters) extends Module {
         hasRegConf(3) := true.B
     }
 
-    val narrowTo1NoStall = ctrl.narrow_to_1 
-    needStall := hasRegConf(0) || hasRegConf(1) || hasRegConf(2) || hasRegConf(3) || 
-                 io.lsuStallSplit || io.iexNeedStall && ~narrowTo1NoStall ||
-                 ctrl.illegal || io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl
+    //narrowTo1NoStall need to deal with
+    //val narrowTo1NoStall = ctrl.narrow_to_1 
+    val regConf = hasRegConf(0) || hasRegConf(1) || hasRegConf(2) || hasRegConf(3) 
+
+    io.out.toRegFileRead.rfReadEn(0)      := fire2PipeReg && ctrl.lsrcVal(0)
+    io.out.toRegFileRead.rfReadEn(1)      := fire2PipeReg && ctrl.lsrcVal(1)
+    io.out.toRegFileRead.rfReadEn(2)      := fire2PipeReg && ~ctrl.vm
+    io.out.toRegFileRead.rfReadEn(3)      := fire2PipeReg && (ctrl.ldestVal || ctrl.store)
+    io.out.toRegFileRead.rfReadIdx(0)     := ctrl.lsrc(0) + lsrc0_inc
+    io.out.toRegFileRead.rfReadIdx(1)     := ctrl.lsrc(1) + lsrc1_inc
+    io.out.toRegFileRead.rfReadIdx(2)     := 0.U
+    io.out.toRegFileRead.rfReadIdx(3)     := ctrl.ldest + ldest_inc
+
+    io.scoreBoardSetIO.setEn      := RegNext(fire2PipeReg && ctrl.ldestVal && (~ctrl.perm || ~(ldstCtrl.segment && segmentRegNotFirstElem)))
+    io.scoreBoardSetIO.setMultiEn := RegNext(fire2PipeReg && ctrl.ldestVal && ctrl.perm)
+    io.scoreBoardSetIO.setNum     := RegNext(emulVd)
+    io.scoreBoardSetIO.setAddr    := RegNext(mUopMergeAttrIn.bits.ldest)
+
+    // * read & write scoreboard
+    // * END
+
+    val hasExcp = ctrl.illegal || io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl    
 
     mUopIn.bits.uop.uopIdx   := uopIdx
     mUopIn.bits.uop.segIndex := segIndex
@@ -484,27 +499,15 @@ class Vsplit(implicit p : Parameters) extends Module {
     mUopIn.bits.uopRegInfo.old_vd    := old_vd
     mUopIn.bits.uopRegInfo.mask      := mask
 
-    io.out.toRegFileRead.rfReadEn(0)      := mUopIn.valid && ctrl.lsrcVal(0)
-    io.out.toRegFileRead.rfReadEn(1)      := mUopIn.valid && ctrl.lsrcVal(1)
-    io.out.toRegFileRead.rfReadEn(2)      := mUopIn.valid && ~ctrl.vm
-    io.out.toRegFileRead.rfReadEn(3)      := mUopIn.valid && (ctrl.ldestVal || ctrl.store)
-    io.out.toRegFileRead.rfReadIdx(0)     := ctrl.lsrc(0) + lsrc0_inc
-    io.out.toRegFileRead.rfReadIdx(1)     := ctrl.lsrc(1) + lsrc1_inc
-    io.out.toRegFileRead.rfReadIdx(2)     := 0.U
-    io.out.toRegFileRead.rfReadIdx(3)     := ctrl.ldest + ldest_inc
 
-    io.scoreBoardSetIO.setEn      := RegNext(mUopIn.valid && ctrl.ldestVal && (~ctrl.perm || ~(ldstCtrl.segment && segmentRegNotFirstElem)))
-    io.scoreBoardSetIO.setMultiEn := RegNext(mUopIn.valid && ctrl.ldestVal && ctrl.perm)
-    io.scoreBoardSetIO.setNum     := RegNext(emulVd)
-    io.scoreBoardSetIO.setAddr    := RegNext(mUopMergeAttrIn.bits.ldest)
-
-    when((instFirstIn || currentState === ongoing) & ~needStall){
-        mUopIn.valid := true.B
-        idx := idx + 1.U
+    when((instDecodeIn || currentState === ongoing) & ~regConf & ~hasExcp){
+        mUopIn.valid := true.B   
     }.otherwise{
         mUopIn.valid := false.B
     }
 
+    // * BEGIN
+    // * Split FSM
     val ldStEmulVd  = eewEmulInfo1.emulVd
     val ldStEmulVs2 = eewEmulInfo1.emulVs2
   
@@ -521,32 +524,32 @@ class Vsplit(implicit p : Parameters) extends Module {
     expdLenIn := Mux(ldst, expdLenLdSt,
                     Mux(ctrl.perm || vmv_vfmv, 1.U, (Mux(vcpop || viota || vid, lmul, maxOfVs12Vd))))
     
-    when(instFirstIn){
+    when(instDecodeIn){
         expdLenReg := expdLenIn
     }
-    expdLen := Mux(instFirstIn, expdLenIn, expdLenReg)
+    expdLen := Mux(instDecodeIn, expdLenIn, expdLenReg)
 
     switch(currentState){
         is(empty){
-            when(instFirstIn && needStall){
-                currentStateNext := ongoing
-            }.elsewhen(io.in.decodeIn.valid && expdLen === 1.U){
+            when(hasExcp){
                 currentStateNext := empty
-                idx := 0.U              
-            }.elsewhen(io.in.decodeIn.valid && expdLen =/= 1.U){
+            }.elsewhen(instDecodeIn && (regConf || ~pipeRegReady)){
+                currentStateNext := ongoing
+            }.elsewhen(instDecodeIn && expdLen === 1.U){
+                currentStateNext := empty            
+            }.elsewhen(instDecodeIn && expdLen =/= 1.U){
                 currentStateNext := ongoing
             }.otherwise{
                 currentStateNext := empty
             }
         }
         is(ongoing){
-            when(needStall){
-                currentStateNext := ongoing
-            }.elsewhen((idx + 1.U) === expdLen && ~needStall){
+            when(hasExcp){
                 currentStateNext := empty
-                idx := 0.U
-            }.elsewhen((idx + 1.U) === expdLen && needStall){
+            }.elsewhen(regConf || ~pipeRegReady){
                 currentStateNext := ongoing
+            }.elsewhen(((idx + 1.U) === expdLen)){
+                currentStateNext := empty
             }.elsewhen((idx + 1.U) < expdLen){
                 currentStateNext := ongoing
             }
@@ -555,43 +558,66 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     currentState := currentStateNext
 
-    io.in.decodeIn.ready := (currentStateNext === empty)
-    
-    val validReg = RegInit(false.B)
-    val bitsReg = RegInit(0.U.asTypeOf(new Muop))
-    val mergeAttrReg = RegInit(0.U.asTypeOf(new MuopMergeAttr))
-    val ready = (bitsReg.uop.ctrl.isLdst && ~io.lsuStallSplit) || (~bitsReg.uop.ctrl.isLdst && ~io.iexNeedStall)
-
-    when(!validReg || ready){
-        validReg := mUopIn.valid
+    when(hasExcp || currentStateNext === empty) {
+        idx := 0.U
+    }.elsewhen((instDecodeIn || currentState === ongoing) & ~regConf & pipeRegReady & ~hasExcp){
+        idx := idx + 1.U    
     }
-    when(mUopIn.valid) {
+
+    io.in.decodeIn.ready := currentStateNext === empty
+
+    // * Split FSM
+    // * END
+    
+
+    // * BEGIN
+    // * Pipeline Register
+    val validReg        = RegInit(false.B)
+    val bitsReg         = RegInit(0.U.asTypeOf(new Muop))
+    val mergeAttrReg    = RegInit(0.U.asTypeOf(new MuopMergeAttr))
+
+    pipeRegReady        := exuReady || (!validReg)
+    fire2PipeReg        := pipeRegReady && mUopIn.valid
+    fire2Exu            := exuReady && validReg
+
+    // when exu accepts the current muop or when there is no uop accept new muop
+    when (pipeRegReady) {
+        validReg := mUopIn.valid
         bitsReg := mUopIn.bits
         mergeAttrReg := mUopMergeAttrIn.bits
     }
 
-    when(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl){
+    when (io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl){
         validReg := false.B
     }
 
-    val muopOutValid             = validReg && ~(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl)
+    // * Pipeline Register
+    // * END
+
+
+    // * BEGIN
+    // * Output mUop to EXU
+    val muopOutValid             = fire2Exu && ~(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl)
     io.out.mUop.valid           := muopOutValid
     io.out.mUopMergeAttr.valid  := muopOutValid
     io.out.mUop.bits            := bitsReg
     io.out.mUopMergeAttr.bits   := mergeAttrReg
+    // * Output mUop to EXU
+    // * END
 
-    when(ctrl.illegal || io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl){
-        currentStateNext := empty
-        idx := 0.U
-        io.in.decodeIn.ready := true.B
-    }
 
-    io.excpInfo.exception_vld := io.vLSUXcpt.exception_vld || (ctrl.illegal & instFirstIn)
+    // * BEGIN
+    // * Output ExcpInfo
+    io.excpInfo.exception_vld := io.vLSUXcpt.exception_vld || (ctrl.illegal & instDecodeIn)
     io.excpInfo.illegalInst   := ctrl.illegal
+    io.excpInfo.update_float  := ctrl.rdVal && isfloat
+    io.excpInfo.reg_idx       := ctrl.ldest
     io.excpInfo.update_vl     := io.vLSUXcpt.update_vl
     io.excpInfo.update_data   := io.vLSUXcpt.update_data
     io.excpInfo.xcpt_addr     := io.vLSUXcpt.xcpt_addr
     io.excpInfo.xcpt_cause    := io.vLSUXcpt.xcpt_cause
+    // * Output ExcpInfo
+    // * END
 
 }
 
