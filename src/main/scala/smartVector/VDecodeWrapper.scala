@@ -31,20 +31,26 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
     val in  = Flipped(Decoupled(new RVUissue))
     val out = Decoupled(new VDecodeOutput)
     val vLSUXcpt = Input (new VLSUXcpt)
-    //val decode_ready = Output(Bool())
-    //val iexNeedStall = Input(Bool())
   })
 
   val bufferReg = RegInit(0.U.asTypeOf(new RVUissue))
   val bufferValidReg = RegInit(false.B)
+  val validReg = RegInit(false.B)
 
-  when(!io.out.ready & !bufferValidReg){
+  //has exception, clear buffer
+  when(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl || io.out.bits.vCtrl.illegal){
+    bufferValidReg := false.B
+  }
+
+  //set buffer
+  when(!bufferValidReg && !(!validReg || io.out.ready) && io.in.valid){
     bufferReg := io.in.bits
     bufferValidReg := io.in.valid
   }
 
-  when(io.out.ready){
-    bufferValidReg := false.B
+  //fire to pipeline reg, clear buffer
+  when(!validReg || io.out.ready){
+      bufferValidReg := false.B
   }
 
   val muxData = Wire(new RVUissue)
@@ -119,7 +125,6 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
 
   bitsIn.eewEmulInfo := infoCalc.io.infoAll
 
-  val validReg = RegInit(false.B)
   val bitsReg = RegInit(0.U.asTypeOf(new VDecodeOutput))
 
   when(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl || io.out.bits.vCtrl.illegal){
@@ -129,12 +134,11 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   when(!validReg || io.out.ready){
       validReg := decodeInValid
   }
-  
-  when(decodeInValid & (!validReg || io.out.ready)) {
+ 
+  val fire = decodeInValid & (!validReg || io.out.ready)
+  when(fire) {
       bitsReg := bitsIn
   }
-  
-  val fire = decodeInValid & (!validReg || io.out.ready)
  
   when(RegNext(fire)){
     bitsReg.vCtrl.illegal := vIllegalInstrn.io.ill.valid
@@ -142,8 +146,6 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   
   io.out.valid := validReg
   io.out.bits  := bitsReg
-
-  io.out.bits.vCtrl.illegal := Mux(RegNext(fire), vIllegalInstrn.io.ill.valid, bitsReg.vCtrl.illegal)
 
   io.out.bits.vCtrl.illegal := Mux(RegNext(fire), vIllegalInstrn.io.ill.valid, bitsReg.vCtrl.illegal)
 
