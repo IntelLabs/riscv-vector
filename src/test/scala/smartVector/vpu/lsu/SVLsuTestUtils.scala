@@ -315,7 +315,7 @@ class SmartVectorLsuTestWrapper(isLoad: Boolean) extends Module {
     vLsu.io.mUopMergeAttr.valid                 := io.mUop.valid
     vLsu.io.mUopMergeAttr.bits.rfWriteEn        := isLoad.asBool
     vLsu.io.mUopMergeAttr.bits.ldest            := DontCare
-    vLsu.io.mUopMergeAttr.bits.muopEnd          := DontCare
+    vLsu.io.mUopMergeAttr.bits.muopEnd          := io.mUop.bits.uop.splitUopEnd
     vLsu.io.mUopMergeAttr.bits.alu              := false.B
     vLsu.io.mUopMergeAttr.bits.mul              := false.B
     vLsu.io.mUopMergeAttr.bits.fp               := false.B

@@ -167,30 +167,27 @@ class SVVLsu(implicit p: Parameters) extends Module {
     }
 
     // TODO: store waiting resp
-    when (isNoXcptMaskUop) {
-        val data    = issueLdstUop.data
-        val dataSz  = (1.U << issueLdstUop.size)
-        val offset  = AddrUtil.getAlignedOffset(issueLdstUop.addr)
 
-        val wData = data << (offset << 3.U)
-        val wMask = VecInit(Seq.fill(8)(0.U(1.W)))
+    val issueData    = issueLdstUop.data
+    val issueDataSz  = (1.U << issueLdstUop.size)
+    val issueOffset  = AddrUtil.getAlignedOffset(issueLdstUop.addr)
 
-        for (i <- 0 until 8) {
-            // 1 to write, 0 to skip
-            wMask(i) := Mux(i.U >= offset && i.U < offset + dataSz, 1.U, 0.U)
-        }
+    val issueWData = issueData << (issueOffset << 3.U)
+    val issueWMask = VecInit(Seq.fill(8)(0.U(1.W)))
 
-        val memOp = issueLdstUop.memOp
-        io.dataExchange.req.valid       := true.B
-        io.dataExchange.req.bits.addr   := AddrUtil.getAlignedAddr(issueLdstUop.addr)
-        io.dataExchange.req.bits.cmd    := memOp
-        io.dataExchange.req.bits.idx    := (1 << 4).U | issueLdstPtr // to figure out hlsu or vlsu
-        io.dataExchange.req.bits.data   := Mux(memOp, wData, DontCare)
-        io.dataExchange.req.bits.mask   := Mux(memOp, wMask.asUInt, DontCare)
-    }.otherwise {
-        io.dataExchange.req.valid       := false.B
-        io.dataExchange.req.bits        := DontCare
+    for (i <- 0 until 8) {
+        // 1 to write, 0 to skip
+        issueWMask(i) := Mux(i.U >= issueOffset && i.U < issueOffset + issueDataSz, 1.U, 0.U)
     }
+
+    val memOp = issueLdstUop.memOp
+    io.dataExchange.req.valid       := isNoXcptMaskUop
+    io.dataExchange.req.bits.addr   := AddrUtil.getAlignedAddr(issueLdstUop.addr)
+    io.dataExchange.req.bits.cmd    := memOp
+    io.dataExchange.req.bits.idx    := (1 << 4).U | issueLdstPtr // to figure out hlsu or vlsu
+    io.dataExchange.req.bits.data   := Mux(memOp, issueWData, DontCare)
+    io.dataExchange.req.bits.mask   := Mux(memOp, issueWMask.asUInt, DontCare)
+
     // * Issue LdstUop
     // * END
 
@@ -199,18 +196,17 @@ class SVVLsu(implicit p: Parameters) extends Module {
     // * Recv Resp
 
     val memXcpt = io.dataExchange.xcpt.asUInt.orR
+    val isLoadResp = ldstUopQueue(respLdstPtr).memOp === VMemCmd.read
+    val isLoadRespDataValid = io.dataExchange.resp.bits.has_data
+    val loadComplete  = isLoadResp && isLoadRespDataValid && !memXcpt
+
+    val respDataSz = (1.U << ldstUopQueue(respLdstPtr).size)
+    val respLdData = WireInit(0.U(64.W))
+    val respOffset = AddrUtil.getAlignedOffset(ldstUopQueue(respLdstPtr).addr)
+    // ldData := io.dataExchange.resp.bits.data((offset + dataSz) << 3.U - 1.U, offset << 3.U)
+    respLdData := (respData >> (respOffset << 3.U)) & ((1.U << (respDataSz << 3.U)) - 1.U)
     when (io.dataExchange.resp.valid || memXcpt) {
-        val isLoadResp = ldstUopQueue(respLdstPtr).memOp === VMemCmd.read
-        val isLoadRespDataValid = io.dataExchange.resp.bits.has_data
-        val loadComplete  = isLoadResp && isLoadRespDataValid && !memXcpt
-
-        val dataSz = (1.U << ldstUopQueue(respLdstPtr).size)
-        val ldData = WireInit(0.U(64.W))
-        val offset = AddrUtil.getAlignedOffset(ldstUopQueue(respLdstPtr).addr)
-        // ldData := io.dataExchange.resp.bits.data((offset + dataSz) << 3.U - 1.U, offset << 3.U)
-        ldData := (respData >> (offset << 3.U)) & ((1.U << (dataSz << 3.U)) - 1.U)
-
-        ldstUopQueue(respLdstPtr).data   := Mux(loadComplete, ldData, ldstUopQueue(respLdstPtr).data)
+        ldstUopQueue(respLdstPtr).data   := Mux(loadComplete, respLdData, ldstUopQueue(respLdstPtr).data)
         ldstUopQueue(respLdstPtr).status := LdstUopStatus.ready
         ldstUopQueue(respLdstPtr).commitInfo.xcpt.xcptValid := memXcpt  // misalign xcpt wont get resp
         ldstUopQueue(respLdstPtr).commitInfo.xcpt.fromHellaXcpt(io.dataExchange.xcpt)
@@ -226,51 +222,39 @@ class SVVLsu(implicit p: Parameters) extends Module {
     val commitXcpt   = canCommit && ldstUopQueue(commitPtr).commitInfo.xcpt.xcptValid
     val commitMasked = canCommit && ldstUopQueue(commitPtr).masked
     
+    val commitDestElem    = ldstUopQueue(commitPtr).destElem
+    val commitData        = ldstUopQueue(commitPtr).data
+    val commitDataSz      = (1.U << ldstUopQueue(commitPtr).size)
+    val commitLog2DataSz  = ldstUopQueue(commitPtr).size
 
-    when (canCommit) {
-        val destElem    = ldstUopQueue(commitPtr).destElem
-        val data        = ldstUopQueue(commitPtr).data
-        val dataSz      = (1.U << ldstUopQueue(commitPtr).size)
-        val log2DataSz  = ldstUopQueue(commitPtr).size
-    
-        val wData       = data << ((destElem << log2DataSz) << 3.U)
-        val wMask       = VecInit(Seq.fill(vlenb)(0.U(1.W)))
+    val commitWData       = commitData << ((commitDestElem << commitLog2DataSz) << 3.U)
+    val commitWMask       = VecInit(Seq.fill(vlenb)(0.U(1.W)))
 
-        for (i <- 0 until vlenb) {
-            wMask(i) := ~(i.U >= (destElem << log2DataSz) && i.U < (destElem << log2DataSz) + dataSz)
-        }
-
-        io.lsuOut.valid             := true.B
-        io.lsuOut.bits.muopEnd      := ldstUopQueue(commitPtr).commitInfo.muopEnd
-        io.lsuOut.bits.rfWriteEn    := Mux(commitXcpt, false.B, ldstUopQueue(commitPtr).commitInfo.rfWriteEn)
-        io.lsuOut.bits.rfWriteIdx   := ldstUopQueue(commitPtr).commitInfo.rfWriteIdx
-        io.lsuOut.bits.data         := wData
-        io.lsuOut.bits.rfWriteMask  := Mux(commitMasked, Fill(vlenb, 1.U), wMask.asUInt)
-        io.lsuOut.bits.isSegLoad    := ldstUopQueue(commitPtr).memOp === VMemCmd.read
-        io.lsuOut.bits.regCount     := ldstUopQueue(commitPtr).commitInfo.regCount
-        io.lsuOut.bits.regStartIdx  := ldstUopQueue(commitPtr).commitInfo.regStartIdx
-    }.otherwise {
-        io.lsuOut.valid             := false.B
-        io.lsuOut.bits              := DontCare
-        io.lsuOut.bits.rfWriteEn    := false.B
+    for (i <- 0 until vlenb) {
+        commitWMask(i) := ~(i.U >= (commitDestElem << commitLog2DataSz) && i.U < (commitDestElem << commitLog2DataSz) + commitDataSz)
     }
 
-    when (commitXcpt) {
-        val xcptVl   = ldstUopQueue(commitPtr).pos
-        val fofValid = ldstUopQueue(commitPtr).commitInfo.isFof && xcptVl > 0.U
+    io.lsuOut.valid             := canCommit
+    io.lsuOut.bits.muopEnd      := ldstUopQueue(commitPtr).commitInfo.muopEnd
+    io.lsuOut.bits.rfWriteEn    := Mux(commitXcpt, false.B, ldstUopQueue(commitPtr).commitInfo.rfWriteEn)
+    io.lsuOut.bits.rfWriteIdx   := ldstUopQueue(commitPtr).commitInfo.rfWriteIdx
+    io.lsuOut.bits.data         := commitWData
+    io.lsuOut.bits.rfWriteMask  := Mux(commitMasked, Fill(vlenb, 1.U), commitWMask.asUInt)
+    io.lsuOut.bits.isSegLoad    := ldstUopQueue(commitPtr).memOp === VMemCmd.read
+    io.lsuOut.bits.regCount     := ldstUopQueue(commitPtr).commitInfo.regCount
+    io.lsuOut.bits.regStartIdx  := ldstUopQueue(commitPtr).commitInfo.regStartIdx
 
-        val commitUop = ldstUopQueue(commitPtr)
-        val hellaXcpt = commitUop.commitInfo.xcpt.generateHellaXcpt(commitUop.memOp)
+    val xcptVl   = ldstUopQueue(commitPtr).pos
+    val fofValid = ldstUopQueue(commitPtr).commitInfo.isFof && xcptVl > 0.U
 
-        io.lsuOut.bits.xcpt.exception_vld := ~fofValid
-        io.lsuOut.bits.xcpt.xcpt_cause    := Mux(fofValid, 0.U.asTypeOf(new HellaCacheExceptions), hellaXcpt)
-        io.lsuOut.bits.xcpt.update_vl     := fofValid
-        io.lsuOut.bits.xcpt.update_data   := xcptVl
-        io.lsuOut.bits.xcpt.xcpt_addr     := ldstUopQueue(commitPtr).addr
-    }.otherwise {
-        io.lsuOut.bits.xcpt := 0.U.asTypeOf(new VLSUXcpt)
-    }
+    val commitUop = ldstUopQueue(commitPtr)
+    val hellaXcpt = commitUop.commitInfo.xcpt.generateHellaXcpt(commitUop.memOp)
 
+    io.lsuOut.bits.xcpt.exception_vld := Mux(commitXcpt, ~fofValid, false.B)
+    io.lsuOut.bits.xcpt.xcpt_cause    := Mux(fofValid || !commitXcpt, 0.U.asTypeOf(new HellaCacheExceptions), hellaXcpt)
+    io.lsuOut.bits.xcpt.update_vl     := Mux(commitXcpt, fofValid, false.B)
+    io.lsuOut.bits.xcpt.update_data   := xcptVl
+    io.lsuOut.bits.xcpt.xcpt_addr     := ldstUopQueue(commitPtr).addr
 
     when (io.lsuOut.fire) {
         when (commitXcpt) {

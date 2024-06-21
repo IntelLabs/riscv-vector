@@ -713,15 +713,14 @@ trait VLsuBehavior_ld {
     }
 
     def vLsuTest20(): Unit = {
-        it should "pass: strided load (uops=2, eew=16, vl=10, vstart=0, stride=8) with mask exception" in {
+        it should "pass: unit-stride load (uops=2, eew=8, vl=0)" in {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
             dut.clock.step(1)
             val ldReqs = Seq(
-                // 1000~1001(cdef), 1008~1009(ffff), 1010~1011(0f0f), 1018~1019(3210)
-                // 1020~1021(3456), 1028~1029(0101), 1030~1031(4567), 1038~1039(1111)
-                (vlse16.copy(vm=false, vl=10, uopIdx=0, uopEnd=false), SrcBundleLd(scalar_opnd_2="h1", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fefe"), "h201f1e1d1c1b1a191817161514131211".U, "hffff".U),
+                (vle8.copy(vl=0, uopIdx=0, uopEnd=true, vstart=0), ldReqSrc_default, "h201f1e1d1c1b1a191817161514131211".U, "hffff".U),
+                (vl2re16.copy(vl=0, uopIdx=0, uopEnd=false, vstart=1), ldReqSrc_default, "hffffffffffffffff0123456789ab1211".U, "h0003".U),
             )
-
+            
             for ((c, s, r, m) <- ldReqs) {
                 while (!dut.io.lsuReady.peekBoolean()) {
                     dut.clock.step(1)
@@ -735,9 +734,7 @@ trait VLsuBehavior_ld {
                     dut.clock.step(1)
                 }
                 dut.io.lsuOut.valid.expect(true.B)
-                dut.io.xcpt.exception_vld.expect(true.B)
-                dut.io.xcpt.update_vl.expect(false.B)
-                dut.io.xcpt.update_data.expect(1.U)
+                // dut.clock.step(50)
                 dut.io.lsuOut.bits.data.expect(r)
                 dut.io.lsuOut.bits.rfWriteMask.expect(m)
                 dut.clock.step(4)

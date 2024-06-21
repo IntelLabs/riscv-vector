@@ -24,7 +24,7 @@ trait SmartVectorBehavior_ld {
     def VLE32_V = "b000_000_1_00000_00001_110_00100_0000111"
     
     def VLE64_V = "b000_000_1_00000_00001_111_00100_0000111"
-
+    def VSE8_V  = "b000_000_1_00000_00001_000_01000_0100111"
     // def VLSE8_V            = BitPat("b???010???????????000?????0000111")
     def VLSE8_V  = "b000_010_1_00010_00001_000_00100_0000111"
 
@@ -286,11 +286,23 @@ trait SmartVectorBehavior_ld {
             dut.clock.setTimeout(200)
             dut.clock.step(1)
             val ldReqs = Seq(
+                (ldstReqCtrl_default.copy(instrn=VSE8_V, vl=0, vlmul=1, vstart=1, vsew=0), ldstReqSrc_default.copy(rs1="h1058")),
                 (ldstReqCtrl_default.copy(instrn=VLE8_V, vl=19, vlmul=1, vstart=1, vsew=0), ldstReqSrc_default.copy(rs1="h1058")),
             )
 
             dut.io.rvuIssue.valid.poke(true.B)
             dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(0)._1, ldReqs(0)._2))
+            dut.clock.step(1)
+            dut.io.rvuIssue.valid.poke(false.B)
+
+            while (!dut.io.rvuCommit.commit_vld.peekBoolean()) {
+                dut.clock.step(1)
+            }
+
+            dut.io.rvuCommit.commit_vld.expect(true.B)
+
+            dut.io.rvuIssue.valid.poke(true.B)
+            dut.io.rvuIssue.bits.poke(genLdstInput(ldReqs(1)._1, ldReqs(1)._2))
             dut.clock.step(1)
             dut.io.rvuIssue.valid.poke(false.B)
 
@@ -347,4 +359,5 @@ class VPULdSpec extends AnyFlatSpec with ChiselScalatestTester with BundleGenHel
     it should behave like vLsuTest7()   //
     it should behave like vLsuTest8()   //
     it should behave like vLsuTest9()   //
+    // it should behave like vLsuTest10()   //
 }
