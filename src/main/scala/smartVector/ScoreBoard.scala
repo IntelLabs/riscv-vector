@@ -24,7 +24,7 @@ class Scoreboard(n: Int, zero: Boolean = false)
   var _next = r
   var ens = false.B
   def mask(en: Bool, addr: UInt) = Mux(en, 1.U << addr, 0.U)
-  def maskN(en: Bool, addr: UInt, num: UInt) = Mux(en, Mux(num === 32.U, 1.U(32.W), ((1.U << num) - 1.U) << addr), 0.U)
+  def maskN(en: Bool, addr: UInt, num: UInt) = Mux(en, Mux(num === 32.U, ~0.U, ((1.U << num) - 1.U) << addr), 0.U)
   def update(en: Bool, update: UInt) = {
     _next = update
     ens = ens || en
