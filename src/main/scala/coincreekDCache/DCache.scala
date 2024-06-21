@@ -188,5 +188,8 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     toAddress = s1_req.paddr,
     lgSize = log2Up(blockBytes).U,
   )._2
-
+  tl_out.c.valid := false.B
+  tl_out.b.ready := false.B
+  tl_out.d.ready := false.B
+  tl_out.e.valid := false.B
 }
