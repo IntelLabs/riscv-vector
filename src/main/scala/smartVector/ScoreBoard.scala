@@ -7,28 +7,25 @@ import chisel3.util._
 
 class Scoreboard(n: Int, zero: Boolean = false)
 {
-
-  def set(en: Bool, addr: UInt): Unit = update(en, _next | mask(en, addr))
-  def setN(en: Bool, addr: UInt, num: UInt): Unit = update(en, _next | maskN(en, addr, num))
-  def clear(en: Bool, addr: UInt): Unit = update(en, _next & ~mask(en, addr))
-  def clearN(en: Bool, addr: UInt, num: UInt): Unit = update(en, _next & ~maskN(en, addr, num))
-  //def clearAll(en: Bool): Unit = update(en, 0.U(n.W))
+  def clearAll(en: Bool): Unit = update(en, 0.U)
+  def set(en: Bool, addr: UInt): Unit = update(en, r | mask(en, addr))
+  def setN(en: Bool, addr: UInt, num: UInt): Unit = update(en, r | maskN(en, addr, num))
+  def clear(en: Bool, addr: UInt): Unit = update(en, r & ~mask(en, addr))
+  def clearN(en: Bool, addr: UInt, num: UInt): Unit = update(en, r & ~maskN(en, addr, num)) 
   def read(addr: UInt): Bool = r(addr)
   def readBypassed(addr: UInt): Bool = _next(addr)
   def readBypassedN(n: UInt, addr: UInt) = {
       val mask = ((1.U << n) - 1.U) << addr
       (_next & mask).orR()
   } 
-  val _r = RegInit(0.U(n.W))
-  val r = if (zero) (_r >> 1 << 1) else _r
-  var _next = r
-  var ens = false.B
+  val sboardReg = RegInit(0.U(n.W))
+  val r = if (zero) (sboardReg >> 1 << 1) else sboardReg
+  var _next = WireInit(0.U(n.W))
   def mask(en: Bool, addr: UInt) = Mux(en, 1.U << addr, 0.U)
-  def maskN(en: Bool, addr: UInt, num: UInt) = Mux(en, Mux(num === 32.U, ~0.U, ((1.U << num) - 1.U) << addr), 0.U)
-  def update(en: Bool, update: UInt) = {
-    _next = update
-    ens = ens || en
-    when (ens) { _r := _next }
+  def maskN(en: Bool, addr: UInt, num: UInt) = Mux(en, ((1.U << num) - 1.U) << addr, 0.U)
+  def update(en: Bool, data: UInt) = {
+    _next = data
+    when (en) { sboardReg := _next }
   }
 }
 
