@@ -22,6 +22,7 @@ class SVHLsu(implicit p: Parameters) extends Module {
     val stopSplit       = WireInit(false.B)
 
     // address reg
+    val s1_isValidAddr  = Reg(Bool())
     val addrReg         = RegInit(0.U(addrWidth.W))
 
     // uop & control related
@@ -97,7 +98,7 @@ class SVHLsu(implicit p: Parameters) extends Module {
             nextUopState := uop_split
         }
     }.elsewhen (uopState === uop_split_finish) {
-        when (completeLdst) {
+        when (completeLdst && !s1_isValidAddr) {
             nextUopState := uop_idle
         }.otherwise {
             nextUopState := uop_split_finish
@@ -228,7 +229,7 @@ class SVHLsu(implicit p: Parameters) extends Module {
 
     // pipeline stage 1
 
-    val s1_isValidAddr      = RegNext(isValidAddr)
+    s1_isValidAddr         := isValidAddr
     val s1_strideAbs        = RegEnable(strideAbs, isValidAddr)
     val s1_negStride        = RegEnable(negStride, isValidAddr)
     val s1_log2Stride       = RegEnable(log2Stride, isValidAddr)
@@ -392,8 +393,6 @@ class SVHLsu(implicit p: Parameters) extends Module {
 
     // * Commit to VRegIngo
     // * END
-
-
 
     // * BEGIN
     // * Writeback to uopQueue
