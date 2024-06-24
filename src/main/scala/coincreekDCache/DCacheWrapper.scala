@@ -34,16 +34,27 @@ class TLCManager()(
     )),
     beatBytes = beatBytes,
     endSinkId = nMSHRs,
-    minLatency = 2,
+    minLatency = 1,
   )))
 
   lazy val module = new LazyModuleImp(this) {
-    val (in, _) = node.in(0)
+    implicit val edge = node.edges.in(0)
+    val (in, _)       = node.in(0)
+
+    val (first, last, _, beat) = edge.count(in.c)
+
     in.a.ready := false.B
     in.b.valid := false.B
-    in.c.ready := false.B
-    in.d.valid := false.B
     in.e.ready := false.B
+
+    in.c.ready := true.B
+
+    val s1_cValid = RegNext(in.c.fire)
+    val s1_cReq   = RegEnable(in.c.bits, in.c.fire)
+
+    in.d.valid := s1_cValid
+    in.d.bits  := edge.ReleaseAck(s1_cReq)
+
   }
 }
 
@@ -58,10 +69,12 @@ class DCacheWrapper()(
   tlXbar.node  := TLWidthWidget(64) := dcacheClient.node
   manager.node := tlXbar.node
 
-  lazy val module = new LazyModuleImp(this) {
-    val io = IO(new DataExchangeIO())
-    dcacheClient.module.io <> io
-  }
+  lazy val module = new DCacheWrapperImp(this)
+}
+
+class DCacheWrapperImp(outer: DCacheWrapper) extends LazyModuleImp(outer) {
+  val io = IO(new DataExchangeIO())
+  outer.dcacheClient.module.io <> io
 }
 
 object Main extends App {

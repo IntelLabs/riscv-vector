@@ -6,3 +6,6 @@ test_meta:
 
 test_data:
 	mill -i $(PRJ)[$(CHISEL_VERSION)].test.testOnly $(PRJ).DataArrayTest
+
+test_wbu:
+	mill -i $(PRJ)[$(CHISEL_VERSION)].test.testOnly $(PRJ).WriteBackTest

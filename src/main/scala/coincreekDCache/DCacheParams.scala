@@ -35,6 +35,9 @@ trait DCacheParams {
   val dataBytes = dataWidth / 8
 
   val cohWidth = ClientStates.width // tilelink
+
+  val beatBits     = beatBytes * 8
+  val refillCycles = blockBytes / beatBytes
   // }}}
 
   val rowBytes     = rowBits / 8

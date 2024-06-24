@@ -17,6 +17,7 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   def onReset   = Metadata(0.U, ClientMetadata.onReset.state)
   val metaArray = Module(new MetaArray[Metadata](() => onReset))
   val dataArray = Module(new DataArray())
+  val wbQueue   = Module(new WriteBackQueue)
 
   // * Signal Define Begin
   // Store -> Load Bypassing
@@ -140,11 +141,16 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // meta write
   // FIXME
-  metaArray.io.write.valid         := s2_valid && s2_req.cmd === MemoryOpConstants.M_FILL
+  metaArray.io.write.valid := s2_valid &&
+    (s2_req.cmd === MemoryOpConstants.M_FILL || s2_req.cmd === MemoryOpConstants.M_REP)
   metaArray.io.write.bits.setIdx   := AddrDecoder.getSetIdx(s2_req.paddr)
   metaArray.io.write.bits.wayEn    := s2_wayEn
   metaArray.io.write.bits.data.tag := AddrDecoder.getTag(s2_req.paddr)
-  metaArray.io.write.bits.data.coh := ClientStates.Dirty
+  metaArray.io.write.bits.data.coh := Mux(
+    s2_req.cmd === MemoryOpConstants.M_REP,
+    ClientStates.Nothing,
+    ClientStates.Dirty,
+  )
 
   // data write
   dataArray.io.write.valid       := s2_valid
@@ -178,18 +184,37 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // return resp
   io.resp <> s1_cacheResp
 
-  io.req.ready := true.B
+  // * Writeback Begin
+  wbQueue.io.req.valid          := s1_valid && (s1_req.cmd === MemoryOpConstants.M_REP)
+  wbQueue.io.req.bits           := DontCare
+  wbQueue.io.req.bits.addr      := s1_req.paddr
+  wbQueue.io.req.bits.source    := 1.U
+  wbQueue.io.req.bits.voluntary := true.B
+  wbQueue.io.req.bits.hasData   := false.B
+  wbQueue.io.missCheck.valid    := false.B
+  wbQueue.io.missCheck.addr     := DontCare
+
+  wbQueue.io.release <> tl_out.c
+  // default value
+  wbQueue.io.grant.valid := false.B
+  wbQueue.io.grant.bits  := DontCare
+
+  // * Writeback End
 
   // FIXME
   // test tilelink
-  tl_out.a.valid := RegNext(s1_valid && ~s1_hit)
-  tl_out.a.bits := edge.Get(
-    fromSource = 0.U,
-    toAddress = s1_req.paddr,
-    lgSize = log2Up(blockBytes).U,
-  )._2
-  tl_out.c.valid := false.B
+  tl_out.a.valid := false.B
   tl_out.b.ready := false.B
-  tl_out.d.ready := false.B
   tl_out.e.valid := false.B
+
+  tl_out.d.ready := false.B
+  when(tl_out.d.bits.opcode === TLMessages.ReleaseAck) {
+    tl_out.d <> wbQueue.io.grant
+  }.elsewhen(tl_out.d.bits.opcode === TLMessages.Grant || tl_out.d.bits.opcode === TLMessages.GrantData) {
+    tl_out.d.ready := true.B
+  }.otherwise {
+    assert(!tl_out.d.fire)
+  }
+
+  io.req.ready := true.B
 }
