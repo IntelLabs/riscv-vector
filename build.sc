@@ -9,15 +9,15 @@ val defaultScalaVersion = "2.13.10"
 def defaultVersions(chiselVersion: String) = chiselVersion match {
   case "chisel" =>
     Map(
-      "chisel"        -> ivy"org.chipsalliance::chisel:6.4.0",
-      "chisel-plugin" -> ivy"org.chipsalliance:::chisel-plugin:6.4.0",
-      "chiseltest"    -> ivy"edu.berkeley.cs::chiseltest:5.0.2"
+      "chisel"        -> ivy"org.chipsalliance::chisel:5.0.0",
+      "chisel-plugin" -> ivy"org.chipsalliance:::chisel-plugin:5.0.0",
+      "chiseltest"    -> ivy"edu.berkeley.cs::chiseltest:5.0.0",
     )
   case "chisel3" =>
     Map(
       "chisel"        -> ivy"edu.berkeley.cs::chisel3:3.6.0",
       "chisel-plugin" -> ivy"edu.berkeley.cs:::chisel3-plugin:3.6.0",
-      "chiseltest"    -> ivy"edu.berkeley.cs::chiseltest:0.6.2"
+      "chiseltest"    -> ivy"edu.berkeley.cs::chiseltest:0.6.2",
     )
 }
 
@@ -102,12 +102,12 @@ trait Utility extends HasChisel {
 // extends this trait to use coincreekDCache in other projects
 trait coincreekDCacheModule extends ScalaModule {
 
-  def rocketModule: ScalaModule
+  def rocketModule:  ScalaModule
   def utilityModule: ScalaModule
 
   override def moduleDeps = super.moduleDeps ++ Seq(
     rocketModule,
-    utilityModule
+    utilityModule,
   )
 
   val resourcesPATH = os.pwd.toString() + "/src/main/resources"
