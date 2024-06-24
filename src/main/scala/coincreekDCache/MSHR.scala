@@ -3,140 +3,375 @@ package coincreekDCache
 import chisel3._
 import chisel3.util._
 import util._
-import java.rmi.server.UID
-
-class ioCachepipeMSHRFile extends Bundle() {
-  // val allocate_valid = Bool()
-  val allocate_tag  = UInt(addrWidth.W)
-  val allocate_type = UInt(1.W) // 1 for write && 0 for read
-  val allocate_mask = UInt(mshrEntryMaskWidth.W)
-  val allocate_data = UInt(mshrEntryDataWidth.W)
-}
-
-class ioMSHR extends Bundle() {
-  // mshr entry search & add new request inst
-  val allocateReq  = Input(Bool())
-  val allocateType = Input(UInt(1.W))
-  val tag          = Input(UInt(tagWidth.W))
-
-  val tagMatch = Output(Bool())                   // mshr allocate match
-  val isEmpty  = Output(Bool())
-  val isFull   = Output(Bool())                   // mshr allocate full -> need stall outside
-  val privErr  = 
-  val wrLineOH = Output(UInt(mshrEntryDataNum.W)) // new inst data write to which line of current mshr entry
-
-  // mshr sender port
-  val senderReq = Output(Bool()) // req to send this entry
-
-  val senderResp = Input(Bool())  // permitted to send this entry now
-  val senderPriv = Output(Bool()) // 1 for write, 0 for read
-  val senderTag  = Output(UInt(tagWidth.W))
-}
+import coincreekDCache.util._
+import _root_.circt.stage.ChiselStage
 
 class MSHR(id: Int) extends Module() {
-  val io = IO(new ioMSHR)
+  val io = IO(new MSHREntryIO)
 
-  val mode_idle :: mode_req_enqueue :: mode_resp_wait :: mode_replay :: mode_refill :: Nil = Enum(5)
+  val mode_idle :: mode_req_enqueue :: mode_resp_wait :: mode_replay :: mode_clear :: Nil = Enum(5)
+  private val state                                                                       = RegInit(mode_idle)
 
-  val state = RegInit(mode_idle)
+  // req priority
+  val probeReq    = io.req(2)
+  val replayReq   = !probeReq && io.req(1)
+  val allocateReq = !io.req(2, 1).orR && io.req(0) && state === mode_idle
 
   // info regs & wires
-  val sendedPermission = Wire(1.W) // 1 for write, 0 for read
+  val sentPermission = RegInit(false.B) // 1 for write, 0 for read
+  val tagReg         = RegEnable(io.reqTag, 0.U, allocateReq)
 
-  val typeList = RegInit(0.U(mshrEntryDataNum.W))
-  val tagReg   = RegInit(0.U(addrWidth.W))
-
-  val totalCounter = RegInit(0.U(log2Up(mshrEntryDataNum).W))
+  val metaCounter = RegInit(0.U(log2Up(mshrEntryMetaNum).W))
+  val dataCounter = RegInit(0.U(log2Up(mshrEntryDataNum).W))
 
   // match & output
-  val tagMatch = io.allocateReq && tagReg === io.tag
-  val privErr  = tagMatch && (state > mode_req_enqueue) && !sendedPermission && io.allocateType
-  val isFull   = io.allocateReq && totalCounter >= mshrEntryDataNum.asUInt
+  val tagMatch = tagReg === io.reqTag
   io.tagMatch := tagMatch
-  io.isFull   := isFull
+
+  /////////////// allocate state flag
+  // current entry is sent as read, but here is a write req
+  val privErr = tagMatch && (state === mode_resp_wait) && (!sentPermission) && io.reqType.asBool
+
+  // don't have enough space to store current inst
+  val isFull = tagMatch &&
+    ((dataCounter + io.reqDataEntryNum) > mshrEntryDataNum.asUInt || (metaCounter + 1.U) > mshrEntryMetaNum.asUInt)
+
+  val stallReq = (tagMatch && !(state <= mode_resp_wait)) || isFull || privErr
+  io.stallReq := stallReq
   io.isEmpty  := state === mode_idle
-  io.privErr  := privErr
 
-  io.wrLineOH := Mux(io.allocateReq, UIntToOH(totalCounter, mshrEntryDataNum), 0.U)
+  /////////////// refill state flag & io
+  io.metaCounter := metaCounter
+  io.dataCounter := dataCounter
 
-  // info regs & wires update
-  sendedPermission := typeList.orR
+  when(allocateReq || (tagMatch & !stallReq)) {
+    metaCounter := metaCounter + 1.U
+    when(io.reqType.asBool) {
+      dataCounter := dataCounter + io.reqDataEntryNum
+    }
+  }
 
-  typeList := Mux(state === mode_refill,
-    0.U,
-    Mux(tagMatch && !isFull && , 
-      typeList | (Cat(0.U((mshrEntryDataNum - 1).W), io.allocateType) << totalCounter), 
-      typeList
-    )
+  /////////////// sent info
+  sentPermission := Mux(
+    state === mode_clear,
+    false.B,
+    Mux(allocateReq || (tagMatch && !stallReq), sentPermission | io.reqType, sentPermission)
   )
 
-  tagReg := Mux(state === mode_idle, 
-    Mux(tagMatch, io.tag, 0.U), 
-    tagReg
-  )
-
-  totalCounter := Mux(state === mode_refill, 0.U, Mux(tagMatch && !isFull, totalCounter + 1.U, totalCounter))
+  // enqueue the sender
+  io.senderPriv := sentPermission | Mux(tagMatch && !stallReq, io.reqType, false.B)
+  io.senderTag  := tagReg
 
   // FSM
   state := MuxLookup(state, state)(
     Seq(
-      mode_idle -> Mux(tagMatch, mode_req_enqueue, state),
-      mode_req_enqueue ->
+      mode_idle        -> Mux(allocateReq, mode_req_enqueue, state),
+      mode_req_enqueue -> Mux(io.senderResp, mode_resp_wait, state),
+      mode_resp_wait   -> Mux(tagMatch && replayReq, mode_replay, state),
+      mode_replay      -> Mux(io.replayFinish, mode_clear, state),
+      mode_clear       -> mode_idle
     )
   )
+
+}
+
+class replayModule extends Module() {
+  val io                = IO(new ReplayModuleIO())
+  private val replayReg = RegInit(0.U(mshrDataBusWidth.W))
+
+  val mode_idle :: mode_replay :: mode_wait_replace :: mode_clear :: Nil = Enum(4)
+  private val state                                                      = RegInit(mode_idle)
+
+  val metaCounter = RegInit(0.U(log2Up(mshrEntryMetaNum).W))
+  val dataCounter = RegInit(0.U(log2Up(mshrEntryDataNum).W))
+
+  val initEnable   = state === mode_idle && io.innerIO.valid
+  val mshrEntryIdx = RegEnable(io.innerIO.bits.entryIdx, 0.U(log2Up(mshrEntryNum).W), initEnable)
+  val totalCounter = RegEnable(io.innerIO.bits.counter, 0.U(log2Up(mshrEntryMetaNum).W), initEnable)
+  val replayTag    = RegEnable(io.innerIO.bits.tag, 0.U(tagWidth.W), initEnable)
+
+  val replayStall = RegInit(false.B)
+
+  val loadgen =
+    new LoadGen(
+      io.innerIO.bits.meta.typ,
+      io.innerIO.bits.meta.signed,
+      io.innerIO.bits.meta.addrIndex,
+      replayReg,
+      false.B,
+      mshrDataBusWidth / 8
+    )
+
+//  val load4Scalar = loadgen.genData(3)
+//  val load4Vector = loadgen.genData(typMax)
+
+  val storegen =
+    new StoreGen(
+      io.innerIO.bits.meta.typ,
+      io.innerIO.bits.meta.addrIndex,
+      (new LoadGen(io.innerIO.bits.meta.typ, false.B, dataCounter, io.innerIO.bits.data.asUInt, false.B, typMax))
+        .genData(toInt(io.innerIO.bits.meta.typ)),
+      mshrDataBusWidth / 8
+    )
+
+  val storeMask = storegen.mask
+  val storeData = storegen.genData(toInt(io.innerIO.bits.meta.typ))
+
+  val mask4Reg: UInt = storeMask.asBools.foldLeft(0.U) {
+    (res, mask) =>
+      Cat(res, Fill(8, mask.asUInt))
+  }
+
+  when(!replayStall) {
+    metaCounter := MuxLookup(state, metaCounter)(
+      Seq(
+        mode_clear  -> 0.U,
+        mode_replay -> (metaCounter + 1.U)
+      )
+    )
+
+    dataCounter := MuxLookup(state, dataCounter)(
+      Seq(
+        mode_clear -> 0.U,
+        mode_replay -> Mux(
+          io.innerIO.bits.meta.rw_type.asBool,
+          dataCounter + (1.U << io.innerIO.bits.meta.typ),
+          dataCounter
+        )
+      )
+    )
+
+    replayReg := MuxCase(
+      replayReg,
+      Seq(
+        initEnable -> io.innerIO.bits.data.asTypeOf(replayReg),
+        ((state === mode_replay) && io.innerIO.bits.meta.rw_type.asBool) -> ((storeData & !mask4Reg) | (storeData & mask4Reg))
+      )
+    )
+
+    state := MuxLookup(state, state)(
+      Seq(
+        mode_idle         -> Mux(io.innerIO.valid, mode_replay, state),
+        mode_replay       -> Mux((metaCounter + 1.U) >= totalCounter, mode_wait_replace, state),
+        mode_wait_replace -> Mux(io.replaceFinish, mode_clear, state),
+        mode_clear        -> mode_idle
+      )
+    )
+
+  }
+
+  // inner connect
+  io.innerIO.ready := state === mode_idle
+  io.idxMeta       := metaCounter
+  io.replayIdx     := mshrEntryIdx
+
+  // replace signal connect
+  val replaceSendFlag = RegInit(false.B)
+
+  replaceSendFlag := Mux(
+    state =/= mode_wait_replace,
+    false.B,
+    Mux(io.toReplace.ready, true.B, replaceSendFlag)
+  )
+
+  io.toReplace.valid     := state === mode_wait_replace && !replaceSendFlag
+  io.toReplace.bits.tag  := replayTag
+  io.toReplace.bits.data := replayReg
+
+  // replay output
+  io.toPipe.valid        := (state === mode_replay) && !io.innerIO.bits.meta.rw_type
+  replayStall            := io.toPipe.valid && !io.toPipe.ready
+  io.toPipe.bits.regAddr := io.innerIO.bits.meta.regAddr
+  io.toPipe.bits.regData := loadgen.genData(toInt(io.innerIO.bits.meta.typ))
 
 }
 
 class MSHRFile extends Module() {
 
   val io = IO(
-    new Bundle(
-      pipeline_req = Flipped(Decoupled(new ioCachepipeMSHRFile))
+    new Bundle {
+      val pipelineReq = Flipped(DecoupledIO(new CachepipeMSHRFile))
+      val toL2Req     = DecoupledIO(new MSHRFileL2)
+      val fromRefill  = Flipped(DecoupledIO(new RefillMSHRFile))
+      val fromProbe   = Flipped(DecoupledIO(new ProbeMSHRFile)) // use ready as match signal
+
+      val toPipeline    = DecoupledIO(new MSHRPipeReplay())
+      val toReplace     = DecoupledIO(new MSHRReplace())
+      val replaceFinish = Input(Bool())
+    }
+  )
+
+  val replayReg = Module(new replayModule)
+
+  val metaArray = RegInit(
+    VecInit(
+      Seq.fill(mshrEntryNum)(VecInit(Seq.fill(mshrEntryMetaNum)(0.U((new ReqMetaBundle).getWidth.W))))
     )
   )
 
-  val array4MaskAndData = Module(
-    new SRAMWrapper(
-      gen = UInt((mshrEntryMaskWidth + mshrEntryDataWidth).W),
-      set = mshrEntryDataNum * mshrEntryDataNum
+  val dataArray = RegInit(
+    VecInit(
+      Seq.fill(mshrEntryNum)(VecInit(Seq.fill(mshrEntryDataNum)(0.U(mshrEntryDataWidth.W))))
     )
   )
 
-  val senderQueue = Module(new Queue(UInt(log2Up(mshrEntryNum).W), mshrEntryNum))
+// general signal
 
-  senderQueue.io.enq.valid :=
-    senderQueue.io.enq.bits :=
-    senderQueue.io.deq.ready :=
+  val tagMatchList    = Wire(Vec(mshrEntryNum, Bool()))
+  val tagMatch        = tagMatchList.asUInt.orR
+  val tagMatchIdxList = Wire(Vec(mshrEntryNum, UInt(log2Up(mshrEntryNum).W)))
+  val tagMatchIdx     = tagMatchIdxList.reduce(_ | _)
 
-  val allocateArb = Module(new Arbiter(UInt(), mshrEntryNum))
-  alloc_arb.io.in.foreach(_.bits := DontCare)
+  // interface for probe
+  val probeReq = io.fromProbe.valid
+  io.fromProbe.ready := probeReq && tagMatch
 
-  val tagMatchList   = Wire(Vec(mshrEntryNum, Bool()))
-  val entryFullList  = Wire(Vec(mshrEntryNum, Bool()))
-  val sramWriteIdxOH = Wire(Vec(mshrEntryNum, UInt(mshrEntryDataNum.W)))
+  // interface for replay
+  val replayReq = io.fromRefill.valid
+  io.fromRefill.ready := replayReg.io.innerIO.ready && !probeReq
 
-  val needStall = (tagMatchList & entryFullList).orR
+  val metaCounterList = Wire(Vec(mshrEntryNum, UInt(log2Up(mshrEntryMetaNum).W)))
+  val dataCounterList = Wire(Vec(mshrEntryNum, UInt(log2Up(mshrEntryDataNum).W)))
 
+  val replayFinishRespList = Wire(Vec(mshrEntryNum, Bool()))
+
+  // interface for allocate
+  val allocateReq = io.pipelineReq.valid
+
+  val allocateArb = Module(new Arbiter(Bool(), mshrEntryNum))
+  allocateArb.io.in.foreach(_.bits := DontCare)
+
+  val metaWriteIdx = metaCounterList(tagMatchIdx)
+  val dataWriteIdx = dataCounterList(tagMatchIdx)
+
+  val allocateDataEntryNum = Wire(UInt(3.W))
+
+  allocateDataEntryNum :=
+    Mux(io.pipelineReq.bits.meta.typ < 3.U, 1.U, 1.U << (io.pipelineReq.bits.meta.typ - 3.U)).asUInt
+
+  val stallReqList = Wire(Vec(mshrEntryNum, Bool()))
+  val stallReq     = stallReqList.asUInt.orR
+
+  val reqTag = MuxCase(
+    io.pipelineReq.bits.tag,
+    Seq(
+      probeReq                -> io.fromProbe.bits.tag,
+      (replayReq & !probeReq) -> io.fromRefill.bits.tag
+    )
+  )
+
+  // interface for new entry sender
+  val senderQueue    = Module(new Queue(UInt(log2Up(mshrEntryNum).W), mshrEntryNum))
+  val senderReqList  = Wire(Vec(mshrEntryNum, Bool()))
+  val senderRespList = Wire(Vec(mshrEntryNum, Bool()))
+  val senderIdxList  = Wire(Vec(mshrEntryNum, UInt(mshrEntryDataNum.W)))
+
+  val tagList        = Wire(Vec(mshrEntryNum, UInt(tagWidth.W)))
+  val senderPrivList = Wire(Vec(mshrEntryNum, Bool()))
+
+  // connect mshr
   val mshrs = (0 until mshrEntryNum) map {
     i =>
       val mshr = Module(new MSHR(i))
 
-      allocateArb.io.in(i).valid := mshr.io.isEmpty
-      mshr.io.allocateReq        := allocateArb.io.in(i).ready
+      mshr.io.req             := Cat(io.fromProbe.valid, io.fromRefill.valid, allocateArb.io.in(i).ready)
+      mshr.io.reqTag          := reqTag
+      mshr.io.reqType         := io.pipelineReq.bits.meta.rw_type
+      mshr.io.reqDataEntryNum := allocateDataEntryNum
 
-      tagMatchList(i)   := mshr.io.tagMatch
-      entryFullList(i)  := mshr.io.isFull
-      sramWriteIdxOH(i) := mshr.io.wrLineOH
+      tagMatchList(i)    := mshr.io.tagMatch
+      tagMatchIdxList(i) := Mux(mshr.io.tagMatch, i.asUInt, 0.U)
 
+      // replay & refill signal
+      metaCounterList(i) := mshr.io.metaCounter
+      dataCounterList(i) := mshr.io.dataCounter
+
+      mshr.io.replayFinish := replayFinishRespList(i)
+
+      // allocate signal
+      allocateArb.io.in(i).valid := mshr.io.isEmpty & !tagMatch
+
+      stallReqList(i) := mshr.io.stallReq
+
+      // sender signal
+      tagList(i)         := mshr.io.senderTag
+      senderReqList(i)   := mshr.io.isEmpty & !tagMatch & allocateArb.io.in(i).ready
+      senderIdxList(i)   := Mux(senderReqList(i), i.asUInt, 0.U)
+      senderPrivList(i)  := mshr.io.senderPriv
+      mshr.io.senderResp := senderRespList(i)
   }
 
-  // Write Mask & Data SRAM
-  array4MaskAndData.io.w.req.valid := Mux(!needStall && io.pipeline_req.valid, True.B, False.B)
+  // Write Mask & Data Array
+  when(!probeReq && !replayReq && allocateReq && !stallReq) {
+    metaArray(tagMatchIdx)(metaWriteIdx) := io.pipelineReq.bits.meta.asUInt
+    val inData = io.pipelineReq.bits.data.asTypeOf(Vec(mshrEntryDataNum, UInt(mshrEntryDataWidth.W)))
+    var j      = 0
+    for (i <- toInt(dataWriteIdx) until mshrEntryDataNum)
+      when(j.asUInt < allocateDataEntryNum) {
+        dataArray(tagMatchIdx)(i) := inData(j)
+        j = j + 1
+      }
+  }
 
-  array4MaskAndData.io.w.bits.apply(
-    setIdx  := OHToUInt(sramAccessIdxOH.asTypeOf(UInt)),
-    data    := Cat(io.pipeline_req.allocate_mask, io.pipeline_req.allocate_data),
-    waymask := 1
+  // Resp To Cache Pipeline
+  io.pipelineReq.ready     := !probeReq && !replayReq && !stallReq
+  allocateArb.io.out.ready := allocateReq
+
+  // sender queue
+  senderQueue.io.enq.valid := io.pipelineReq.valid && senderReqList.asUInt.orR
+  senderQueue.io.enq.bits  := senderIdxList.reduce(_ | _)
+
+  io.toL2Req.valid         := senderQueue.io.deq.valid
+  senderQueue.io.deq.ready := io.toL2Req.ready
+  io.toL2Req.bits.priv     := senderPrivList(senderQueue.io.deq.bits)
+  io.toL2Req.bits.tag      := tagList(senderQueue.io.deq.bits)
+
+  senderRespList := Mux(
+    io.toL2Req.ready,
+    UIntToOH(senderQueue.io.deq.bits, mshrEntryNum),
+    0.U
+  ).asBools
+
+  // refill queue wakeup MSHR FSM & replay reg
+  replayReg.io.innerIO.valid    := io.fromRefill.valid
+  io.fromRefill.ready           := replayReg.io.innerIO.ready
+  replayReg.io.innerIO.bits.tag := io.fromRefill.bits.tag
+
+  replayReg.io.innerIO.bits.entryIdx := tagMatchIdx
+  replayReg.io.innerIO.bits.meta := metaArray(replayReg.io.replayIdx)(replayReg.io.idxMeta).asTypeOf(new ReqMetaBundle)
+
+  replayReg.io.innerIO.bits.data := Mux(
+    io.fromRefill.valid,
+    io.fromRefill.bits.data.asTypeOf(Vec(mshrEntryDataNum, UInt(mshrEntryDataWidth.W))),
+    dataArray(replayReg.io.replayIdx)
   )
 
+  replayReg.io.innerIO.bits.entryIdx := senderIdxList.reduce(_ | _)
+  replayReg.io.innerIO.bits.counter  := metaCounterList(tagMatchIdx)
+
+  io.toPipeline <> replayReg.io.toPipe
+  io.toReplace <> replayReg.io.toReplace
+  replayReg.io.replaceFinish := io.replaceFinish
+
+  replayFinishRespList := Mux(
+    io.replaceFinish,
+    UIntToOH(replayReg.io.replayIdx),
+    0.U
+  ).asBools
+
+}
+
+/** For Test * */
+
+object MSHRFile extends App {
+
+  val firtoolOptions = Array(
+    "--lowering-options=" + List(
+      "disallowLocalVariables",
+      "disallowPackedArrays",
+      "locationInfoStyle=wrapInAtSquareBracket"
+    ).reduce(_ + "," + _)
+  )
+
+  ChiselStage.emitSystemVerilogFile(new MSHRFile, args, firtoolOptions)
 }

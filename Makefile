@@ -11,6 +11,10 @@ dcache:
 	mkdir -p $(BUILD_DIR)
 	mill -i $(PRJ)[$(CHISEL_VERSION)].runMain coincreekDCache.Main --target-dir $(BUILD_DIR)
 
+mshr:
+	mkdir -p $(BUILD_DIR)
+	mill -i $(PRJ)[$(CHISEL_VERSION)].runMain coincreekDCache.MSHRFile --target-dir $(BUILD_DIR)
+
 help:
 	mill -i $(PRJ).runMain coincreekDCache.DCache --help
 
