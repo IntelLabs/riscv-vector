@@ -143,9 +143,8 @@ class VMerge (implicit p : Parameters) extends Module {
 
     io.scoreBoardCleanIO.clearEn        := io.out.toRegFileWrite.rfWriteEn && !(io.in.lsuIn.valid && io.in.lsuIn.bits.isSegLoad)                                          
     io.scoreBoardCleanIO.clearAddr      := Mux(sboardClearMulti, io.in.lsuIn.bits.regStartIdx, 
-                                           Mux(sboardClearAll, 0.U(4.W), 
-                                            io.out.toRegFileWrite.rfWriteIdx))
-    io.scoreBoardCleanIO.clearMultiEn   := sboardClearMulti || sboardClearAll
-    io.scoreBoardCleanIO.clearNum       := Mux(sboardClearAll, 32.U(6.W), io.in.lsuIn.bits.regCount)
-    //io.scoreBoardCleanIO.clearAll       := sboardClearAll
+                                           io.out.toRegFileWrite.rfWriteIdx)
+    io.scoreBoardCleanIO.clearMultiEn   := sboardClearMulti
+    io.scoreBoardCleanIO.clearNum       := io.in.lsuIn.bits.regCount
+    io.scoreBoardCleanIO.clearAll       := sboardClearAll
 }
