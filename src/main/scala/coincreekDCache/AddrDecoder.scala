@@ -4,6 +4,9 @@ import chisel3._
 import chisel3.util._
 
 object AddrDecoder {
+  def getLineAddr(addr: UInt): UInt =
+    addr(addr.getWidth - blockOffBits - 1, blockOffBits)
+
   def getBankIdx(addr: UInt): UInt =
     addr(bankIdxBits + rowOffBits - 1, rowOffBits)
 

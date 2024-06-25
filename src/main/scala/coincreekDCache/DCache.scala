@@ -187,12 +187,13 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // * Writeback Begin
   wbQueue.io.req.valid          := s1_valid && (s1_req.cmd === MemoryOpConstants.M_REP)
   wbQueue.io.req.bits           := DontCare
-  wbQueue.io.req.bits.addr      := s1_req.paddr
-  wbQueue.io.req.bits.source    := 1.U
+  wbQueue.io.req.bits.lineAddr  := AddrDecoder.getLineAddr(s1_req.paddr)
+  wbQueue.io.req.bits.source    := (s1_valid && (s1_req.cmd === MemoryOpConstants.M_REP)).asUInt
   wbQueue.io.req.bits.voluntary := true.B
-  wbQueue.io.req.bits.hasData   := false.B
+  wbQueue.io.req.bits.hasData   := true.B
+  wbQueue.io.req.bits.data      := s1_dataPreBypass
   wbQueue.io.missCheck.valid    := false.B
-  wbQueue.io.missCheck.addr     := DontCare
+  wbQueue.io.missCheck.lineAddr := DontCare
 
   wbQueue.io.release <> tl_out.c
   // default value
