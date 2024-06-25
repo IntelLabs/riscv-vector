@@ -30,18 +30,20 @@ class MSHREntryIO extends Bundle() {
 }
 
 /////// replay reg IOs
-class MSHRPipeReplay extends Bundle() {
+class MSHRPipeResp extends Bundle() {
   val regAddr = UInt(regAddrWidth.W)
   val regData = UInt(regDataWidth.W)
 }
 
 class MSHRReplace extends Bundle() {
-  val tag  = UInt(tagWidth.W)
-  val data = UInt(regDataWidth.W)
+  val priv = Bool()                   // for s0
+  val tag  = UInt(tagWidth.W)         // for s0
+  val data = UInt(mshrDataBusWidth.W) // for s2
 }
 
 class MSHRInner extends Bundle() {
-  val tag = UInt(tagWidth.W)
+  val priv = Bool()
+  val tag  = UInt(tagWidth.W)
 
   val meta = new ReqMetaBundle()
   val data = Vec(mshrEntryDataNum, UInt(mshrEntryDataWidth.W))
@@ -51,7 +53,7 @@ class MSHRInner extends Bundle() {
 }
 
 class ReplayModuleIO extends Bundle() {
-  val toPipe = DecoupledIO(new MSHRPipeReplay())
+  val toPipe = DecoupledIO(new MSHRPipeResp())
 
   val toReplace     = DecoupledIO(new MSHRReplace())
   val replaceFinish = Input(Bool())
@@ -88,5 +90,7 @@ class RefillMSHRFile extends Bundle() {
 }
 
 class ProbeMSHRFile extends Bundle() {
-  val tag = UInt(tagWidth.W)
+  val valid      = Input(Bool())
+  val tag        = Input(UInt(tagWidth.W))
+  val probeReady = Output(Bool())
 }
