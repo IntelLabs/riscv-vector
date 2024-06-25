@@ -75,6 +75,8 @@ class WriteBackTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.resp.valid.expect(true.B)
       dut.io.resp.bits.hit.expect(false.B)
       dut.clock.step(10)
+
+      // check waveform
     }
   }
 
