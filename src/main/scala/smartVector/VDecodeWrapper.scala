@@ -35,7 +35,7 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
 
   val bufferReg = RegInit(0.U.asTypeOf(new RVUissue))
   val bufferValidReg = RegInit(false.B)
-  val validReg = RegInit(false.B)
+  val PipeValidReg = RegInit(false.B)
 
   //has exception, clear buffer
   when(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl || io.out.bits.vCtrl.illegal){
@@ -43,13 +43,13 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   }
 
   //set buffer
-  when(!bufferValidReg && !(!validReg || io.out.ready) && io.in.valid){
+  when(!bufferValidReg && !(!PipeValidReg || io.out.ready) && io.in.valid){
     bufferReg := io.in.bits
     bufferValidReg := io.in.valid
   }
 
   //fire to pipeline reg, clear buffer
-  when(!validReg || io.out.ready){
+  when(!PipeValidReg || io.out.ready){
       bufferValidReg := false.B
   }
 
@@ -125,29 +125,29 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
 
   bitsIn.eewEmulInfo := infoCalc.io.infoAll
 
-  val bitsReg = RegInit(0.U.asTypeOf(new VDecodeOutput))
+  val PipeBitsReg = RegInit(0.U.asTypeOf(new VDecodeOutput))
 
   when(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl || io.out.bits.vCtrl.illegal){
-    validReg := false.B
+    PipeValidReg := false.B
   }
 
-  when(!validReg || io.out.ready){
-      validReg := decodeInValid
+  when(!PipeValidReg || io.out.ready){
+      PipeValidReg := decodeInValid
   }
  
-  val fire = decodeInValid & (!validReg || io.out.ready)
+  val fire = decodeInValid & (!PipeValidReg || io.out.ready)
   when(fire) {
-      bitsReg := bitsIn
+      PipeBitsReg := bitsIn
   }
  
   when(RegNext(fire)){
-    bitsReg.vCtrl.illegal := vIllegalInstrn.io.ill.valid
+    PipeBitsReg.vCtrl.illegal := vIllegalInstrn.io.ill.valid
   }
   
-  io.out.valid := validReg
-  io.out.bits  := bitsReg
+  io.out.valid := PipeValidReg
+  io.out.bits  := PipeBitsReg
 
-  io.out.bits.vCtrl.illegal := Mux(RegNext(fire), vIllegalInstrn.io.ill.valid, bitsReg.vCtrl.illegal)
+  io.out.bits.vCtrl.illegal := Mux(RegNext(fire), vIllegalInstrn.io.ill.valid, PipeBitsReg.vCtrl.illegal)
 
   io.in.ready := !bufferValidReg
 }
