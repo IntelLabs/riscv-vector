@@ -14,10 +14,15 @@ class CCDCache()(
 
 class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
-  def onReset   = Metadata(0.U, ClientMetadata.onReset.state)
-  val metaArray = Module(new MetaArray[Metadata](() => onReset))
-  val dataArray = Module(new DataArray())
-  val wbQueue   = Module(new WriteBackQueue)
+  def onReset    = Metadata(0.U, ClientMetadata.onReset.state)
+  val metaArray  = Module(new MetaArray[Metadata](() => onReset))
+  val dataArray  = Module(new DataArray())
+  val wbQueue    = Module(new WriteBackQueue)
+  val probeQueue = Module(new ProbeQueue)
+  val mainReqArb = Module(new Arbiter(new MainPipeReq(), 2))
+
+  probeQueue.io.mainPipeReq.ready := mainReqArb.io.in(0).ready
+  io.req.ready                    := mainReqArb.io.in(1).ready
 
   // * Signal Define Begin
   // Store -> Load Bypassing
@@ -26,8 +31,17 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // * Signal Define End
 
   // * pipeline stage 0 Begin
-  val s0_valid = io.req.valid & ~io.s0_kill
-  val s0_req   = io.req.bits
+
+  // req arbiter
+  mainReqArb.io.in(0) <> probeQueue.io.mainPipeReq
+  mainReqArb.io.in(1).valid := io.req.valid
+  mainReqArb.io.in(1).bits  := MainPipeReqConverter(io.req.bits)
+  mainReqArb.io.out.ready   := true.B
+
+  // get s0 req
+  val s0_req   = mainReqArb.io.out.bits
+  val s0_valid = mainReqArb.io.out.valid & ~(io.s0_kill && s0_req.isFromCore)
+
   // read tag array
   metaArray.io.read.valid       := s0_valid
   metaArray.io.read.bits.setIdx := AddrDecoder.getSetIdx(s0_req.paddr)
@@ -44,7 +58,7 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // 1. Judge Tag & Meta
   // 2. Organize Data
   // 3. Return Resp
-  val s1_valid = RegNext(s0_valid) & !io.s1_kill
+  val s1_valid = RegNext(s0_valid) & ~(io.s1_kill && RegNext(s0_req.isFromCore))
   val s1_req   = RegNext(s0_req)
 
   // meta & data resp
@@ -96,9 +110,7 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   val lrscAddr         = RegEnable(s1_req.paddr >> blockOffBits, s1_lr)
   val s1_lrscAddrMatch = lrscValid && (s1_req.paddr >> blockOffBits === lrscAddr)
-
-  // FIXME: s1 sc miss?
-  val s1_scFail = s1_sc && !s1_lrscAddrMatch
+  val s1_scFail        = s1_sc && !s1_lrscAddrMatch // FIXME: s1 sc miss?
 
   lrscCount := MuxCase(
     lrscCount,
@@ -112,10 +124,25 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     ),
   )
 
+  val s1_storeUpdateData = (s1_hit && MemoryOpConstants.isWrite(s1_req.cmd)) || (s1_sc && ~s1_scFail)
+
+  // probe
+  val s1_validProbe                   = s1_valid && s1_req.isProbe
+  val (s1_pbDirty, _, s1_newProbeCoh) = s1_cohMeta.onProbe(s1_req.perm)
+  val s1_probeUpdateMeta              = s1_validProbe && s1_tagMatch // probe should update meta
+  val s1_probeWritebackData           = s1_validProbe && s1_pbDirty  // probe should writeback data
+
+  // replace
+  val s1_validReplace                = s1_valid && (s1_req.isReplace || s1_req.cmd === MemoryOpConstants.M_REPLACE)
+  val (s1_repDirty, _, s1_newRepCoh) = s1_cohMeta.onCacheControl(MemoryOpConstants.M_FLUSH)
+  val s1_repUpdateMeta               = s1_validReplace
+  val s1_repUpdateData               = s1_validReplace
+  val s1_repWritebackData            = s1_validReplace && s1_repDirty
+
   //  s1 resp
   val s1_cacheResp = Wire(Valid(new DataExchangeResp))
 
-  s1_cacheResp.valid            := s1_valid
+  s1_cacheResp.valid            := s1_valid && s1_req.isFromCore
   s1_cacheResp.bits.hit         := s1_hit
   s1_cacheResp.bits.source      := RegNext(s1_req.source)
   s1_cacheResp.bits.data        := Mux(s1_sc, s1_scFail, loadGen.data)
@@ -123,37 +150,42 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   s1_cacheResp.bits.replay      := false.B
   s1_cacheResp.bits.nextCycleWb := false.B
 
-  val s1_needWrite =
-    s1_hit & MemoryOpConstants.isWrite(s1_req.cmd) || (s1_valid & s1_req.cmd === MemoryOpConstants.M_FILL) // TODO
+  val s1_needUpdateMeta = s1_probeUpdateMeta || s1_repUpdateMeta || (s1_valid & s1_req.cmd === MemoryOpConstants.M_FILL)
+  val s1_needUpdateData = s1_storeUpdateData || s1_repUpdateData || (s1_valid & s1_req.cmd === MemoryOpConstants.M_FILL)
 
   // * pipeline stage 1 End
 
   // * pipeline stage 2 Begin
-  val s2_valid = RegNext(s1_valid & !s1_scFail & s1_needWrite)
-  val s2_req   = Reg(new DataExchangeReq)
-  val s2_wayEn = RegInit(0.U(nWays.W))
+  val s2_valid          = RegNext(s1_needUpdateMeta || s1_needUpdateData)
+  val s2_req            = Reg(new MainPipeReq)
+  val s2_wayEn          = RegInit(0.U(nWays.W))
+  val s2_needUpdateMeta = RegNext(s1_needUpdateMeta)
+  val s2_needUpdateData = RegNext(s1_needUpdateData)
 
-  when(s1_valid && s1_needWrite) {
-    s2_req       := s1_req
+  when(s1_needUpdateMeta || s1_needUpdateData) {
+    s2_req := s1_req
+    s2_req.perm := MuxCase(
+      s1_req.cmd,
+      Seq(
+        s1_validProbe                             -> s1_newProbeCoh.state,
+        s1_validReplace                           -> s1_newRepCoh.state,
+        (s1_req.cmd === MemoryOpConstants.M_FILL) -> ClientStates.Dirty,
+      ),
+    )
     s2_wayEn     := Mux(s1_hit, s1_tagMatchWay, VecInit(UIntToOH(s1_req.specifyWay).asBools)).asUInt
     s2_req.wdata := s1_storeData
   }
 
   // meta write
   // FIXME
-  metaArray.io.write.valid := s2_valid &&
-    (s2_req.cmd === MemoryOpConstants.M_FILL || s2_req.cmd === MemoryOpConstants.M_REP)
+  metaArray.io.write.valid         := s2_needUpdateMeta
   metaArray.io.write.bits.setIdx   := AddrDecoder.getSetIdx(s2_req.paddr)
   metaArray.io.write.bits.wayEn    := s2_wayEn
   metaArray.io.write.bits.data.tag := AddrDecoder.getTag(s2_req.paddr)
-  metaArray.io.write.bits.data.coh := Mux(
-    s2_req.cmd === MemoryOpConstants.M_REP,
-    ClientStates.Nothing,
-    ClientStates.Dirty,
-  )
+  metaArray.io.write.bits.data.coh := s2_req.perm
 
   // data write
-  dataArray.io.write.valid       := s2_valid
+  dataArray.io.write.valid       := s2_needUpdateData
   dataArray.io.write.bits.setIdx := AddrDecoder.getSetIdx(s2_req.paddr)
   dataArray.io.write.bits.bankEn := Fill(nBanks, true.B).asUInt
   dataArray.io.write.bits.wayEn  := s2_wayEn
@@ -185,13 +217,19 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   io.resp <> s1_cacheResp
 
   // * Writeback Begin
-  wbQueue.io.req.valid          := s1_valid && (s1_req.cmd === MemoryOpConstants.M_REP)
+
+  // pipeline stage 1
+
+  val s1_repLineAddr = Cat(s1_metaArrayResp(s1_req.specifyWay).tag, AddrDecoder.getSetIdx(s1_req.paddr))
+  val s1_repData     = s1_dataArrayResp(s1_req.specifyWay).asUInt
+
+  wbQueue.io.req.valid          := s1_probeWritebackData || s1_repWritebackData
   wbQueue.io.req.bits           := DontCare
-  wbQueue.io.req.bits.lineAddr  := AddrDecoder.getLineAddr(s1_req.paddr)
-  wbQueue.io.req.bits.source    := (s1_valid && (s1_req.cmd === MemoryOpConstants.M_REP)).asUInt
-  wbQueue.io.req.bits.voluntary := true.B
-  wbQueue.io.req.bits.hasData   := true.B
-  wbQueue.io.req.bits.data      := s1_dataPreBypass
+  wbQueue.io.req.bits.lineAddr  := Mux(s1_probeWritebackData, AddrDecoder.getLineAddr(s1_req.paddr), s1_repLineAddr)
+  wbQueue.io.req.bits.source    := 0.U // FIXME
+  wbQueue.io.req.bits.voluntary := s1_req.isReplace
+  wbQueue.io.req.bits.hasData   := Mux(s1_probeWritebackData, s1_pbDirty, s1_repDirty)
+  wbQueue.io.req.bits.data      := Mux(s1_probeWritebackData, s1_dataPreBypass, s1_repData)
   wbQueue.io.missCheck.valid    := false.B
   wbQueue.io.missCheck.lineAddr := DontCare
 
@@ -200,7 +238,18 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   wbQueue.io.grant.valid := false.B
   wbQueue.io.grant.bits  := DontCare
 
+  assert(!(s1_probeWritebackData && s1_repWritebackData))
+
   // * Writeback End
+
+  // * Probe Begin
+  probeQueue.io.memProbe <> tl_out.b
+
+  probeQueue.io.lsrcValid             := false.B
+  probeQueue.io.lsrcLineAddr          := DontCare
+  probeQueue.io.probeCheck.blockProbe := false.B
+  probeQueue.io.wbReady               := true.B
+  // * Probe End
 
   // FIXME
   // test tilelink
@@ -216,6 +265,4 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   }.otherwise {
     assert(!tl_out.d.fire)
   }
-
-  io.req.ready := true.B
 }

@@ -47,7 +47,7 @@ class MetaArray[T <: Metadata](onReset: () => T) extends Module with DCacheParam
     val resp  = Output(Vec(nWays, rstVal.cloneType))
   })
 
-  val tagArray = Module(
+  val metaArray = Module(
     new SRAMTemplate(
       UInt(metaBits.W),
       set = nSets,
@@ -71,8 +71,8 @@ class MetaArray[T <: Metadata](onReset: () => T) extends Module with DCacheParam
 
   // * Tag Write Begin
   val wen = rst || io.write.fire
-  tagArray.io.w.req.valid := wen
-  tagArray.io.w.req.bits.apply(
+  metaArray.io.w.req.valid := wen
+  metaArray.io.w.req.bits.apply(
     setIdx = waddr,
     data = wdata,
     waymask = VecInit(wmask).asUInt,
@@ -81,9 +81,9 @@ class MetaArray[T <: Metadata](onReset: () => T) extends Module with DCacheParam
 
   // * Tag Read Begin
   val ren = io.read.fire
-  tagArray.io.r.req.valid := ren
-  tagArray.io.r.req.bits.apply(setIdx = io.read.bits.setIdx)
-  io.resp := tagArray.io.r.resp.data.map(_.asTypeOf(chiselTypeOf(rstVal)))
+  metaArray.io.r.req.valid := ren
+  metaArray.io.r.req.bits.apply(setIdx = io.read.bits.setIdx)
+  io.resp := metaArray.io.r.resp.data.map(_.asTypeOf(chiselTypeOf(rstVal)))
   // * Tag Read End
 
   io.read.ready  := !rst

@@ -59,7 +59,7 @@ class WriteBackTest extends AnyFlatSpec with ChiselScalatestTester {
 
       // replace
       dut.io.req.valid.poke(true.B)
-      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_REP)
+      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_REPLACE)
       dut.io.req.bits.paddr.poke("h80004000".U)
 
       dut.clock.step(1)
