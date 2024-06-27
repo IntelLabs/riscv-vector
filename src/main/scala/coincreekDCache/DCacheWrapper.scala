@@ -49,9 +49,17 @@ class TLCManager()(
     in.c.ready := true.B
 
     val s1_cValid = RegNext(in.c.fire && c_last)
-    val s1_cReq   = RegEnable(in.c.bits, in.c.fire)
+    val s1_cReq   = RegEnable(in.c.bits, in.c.fire && c_last)
 
-    in.d.valid := s1_cValid
+    in.b.valid := RegNext(RegNext(s1_cValid))
+    in.b.bits := edge.Probe(
+      fromAddress = s1_cReq.address,
+      toSource = 0.U,
+      lgSize = log2Ceil(blockBytes).U,
+      capPermissions = TLPermissions.toN,
+    )._2
+
+    in.d.valid := s1_cValid && s1_cReq.opcode === TLMessages.Release
     in.d.bits  := edge.ReleaseAck(in.c.bits)
 
   }
@@ -87,5 +95,5 @@ object Main extends App {
   )
 
   lazy val dcacheWrapper = LazyModule(new DCacheWrapper()(Parameters.empty))
-  ChiselStage.emitSystemVerilogFile(dcacheWrapper.dcacheClient.module, args, firtoolOptions)
+  ChiselStage.emitSystemVerilogFile(dcacheWrapper.module, args, firtoolOptions)
 }
