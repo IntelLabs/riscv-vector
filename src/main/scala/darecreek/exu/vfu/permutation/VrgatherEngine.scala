@@ -104,11 +104,11 @@ class VrgatherEngine(implicit p: Parameters) extends VFuModule {
     when(vrgather_vxi) {
       vrgather_byte_sel(i) := rs1
       when(vsew === 1.U) {
-        vrgather_byte_sel(i) := Cat(rs1, 0.U(1.W)) + i.U % 2.U
+        vrgather_byte_sel(i) := Cat(rs1, 0.U(1.W)) + (i % 2).U
       }.elsewhen(vsew === 2.U) {
-        vrgather_byte_sel(i) := Cat(rs1, 0.U(2.W)) + i.U % 4.U
+        vrgather_byte_sel(i) := Cat(rs1, 0.U(2.W)) + (i % 4).U
       }.elsewhen(vsew === 3.U) {
-        vrgather_byte_sel(i) := Cat(rs1, 0.U(3.W)) + i.U % 8.U
+        vrgather_byte_sel(i) := Cat(rs1, 0.U(3.W)) + (i % 8).U
       }
     }.otherwise {
       when(vs1_vsew === 0.U) {
@@ -117,28 +117,28 @@ class VrgatherEngine(implicit p: Parameters) extends VFuModule {
         when((vsew === 0.U) && !vd_idx(0)) {
           vrgather_byte_sel(i) := vs1((i + 1) * 16 - 1, i * 16)
         }.elsewhen(vsew === 1.U) {
-          vrgather_byte_sel(i) := Cat(vs1((i / 2 + 1) * 16 - 1, i / 2 * 16), 0.U(1.W)) + i.U % 2.U
+          vrgather_byte_sel(i) := Cat(vs1((i / 2 + 1) * 16 - 1, i / 2 * 16), 0.U(1.W)) + (i % 2).U
         }.elsewhen(vsew === 2.U) {
           when(vd_idx(0).asBool) {
-            vrgather_byte_sel(i) := Cat(vs1((i / 4 + 1 + 4) * 16 - 1, (i / 4 + 4) * 16), 0.U(2.W)) + i.U % 4.U
+            vrgather_byte_sel(i) := Cat(vs1((i / 4 + 1 + 4) * 16 - 1, (i / 4 + 4) * 16), 0.U(2.W)) + (i % 4).U
           }.otherwise {
-            vrgather_byte_sel(i) := Cat(vs1((i / 4 + 1) * 16 - 1, i / 4 * 16), 0.U(2.W)) + i.U % 4.U
+            vrgather_byte_sel(i) := Cat(vs1((i / 4 + 1) * 16 - 1, i / 4 * 16), 0.U(2.W)) + (i % 4).U
           }
         }.elsewhen(vsew === 3.U) {
           when(vd_idx(1, 0) === 0.U) {
-            vrgather_byte_sel(i) := Cat(vs1((i / 8 + 1) * 16 - 1, (i / 8) * 16), 0.U(3.W)) + i.U % 8.U
+            vrgather_byte_sel(i) := Cat(vs1((i / 8 + 1) * 16 - 1, (i / 8) * 16), 0.U(3.W)) + (i % 8).U
           }.elsewhen(vd_idx(1, 0) === 1.U) {
-            vrgather_byte_sel(i) := Cat(vs1((i / 8 + 1 + 2) * 16 - 1, (i / 8 + 2) * 16), 0.U(3.W)) + i.U % 8.U
+            vrgather_byte_sel(i) := Cat(vs1((i / 8 + 1 + 2) * 16 - 1, (i / 8 + 2) * 16), 0.U(3.W)) + (i % 8).U
           }.elsewhen(vd_idx(1, 0) === 2.U) {
-            vrgather_byte_sel(i) := Cat(vs1((i / 8 + 1 + 4) * 16 - 1, (i / 8 + 4) * 16), 0.U(3.W)) + i.U % 8.U
+            vrgather_byte_sel(i) := Cat(vs1((i / 8 + 1 + 4) * 16 - 1, (i / 8 + 4) * 16), 0.U(3.W)) + (i % 8).U
           }.elsewhen(vd_idx(1, 0) === 3.U) {
-            vrgather_byte_sel(i) := Cat(vs1((i / 8 + 1 + 6) * 16 - 1, (i / 8 + 6) * 16), 0.U(3.W)) + i.U % 8.U
+            vrgather_byte_sel(i) := Cat(vs1((i / 8 + 1 + 6) * 16 - 1, (i / 8 + 6) * 16), 0.U(3.W)) + (i % 8).U
           }
         }
       }.elsewhen(vs1_vsew === 2.U) {
-        vrgather_byte_sel(i) := Cat(vs1((i / 4 + 1) * 32 - 1, i / 4 * 32), 0.U(2.W)) + i.U % 4.U
+        vrgather_byte_sel(i) := Cat(vs1((i / 4 + 1) * 32 - 1, i / 4 * 32), 0.U(2.W)) + (i % 4).U
       }.elsewhen(vs1_vsew === 3.U) {
-        vrgather_byte_sel(i) := Cat(vs1((i / 8 + 1) * 64 - 1, i / 8 * 64), 0.U(3.W)) + i.U % 8.U
+        vrgather_byte_sel(i) := Cat(vs1((i / 8 + 1) * 64 - 1, i / 8 * 64), 0.U(3.W)) + (i % 8).U
       }
     }
   }
@@ -148,11 +148,11 @@ class VrgatherEngine(implicit p: Parameters) extends VFuModule {
     when(vrgather_vxi) {
       vrgather_byte_sel(i) := rs1
       when(vsew === 1.U) {
-        vrgather_byte_sel(i) := Cat(rs1, 0.U(1.W)) + i.U % 2.U
+        vrgather_byte_sel(i) := Cat(rs1, 0.U(1.W)) + (i % 2).U
       }.elsewhen(vsew === 2.U) {
-        vrgather_byte_sel(i) := Cat(rs1, 0.U(2.W)) + i.U % 4.U
+        vrgather_byte_sel(i) := Cat(rs1, 0.U(2.W)) + (i % 4).U
       }.elsewhen(vsew === 3.U) {
-        vrgather_byte_sel(i) := Cat(rs1, 0.U(3.W)) + i.U % 8.U
+        vrgather_byte_sel(i) := Cat(rs1, 0.U(3.W)) + (i % 8).U
       }
     }.otherwise {
       when(vs1_vsew === 0.U) {
@@ -161,28 +161,28 @@ class VrgatherEngine(implicit p: Parameters) extends VFuModule {
         when((vsew === 0.U) && vd_idx(0)) {
           vrgather_byte_sel(i) := vs1((i + 1 - VLENB / 2) * 16 - 1, (i - VLENB / 2) * 16)
         }.elsewhen(vsew === 1.U) {
-          vrgather_byte_sel(i) := Cat(vs1((i / 2 + 1) * 16 - 1, i / 2 * 16), 0.U(1.W)) + i.U % 2.U
+          vrgather_byte_sel(i) := Cat(vs1((i / 2 + 1) * 16 - 1, i / 2 * 16), 0.U(1.W)) + (i % 2).U
         }.elsewhen(vsew === 2.U) {
           when(vd_idx(0).asBool) {
-            vrgather_byte_sel(i) := Cat(vs1((i / 4 + 1 + 4) * 16 - 1, (i / 4 + 4) * 16), 0.U(2.W)) + i.U % 4.U
+            vrgather_byte_sel(i) := Cat(vs1((i / 4 + 1 + 4) * 16 - 1, (i / 4 + 4) * 16), 0.U(2.W)) + (i % 4).U
           }.otherwise {
-            vrgather_byte_sel(i) := Cat(vs1((i / 4 + 1) * 16 - 1, i / 4 * 16), 0.U(2.W)) + i.U % 4.U
+            vrgather_byte_sel(i) := Cat(vs1((i / 4 + 1) * 16 - 1, i / 4 * 16), 0.U(2.W)) + (i % 4).U
           }
         }.elsewhen(vsew === 3.U) {
           when(vd_idx(1, 0) === 0.U) {
-            vrgather_byte_sel(i) := Cat(vs1((i / 8 + 1) * 16 - 1, (i / 8) * 16), 0.U(3.W)) + i.U % 8.U
+            vrgather_byte_sel(i) := Cat(vs1((i / 8 + 1) * 16 - 1, (i / 8) * 16), 0.U(3.W)) + (i % 8).U
           }.elsewhen(vd_idx(1, 0) === 1.U) {
-            vrgather_byte_sel(i) := Cat(vs1((i / 8 + 1 + 2) * 16 - 1, (i / 8 + 2) * 16), 0.U(3.W)) + i.U % 8.U
+            vrgather_byte_sel(i) := Cat(vs1((i / 8 + 1 + 2) * 16 - 1, (i / 8 + 2) * 16), 0.U(3.W)) + (i % 8).U
           }.elsewhen(vd_idx(1, 0) === 2.U) {
-            vrgather_byte_sel(i) := Cat(vs1((i / 8 + 1 + 4) * 16 - 1, (i / 8 + 4) * 16), 0.U(3.W)) + i.U % 8.U
+            vrgather_byte_sel(i) := Cat(vs1((i / 8 + 1 + 4) * 16 - 1, (i / 8 + 4) * 16), 0.U(3.W)) + (i % 8).U
           }.elsewhen(vd_idx(1, 0) === 3.U) {
-            vrgather_byte_sel(i) := Cat(vs1((i / 8 + 1 + 6) * 16 - 1, (i / 8 + 6) * 16), 0.U(3.W)) + i.U % 8.U
+            vrgather_byte_sel(i) := Cat(vs1((i / 8 + 1 + 6) * 16 - 1, (i / 8 + 6) * 16), 0.U(3.W)) + (i % 8).U
           }
         }
       }.elsewhen(vs1_vsew === 2.U) {
-        vrgather_byte_sel(i) := Cat(vs1((i / 4 + 1) * 32 - 1, i / 4 * 32), 0.U(2.W)) + i.U % 4.U
+        vrgather_byte_sel(i) := Cat(vs1((i / 4 + 1) * 32 - 1, i / 4 * 32), 0.U(2.W)) + (i % 4).U
       }.elsewhen(vs1_vsew === 3.U) {
-        vrgather_byte_sel(i) := Cat(vs1((i / 8 + 1) * 64 - 1, i / 8 * 64), 0.U(3.W)) + i.U % 8.U
+        vrgather_byte_sel(i) := Cat(vs1((i / 8 + 1) * 64 - 1, i / 8 * 64), 0.U(3.W)) + (i % 8).U
       }
     }
   }
