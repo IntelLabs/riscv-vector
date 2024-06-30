@@ -20,7 +20,7 @@ class StoreGen(sizeType: UInt, addr: UInt, dat: UInt, maxSizeInBytes: Int) {
     res
   }
 
-  protected def genData(i: Int): UInt =
+  def genData(i: Int): UInt =
     if (i >= log2Up(maxSizeInBytes)) dat
     else Mux(size === i.U, Fill(1 << (log2Up(maxSizeInBytes) - i), dat((8 << i) - 1, 0)), genData(i + 1))
 
@@ -31,7 +31,7 @@ class StoreGen(sizeType: UInt, addr: UInt, dat: UInt, maxSizeInBytes: Int) {
 class LoadGen(sizeType: UInt, signed: Bool, addr: UInt, dat: UInt, zero: Bool, maxSizeInBytes: Int) {
   private val size = new StoreGen(sizeType, addr, dat, maxSizeInBytes).size
 
-  private def genData(logMinSize: Int): UInt = {
+  def genData(logMinSize: Int): UInt = {
     var res = dat
     for (i <- log2Up(maxSizeInBytes) - 1 to logMinSize by -1) {
       val pos     = 8 << i
