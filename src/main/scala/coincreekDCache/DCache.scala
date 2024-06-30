@@ -45,21 +45,26 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // read tag array
   metaArray.io.read.valid       := s0_valid
   metaArray.io.read.bits.setIdx := AddrDecoder.getSetIdx(s0_req.paddr)
-  metaArray.io.read.bits.wayEn  := Mux(s0_req.specifyValid, UIntToOH(s0_req.specifyWay), Fill(nWays, true.B))
+  metaArray.io.read.bits.wayEn  := Mux(s0_req.isRefill, UIntToOH(s0_req.refillWay), Fill(nWays, true.B))
 
   // read data array
   dataArray.io.read.valid       := s0_valid
   dataArray.io.read.bits.setIdx := AddrDecoder.getSetIdx(s0_req.paddr)
   dataArray.io.read.bits.bankEn := UIntToOH(AddrDecoder.getBankIdx(s0_req.paddr))
-  dataArray.io.read.bits.wayEn  := Mux(s0_req.specifyValid, UIntToOH(s0_req.specifyWay), Fill(nWays, true.B))
+  dataArray.io.read.bits.wayEn  := Mux(s0_req.isRefill, UIntToOH(s0_req.refillWay), Fill(nWays, true.B))
   // * pipeline stage 0 End
 
   // * pipeline stage 1 Begin
-  // 1. Judge Tag & Meta
+  // 1. Obtain meta & data
   // 2. Organize Data
   // 3. Return Resp
-  val s1_valid = RegNext(s0_valid) & ~(io.s1_kill && RegNext(s0_req.isFromCore))
+
+  val s1_valid = RegNext(s0_valid) & ~io.s1_kill
   val s1_req   = RegNext(s0_req)
+
+  val s1_validFromCore = s1_valid && s1_req.isFromCore
+  val s1_validProbe    = s1_valid && s1_req.isProbe
+  val s1_validRefill   = s1_valid && s1_req.isRefill
 
   // meta & data resp
   val s1_dataArrayResp = dataArray.io.resp // nways nbanks data
@@ -67,15 +72,13 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // tag & coh match
   val s1_tagMatchWay = VecInit((0 until nWays).map(w =>
-    // tag match & coh valid
     s1_metaArrayResp(w).tag === AddrDecoder.getTag(s1_req.paddr) && s1_metaArrayResp(w).coh > 0.U
   ))
   val s1_tagMatch = s1_tagMatchWay.asUInt.orR
 
   val s1_cohMeta                        = ClientMetadata(Mux1H(s1_tagMatchWay, s1_metaArrayResp.map(_.coh)))
   val (s1_hasPerm, _, s1_newHitCohMeta) = s1_cohMeta.onAccess(s1_req.cmd)
-  // special case: trunk -> dirty, has perm but not hit
-  val s1_hit = s1_valid && s1_tagMatch && s1_hasPerm && (s1_cohMeta === s1_newHitCohMeta)
+  val s1_hit                            = s1_valid && s1_tagMatch && s1_hasPerm
 
   // organize read data
   val s1_dataPreBypass = Mux1H(s1_tagMatchWay, s1_dataArrayResp).asUInt
@@ -124,20 +127,27 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     ),
   )
 
+  val s1_storeUpdateMeta =
+    s1_hit && (s1_cohMeta =/= s1_newHitCohMeta) && MemoryOpConstants.isWrite(s1_req.cmd) // hit but need to upgrade perm
   val s1_storeUpdateData = (s1_hit && MemoryOpConstants.isWrite(s1_req.cmd)) || (s1_sc && ~s1_scFail)
 
   // probe
-  val s1_validProbe                   = s1_valid && s1_req.isProbe
-  val (s1_pbDirty, _, s1_newProbeCoh) = s1_cohMeta.onProbe(s1_req.perm)
-  val s1_probeUpdateMeta              = s1_validProbe && s1_tagMatch // probe should update meta
-  val s1_probeWritebackData           = s1_validProbe && s1_pbDirty  // probe should writeback data
+  val s1_pbDirty         = s1_cohMeta.onProbe(s1_req.probePerm)._1
+  val s1_newProbeCoh     = s1_cohMeta.onProbe(s1_req.probePerm)._3
+  val s1_probeUpdateMeta = s1_validProbe && s1_tagMatch               // probe should update meta
+  val s1_probeWb         = s1_validProbe
+  val s1_probeWbData     = s1_validProbe && s1_tagMatch && s1_pbDirty // probe has data
 
   // replace
-  val s1_validReplace                = s1_valid && (s1_req.isReplace || s1_req.cmd === MemoryOpConstants.M_REPLACE)
-  val (s1_repDirty, _, s1_newRepCoh) = s1_cohMeta.onCacheControl(MemoryOpConstants.M_FLUSH)
-  val s1_repUpdateMeta               = s1_validReplace
-  val s1_repUpdateData               = s1_validReplace
-  val s1_repWritebackData            = s1_validReplace && s1_repDirty
+  val s1_repLineAddr      = Cat(s1_metaArrayResp(s1_req.refillWay).tag, AddrDecoder.getSetIdx(s1_req.paddr))
+  val s1_repData          = s1_dataArrayResp(s1_req.refillWay).asUInt
+  val s1_repMeta          = ClientMetadata(s1_metaArrayResp(s1_req.refillWay).coh)
+  val (s1_repDirty, _, _) = s1_repMeta.onCacheControl(MemoryOpConstants.M_FLUSH)
+
+  val s1_refillUpdateMeta = s1_validRefill
+  val s1_refillUpdateData = s1_validRefill
+  val s1_replaceWb        = s1_validRefill && s1_repMeta.state > 0.U
+  val s1_replaceWbData    = s1_validRefill && s1_repDirty
 
   //  s1 resp
   val s1_cacheResp = Wire(Valid(new DataExchangeResp))
@@ -150,42 +160,49 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   s1_cacheResp.bits.replay      := false.B
   s1_cacheResp.bits.nextCycleWb := false.B
 
-  val s1_needUpdateMeta = s1_probeUpdateMeta || s1_repUpdateMeta || (s1_valid & s1_req.cmd === MemoryOpConstants.M_FILL)
-  val s1_needUpdateData = s1_storeUpdateData || s1_repUpdateData || (s1_valid & s1_req.cmd === MemoryOpConstants.M_FILL)
+  val s1_updateMeta = s1_storeUpdateMeta || s1_probeUpdateMeta || s1_refillUpdateMeta
+  val s1_updateData = s1_storeUpdateData || s1_refillUpdateData
 
   // * pipeline stage 1 End
 
   // * pipeline stage 2 Begin
-  val s2_valid          = RegNext(s1_needUpdateMeta || s1_needUpdateData)
-  val s2_req            = Reg(new MainPipeReq)
-  val s2_wayEn          = RegInit(0.U(nWays.W))
-  val s2_needUpdateMeta = RegNext(s1_needUpdateMeta)
-  val s2_needUpdateData = RegNext(s1_needUpdateData)
+  val s2_valid      = RegNext(s1_updateMeta || s1_updateData)
+  val s2_req        = Reg(new MainPipeReq)
+  val s2_wayEn      = RegInit(0.U(nWays.W))
+  val s2_newCoh     = RegInit(0.U(cohWidth.W))
+  val s2_updateMeta = RegNext(s1_updateMeta)
+  val s2_updateData = RegNext(s1_updateData)
 
-  when(s1_needUpdateMeta || s1_needUpdateData) {
+  when(s1_updateMeta || s1_updateData) {
     s2_req := s1_req
-    s2_req.perm := MuxCase(
+    s2_newCoh := MuxCase(
       s1_req.cmd,
       Seq(
-        s1_validProbe                             -> s1_newProbeCoh.state,
-        s1_validReplace                           -> s1_newRepCoh.state,
-        (s1_req.cmd === MemoryOpConstants.M_FILL) -> ClientStates.Dirty,
+        s1_validProbe    -> s1_newProbeCoh.state,
+        s1_validRefill   -> s1_req.refillCoh,
+        s1_validFromCore -> s1_newHitCohMeta.state,
       ),
     )
-    s2_wayEn     := Mux(s1_hit, s1_tagMatchWay, VecInit(UIntToOH(s1_req.specifyWay).asBools)).asUInt
+    s2_wayEn := MuxCase(
+      s1_tagMatchWay,
+      Seq(
+        s1_validProbe    -> s1_tagMatchWay,
+        s1_validRefill   -> VecInit(UIntToOH(s1_req.refillWay).asBools),
+        s1_validFromCore -> s1_tagMatchWay,
+      ),
+    ).asUInt
     s2_req.wdata := s1_storeData
   }
 
   // meta write
-  // FIXME
-  metaArray.io.write.valid         := s2_needUpdateMeta
+  metaArray.io.write.valid         := s2_updateMeta
   metaArray.io.write.bits.setIdx   := AddrDecoder.getSetIdx(s2_req.paddr)
   metaArray.io.write.bits.wayEn    := s2_wayEn
   metaArray.io.write.bits.data.tag := AddrDecoder.getTag(s2_req.paddr)
-  metaArray.io.write.bits.data.coh := s2_req.perm
+  metaArray.io.write.bits.data.coh := s2_newCoh
 
   // data write
-  dataArray.io.write.valid       := s2_needUpdateData
+  dataArray.io.write.valid       := s2_updateData
   dataArray.io.write.bits.setIdx := AddrDecoder.getSetIdx(s2_req.paddr)
   dataArray.io.write.bits.bankEn := Fill(nBanks, true.B).asUInt
   dataArray.io.write.bits.wayEn  := s2_wayEn
@@ -218,18 +235,16 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // * Writeback Begin
 
-  // pipeline stage 1
+  // wb in pipeline stage 1
 
-  val s1_repLineAddr = Cat(s1_metaArrayResp(s1_req.specifyWay).tag, AddrDecoder.getSetIdx(s1_req.paddr))
-  val s1_repData     = s1_dataArrayResp(s1_req.specifyWay).asUInt
-
-  wbQueue.io.req.valid          := s1_probeWritebackData || s1_repWritebackData
+  wbQueue.io.req.valid          := s1_probeWb || s1_replaceWb
   wbQueue.io.req.bits           := DontCare
-  wbQueue.io.req.bits.lineAddr  := Mux(s1_probeWritebackData, AddrDecoder.getLineAddr(s1_req.paddr), s1_repLineAddr)
   wbQueue.io.req.bits.source    := 0.U // FIXME
-  wbQueue.io.req.bits.voluntary := s1_req.isReplace
-  wbQueue.io.req.bits.hasData   := Mux(s1_probeWritebackData, s1_pbDirty, s1_repDirty)
-  wbQueue.io.req.bits.data      := Mux(s1_probeWritebackData, s1_dataPreBypass, s1_repData)
+  wbQueue.io.req.bits.voluntary := s1_req.isRefill
+  wbQueue.io.req.bits.lineAddr  := Mux(s1_probeWb, AddrDecoder.getLineAddr(s1_req.paddr), s1_repLineAddr)
+  wbQueue.io.req.bits.hasData   := Mux(s1_probeWb, s1_probeWbData, s1_replaceWbData)
+  wbQueue.io.req.bits.data      := Mux(s1_probeWb, s1_dataPreBypass, s1_repData)
+
   wbQueue.io.missCheck.valid    := false.B
   wbQueue.io.missCheck.lineAddr := DontCare
 
@@ -238,7 +253,7 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   wbQueue.io.grant.valid := false.B
   wbQueue.io.grant.bits  := DontCare
 
-  assert(!(s1_probeWritebackData && s1_repWritebackData))
+  assert(!(s1_probeWbData && s1_replaceWbData))
 
   // * Writeback End
 

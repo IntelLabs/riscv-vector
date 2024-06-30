@@ -17,10 +17,11 @@ class DataExchangeReq extends Bundle {
   val wmask   = UInt(dataBytes.W)
   val noAlloc = Bool()
 
-  // for replace & test fill
+  // for test fill
   // operate a specific cache way
-  val specifyValid = Bool()
-  val specifyWay   = UInt(log2Up(nWays).W)
+  val isRefill  = Bool()
+  val refillWay = UInt(log2Up(nWays).W)
+  val refillCoh = UInt(cohWidth.W)
 
 }
 
@@ -50,12 +51,12 @@ class MainPipeReq extends Bundle {
   val wmask   = UInt(dataBytes.W)
   val noAlloc = Bool()
 
-  val isFromCore   = Bool()
-  val isProbe      = Bool()
-  val isReplace    = Bool()
-  val perm         = UInt(TLPermissions.bdWidth.W) // probe permission
-  val specifyValid = Bool()
-  val specifyWay   = UInt(log2Up(nWays).W)
+  val isFromCore = Bool()
+  val isProbe    = Bool()
+  val isRefill   = Bool()
+  val probePerm  = UInt(TLPermissions.bdWidth.W) // probe permission
+  val refillWay  = UInt(log2Up(nWays).W)
+  val refillCoh  = UInt(cohWidth.W)
 }
 
 object MainPipeReqConverter {
@@ -63,17 +64,19 @@ object MainPipeReqConverter {
   def apply(req: DataExchangeReq): MainPipeReq = {
     val mainPipeReq = WireInit(0.U.asTypeOf(new MainPipeReq))
 
-    mainPipeReq.source       := req.source
-    mainPipeReq.paddr        := req.paddr
-    mainPipeReq.cmd          := req.cmd
-    mainPipeReq.size         := req.size
-    mainPipeReq.signed       := req.signed
-    mainPipeReq.wdata        := req.wdata
-    mainPipeReq.wmask        := req.wmask
-    mainPipeReq.noAlloc      := req.noAlloc
-    mainPipeReq.isFromCore   := true.B
-    mainPipeReq.specifyValid := req.specifyValid
-    mainPipeReq.specifyWay   := req.specifyWay
+    mainPipeReq.source  := req.source
+    mainPipeReq.paddr   := req.paddr
+    mainPipeReq.cmd     := req.cmd
+    mainPipeReq.size    := req.size
+    mainPipeReq.signed  := req.signed
+    mainPipeReq.wdata   := req.wdata
+    mainPipeReq.wmask   := req.wmask
+    mainPipeReq.noAlloc := req.noAlloc
+    // for test
+    mainPipeReq.isFromCore := Mux(req.isRefill, false.B, true.B)
+    mainPipeReq.isRefill   := req.isRefill
+    mainPipeReq.refillWay  := req.refillWay
+    mainPipeReq.refillCoh  := req.refillCoh
     mainPipeReq
   }
 
@@ -81,11 +84,11 @@ object MainPipeReqConverter {
   def apply(req: TLBundleB): MainPipeReq = {
     val mainPipeReq = WireInit(0.U.asTypeOf(new MainPipeReq))
 
-    mainPipeReq.source  := req.source
-    mainPipeReq.paddr   := req.address
-    mainPipeReq.cmd     := req.opcode
-    mainPipeReq.isProbe := true.B
-    mainPipeReq.perm    := req.param
+    mainPipeReq.source    := req.source
+    mainPipeReq.paddr     := req.address
+    mainPipeReq.cmd       := req.opcode
+    mainPipeReq.isProbe   := true.B
+    mainPipeReq.probePerm := req.param
     mainPipeReq
   }
 

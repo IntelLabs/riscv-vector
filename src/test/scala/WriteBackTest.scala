@@ -23,18 +23,20 @@ class WriteBackTest extends AnyFlatSpec with ChiselScalatestTester {
 
     dut.io.req.valid.poke(true.B)
     dut.io.req.bits.source.poke(1.U)
+    dut.io.req.bits.paddr.poke("h80004000".U)
+    dut.io.req.bits.cmd.poke(0.U) // dontcare
     dut.io.req.bits.size.poke(6.U)
     dut.io.req.bits.signed.poke(false.B)
-    dut.io.req.bits.cmd.poke(MemoryOpConstants.M_FILL)
-    dut.io.req.bits.paddr.poke("h80004000".U)
     dut.io.req.bits.wdata.poke(initilizeData.U)
+    dut.io.req.bits.wmask.poke(0.U)
     dut.io.req.bits.noAlloc.poke(false.B)
-    dut.io.req.bits.specifyValid.poke(true.B)
-    dut.io.req.bits.specifyWay.poke(1.U)
+    dut.io.req.bits.isRefill.poke(true.B)
+    dut.io.req.bits.refillWay.poke(1.U)
+    dut.io.req.bits.refillCoh.poke(ClientStates.Dirty)
 
     dut.clock.step(1)
     dut.io.req.valid.poke(false.B)
-    dut.io.req.bits.specifyValid.poke(false.B)
+    dut.io.req.bits.isRefill.poke(false.B)
     dut.clock.step(5)
   }
 
@@ -59,11 +61,12 @@ class WriteBackTest extends AnyFlatSpec with ChiselScalatestTester {
 
       // replace
       dut.io.req.valid.poke(true.B)
-      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_REPLACE)
+      dut.io.req.bits.isRefill.poke(true.B)
       dut.io.req.bits.paddr.poke("h80004000".U)
 
       dut.clock.step(1)
       dut.io.req.valid.poke(false.B)
+      dut.io.req.bits.isRefill.poke(false.B)
       dut.clock.step(10)
 
       dut.io.req.valid.poke(true.B)
