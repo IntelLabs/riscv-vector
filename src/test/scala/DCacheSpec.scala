@@ -23,18 +23,20 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
 
     dut.io.req.valid.poke(true.B)
     dut.io.req.bits.source.poke(1.U)
+    dut.io.req.bits.paddr.poke("h80004000".U)
+    dut.io.req.bits.cmd.poke(0.U) // dontcare
     dut.io.req.bits.size.poke(6.U)
     dut.io.req.bits.signed.poke(false.B)
-    dut.io.req.bits.cmd.poke(MemoryOpConstants.M_FILL)
-    dut.io.req.bits.paddr.poke(0x1234000.U)
     dut.io.req.bits.wdata.poke(initilizeData.U)
+    dut.io.req.bits.wmask.poke(0.U)
     dut.io.req.bits.noAlloc.poke(false.B)
-    dut.io.req.bits.specifyValid.poke(true.B)
-    dut.io.req.bits.specifyWay.poke(1.U)
+    dut.io.req.bits.isRefill.poke(true.B)
+    dut.io.req.bits.refillWay.poke(1.U)
+    dut.io.req.bits.refillCoh.poke(ClientStates.Dirty)
 
     dut.clock.step(1)
     dut.io.req.valid.poke(false.B)
-    dut.io.req.bits.specifyValid.poke(false.B)
+    dut.io.req.bits.isRefill.poke(false.B)
     dut.clock.step(5)
   }
 
@@ -48,7 +50,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.req.valid.poke(true.B)
       dut.io.req.bits.signed.poke(false.B)
       dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-      dut.io.req.bits.paddr.poke(0x1234000.U)
+      dut.io.req.bits.paddr.poke("h80004000".U)
 
       dut.clock.step(1)
       dut.io.req.valid.poke(false.B)
@@ -79,14 +81,14 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
       // write hit
       dut.io.req.valid.poke(true.B)
       dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XWR)
-      dut.io.req.bits.paddr.poke(0x1234000.U)
+      dut.io.req.bits.paddr.poke("h80004000".U)
       dut.io.req.bits.wdata.poke(0x7890.U)
 
       dut.clock.step(1)
       // read hit
       dut.io.req.valid.poke(true.B)
       dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-      dut.io.req.bits.paddr.poke(0x1234000.U)
+      dut.io.req.bits.paddr.poke("h80004000".U)
       dut.io.req.bits.wdata.poke(0x7890.U)
 
       dut.clock.step(1)
@@ -108,7 +110,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.req.valid.poke(true.B)
       dut.io.req.bits.size.poke(6.U)
       dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-      dut.io.req.bits.paddr.poke(0x1234000.U)
+      dut.io.req.bits.paddr.poke("h80004000".U)
 
       dut.clock.step(1)
       dut.io.resp.valid.expect(true.B)
@@ -120,7 +122,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.req.valid.poke(true.B)
       dut.io.req.bits.size.poke(3.U)
       dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-      dut.io.req.bits.paddr.poke(0x1234000.U)
+      dut.io.req.bits.paddr.poke("h80004000".U)
 
       dut.clock.step(1)
       dut.io.resp.valid.expect(true.B)
@@ -133,7 +135,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.req.bits.size.poke(2.U)
       dut.io.req.bits.signed.poke(true.B)
       dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-      dut.io.req.bits.paddr.poke(0x1234010.U)
+      dut.io.req.bits.paddr.poke("h80004010".U)
 
       dut.clock.step(1)
       dut.io.resp.valid.expect(true.B)
@@ -155,14 +157,14 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.req.valid.poke(true.B)
       dut.io.req.bits.size.poke(3.U)
       dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XA_SWAP)
-      dut.io.req.bits.paddr.poke(0x1234000.U)
+      dut.io.req.bits.paddr.poke("h80004000".U)
       dut.io.req.bits.wdata.poke(0x7890.U)
 
       dut.clock.step(1)
 
       dut.io.req.valid.poke(true.B)
       dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-      dut.io.req.bits.paddr.poke(0x1234000.U)
+      dut.io.req.bits.paddr.poke("h80004000".U)
 
       dut.io.resp.valid.expect(true.B)
       dut.io.resp.bits.data.expect("h2323232323232323".U)
@@ -186,14 +188,14 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.req.valid.poke(true.B)
       dut.io.req.bits.size.poke(3.U)
       dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XA_ADD)
-      dut.io.req.bits.paddr.poke(0x1234000.U)
+      dut.io.req.bits.paddr.poke("h80004000".U)
       dut.io.req.bits.wdata.poke("h0101010101010101".U)
 
       dut.clock.step(1)
 
       dut.io.req.valid.poke(true.B)
       dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-      dut.io.req.bits.paddr.poke(0x1234000.U)
+      dut.io.req.bits.paddr.poke("h80004000".U)
 
       dut.io.resp.valid.expect(true.B)
       dut.io.resp.bits.data.expect("h2323232323232323".U)
@@ -217,7 +219,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.req.valid.poke(true.B)
       dut.io.req.bits.size.poke(3.U)
       dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XLR)
-      dut.io.req.bits.paddr.poke(0x1234000.U)
+      dut.io.req.bits.paddr.poke("h80004000".U)
 
       dut.clock.step(1)
       dut.io.req.valid.poke(false.B)
@@ -230,7 +232,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.req.valid.poke(true.B)
       dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XSC)
       dut.io.req.bits.wdata.poke("h0101010101010101".U)
-      dut.io.req.bits.paddr.poke(0x1234000.U)
+      dut.io.req.bits.paddr.poke("h80004000".U)
 
       dut.clock.step(1)
       dut.io.req.valid.poke(false.B)
@@ -241,7 +243,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.req.valid.poke(true.B)
       dut.io.req.bits.size.poke(3.U)
       dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-      dut.io.req.bits.paddr.poke(0x1234000.U)
+      dut.io.req.bits.paddr.poke("h80004000".U)
 
       dut.clock.step(1)
       dut.io.req.valid.poke(false.B)
@@ -262,7 +264,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.req.valid.poke(true.B)
       dut.io.req.bits.size.poke(3.U)
       dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XLR)
-      dut.io.req.bits.paddr.poke(0x1234000.U)
+      dut.io.req.bits.paddr.poke("h80004000".U)
 
       dut.clock.step(1)
       dut.io.req.valid.poke(false.B)
@@ -276,7 +278,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.req.valid.poke(true.B)
       dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XSC)
       dut.io.req.bits.wdata.poke("h0101010101010101".U)
-      dut.io.req.bits.paddr.poke(0x1234000.U)
+      dut.io.req.bits.paddr.poke("h80004000".U)
 
       dut.clock.step(1)
       dut.io.req.valid.poke(false.B)
@@ -288,7 +290,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.req.valid.poke(true.B)
       dut.io.req.bits.size.poke(3.U)
       dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-      dut.io.req.bits.paddr.poke(0x1234000.U)
+      dut.io.req.bits.paddr.poke("h80004000".U)
 
       dut.clock.step(1)
       dut.io.req.valid.poke(false.B)
