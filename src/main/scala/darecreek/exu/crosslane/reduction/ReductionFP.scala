@@ -330,14 +330,13 @@ class ReductionFP(implicit p: Parameters) extends VFuModule {
     }
   }
 
-  val div_cnt = 1.U << vs2_cnt
   val vs2_rnd0 = fpu_valid
   val vs2_rndx = (red_state === calc_vs2) && (vs2_cnt === (vs2_rnd - 1.U)) && red_out_valid && red_out_ready
   val red_out_bits = Cat(red_out_vd.reverse)
   val vs2m_bits_hi = vs2m_bits(VLEN - 1, VLEN / 2)
-  val red_out_hi = (red_out_bits & (vd_mask_half >> ((VLEN / 2).U - (VLEN / 2).U / div_cnt))) >> (VLEN / 4).U / div_cnt
+  val red_out_hi = (red_out_bits & (vd_mask_half >> ((VLEN / 2).U - ((VLEN / 2).U >> vs2_cnt)))) >> ((VLEN / 4).U >> vs2_cnt)
   val vs2m_bits_lo = vs2m_bits(VLEN / 2 - 1, 0)
-  val red_out_lo = red_out_bits & (vd_mask_half >> ((VLEN / 2).U - (VLEN / 4).U / div_cnt))
+  val red_out_lo = red_out_bits & (vd_mask_half >> ((VLEN / 2).U - ((VLEN / 4).U >> vs2_cnt)))
 
   val red_zero = RegEnable(red_out_bits(63, 0), (red_state === calc_vs1) && red_out_valid && red_out_ready)
   val red_vs1_zero = Mux(expdIdxZero, vs1_zero, red_zero)
@@ -472,7 +471,7 @@ class ReductionFP(implicit p: Parameters) extends VFuModule {
     red_fflag := red_fflag | fpu(0).io.out.bits.fflags | fpu(1).io.out.bits.fflags
   }
 
-  io.out.bits.vd := VecInit(Seq.tabulate(NLanes)(i => (output_data) ((i + 1) * LaneWidth - 1, i * LaneWidth)))
+  io.out.bits.vd := VecInit(Seq.tabulate(NLanes)(i => (output_data)((i + 1) * LaneWidth - 1, i * LaneWidth)))
   io.in.ready := fpu(0).io.in.ready && fpu(1).io.in.ready && !red_uop_busy
   io.out.bits.fflags := Mux(vstart_gte_vl, 0.U, Mux(output_en, red_fflag, 0.U))
   io.out.valid := output_valid

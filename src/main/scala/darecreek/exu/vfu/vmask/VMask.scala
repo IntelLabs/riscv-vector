@@ -271,24 +271,24 @@ class VMask(implicit p: Parameters) extends VFuModule {
   }
 
   for (i <- 0 until VLENB) {
-    when(i.U % 2.U === 0.U) {
+    if (i % 2 == 0) {
       vid_vd_sew16(i) := vd_reg_byte(i / 2)
-    }.otherwise {
+    } else {
       vid_vd_sew16(i) := 0.U
     }
   }
 
   for (i <- 0 until VLENB) {
-    when(i.U % 4.U === 0.U) {
+    if (i % 4 == 0) {
       vid_vd_sew32(i) := vd_reg_byte(i / 4)
-    }.otherwise {
+    } else {
       vid_vd_sew32(i) := 0.U
     }
   }
   for (i <- 0 until VLENB) {
-    when(i.U % 8.U === 0.U) {
+    if (i % 8 == 0) {
       vid_vd_sew64(i) := vd_reg_byte(i / 8)
-    }.otherwise {
+    } else {
       vid_vd_sew64(i) := 0.U
     }
   }
