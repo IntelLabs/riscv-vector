@@ -66,9 +66,9 @@ class ReplayModuleIO extends Bundle() {
 
 /////// MSHR file IO
 class ReqMetaBundle extends Bundle() {
-  val rw_type   = UInt(1.W)
+  val rwType    = UInt(1.W)
   val regAddr   = UInt(regAddrWidth.W)
-  val typ       = UInt(typWidth.W)
+  val size      = UInt(log2Up(log2Up(mshrDataBusWidth / 8) + 1).W)
   val signed    = Bool()
   val addrIndex = UInt(dataIndexWidth.W)
 }

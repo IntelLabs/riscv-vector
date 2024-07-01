@@ -55,7 +55,7 @@ class MSHR(id: Int) extends Module() {
   sentPermission := Mux(
     state === mode_clear,
     false.B,
-    Mux(allocateReq || (tagMatch && !stallReq), sentPermission | io.reqType, sentPermission)
+    Mux(allocateReq || (tagMatch && !stallReq), sentPermission | io.reqType, sentPermission),
   )
 
   // enqueue the sender
@@ -69,7 +69,7 @@ class MSHR(id: Int) extends Module() {
       mode_req_enqueue -> Mux(io.senderResp, mode_resp_wait, state),
       mode_resp_wait   -> Mux(tagMatch && replayReq, mode_replay, state),
       mode_replay      -> Mux(io.replayFinish, mode_clear, state),
-      mode_clear       -> mode_idle
+      mode_clear       -> mode_idle,
     )
   )
 
@@ -95,12 +95,12 @@ class ReplayModule extends Module() {
 
   val loadgen =
     new LoadGen(
-      io.innerIO.bits.meta.typ,
+      io.innerIO.bits.meta.size,
       io.innerIO.bits.meta.signed,
       io.innerIO.bits.meta.addrIndex,
       replayReg,
       false.B,
-      mshrDataBusWidth / 8
+      mshrDataBusWidth / 8,
     )
 
 //  val load4Scalar = loadgen.genData(3)
@@ -108,15 +108,15 @@ class ReplayModule extends Module() {
 
   val storegen =
     new StoreGen(
-      io.innerIO.bits.meta.typ,
+      io.innerIO.bits.meta.size,
       io.innerIO.bits.meta.addrIndex,
-      (new LoadGen(io.innerIO.bits.meta.typ, false.B, dataCounter, io.innerIO.bits.data.asUInt, false.B, typMax))
-        .genData(toInt(io.innerIO.bits.meta.typ)),
-      mshrDataBusWidth / 8
+      (new LoadGen(io.innerIO.bits.meta.size, false.B, dataCounter, io.innerIO.bits.data.asUInt, false.B, sizeMax))
+        .genData(toInt(io.innerIO.bits.meta.size)),
+      mshrDataBusWidth / 8,
     )
 
   val storeMask = storegen.mask
-  val storeData = storegen.genData(toInt(io.innerIO.bits.meta.typ))
+  val storeData = storegen.genData(toInt(io.innerIO.bits.meta.size))
 
   val mask4Reg: UInt = storeMask.asBools.foldLeft(0.U) {
     (res, mask) =>
@@ -127,7 +127,7 @@ class ReplayModule extends Module() {
     metaCounter := MuxLookup(state, metaCounter)(
       Seq(
         mode_clear  -> 0.U,
-        mode_replay -> (metaCounter + 1.U)
+        mode_replay -> (metaCounter + 1.U),
       )
     )
 
@@ -135,10 +135,10 @@ class ReplayModule extends Module() {
       Seq(
         mode_clear -> 0.U,
         mode_replay -> Mux(
-          io.innerIO.bits.meta.rw_type.asBool,
-          dataCounter + (1.U << io.innerIO.bits.meta.typ),
-          dataCounter
-        )
+          io.innerIO.bits.meta.rwType.asBool,
+          dataCounter + (1.U << io.innerIO.bits.meta.size),
+          dataCounter,
+        ),
       )
     )
 
@@ -146,8 +146,8 @@ class ReplayModule extends Module() {
       replayReg,
       Seq(
         initEnable -> io.innerIO.bits.data.asTypeOf(replayReg),
-        ((state === mode_replay) && io.innerIO.bits.meta.rw_type.asBool) -> ((storeData & !mask4Reg) | (storeData & mask4Reg))
-      )
+        ((state === mode_replay) && io.innerIO.bits.meta.rwType.asBool) -> ((storeData & !mask4Reg) | (storeData & mask4Reg)),
+      ),
     )
 
     state := MuxLookup(state, state)(
@@ -155,7 +155,7 @@ class ReplayModule extends Module() {
         mode_idle         -> Mux(io.innerIO.valid, mode_replay, state),
         mode_replay       -> Mux((metaCounter + 1.U) >= totalCounter, mode_wait_replace, state),
         mode_wait_replace -> Mux(io.replaceFinish, mode_clear, state),
-        mode_clear        -> mode_idle
+        mode_clear        -> mode_idle,
       )
     )
 
@@ -172,7 +172,7 @@ class ReplayModule extends Module() {
   replaceSendFlag := Mux(
     state =/= mode_wait_replace,
     false.B,
-    Mux(io.toReplace.ready, true.B, replaceSendFlag)
+    Mux(io.toReplace.ready, true.B, replaceSendFlag),
   )
 
   io.toReplace.valid     := state === mode_wait_replace && !replaceSendFlag
@@ -181,10 +181,10 @@ class ReplayModule extends Module() {
   io.toReplace.bits.data := replayReg
 
   // replay output
-  io.toPipe.valid        := (state === mode_replay) && !io.innerIO.bits.meta.rw_type
+  io.toPipe.valid        := (state === mode_replay) && !io.innerIO.bits.meta.rwType
   replayStall            := io.toPipe.valid && !io.toPipe.ready
   io.toPipe.bits.regAddr := io.innerIO.bits.meta.regAddr
-  io.toPipe.bits.regData := loadgen.genData(toInt(io.innerIO.bits.meta.typ))
+  io.toPipe.bits.regData := loadgen.genData(toInt(io.innerIO.bits.meta.size))
 
 }
 
@@ -249,7 +249,7 @@ class MSHRFile extends Module() {
   val allocateDataEntryNum = Wire(UInt(3.W))
 
   allocateDataEntryNum :=
-    Mux(io.pipelineReq.bits.meta.typ < 3.U, 1.U, 1.U << (io.pipelineReq.bits.meta.typ - 3.U)).asUInt
+    Mux(io.pipelineReq.bits.meta.size < 3.U, 1.U, 1.U << (io.pipelineReq.bits.meta.size - 3.U)).asUInt
 
   val stallReqList = Wire(Vec(mshrEntryNum, Bool()))
   val stallReq     = stallReqList.asUInt.orR
@@ -258,8 +258,8 @@ class MSHRFile extends Module() {
     io.pipelineReq.bits.tag,
     Seq(
       probeReq                -> io.fromProbe.tag,
-      (replayReq & !probeReq) -> io.fromRefill.bits.tag
-    )
+      (replayReq & !probeReq) -> io.fromRefill.bits.tag,
+    ),
   )
 
   // interface for new entry sender
@@ -278,7 +278,7 @@ class MSHRFile extends Module() {
 
       mshr.io.req             := Cat(io.fromProbe.valid, io.fromRefill.valid, allocateArb.io.in(i).ready)
       mshr.io.reqTag          := reqTag
-      mshr.io.reqType         := io.pipelineReq.bits.meta.rw_type
+      mshr.io.reqType         := io.pipelineReq.bits.meta.rwType
       mshr.io.reqDataEntryNum := allocateDataEntryNum
 
       tagMatchList(i)    := mshr.io.tagMatch
@@ -331,7 +331,7 @@ class MSHRFile extends Module() {
   senderRespList := Mux(
     io.toL2Req.ready,
     UIntToOH(senderQueue.io.deq.bits, mshrEntryNum),
-    0.U
+    0.U,
   ).asBools
 
   // refill queue wakeup MSHR FSM & replay reg
@@ -346,7 +346,7 @@ class MSHRFile extends Module() {
   replayReg.io.innerIO.bits.data := Mux(
     io.fromRefill.valid,
     io.fromRefill.bits.data.asTypeOf(Vec(mshrEntryDataNum, UInt(mshrEntryDataWidth.W))),
-    dataArray(replayReg.io.replayIdx)
+    dataArray(replayReg.io.replayIdx),
   )
 
   replayReg.io.innerIO.bits.entryIdx := senderIdxList.reduce(_ | _)
@@ -359,7 +359,7 @@ class MSHRFile extends Module() {
   replayFinishRespList := Mux(
     io.replaceFinish,
     UIntToOH(replayReg.io.replayIdx),
-    0.U
+    0.U,
   ).asBools
 
 }
@@ -372,7 +372,7 @@ object MSHRFile extends App {
     "--lowering-options=" + List(
       "disallowLocalVariables",
       "disallowPackedArrays",
-      "locationInfoStyle=wrapInAtSquareBracket"
+      "locationInfoStyle=wrapInAtSquareBracket",
     ).reduce(_ + "," + _)
   )
 

@@ -16,10 +16,11 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   def onReset    = Metadata(0.U, ClientMetadata.onReset.state)
   val metaArray  = Module(new MetaArray[Metadata](() => onReset))
-  val dataArray  = Module(new DataArray())
+  val dataArray  = Module(new DataArray)
+  val mshrs      = Module(new MSHRFile)
   val wbQueue    = Module(new WriteBackQueue)
   val probeQueue = Module(new ProbeQueue)
-  val mainReqArb = Module(new Arbiter(new MainPipeReq(), 2))
+  val mainReqArb = Module(new Arbiter(new MainPipeReq, 2))
 
   probeQueue.io.mainPipeReq.ready := mainReqArb.io.in(0).ready
   io.req.ready                    := mainReqArb.io.in(1).ready
@@ -233,6 +234,41 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // return resp
   io.resp <> s1_cacheResp
 
+  // * MSHR Begin
+
+  // get pipeline miss req
+  mshrs.io.pipelineReq.valid := s1_validFromCore && ~s1_hit // FIXME
+  mshrs.io.pipelineReq.bits  := DontCare
+
+  mshrs.io.pipelineReq.bits.data           := s1_storeData
+  mshrs.io.pipelineReq.bits.tag            := AddrDecoder.getTag(s1_req.paddr)
+  mshrs.io.pipelineReq.bits.meta.rwType    := MemoryOpConstants.isWrite(s1_req.cmd)
+  mshrs.io.pipelineReq.bits.meta.regAddr   := s1_req.dest
+  mshrs.io.pipelineReq.bits.meta.size      := s1_req.size
+  mshrs.io.pipelineReq.bits.meta.signed    := s1_req.signed
+  mshrs.io.pipelineReq.bits.meta.addrIndex := s1_req.paddr
+
+  mshrs.io.fromRefill       := DontCare
+  mshrs.io.fromProbe        := DontCare
+  mshrs.io.replaceFinish    := false.B
+  mshrs.io.toReplace.ready  := false.B
+  mshrs.io.toPipeline.ready := false.B
+
+  mshrs.io.toL2Req.ready := tl_out.a.ready
+  tl_out.a.valid         := mshrs.io.toL2Req.valid
+  tl_out.a.bits := edge.AcquireBlock(
+    fromSource = 0.U, // FIXME
+    toAddress = Cat(mshrs.io.toL2Req.bits.tag, 0.U(setIdxBits.W)) << blockOffBits,
+    lgSize = log2Ceil(blockBytes).U,
+    growPermissions = TLPermissions.NtoT,
+  )._2
+
+  mshrs.io.fromRefill.valid     := tl_out.d.valid
+  mshrs.io.fromRefill.bits.tag  := AddrDecoder.getTag("h80008000".U)
+  mshrs.io.fromRefill.bits.data := tl_out.d.bits.data
+
+  // * MSHR End
+
   // * Writeback Begin
 
   // wb in pipeline stage 1
@@ -268,7 +304,6 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // FIXME
   // test tilelink
-  tl_out.a.valid := false.B
   tl_out.b.ready := false.B
   tl_out.e.valid := false.B
 
@@ -280,4 +315,5 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   }.otherwise {
     assert(!tl_out.d.fire)
   }
+  dontTouch(tl_out)
 }

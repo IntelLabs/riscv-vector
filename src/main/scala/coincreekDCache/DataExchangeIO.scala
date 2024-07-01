@@ -16,7 +16,7 @@ class DataExchangeReq extends Bundle {
   val wdata   = UInt(dataWidth.W)
   val wmask   = UInt(dataBytes.W)
   val noAlloc = Bool()
-
+  val dest    = UInt(destWidth.W) // reg addr or lsq idx
   // for test fill
   // operate a specific cache way
   val isRefill  = Bool()
@@ -50,6 +50,7 @@ class MainPipeReq extends Bundle {
   val wdata   = UInt(dataWidth.W)
   val wmask   = UInt(dataBytes.W)
   val noAlloc = Bool()
+  val dest    = UInt(destWidth.W) // reg addr or lsq idx
 
   val isFromCore = Bool()
   val isProbe    = Bool()
@@ -72,6 +73,7 @@ object MainPipeReqConverter {
     mainPipeReq.wdata   := req.wdata
     mainPipeReq.wmask   := req.wmask
     mainPipeReq.noAlloc := req.noAlloc
+    mainPipeReq.dest    := req.dest
     // for test
     mainPipeReq.isFromCore := Mux(req.isRefill, false.B, true.B)
     mainPipeReq.isRefill   := req.isRefill

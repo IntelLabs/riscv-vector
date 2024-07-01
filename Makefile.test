@@ -9,3 +9,6 @@ test_data:
 
 test_wbu:
 	mill -i $(PRJ)[$(CHISEL_VERSION)].test.testOnly $(PRJ).WriteBackTest
+
+test_miss:
+	mill -i $(PRJ)[$(CHISEL_VERSION)].test.testOnly $(PRJ).DcacheMissTest

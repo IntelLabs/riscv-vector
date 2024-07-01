@@ -43,7 +43,7 @@ class TLCManager()(
 
     val (c_first, c_last, _) = edge.firstlast(in.c)
 
-    in.a.ready := false.B
+    in.a.ready := true.B
     in.b.valid := false.B
     in.e.ready := false.B
     in.c.ready := true.B
@@ -59,9 +59,24 @@ class TLCManager()(
       capPermissions = TLPermissions.toN,
     )._2
 
-    in.d.valid := s1_cValid && s1_cReq.opcode === TLMessages.Release
-    in.d.bits  := edge.ReleaseAck(in.c.bits)
+    val s1_aValid = RegNext(RegNext(in.a.fire))
+    val s1_aReq   = RegNext(RegEnable(in.a.bits, in.a.fire))
 
+    in.d.valid := s1_aValid || (s1_cValid && s1_cReq.opcode === TLMessages.Release)
+    when(s1_cValid) {
+      in.d.bits := edge.ReleaseAck(in.c.bits)
+    }.elsewhen(s1_aValid) {
+      in.d.bits := edge.Grant(
+        fromSink = 0.U,
+        toSource = s1_aReq.source,
+        lgSize = s1_aReq.size,
+        capPermissions = TLPermissions.toT,
+        data = "h22334455".U,
+      )
+
+    }.otherwise {
+      in.d.valid := false.B
+    }
   }
 }
 

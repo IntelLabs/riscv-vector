@@ -15,7 +15,7 @@ trait DCacheParams {
   val nMSHRs            = 4
   val nMMIOs            = 0
   val replacementPolicy = "plru"
-  val beatBytes         = 32
+  val beatBytes         = 64
   // }}}
 
   // lrsc params
@@ -25,12 +25,15 @@ trait DCacheParams {
   // }}}
 
   // {{{
-  val XLEN       = 64
-  val VLEN       = 512
-  val vaddrWidth = 39
-  val paddrWidth = 39
-  val srcWidth   = 8
+  val XLEN          = 64
+  val VLEN          = 512
+  val vaddrWidth    = 39
+  val paddrWidth    = 39
+  val regAddrWidth  = 5
+  val vLsqSizeWidth = 5
+  val srcWidth      = 8
 
+  val destWidth = max(regAddrWidth, vLsqSizeWidth)
   val dataWidth = max(XLEN, VLEN)
   val dataBytes = dataWidth / 8
 
@@ -54,7 +57,6 @@ trait DCacheParams {
 
   // MSHR
   // {{{
-  val regAddrWidth = 5
   val regDataWidth = 64
   val tagWidth     = 32
 
@@ -72,8 +74,7 @@ trait DCacheParams {
   val mshrMetaBusWidth = 16
   val mshrDataBusWidth = 512
 
-  val typMax         = 6
-  val typWidth       = log2Up(log2Up(mshrDataBusWidth / 8) + 1)
+  val sizeMax        = 6
   val dataIndexWidth = log2Up(mshrDataBusWidth / 8)
 
   val mshrType = 1
