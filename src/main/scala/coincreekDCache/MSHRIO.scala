@@ -3,50 +3,55 @@ package coincreekDCache
 import chisel3._
 import chisel3.util._
 import util._
+import freechips.rocketchip.tilelink._
 
 /////// MSHR Entry IO
 class MSHREntryIO extends Bundle() {
-  val req             = Input(UInt(mshrReqType.W))
-  val reqType         = Input(UInt(mshrType.W))
-  val reqTag          = Input(UInt(tagWidth.W))
-  val reqDataEntryNum = Input(UInt(log2Up(mshrEntryDataNum).W))
+  val req         = Input(UInt(mshrReqType.W))
+  val reqType     = Input(UInt(mshrType.W))
+  val reqLineAddr = Input(UInt(lineAddrWidth.W))
+  val isUpgrade   = Input(Bool()) // for BtoT
 
-  val tagMatch = Output(Bool()) // mshr inner tag match
+  val lineAddrMatch = Output(Bool()) // mshr inner tag match
 
   // replay & refill signals
   val replayFinish = Input(Bool())
   val metaCounter  = Output(UInt(log2Up(mshrEntryMetaNum).W))
-  val dataCounter  = Output(UInt(log2Up(mshrEntryDataNum).W))
 
   // state flag for allocate
-  val isEmpty  = Output(Bool())
-  val stallReq = Output(Bool())
+  val isEmpty      = Output(Bool())
+  val stallReq     = Output(Bool())
+  val maskConflict = Input(Bool())
 
   // mshr sender port
-  val senderResp = Input(Bool())  // permitted to send this entry now
-  val senderPriv = Output(Bool()) // 1 for write, 0 for read
-  val senderTag  = Output(UInt(tagWidth.W))
+  val senderResp       = Input(Bool()) // permitted to send this entry now
+  val senderPermission = Output(UInt(TLPermissions.aWidth.W))
+  val senderLineAddr   = Output(UInt(lineAddrWidth.W))
 
+  // probe permission
+  val probePermission = Input(UInt(TLPermissions.bdWidth.W))
+  val probeBlock      = Output(Bool())
 }
 
 /////// replay reg IOs
 class MSHRPipeResp extends Bundle() {
-  val regAddr = UInt(regAddrWidth.W)
-  val regData = UInt(regDataWidth.W)
+  val regIdx  = UInt(regAddrWidth.W)
+  val regData = UInt(mshrDataWidth.W)
 }
 
 class MSHRReplace extends Bundle() {
-  val priv = Bool()                   // for s0
-  val tag  = UInt(tagWidth.W)         // for s0
-  val data = UInt(mshrDataBusWidth.W) // for s2
+  val state    = UInt(cohBits.W)       // for s0
+  val lineAddr = UInt(lineAddrWidth.W) // for s0
+  val data     = UInt(mshrDataWidth.W) // for s2
 }
 
 class MSHRInner extends Bundle() {
-  val priv = Bool()
-  val tag  = UInt(tagWidth.W)
+  val perm     = UInt(TLPermissions.aWidth.W)
+  val lineAddr = UInt(lineAddrWidth.W)
 
   val meta = new ReqMetaBundle()
-  val data = Vec(mshrEntryDataNum, UInt(mshrEntryDataWidth.W))
+  val mask = UInt(mshrMaskWidth.W)
+  val data = UInt(mshrDataWidth.W)
 
   val entryIdx = UInt(log2Up(mshrEntryNum).W)
   val counter  = UInt(log2Up(mshrEntryMetaNum).W)
@@ -65,32 +70,41 @@ class ReplayModuleIO extends Bundle() {
 }
 
 /////// MSHR file IO
-class ReqMetaBundle extends Bundle() {
-  val rwType    = UInt(1.W)
-  val regAddr   = UInt(regAddrWidth.W)
-  val size      = UInt(log2Up(log2Up(mshrDataBusWidth / 8) + 1).W)
-  val signed    = Bool()
-  val addrIndex = UInt(dataIndexWidth.W)
+class MetaBundle extends Bundle() {
+  val regIdx = UInt(regAddrWidth.W)
+  val size   = UInt(log2Up(log2Up(dataBytes)).W)
+  val signed = Bool()
+  val offset = UInt(dataOffsetWidth.W)
+}
+
+class ReqMetaBundle extends MetaBundle() {
+  val rwType = UInt(1.W)
 }
 
 class CachepipeMSHRFile extends Bundle() {
-  val tag  = UInt(tagWidth.W)
-  val meta = new ReqMetaBundle
-  val data = UInt(mshrDataBusWidth.W)
+  val isUpgrade = Bool()
+  val lineAddr  = UInt(lineAddrWidth.W)
+  val meta      = new ReqMetaBundle
+  val mask      = UInt(mshrMaskWidth.W)
+  val data      = UInt(mshrDataWidth.W)
 }
 
 class MSHRFileL2 extends Bundle() {
-  val priv = Bool()
-  val tag  = UInt(tagWidth.W)
+  val perm     = UInt(TLPermissions.aWidth.W)
+  val entryId  = UInt(log2Up(mshrEntryNum).W)
+  val lineAddr = UInt(lineAddrWidth.W)
 }
 
 class RefillMSHRFile extends Bundle() {
-  val tag  = UInt(tagWidth.W)
-  val data = UInt(mshrDataBusWidth.W)
+  val entryId  = UInt(log2Up(mshrEntryNum).W)
+  val lineAddr = UInt(lineAddrWidth.W)
+  val data     = UInt(mshrDataWidth.W)
 }
 
 class ProbeMSHRFile extends Bundle() {
-  val valid      = Input(Bool())
-  val tag        = Input(UInt(tagWidth.W))
-  val probeReady = Output(Bool())
+  val valid           = Input(Bool())
+  val probePermission = Input(UInt(TLPermissions.bdWidth.W))
+  val lineAddr        = Input(UInt(lineAddrWidth.W))
+  val probeMatch      = Output(Bool())
+  val probeBlock      = Output(Bool())
 }

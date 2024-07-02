@@ -7,8 +7,8 @@ import utility.SRAMTemplate
 import _root_.circt.stage.ChiselStage
 
 class Metadata extends Bundle {
-  val tag = UInt(tagWidth.W)
-  val coh = UInt(cohWidth.W)
+  val tag = UInt(tagBits.W)
+  val coh = UInt(cohBits.W)
 }
 
 object Metadata {

@@ -21,7 +21,7 @@ class DataExchangeReq extends Bundle {
   // operate a specific cache way
   val isRefill  = Bool()
   val refillWay = UInt(log2Up(nWays).W)
-  val refillCoh = UInt(cohWidth.W)
+  val refillCoh = UInt(cohBits.W)
 
 }
 
@@ -57,7 +57,7 @@ class MainPipeReq extends Bundle {
   val isRefill   = Bool()
   val probePerm  = UInt(TLPermissions.bdWidth.W) // probe permission
   val refillWay  = UInt(log2Up(nWays).W)
-  val refillCoh  = UInt(cohWidth.W)
+  val refillCoh  = UInt(cohBits.W)
 }
 
 object MainPipeReqConverter {

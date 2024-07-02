@@ -171,7 +171,7 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s2_valid          = RegNext(s1_updateMeta || s1_updateData)
   val s2_req            = Reg(new MainPipeReq)
   val s2_wayEn          = RegInit(0.U(nWays.W))
-  val s2_newCoh         = RegInit(0.U(cohWidth.W))
+  val s2_newCoh         = RegInit(0.U(cohBits.W))
   val s2_updateMeta     = RegNext(s1_updateMeta)
   val s2_updateData     = RegNext(s1_updateData)
   val s2_updateReplacer = RegNext(s1_hit || s1_validRefill)
@@ -260,13 +260,13 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   mshrs.io.pipelineReq.valid := s1_validFromCore && ~s1_hit // FIXME
   mshrs.io.pipelineReq.bits  := DontCare
 
-  mshrs.io.pipelineReq.bits.data           := s1_storeData
-  mshrs.io.pipelineReq.bits.tag            := AddrDecoder.getTag(s1_req.paddr)
-  mshrs.io.pipelineReq.bits.meta.rwType    := MemoryOpConstants.isWrite(s1_req.cmd)
-  mshrs.io.pipelineReq.bits.meta.regAddr   := s1_req.dest
-  mshrs.io.pipelineReq.bits.meta.size      := s1_req.size
-  mshrs.io.pipelineReq.bits.meta.signed    := s1_req.signed
-  mshrs.io.pipelineReq.bits.meta.addrIndex := s1_req.paddr
+  mshrs.io.pipelineReq.bits.isUpgrade   := false.B
+  mshrs.io.pipelineReq.bits.data        := s1_storeData
+  mshrs.io.pipelineReq.bits.lineAddr    := AddrDecoder.getLineAddr(s1_req.paddr)
+  mshrs.io.pipelineReq.bits.meta.rwType := MemoryOpConstants.isWrite(s1_req.cmd)
+  mshrs.io.pipelineReq.bits.meta.regIdx := s1_req.dest
+  mshrs.io.pipelineReq.bits.meta.size   := s1_req.size
+  mshrs.io.pipelineReq.bits.meta.signed := s1_req.signed
 
   mshrs.io.fromRefill       := DontCare
   mshrs.io.fromProbe        := DontCare
@@ -279,15 +279,16 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   mshrs.io.toL2Req.ready := tl_out.a.ready
   tl_out.a.valid         := mshrs.io.toL2Req.valid
   tl_out.a.bits := edge.AcquireBlock(
-    fromSource = 0.U, // FIXME
-    toAddress = Cat(mshrs.io.toL2Req.bits.tag, 0.U(setIdxBits.W)) << blockOffBits,
+    fromSource = mshrs.io.toL2Req.bits.entryId, // FIXME
+    toAddress = mshrs.io.toL2Req.bits.lineAddr << blockOffBits,
     lgSize = log2Ceil(blockBytes).U,
-    growPermissions = TLPermissions.NtoT,
+    growPermissions = mshrs.io.toL2Req.bits.perm,
   )._2
 
-  mshrs.io.fromRefill.valid     := tl_out.d.valid
-  mshrs.io.fromRefill.bits.tag  := AddrDecoder.getTag("h80008000".U)
-  mshrs.io.fromRefill.bits.data := tl_out.d.bits.data
+  mshrs.io.fromRefill.valid         := tl_out.d.valid
+  mshrs.io.fromRefill.bits.lineAddr := AddrDecoder.getLineAddr("h80008000".U)
+  mshrs.io.fromRefill.bits.data     := tl_out.d.bits.data
+  mshrs.io.fromRefill.bits.entryId  := tl_out.d.bits.source
 
   // * MSHR End
 
