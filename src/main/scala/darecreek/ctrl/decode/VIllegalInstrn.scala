@@ -104,14 +104,14 @@ class VIllegalInstrn extends Module {
   //val vfncvt_f_x  = ctrl.fp && ctrl.funct6 === "b010010".U && ctrl.lsrc(0) === "b10011".U
   //val vfncvt_f_f = ctrl.fp && ctrl.funct6 === "b010010".U && ctrl.lsrc(0) === "b10100".U
   //val vfncvt_rod_f_f = ctrl.fp && ctrl.funct6 === "b010010".U && ctrl.lsrc(0) === "b10101".U
-  val vfwcvt = ctrl.fp && ctrl.funct6 === "b010010".U && ctrl.widen
+  val vfwcvt_f_x = ctrl.fp && ctrl.funct6 === "b010010".U && ctrl.widen && (ctrl.lsrc(0) === "b01010".U || ctrl.lsrc(0) === "b01011".U)
 
   val convertToInt = vfncvt_xu_f || vfncvt_x_f || vfncvt_rtz_xu_f || vfncvt_rtz_x_f // || vfncvt_f_xu || vfncvt_f_x
 
 
   val ill_frm = csr.frm(2) && csr.frm(1, 0) =/= 0.U && isFp
   // invalid SEW of FP
-  val ill_sewFP = (vsew === 0.U && (isFp)) || (vsew === 1.U && (isFp && ~convertToInt && ~vfwcvt))
+  val ill_sewFP = (vsew === 0.U && (isFp)) || (vsew === 1.U && (isFp && ~convertToInt && ~vfwcvt_f_x))
 
   // Illegal start number of register group
   def regGroup_start_illegal(vemul: UInt, startReg: UInt) = {
