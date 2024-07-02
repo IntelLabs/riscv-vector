@@ -5,6 +5,7 @@ import chisel3.util._
 import org.chipsalliance.cde.config.{Parameters, Field}
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
+import utility._
 
 class CCDCache()(
     implicit p: Parameters
@@ -167,14 +168,15 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // * pipeline stage 1 End
 
   // * pipeline stage 2 Begin
-  val s2_valid      = RegNext(s1_updateMeta || s1_updateData)
-  val s2_req        = Reg(new MainPipeReq)
-  val s2_wayEn      = RegInit(0.U(nWays.W))
-  val s2_newCoh     = RegInit(0.U(cohWidth.W))
-  val s2_updateMeta = RegNext(s1_updateMeta)
-  val s2_updateData = RegNext(s1_updateData)
+  val s2_valid          = RegNext(s1_updateMeta || s1_updateData)
+  val s2_req            = Reg(new MainPipeReq)
+  val s2_wayEn          = RegInit(0.U(nWays.W))
+  val s2_newCoh         = RegInit(0.U(cohWidth.W))
+  val s2_updateMeta     = RegNext(s1_updateMeta)
+  val s2_updateData     = RegNext(s1_updateData)
+  val s2_updateReplacer = RegNext(s1_hit || s1_validRefill)
 
-  when(s1_updateMeta || s1_updateData) {
+  when(s1_updateMeta || s1_updateData || s2_updateReplacer) {
     s2_req := s1_req
     s2_newCoh := MuxCase(
       s1_req.cmd,
@@ -234,6 +236,24 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // return resp
   io.resp <> s1_cacheResp
 
+  // * Replacer Begin
+
+  val replacer = ReplacementPolicy.fromString(replacementPolicy, nWays, nSets)
+
+  val touchWay = OHToUInt(s2_wayEn)
+  val touchSet = AddrDecoder.getSetIdx(s2_req.paddr)
+
+  // pipeline stage 2 -> hit update replacer
+  when(s2_updateReplacer) {
+    replacer.access(touchSet, touchWay)
+  }
+
+  val victimWay = replacer.way(s2_req.paddr) // FIXME
+
+  dontTouch(victimWay)
+
+  // * Replacer End
+
   // * MSHR Begin
 
   // get pipeline miss req
@@ -251,8 +271,10 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   mshrs.io.fromRefill       := DontCare
   mshrs.io.fromProbe        := DontCare
   mshrs.io.replaceFinish    := false.B
-  mshrs.io.toReplace.ready  := false.B
+  mshrs.io.toReplace.ready  := true.B
   mshrs.io.toPipeline.ready := false.B
+
+  dontTouch(mshrs.io)
 
   mshrs.io.toL2Req.ready := tl_out.a.ready
   tl_out.a.valid         := mshrs.io.toL2Req.valid

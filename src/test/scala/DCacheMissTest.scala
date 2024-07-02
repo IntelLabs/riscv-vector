@@ -35,6 +35,18 @@ class DcacheMissTest extends AnyFlatSpec with ChiselScalatestTester {
     dut.io.req.bits.refillCoh.poke(ClientStates.Dirty)
 
     dut.clock.step(1)
+    dut.io.req.bits.paddr.poke("h80014000".U)
+    dut.io.req.bits.refillWay.poke(2.U)
+
+    dut.clock.step(1)
+    dut.io.req.bits.paddr.poke("h80024000".U)
+    dut.io.req.bits.refillWay.poke(3.U)
+
+    dut.clock.step(1)
+    dut.io.req.bits.paddr.poke("h80034000".U)
+    dut.io.req.bits.refillWay.poke(0.U)
+
+    dut.clock.step(1)
     dut.io.req.valid.poke(false.B)
     dut.io.req.bits.isRefill.poke(false.B)
     dut.clock.step(5)
