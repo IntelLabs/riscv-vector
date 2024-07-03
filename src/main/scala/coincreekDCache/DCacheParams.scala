@@ -35,6 +35,7 @@ trait DCacheParams {
   val dataBytes = dataWidth / 8
 
   val cohWidth = ClientStates.width // tilelink
+  val tagWidth = 32
 
   val beatBits     = beatBytes * 8
   val refillCycles = blockBytes / beatBytes
@@ -56,7 +57,8 @@ trait DCacheParams {
   // {{{
   val regAddrWidth = 5
   //  val regDataWidth = 64
-  val lineAddrWidth = 32
+//  val tagWidth      = 32
+  val lineAddrWidth = 40
 
   val mshrEntryMetaNum = 8
 
@@ -84,4 +86,11 @@ trait DCacheParams {
   // bit 1: replay req
   // bit 2: probe req
 
+}
+
+object MasterSource {
+  val width = 2
+
+  def Core   = 0.U(width.W)
+  def Vector = 2.U(width.W)
 }

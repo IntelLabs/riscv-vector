@@ -35,8 +35,11 @@ class MSHREntryIO extends Bundle() {
 
 /////// replay reg IOs
 class MSHRPipeResp extends Bundle() {
+  val sID     = UInt(MasterSource.width.W)
   val regIdx  = UInt(regAddrWidth.W)
   val regData = UInt(mshrDataWidth.W)
+
+  val nextCycleWb = Bool()
 }
 
 class MSHRReplace extends Bundle() {
@@ -71,10 +74,11 @@ class ReplayModuleIO extends Bundle() {
 
 /////// MSHR file IO
 class MetaBundle extends Bundle() {
-  val regIdx = UInt(regAddrWidth.W)
-  val typ    = UInt(typWidth.W)
-  val signed = Bool()
-  val offset = UInt(dataOffsetWidth.W)
+  val sourceId = UInt(MasterSource.width.W)
+  val regIdx   = UInt(regAddrWidth.W)
+  val typ      = UInt(typWidth.W)
+  val signed   = Bool()
+  val offset   = UInt(dataOffsetWidth.W)
 }
 
 class ReqMetaBundle extends MetaBundle() {
@@ -96,9 +100,8 @@ class MSHRFileL2 extends Bundle() {
 }
 
 class RefillMSHRFile extends Bundle() {
-  val entryId  = UInt(log2Up(mshrEntryNum).W)
-  val lineAddr = UInt(lineAddrWidth.W)
-  val data     = UInt(mshrDataWidth.W)
+  val entryId = UInt(log2Up(mshrEntryNum).W)
+  val data    = UInt(mshrDataWidth.W)
 }
 
 class ProbeMSHRFile extends Bundle() {
