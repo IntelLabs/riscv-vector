@@ -23,6 +23,7 @@ class WriteBackTest extends AnyFlatSpec with ChiselScalatestTester {
 
     dut.io.req.valid.poke(true.B)
     dut.io.req.bits.source.poke(1.U)
+    dut.io.req.bits.dest.poke(2.U)
     dut.io.req.bits.paddr.poke("h80004000".U)
     dut.io.req.bits.cmd.poke(0.U) // dontcare
     dut.io.req.bits.size.poke(6.U)
@@ -56,7 +57,7 @@ class WriteBackTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.req.valid.poke(false.B)
       dut.io.resp.valid.expect(true.B)
       dut.io.resp.bits.data.expect(initilizeData.U)
-      dut.io.resp.bits.hit.expect(true.B)
+      dut.io.resp.bits.status.expect(CacheRespStatus.hit)
       dut.clock.step(10)
 
       // replace
@@ -76,7 +77,7 @@ class WriteBackTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.clock.step(1)
       dut.io.req.valid.poke(false.B)
       dut.io.resp.valid.expect(true.B)
-      dut.io.resp.bits.hit.expect(false.B)
+      dut.io.resp.bits.status.expect(CacheRespStatus.miss)
       dut.clock.step(10)
 
       // check waveform

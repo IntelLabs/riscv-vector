@@ -35,15 +35,15 @@ class DcacheMissTest extends AnyFlatSpec with ChiselScalatestTester {
     dut.io.req.bits.refillCoh.poke(ClientStates.Dirty)
 
     dut.clock.step(1)
-    dut.io.req.bits.paddr.poke("h80014000".U)
+    dut.io.req.bits.paddr.poke("h80006000".U)
     dut.io.req.bits.refillWay.poke(2.U)
 
     dut.clock.step(1)
-    dut.io.req.bits.paddr.poke("h80024000".U)
+    dut.io.req.bits.paddr.poke("h80008000".U)
     dut.io.req.bits.refillWay.poke(3.U)
 
     dut.clock.step(1)
-    dut.io.req.bits.paddr.poke("h80034000".U)
+    dut.io.req.bits.paddr.poke("h8000a000".U)
     dut.io.req.bits.refillWay.poke(0.U)
 
     dut.clock.step(1)
@@ -68,20 +68,39 @@ class DcacheMissTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.req.valid.poke(false.B)
       dut.io.resp.valid.expect(true.B)
       dut.io.resp.bits.data.expect(initilizeData.U)
-      dut.io.resp.bits.hit.expect(true.B)
+      dut.io.resp.bits.status.expect(CacheRespStatus.hit)
       dut.clock.step(10)
 
       // read miss
       dut.io.req.valid.poke(true.B)
-
       dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-      dut.io.req.bits.paddr.poke("h80008000".U)
+      dut.io.req.bits.paddr.poke("h8000c000".U)
 
       dut.clock.step(1)
       dut.io.req.valid.poke(false.B)
       dut.io.resp.valid.expect(true.B)
-      dut.io.resp.bits.hit.expect(false.B)
+      dut.io.resp.bits.status.expect(CacheRespStatus.miss)
+      dut.clock.step(1)
+
+      while (!dut.io.resp.valid.peekBoolean()) {
+        dut.clock.step(1)
+      }
+      dut.io.resp.valid.expect(true.B)
+      dut.io.resp.bits.status.expect(CacheRespStatus.refill)
+      dut.io.resp.bits.data.expect("h22334455".U)
       dut.clock.step(10)
+
+      // read hit after miss
+      dut.io.req.valid.poke(true.B)
+      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
+      dut.io.req.bits.paddr.poke("h8000c000".U)
+
+      dut.clock.step(1)
+      dut.io.req.valid.poke(false.B)
+      dut.io.resp.valid.expect(true.B)
+      dut.io.resp.bits.data.expect("h22334455".U)
+      dut.io.resp.bits.status.expect(CacheRespStatus.hit)
+      dut.clock.step(1)
     }
   }
 

@@ -7,6 +7,9 @@ object AddrDecoder {
   def getLineAddr(addr: UInt): UInt =
     addr(addr.getWidth - blockOffBits - 1, blockOffBits)
 
+  def getBlockOffset(addr: UInt): UInt =
+    addr(blockOffBits - 1, 0)
+
   def getBankIdx(addr: UInt): UInt =
     addr(bankIdxBits + rowOffBits - 1, rowOffBits)
 

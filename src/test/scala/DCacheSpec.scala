@@ -56,7 +56,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.req.valid.poke(false.B)
       dut.io.resp.valid.expect(true.B)
       dut.io.resp.bits.data.expect(initilizeData.U)
-      dut.io.resp.bits.hit.expect(true.B)
+      dut.io.resp.bits.status.expect(CacheRespStatus.hit)
       dut.clock.step(10)
 
       // read miss
@@ -67,7 +67,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
 
       dut.clock.step(1)
       dut.io.resp.valid.expect(true.B)
-      dut.io.resp.bits.hit.expect(false.B)
+      dut.io.resp.bits.status.expect(CacheRespStatus.miss)
       dut.clock.step(10)
     }
   }
@@ -94,7 +94,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.clock.step(1)
       dut.io.resp.valid.expect(true.B)
       dut.io.resp.bits.data.expect(0x7890.U)
-      dut.io.resp.bits.hit.expect(true.B)
+      dut.io.resp.bits.status.expect(CacheRespStatus.hit)
       dut.clock.step(10)
     }
   }
@@ -115,7 +115,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.clock.step(1)
       dut.io.resp.valid.expect(true.B)
       dut.io.resp.bits.data.expect(initilizeData.U)
-      dut.io.resp.bits.hit.expect(true.B)
+      dut.io.resp.bits.status.expect(CacheRespStatus.hit)
       dut.clock.step(10)
 
       // read hit 64
@@ -127,7 +127,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.clock.step(1)
       dut.io.resp.valid.expect(true.B)
       dut.io.resp.bits.data.expect("h2323232323232323".U)
-      dut.io.resp.bits.hit.expect(true.B)
+      dut.io.resp.bits.status.expect(CacheRespStatus.hit)
       dut.clock.step(10)
 
       // read hit 32
@@ -142,7 +142,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.resp.bits.data.expect(
         "hffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffbbaa9988".U
       )
-      dut.io.resp.bits.hit.expect(true.B)
+      dut.io.resp.bits.status.expect(CacheRespStatus.hit)
       dut.clock.step(10)
     }
   }
@@ -168,12 +168,12 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
 
       dut.io.resp.valid.expect(true.B)
       dut.io.resp.bits.data.expect("h2323232323232323".U)
-      dut.io.resp.bits.hit.expect(true.B)
+      dut.io.resp.bits.status.expect(CacheRespStatus.hit)
       dut.clock.step(1)
 
       dut.io.resp.valid.expect(true.B)
       dut.io.resp.bits.data.expect(0x7890.U)
-      dut.io.resp.bits.hit.expect(true.B)
+      dut.io.resp.bits.status.expect(CacheRespStatus.hit)
       dut.clock.step(10)
     }
   }
@@ -199,12 +199,12 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
 
       dut.io.resp.valid.expect(true.B)
       dut.io.resp.bits.data.expect("h2323232323232323".U)
-      dut.io.resp.bits.hit.expect(true.B)
+      dut.io.resp.bits.status.expect(CacheRespStatus.hit)
       dut.clock.step(1)
 
       dut.io.resp.valid.expect(true.B)
       dut.io.resp.bits.data.expect("h2424242424242424".U)
-      dut.io.resp.bits.hit.expect(true.B)
+      dut.io.resp.bits.status.expect(CacheRespStatus.hit)
       dut.clock.step(10)
     }
   }
@@ -225,7 +225,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.req.valid.poke(false.B)
       dut.io.resp.valid.expect(true.B)
       dut.io.resp.bits.data.expect("h2323232323232323".U)
-      dut.io.resp.bits.hit.expect(true.B)
+      dut.io.resp.bits.status.expect(CacheRespStatus.hit)
       dut.clock.step(10)
 
       // XSC
@@ -237,7 +237,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.clock.step(1)
       dut.io.req.valid.poke(false.B)
       dut.io.resp.valid.expect(true.B)
-      dut.io.resp.bits.hit.expect(true.B)
+      dut.io.resp.bits.status.expect(CacheRespStatus.hit)
 
       // read hit 64
       dut.io.req.valid.poke(true.B)
@@ -249,7 +249,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.req.valid.poke(false.B)
       dut.io.resp.valid.expect(true.B)
       dut.io.resp.bits.data.expect("h101010101010101".U)
-      dut.io.resp.bits.hit.expect(true.B)
+      dut.io.resp.bits.status.expect(CacheRespStatus.hit)
       dut.clock.step(10)
     }
   }
@@ -270,7 +270,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.req.valid.poke(false.B)
       dut.io.resp.valid.expect(true.B)
       dut.io.resp.bits.data.expect("h2323232323232323".U)
-      dut.io.resp.bits.hit.expect(true.B)
+      dut.io.resp.bits.status.expect(CacheRespStatus.hit)
 
       dut.clock.step(80) // time out
 
@@ -284,7 +284,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.req.valid.poke(false.B)
       dut.io.resp.valid.expect(true.B)
       dut.io.resp.bits.data.expect("h1".U)
-      dut.io.resp.bits.hit.expect(true.B)
+      dut.io.resp.bits.status.expect(CacheRespStatus.hit)
 
       // read hit 64
       dut.io.req.valid.poke(true.B)
@@ -296,7 +296,7 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.req.valid.poke(false.B)
       dut.io.resp.valid.expect(true.B)
       dut.io.resp.bits.data.expect("h2323232323232323".U)
-      dut.io.resp.bits.hit.expect(true.B)
+      dut.io.resp.bits.status.expect(CacheRespStatus.hit)
       dut.clock.step(10)
     }
   }

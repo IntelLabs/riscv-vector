@@ -25,20 +25,24 @@ class DataExchangeReq extends Bundle {
 
 }
 
+object CacheRespStatus extends ChiselEnum {
+  val hit, miss, replay, refill = Value
+}
+
 class DataExchangeResp extends Bundle {
-  val source      = UInt(srcWidth.W)
-  val hit         = Bool()
-  val replay      = Bool()
-  val hasData     = Bool()
-  val nextCycleWb = Bool()
-  val data        = UInt(dataWidth.W)
+  val source  = UInt(srcWidth.W)
+  val dest    = UInt(destWidth.W)
+  val status  = CacheRespStatus()
+  val hasData = Bool()
+  val data    = UInt(dataWidth.W)
 }
 
 class DataExchangeIO extends Bundle {
-  val req     = Flipped(Decoupled(new DataExchangeReq))
-  val resp    = Valid(new DataExchangeResp)
-  val s0_kill = Input(Bool())
-  val s1_kill = Input(Bool())
+  val req         = Flipped(Decoupled(new DataExchangeReq))
+  val resp        = Valid(new DataExchangeResp)
+  val nextCycleWb = Bool() // next cycle occupy wb stage
+  val s0_kill     = Input(Bool())
+  val s1_kill     = Input(Bool())
 }
 
 class MainPipeReq extends Bundle {
@@ -91,6 +95,18 @@ object MainPipeReqConverter {
     mainPipeReq.cmd       := req.opcode
     mainPipeReq.isProbe   := true.B
     mainPipeReq.probePerm := req.param
+    mainPipeReq
+  }
+
+  // RefillReq => MainPipeReq
+  def apply(req: MSHRReplace, victimWay: UInt): MainPipeReq = {
+    val mainPipeReq = WireInit(0.U.asTypeOf(new MainPipeReq))
+
+    mainPipeReq.paddr     := req.lineAddr << blockOffBits
+    mainPipeReq.isRefill  := true.B
+    mainPipeReq.refillCoh := req.state
+    mainPipeReq.wdata     := req.data
+    mainPipeReq.refillWay := victimWay
     mainPipeReq
   }
 

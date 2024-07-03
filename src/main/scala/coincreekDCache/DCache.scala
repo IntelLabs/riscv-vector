@@ -21,23 +21,29 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val mshrs      = Module(new MSHRFile)
   val wbQueue    = Module(new WriteBackQueue)
   val probeQueue = Module(new ProbeQueue)
-  val mainReqArb = Module(new Arbiter(new MainPipeReq, 2))
+  val mainReqArb = Module(new Arbiter(new MainPipeReq, 3))
 
   probeQueue.io.mainPipeReq.ready := mainReqArb.io.in(0).ready
-  io.req.ready                    := mainReqArb.io.in(1).ready
+  mshrs.io.toReplace.ready        := mainReqArb.io.in(1).ready
+  io.req.ready                    := mainReqArb.io.in(2).ready
 
   // * Signal Define Begin
   // Store -> Load Bypassing
   val s1_storeBypass     = RegInit(false.B)
   val s1_storeBypassData = RegInit(0.U(dataWidth.W))
+  val s1_cacheResp       = Wire(Valid(new DataExchangeResp))
+  val mshrsResp          = Wire(Valid(new DataExchangeResp))
+  val victimWay          = WireInit(0.U(log2Up(nWays).W))
   // * Signal Define End
 
   // * pipeline stage 0 Begin
 
   // req arbiter
   mainReqArb.io.in(0) <> probeQueue.io.mainPipeReq
-  mainReqArb.io.in(1).valid := io.req.valid
-  mainReqArb.io.in(1).bits  := MainPipeReqConverter(io.req.bits)
+  mainReqArb.io.in(1).valid := mshrs.io.toReplace.valid
+  mainReqArb.io.in(1).bits  := MainPipeReqConverter(mshrs.io.toReplace.bits, victimWay)
+  mainReqArb.io.in(2).valid := io.req.valid
+  mainReqArb.io.in(2).bits  := MainPipeReqConverter(io.req.bits)
   mainReqArb.io.out.ready   := true.B
 
   // get s0 req
@@ -81,6 +87,7 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_cohMeta                        = ClientMetadata(Mux1H(s1_tagMatchWay, s1_metaArrayResp.map(_.coh)))
   val (s1_hasPerm, _, s1_newHitCohMeta) = s1_cohMeta.onAccess(s1_req.cmd)
   val s1_hit                            = s1_valid && s1_tagMatch && s1_hasPerm
+  val s1_upgradePermMiss                = s1_valid && s1_tagMatch && !s1_hasPerm
 
   // organize read data
   val s1_dataPreBypass = Mux1H(s1_tagMatchWay, s1_dataArrayResp).asUInt
@@ -88,8 +95,12 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val loadGen          = new LoadGen(s1_req.size, s1_req.signed, s1_req.paddr, s1_data, false.B, dataBytes)
 
   // organize store data
-  val s1_storeGenMask   = new StoreGen(s1_req.size, s1_req.paddr, 0.U, dataBytes).mask
-  val s1_maskInBytes    = Mux(s1_req.cmd === MemoryOpConstants.M_PWR, s1_req.wmask, s1_storeGenMask)
+  val s1_storeGenMask = new StoreGen(s1_req.size, s1_req.paddr, 0.U, dataBytes).mask
+  val s1_maskInBytes = Mux(
+    s1_req.isRefill,
+    Fill(dataBytes, 1.U),
+    Mux(s1_req.cmd === MemoryOpConstants.M_PWR, s1_req.wmask, s1_storeGenMask),
+  )
   val s1_mask           = FillInterleaved(8, s1_maskInBytes)
   val s1_mergeStoreData = s1_req.wdata & s1_mask | s1_data & ~s1_mask
   // TODO: PWR assertion
@@ -131,6 +142,7 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   val s1_storeUpdateMeta =
     s1_hit && (s1_cohMeta =/= s1_newHitCohMeta) && MemoryOpConstants.isWrite(s1_req.cmd) // hit but need to upgrade perm
+  val s1_storeClearMeta  = s1_upgradePermMiss
   val s1_storeUpdateData = (s1_hit && MemoryOpConstants.isWrite(s1_req.cmd)) || (s1_sc && ~s1_scFail)
 
   // probe
@@ -151,18 +163,7 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_replaceWb        = s1_validRefill && s1_repMeta.state > 0.U
   val s1_replaceWbData    = s1_validRefill && s1_repDirty
 
-  //  s1 resp
-  val s1_cacheResp = Wire(Valid(new DataExchangeResp))
-
-  s1_cacheResp.valid            := s1_valid && s1_req.isFromCore
-  s1_cacheResp.bits.hit         := s1_hit
-  s1_cacheResp.bits.source      := RegNext(s1_req.source)
-  s1_cacheResp.bits.data        := Mux(s1_sc, s1_scFail, loadGen.data)
-  s1_cacheResp.bits.hasData     := MemoryOpConstants.isRead(s1_req.cmd)
-  s1_cacheResp.bits.replay      := false.B
-  s1_cacheResp.bits.nextCycleWb := false.B
-
-  val s1_updateMeta = s1_storeUpdateMeta || s1_probeUpdateMeta || s1_refillUpdateMeta
+  val s1_updateMeta = s1_storeUpdateMeta || s1_storeClearMeta || s1_probeUpdateMeta || s1_refillUpdateMeta
   val s1_updateData = s1_storeUpdateData || s1_refillUpdateData
 
   // * pipeline stage 1 End
@@ -175,15 +176,17 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s2_updateMeta     = RegNext(s1_updateMeta)
   val s2_updateData     = RegNext(s1_updateData)
   val s2_updateReplacer = RegNext(s1_hit || s1_validRefill)
+  val s2_refillFinish   = RegNext(s1_validRefill)
 
   when(s1_updateMeta || s1_updateData || s2_updateReplacer) {
     s2_req := s1_req
     s2_newCoh := MuxCase(
       s1_req.cmd,
       Seq(
-        s1_validProbe    -> s1_newProbeCoh.state,
-        s1_validRefill   -> s1_req.refillCoh,
-        s1_validFromCore -> s1_newHitCohMeta.state,
+        s1_validProbe                            -> s1_newProbeCoh.state,
+        s1_validRefill                           -> s1_req.refillCoh,
+        (s1_validFromCore && s1_hit)             -> s1_newHitCohMeta.state,
+        (s1_validFromCore && s1_upgradePermMiss) -> 0.U,// invalid
       ),
     )
     s2_wayEn := MuxCase(
@@ -233,9 +236,6 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   s1_storeBypassData := PriorityMux(bypassDataList)
   // * Store -> Load Bypassing End
 
-  // return resp
-  io.resp <> s1_cacheResp
-
   // * Replacer Begin
 
   val replacer = ReplacementPolicy.fromString(replacementPolicy, nWays, nSets)
@@ -248,7 +248,7 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     replacer.access(touchSet, touchWay)
   }
 
-  val victimWay = replacer.way(s2_req.paddr) // FIXME
+  victimWay := replacer.way(AddrDecoder.getSetIdx(mshrs.io.toReplace.bits.lineAddr << blockOffBits)) // FIXME
 
   dontTouch(victimWay)
 
@@ -256,39 +256,46 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // * MSHR Begin
 
-  // get pipeline miss req
-  mshrs.io.pipelineReq.valid := s1_validFromCore && ~s1_hit // FIXME
-  mshrs.io.pipelineReq.bits  := DontCare
+  dontTouch(mshrs.io)
 
-  mshrs.io.pipelineReq.bits.isUpgrade   := false.B
+  // pipeline miss -> mshr
+  mshrs.io.pipelineReq.valid            := s1_validFromCore && ~s1_hit // FIXME
+  mshrs.io.pipelineReq.bits.isUpgrade   := s1_upgradePermMiss
   mshrs.io.pipelineReq.bits.data        := s1_storeData
+  mshrs.io.pipelineReq.bits.mask        := s1_req.wmask
   mshrs.io.pipelineReq.bits.lineAddr    := AddrDecoder.getLineAddr(s1_req.paddr)
+  mshrs.io.pipelineReq.bits.meta.offset := AddrDecoder.getBlockOffset(s1_req.paddr)
   mshrs.io.pipelineReq.bits.meta.rwType := MemoryOpConstants.isWrite(s1_req.cmd)
   mshrs.io.pipelineReq.bits.meta.regIdx := s1_req.dest
   mshrs.io.pipelineReq.bits.meta.size   := s1_req.size
   mshrs.io.pipelineReq.bits.meta.signed := s1_req.signed
 
-  mshrs.io.fromRefill       := DontCare
-  mshrs.io.fromProbe        := DontCare
-  mshrs.io.replaceFinish    := false.B
-  mshrs.io.toReplace.ready  := true.B
-  mshrs.io.toPipeline.ready := false.B
-
-  dontTouch(mshrs.io)
-
+  // mshr acquire block or perm from L2
   mshrs.io.toL2Req.ready := tl_out.a.ready
   tl_out.a.valid         := mshrs.io.toL2Req.valid
   tl_out.a.bits := edge.AcquireBlock(
-    fromSource = mshrs.io.toL2Req.bits.entryId, // FIXME
+    fromSource = mshrs.io.toL2Req.bits.entryId,
     toAddress = mshrs.io.toL2Req.bits.lineAddr << blockOffBits,
     lgSize = log2Ceil(blockBytes).U,
     growPermissions = mshrs.io.toL2Req.bits.perm,
   )._2
 
-  mshrs.io.fromRefill.valid         := tl_out.d.valid
-  mshrs.io.fromRefill.bits.lineAddr := AddrDecoder.getLineAddr("h80008000".U)
-  mshrs.io.fromRefill.bits.data     := tl_out.d.bits.data
-  mshrs.io.fromRefill.bits.entryId  := tl_out.d.bits.source
+  // L2 send data to mshr
+  mshrs.io.fromRefill.valid        := tl_out.d.valid
+  mshrs.io.fromRefill.bits.data    := tl_out.d.bits.data
+  mshrs.io.fromRefill.bits.entryId := tl_out.d.bits.source
+  // mshrs.io.fromRefill.bits.lineAddr := DontCare
+  val refillAddr = WireInit("h8000c000".U(paddrWidth.W))
+  mshrs.io.fromRefill.bits.lineAddr := AddrDecoder.getLineAddr(refillAddr)
+
+  // mshr send replace req to pipeline
+  mshrs.io.toReplace.ready := true.B
+  mshrs.io.replaceFinish   := s2_refillFinish
+
+  // probe -> mshr
+  mshrs.io.fromProbe := DontCare
+
+  mshrs.io.toPipeline.ready := true.B // FIXME
 
   // * MSHR End
 
@@ -324,6 +331,34 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   probeQueue.io.probeCheck.blockProbe := false.B
   probeQueue.io.wbReady               := true.B
   // * Probe End
+
+  // * Resp Begin
+
+  //  s1 resp
+  s1_cacheResp.valid        := s1_valid && s1_req.isFromCore
+  s1_cacheResp.bits.status  := Mux(s1_hit, CacheRespStatus.hit, CacheRespStatus.miss)
+  s1_cacheResp.bits.source  := s1_req.source
+  s1_cacheResp.bits.dest    := s1_req.dest
+  s1_cacheResp.bits.data    := Mux(s1_sc, s1_scFail, loadGen.data)
+  s1_cacheResp.bits.hasData := MemoryOpConstants.isRead(s1_req.cmd)
+
+  mshrsResp.valid        := mshrs.io.toPipeline.valid
+  mshrsResp.bits.status  := CacheRespStatus.refill
+  mshrsResp.bits.source  := 0.U // FIXME
+  mshrsResp.bits.dest    := mshrs.io.toPipeline.bits.regIdx
+  mshrsResp.bits.data    := mshrs.io.toPipeline.bits.regData
+  mshrsResp.bits.hasData := true.B
+
+  // return resp
+  io.nextCycleWb := false.B // FIXME
+  io.resp.valid  := s1_cacheResp.valid || mshrsResp.valid
+  io.resp.bits   := Mux(s1_cacheResp.valid, s1_cacheResp.bits, mshrsResp.bits)
+
+  // when mshr wants to wb,
+  // it will send nextCycleWb to kill other cache request
+  assert(~(s1_cacheResp.valid && mshrsResp.valid))
+
+  // * Resp End
 
   // FIXME
   // test tilelink
