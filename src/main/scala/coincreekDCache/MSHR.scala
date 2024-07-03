@@ -141,7 +141,7 @@ class ReplayModule extends Module() {
   writeRecord := MuxLookup(state, writeRecord)(
     Seq(
       mode_clear  -> false.B,
-      mode_replay -> (writeRecord | io.innerIO.bits.meta.rw_type.asBool),
+      mode_replay -> (writeRecord | io.innerIO.bits.meta.rwType.asBool),
     )
   )
 
@@ -217,8 +217,8 @@ class ReplayModule extends Module() {
   io.toReplace.bits.data     := replayReg
 
   // replay output
-  io.toPipe.valid        := (state === mode_replay) && !io.innerIO.bits.meta.rwType
-  replayStall            := io.toPipe.valid && !io.toPipe.ready
+  io.toPipe.valid := (state === mode_replay) && !io.innerIO.bits.meta.rwType
+  // replayStall            := io.toPipe.valid && !io.toPipe.ready
   io.toPipe.bits.regIdx  := io.innerIO.bits.meta.regIdx
   io.toPipe.bits.regData := loadgen.genData(sizeMax)
   io.toPipe.bits.sID     := io.innerIO.bits.meta.sourceId

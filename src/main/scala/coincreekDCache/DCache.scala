@@ -259,16 +259,17 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   dontTouch(mshrs.io)
 
   // pipeline miss -> mshr
-  mshrs.io.pipelineReq.valid            := s1_validFromCore && ~s1_hit // FIXME
-  mshrs.io.pipelineReq.bits.isUpgrade   := s1_upgradePermMiss
-  mshrs.io.pipelineReq.bits.data        := s1_storeData
-  mshrs.io.pipelineReq.bits.mask        := s1_req.wmask
-  mshrs.io.pipelineReq.bits.lineAddr    := AddrDecoder.getLineAddr(s1_req.paddr)
-  mshrs.io.pipelineReq.bits.meta.offset := AddrDecoder.getBlockOffset(s1_req.paddr)
-  mshrs.io.pipelineReq.bits.meta.rwType := MemoryOpConstants.isWrite(s1_req.cmd)
-  mshrs.io.pipelineReq.bits.meta.regIdx := s1_req.dest
-  mshrs.io.pipelineReq.bits.meta.size   := s1_req.size
-  mshrs.io.pipelineReq.bits.meta.signed := s1_req.signed
+  mshrs.io.pipelineReq.valid              := s1_validFromCore && ~s1_hit // FIXME
+  mshrs.io.pipelineReq.bits.isUpgrade     := s1_upgradePermMiss
+  mshrs.io.pipelineReq.bits.data          := s1_storeData
+  mshrs.io.pipelineReq.bits.mask          := s1_req.wmask
+  mshrs.io.pipelineReq.bits.lineAddr      := AddrDecoder.getLineAddr(s1_req.paddr)
+  mshrs.io.pipelineReq.bits.meta.sourceId := s1_req.source
+  mshrs.io.pipelineReq.bits.meta.offset   := AddrDecoder.getBlockOffset(s1_req.paddr)
+  mshrs.io.pipelineReq.bits.meta.rwType   := MemoryOpConstants.isWrite(s1_req.cmd)
+  mshrs.io.pipelineReq.bits.meta.regIdx   := s1_req.dest
+  mshrs.io.pipelineReq.bits.meta.size     := s1_req.size
+  mshrs.io.pipelineReq.bits.meta.signed   := s1_req.signed
 
   // mshr acquire block or perm from L2
   mshrs.io.toL2Req.ready := tl_out.a.ready
@@ -284,9 +285,6 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   mshrs.io.fromRefill.valid        := tl_out.d.valid
   mshrs.io.fromRefill.bits.data    := tl_out.d.bits.data
   mshrs.io.fromRefill.bits.entryId := tl_out.d.bits.source
-  // mshrs.io.fromRefill.bits.lineAddr := DontCare
-  val refillAddr = WireInit("h8000c000".U(paddrWidth.W))
-  mshrs.io.fromRefill.bits.lineAddr := AddrDecoder.getLineAddr(refillAddr)
 
   // mshr send replace req to pipeline
   mshrs.io.toReplace.ready := true.B
@@ -344,13 +342,13 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   mshrsResp.valid        := mshrs.io.toPipeline.valid
   mshrsResp.bits.status  := CacheRespStatus.refill
-  mshrsResp.bits.source  := 0.U // FIXME
+  mshrsResp.bits.source  := mshrs.io.toPipeline.bits.sID
   mshrsResp.bits.dest    := mshrs.io.toPipeline.bits.regIdx
   mshrsResp.bits.data    := mshrs.io.toPipeline.bits.regData
   mshrsResp.bits.hasData := true.B
 
   // return resp
-  io.nextCycleWb := false.B // FIXME
+  io.nextCycleWb := mshrs.io.toPipeline.bits.nextCycleWb // FIXME
   io.resp.valid  := s1_cacheResp.valid || mshrsResp.valid
   io.resp.bits   := Mux(s1_cacheResp.valid, s1_cacheResp.bits, mshrsResp.bits)
 
