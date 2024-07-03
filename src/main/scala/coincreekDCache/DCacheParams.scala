@@ -86,3 +86,10 @@ trait DCacheParams {
   // bit 2: probe req
 
 }
+
+object MasterSource {
+  val width = 2
+
+  def Core   = 0.U(width.W)
+  def Vector = 2.U(width.W)
+}

@@ -136,13 +136,12 @@ class ReplayModule extends Module() {
   val replayLineAddr = RegEnable(io.innerIO.bits.lineAddr, 0.U(lineAddrWidth.W), initEnable)
   val replayPerm     = RegEnable(io.innerIO.bits.perm, TLPermissions.NtoB, initEnable)
 
-  val replayStall = RegInit(false.B)
   val writeRecord = RegInit(false.B)
 
   writeRecord := MuxLookup(state, writeRecord)(
     Seq(
       mode_clear  -> false.B,
-      mode_replay -> (writeRecord | io.innerIO.bits.meta.rwType.asBool),
+      mode_replay -> (writeRecord | io.innerIO.bits.meta.rw_type.asBool),
     )
   )
 
@@ -165,33 +164,30 @@ class ReplayModule extends Module() {
     res.asUInt
   }
 
-  when(!replayStall) {
-    metaCounter := MuxLookup(state, metaCounter)(
-      Seq(
-        mode_clear  -> 0.U,
-        mode_replay -> (metaCounter + 1.U),
-      )
+  metaCounter := MuxLookup(state, metaCounter)(
+    Seq(
+      mode_clear  -> 0.U,
+      mode_replay -> (metaCounter + 1.U),
     )
+  )
 
-    replayReg := MuxCase(
-      replayReg,
-      Seq(
-        initEnable -> io.innerIO.bits.data,
-        ((state === mode_replay) && io.innerIO.bits.meta.rwType.asBool) ->
-          maskedStoreGen(io.innerIO.bits.mask, replayReg, io.innerIO.bits.data),
-      ),
+  replayReg := MuxCase(
+    replayReg,
+    Seq(
+      initEnable -> io.innerIO.bits.data,
+      ((state === mode_replay) && io.innerIO.bits.meta.rwType.asBool) ->
+        maskedStoreGen(io.innerIO.bits.mask, replayReg, io.innerIO.bits.data),
+    ),
+  )
+
+  state := MuxLookup(state, state)(
+    Seq(
+      mode_idle         -> Mux(io.innerIO.valid, mode_replay, state),
+      mode_replay       -> Mux((metaCounter + 1.U) >= totalCounter, mode_wait_replace, state),
+      mode_wait_replace -> Mux(io.replaceFinish, mode_clear, state),
+      mode_clear        -> mode_idle,
     )
-
-    state := MuxLookup(state, state)(
-      Seq(
-        mode_idle         -> Mux(io.innerIO.valid, mode_replay, state),
-        mode_replay       -> Mux((metaCounter + 1.U) >= totalCounter, mode_wait_replace, state),
-        mode_wait_replace -> Mux(io.replaceFinish, mode_clear, state),
-        mode_clear        -> mode_idle,
-      )
-    )
-
-  }
+  )
 
   // inner connect
   io.innerIO.ready := state === mode_idle
@@ -225,7 +221,9 @@ class ReplayModule extends Module() {
   replayStall            := io.toPipe.valid && !io.toPipe.ready
   io.toPipe.bits.regIdx  := io.innerIO.bits.meta.regIdx
   io.toPipe.bits.regData := loadgen.genData(sizeMax)
+  io.toPipe.bits.sID     := io.innerIO.bits.meta.sourceId
 
+  io.toPipe.bits.nextCycleWb := (io.innerIO.valid && state === mode_idle) || (metaCounter < totalCounter - 1.U && state === mode_replay)
 }
 
 class MSHRFile extends Module() {
@@ -296,7 +294,7 @@ class MSHRFile extends Module() {
 
   val maskConflict = allocateReq && lineAddrMatch && (io.pipelineReq.bits.mask & maskArray(lineAddrMatchIdx)).orR
 
-  val reqLineAddr = MuxCase( // TODO del tagmatch req from refill queue
+  val reqLineAddr = MuxCase(
     io.pipelineReq.bits.lineAddr,
     Seq(
       probeReq -> io.fromProbe.lineAddr
@@ -393,7 +391,7 @@ class MSHRFile extends Module() {
   replayReg.io.innerIO.valid         := io.fromRefill.valid
   io.fromRefill.ready                := replayReg.io.innerIO.ready
   replayReg.io.innerIO.bits.perm     := senderPermissionList(io.fromRefill.bits.entryId)
-  replayReg.io.innerIO.bits.lineAddr := io.fromRefill.bits.lineAddr
+  replayReg.io.innerIO.bits.lineAddr := lineAddrList(io.fromRefill.bits.entryId)
 
   replayReg.io.innerIO.bits.entryIdx := io.fromRefill.bits.entryId
   replayReg.io.innerIO.bits.meta := metaArray(replayReg.io.replayIdx)(replayReg.io.idxMeta).asTypeOf(new ReqMetaBundle)
