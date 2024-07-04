@@ -14,7 +14,7 @@ trait DCacheParams {
   val blockBytes        = 64
   val nMSHRs            = 4
   val nMMIOs            = 0
-  val replacementPolicy = "setplru"
+  val replacementPolicy = "setlru"
   val beatBytes         = 64
   // }}}
 

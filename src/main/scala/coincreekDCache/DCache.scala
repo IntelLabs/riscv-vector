@@ -15,6 +15,8 @@ class CCDCache()(
 
 class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
+  dontTouch(io)
+
   def onReset    = Metadata(0.U, ClientMetadata.onReset.state)
   val metaArray  = Module(new MetaArray[Metadata](() => onReset))
   val dataArray  = Module(new DataArray)
@@ -23,17 +25,15 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val probeQueue = Module(new ProbeQueue)
   val mainReqArb = Module(new Arbiter(new MainPipeReq, 3))
 
-  probeQueue.io.mainPipeReq.ready := mainReqArb.io.in(0).ready
-  mshrs.io.toReplace.ready        := mainReqArb.io.in(1).ready
-  io.req.ready                    := mainReqArb.io.in(2).ready
-
   // * Signal Define Begin
   // Store -> Load Bypassing
-  val s1_storeBypass     = RegInit(false.B)
-  val s1_storeBypassData = RegInit(0.U(dataWidth.W))
-  val s1_cacheResp       = Wire(Valid(new DataExchangeResp))
-  val mshrsResp          = Wire(Valid(new DataExchangeResp))
-  val victimWay          = WireInit(0.U(log2Up(nWays).W))
+  val s1_storeBypass      = RegInit(false.B)
+  val s1_storeBypassData  = RegInit(0.U(dataWidth.W))
+  val s1_storeBypassCoh   = RegInit(0.U(cohBits.W))
+  val s1_storeBypassWayEn = RegInit(0.U(nWays.W))
+  val s1_cacheResp        = Wire(Valid(new DataExchangeResp))
+  val mshrsResp           = Wire(Valid(new DataExchangeResp))
+  val victimWay           = WireInit(0.U(log2Up(nWays).W))
   // * Signal Define End
 
   // * pipeline stage 0 Begin
@@ -45,6 +45,10 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   mainReqArb.io.in(2).valid := io.req.valid
   mainReqArb.io.in(2).bits  := MainPipeReqConverter(io.req.bits)
   mainReqArb.io.out.ready   := true.B
+
+  probeQueue.io.mainPipeReq.ready := mainReqArb.io.in(0).ready
+  mshrs.io.toReplace.ready        := mainReqArb.io.in(1).ready
+  io.req.ready                    := mainReqArb.io.in(2).ready
 
   // get s0 req
   val s0_req   = mainReqArb.io.out.bits
@@ -79,27 +83,34 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_metaArrayResp = metaArray.io.resp // nways meta
 
   // tag & coh match
-  val s1_tagMatchWay = VecInit((0 until nWays).map(w =>
-    s1_metaArrayResp(w).tag === AddrDecoder.getTag(s1_req.paddr) && s1_metaArrayResp(w).coh > 0.U
-  ))
-  val s1_tagMatch = s1_tagMatchWay.asUInt.orR
+  val s1_tagMatchWayVec = Mux(
+    s1_storeBypass,
+    VecInit(s1_storeBypassWayEn.asBools),
+    VecInit((0 until nWays).map(w =>
+      s1_metaArrayResp(w).tag === AddrDecoder.getTag(s1_req.paddr) && s1_metaArrayResp(w).coh > 0.U
+    )),
+  )
+  val s1_tagMatch = Mux(s1_storeBypass, s1_storeBypassCoh > 0.U, s1_tagMatchWayVec.asUInt.orR)
+  val s1_cohMeta =
+    ClientMetadata(Mux(s1_storeBypass, s1_storeBypassCoh, Mux1H(s1_tagMatchWayVec, s1_metaArrayResp.map(_.coh))))
 
-  val s1_cohMeta                        = ClientMetadata(Mux1H(s1_tagMatchWay, s1_metaArrayResp.map(_.coh)))
   val (s1_hasPerm, _, s1_newHitCohMeta) = s1_cohMeta.onAccess(s1_req.cmd)
   val s1_hit                            = s1_valid && s1_tagMatch && s1_hasPerm
-  val s1_upgradePermMiss                = s1_valid && s1_tagMatch && !s1_hasPerm
+  val s1_noDataMiss                     = s1_valid && !s1_tagMatch               // e.g. N->B or N->T miss
+  val s1_upgradePermMiss                = s1_valid && s1_tagMatch && !s1_hasPerm // e.g. B->T miss
 
   // organize read data
-  val s1_dataPreBypass = Mux1H(s1_tagMatchWay, s1_dataArrayResp).asUInt
+  val s1_dataPreBypass = Mux1H(s1_tagMatchWayVec, s1_dataArrayResp).asUInt
   val s1_data          = Mux(s1_storeBypass, s1_storeBypassData, s1_dataPreBypass)
   val loadGen          = new LoadGen(s1_req.size, s1_req.signed, s1_req.paddr, s1_data, false.B, dataBytes)
+  // val s1_cohBypass    = Mux(s1_storeBypass, ClientMetadata.onReset, s1_cohMeta)
 
   // organize store data
   val s1_storeGenMask = new StoreGen(s1_req.size, s1_req.paddr, 0.U, dataBytes).mask
   val s1_maskInBytes = Mux(
     s1_req.isRefill,
     Fill(dataBytes, 1.U),
-    Mux(s1_req.cmd === MemoryOpConstants.M_PWR, s1_req.wmask, s1_storeGenMask),
+    Mux(s1_req.cmd === MemoryOpConstants.M_PWR, s1_req.wmask, s1_storeGenMask), // FIXME wmask
   )
   val s1_mask           = FillInterleaved(8, s1_maskInBytes)
   val s1_mergeStoreData = s1_req.wdata & s1_mask | s1_data & ~s1_mask
@@ -114,8 +125,6 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   amoalu.io.cmd  := s1_req.cmd
   amoalu.io.lhs  := s1_data
   amoalu.io.rhs  := s1_req.wdata
-
-  val s1_storeData = Mux(MemoryOpConstants.isAMO(s1_req.cmd), s1_amoStoreData, s1_mergeStoreData)
 
   // lrsc
   val lrscCount = RegInit(0.U)
@@ -146,11 +155,11 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_storeUpdateData = (s1_hit && MemoryOpConstants.isWrite(s1_req.cmd)) || (s1_sc && ~s1_scFail)
 
   // probe
-  val s1_pbDirty         = s1_cohMeta.onProbe(s1_req.probePerm)._1
+  val s1_probeDirty      = s1_cohMeta.onProbe(s1_req.probePerm)._1
   val s1_newProbeCoh     = s1_cohMeta.onProbe(s1_req.probePerm)._3
-  val s1_probeUpdateMeta = s1_validProbe && s1_tagMatch               // probe should update meta
+  val s1_probeUpdateMeta = s1_validProbe && s1_tagMatch                  // probe should update meta
   val s1_probeWb         = s1_validProbe
-  val s1_probeWbData     = s1_validProbe && s1_tagMatch && s1_pbDirty // probe has data
+  val s1_probeWbData     = s1_validProbe && s1_tagMatch && s1_probeDirty // probe has data
 
   // replace
   val s1_repLineAddr      = Cat(s1_metaArrayResp(s1_req.refillWay).tag, AddrDecoder.getSetIdx(s1_req.paddr))
@@ -160,11 +169,35 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   val s1_refillUpdateMeta = s1_validRefill
   val s1_refillUpdateData = s1_validRefill
+  val s1_refillData       = s1_req.wdata
   val s1_replaceWb        = s1_validRefill && s1_repMeta.state > 0.U
   val s1_replaceWbData    = s1_validRefill && s1_repDirty
 
+  // prepare for s2
   val s1_updateMeta = s1_storeUpdateMeta || s1_storeClearMeta || s1_probeUpdateMeta || s1_refillUpdateMeta
   val s1_updateData = s1_storeUpdateData || s1_refillUpdateData
+
+  val s1_storeData =
+    Mux(s1_req.isRefill, s1_req.wdata, Mux(MemoryOpConstants.isAMO(s1_req.cmd), s1_amoStoreData, s1_mergeStoreData))
+
+  val s1_newCoh = MuxCase(
+    s1_req.cmd,
+    Seq(
+      s1_validProbe                            -> s1_newProbeCoh.state,
+      s1_validRefill                           -> s1_req.refillCoh,
+      (s1_validFromCore && s1_hit)             -> s1_newHitCohMeta.state,
+      (s1_validFromCore && s1_upgradePermMiss) -> 0.U,// invalid
+    ),
+  )
+
+  val s1_wayEn = MuxCase(
+    s1_tagMatchWayVec,
+    Seq(
+      s1_validProbe    -> s1_tagMatchWayVec,
+      s1_validRefill   -> VecInit(UIntToOH(s1_req.refillWay).asBools),
+      s1_validFromCore -> s1_tagMatchWayVec,
+    ),
+  ).asUInt
 
   // * pipeline stage 1 End
 
@@ -179,24 +212,9 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s2_refillFinish   = RegNext(s1_validRefill)
 
   when(s1_updateMeta || s1_updateData || s2_updateReplacer) {
-    s2_req := s1_req
-    s2_newCoh := MuxCase(
-      s1_req.cmd,
-      Seq(
-        s1_validProbe                            -> s1_newProbeCoh.state,
-        s1_validRefill                           -> s1_req.refillCoh,
-        (s1_validFromCore && s1_hit)             -> s1_newHitCohMeta.state,
-        (s1_validFromCore && s1_upgradePermMiss) -> 0.U,// invalid
-      ),
-    )
-    s2_wayEn := MuxCase(
-      s1_tagMatchWay,
-      Seq(
-        s1_validProbe    -> s1_tagMatchWay,
-        s1_validRefill   -> VecInit(UIntToOH(s1_req.refillWay).asBools),
-        s1_validFromCore -> s1_tagMatchWay,
-      ),
-    ).asUInt
+    s2_req       := s1_req
+    s2_newCoh    := s1_newCoh
+    s2_wayEn     := s1_wayEn
     s2_req.wdata := s1_storeData
   }
 
@@ -218,22 +236,31 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // * pipeline stage 2 End
 
   // * pipeline stage 3 Begin
-  val s3_valid = RegNext(s2_valid, false.B)
-  val s3_req   = RegNext(s2_req)
+  val s3_valid  = RegNext(s2_valid, false.B)
+  val s3_req    = RegEnable(s2_req, s2_valid)
+  val s3_newCoh = RegEnable(s2_newCoh, s2_valid)
+  val s3_wayEn  = RegEnable(s2_wayEn, s2_valid)
   // * pipeline stage 3 End
 
   // *  Store -> Load Bypassing Begin
-  // bypass list (valid, req, data)
+  // bypass list (valid, req, data, coh, wayEn)
   val bypassDataList = List(
-    (s1_valid && !s1_scFail, s1_req, s1_storeData),
-    (s2_valid, s2_req, s2_req.wdata),
-    (s3_valid, s3_req, s3_req.wdata),
+    (s1_updateMeta || s1_updateData, s1_req, s1_storeData, s1_newCoh, s1_wayEn),
+    (s2_valid, s2_req, s2_req.wdata, s2_newCoh, s2_wayEn),
+    (s3_valid, s3_req, s3_req.wdata, s3_newCoh, s3_wayEn),
   ).map(r =>
-    (r._1 && s1_req.paddr >> blockOffBits === r._2.paddr >> blockOffBits && MemoryOpConstants.isWrite(r._2.cmd), r._3)
+    (
+      r._1 && s1_req.paddr >> blockOffBits === r._2.paddr >> blockOffBits && MemoryOpConstants.isWrite(r._2.cmd),
+      r._3,
+      r._4,
+      r._5,
+    )
   )
 
-  s1_storeBypass     := bypassDataList.map(_._1).reduce(_ || _)
-  s1_storeBypassData := PriorityMux(bypassDataList)
+  s1_storeBypass      := bypassDataList.map(_._1).reduce(_ || _)
+  s1_storeBypassData  := PriorityMux(bypassDataList.map(d => (d._1, d._2)))
+  s1_storeBypassCoh   := PriorityMux(bypassDataList.map(d => (d._1, d._3)))
+  s1_storeBypassWayEn := PriorityMux(bypassDataList.map(d => (d._1, d._4)))
   // * Store -> Load Bypassing End
 
   // * Replacer Begin
@@ -249,8 +276,6 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   }
 
   victimWay := replacer.way(AddrDecoder.getSetIdx(mshrs.io.toReplace.bits.lineAddr << blockOffBits)) // FIXME
-
-  dontTouch(victimWay)
 
   // * Replacer End
 
@@ -307,7 +332,7 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   wbQueue.io.req.bits.voluntary := s1_req.isRefill
   wbQueue.io.req.bits.lineAddr  := Mux(s1_probeWb, AddrDecoder.getLineAddr(s1_req.paddr), s1_repLineAddr)
   wbQueue.io.req.bits.hasData   := Mux(s1_probeWb, s1_probeWbData, s1_replaceWbData)
-  wbQueue.io.req.bits.data      := Mux(s1_probeWb, s1_dataPreBypass, s1_repData)
+  wbQueue.io.req.bits.data      := Mux(s1_probeWb, s1_data, s1_repData)
 
   wbQueue.io.missCheck.valid    := false.B
   wbQueue.io.missCheck.lineAddr := DontCare
