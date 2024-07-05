@@ -58,8 +58,8 @@ object AccTileConstants {
   val numVLdPorts = 1
   val mxuPERows = 1
   val mxuPECols = 1
-  val mxuTileRows =1
-  val mxuTileCols =1
+  val mxuTileRows = 1
+  val mxuTileCols = 1
   val mxuMeshRows = 1
   val mxuMeshCols = 1
   val rLenb = 16
@@ -80,19 +80,19 @@ class MacCtrls(implicit p: Parameters) extends Bundle {
   val macLast = if (!usingInnerProd) Bool() else null
   val autoClr = if (!usingInnerProd) Bool() else null
   val autoCvt = if (!usingInnerProd) Bool() else null
-  val prodLen = if (usingInnerProd) UInt((rLenbSz+1).W) else null
-  val dirCal  = UInt(2.W)
+  val prodLen = if (usingInnerProd) UInt((rLenbSz + 1).W) else null
+  val dirCal = UInt(2.W)
   val rm = UInt(3.W) // rounding mode
 }
 
 
 // class ClrCtrls(implicit p: Parameters) extends BoomBundle {
-  class ClrCtrls(implicit p: Parameters) extends Bundle {
+class ClrCtrls(implicit p: Parameters) extends Bundle {
   val ridx = UInt(log2Ceil(numAccTiles).W) // register index
 }
 
 // class TileReadReq(implicit p: Parameters) extends BoomBundle {
-  class TileReadReq(implicit p: Parameters) extends Bundle {
+class TileReadReq(implicit p: Parameters) extends Bundle {
   val ridx = UInt(tpregSz.W) // register index
   val sidx = UInt(rLenbSz.W) // slice index
   val sew = UInt(2.W) // SEW = 8bits, 16bits, 32bits
@@ -103,14 +103,14 @@ class MacCtrls(implicit p: Parameters) extends Bundle {
 }
 
 // class SliceCtrls(implicit p: Parameters) extends BoomBundle {
-  class SliceCtrls(implicit p: Parameters) extends Bundle {
+class SliceCtrls(implicit p: Parameters) extends Bundle {
   val ridx = UInt(log2Ceil(numAccTiles).W) // register index
   val sidx = UInt(rLenbSz.W) // slice index
   val sew = UInt(2.W) // SEW = 8bits, 16bits, 32bits
 }
 
 // class AccReadReq(implicit p: Parameters) extends BoomBundle {
-  class AccReadReq(implicit p: Parameters) extends Bundle {
+class AccReadReq(implicit p: Parameters) extends Bundle {
   val sCtrls = new SliceCtrls() // slice control signals
   val tt = UInt(1.W) // 0, row slice; 1, col slice
   val quad = UInt(2.W) // acc may support quad-width
@@ -118,13 +118,13 @@ class MacCtrls(implicit p: Parameters) extends Bundle {
 }
 
 // class AccReadResp(implicit p: Parameters) extends BoomBundle {
-  class AccReadResp(implicit p: Parameters) extends Bundle {
+class AccReadResp(implicit p: Parameters) extends Bundle {
   val vstq_idx = UInt(vstqAddrSz.W) // index in vstq
   val data = UInt(rLen.W)
 }
 
 // class FpMacPipe(implicit p: Parameters) extends BoomBundle {
-  class FpMacPipe(implicit p: Parameters) extends Bundle {
+class FpMacPipe(implicit p: Parameters) extends Bundle {
   val outType = UInt(3.W)
   val aluType = UInt(4.W)
   val src1val = UInt(33.W)
@@ -140,53 +140,53 @@ class MacCtrls(implicit p: Parameters) extends Bundle {
 }
 
 // acc 32-bits
-  class IntMacUnit extends Module {
-    val io = IO(new Bundle {
-      val src1 = Input(UInt(32.W))
-      val src2 = Input(UInt(8.W))
-      val src3 = Input(UInt(32.W))
-      val srcType = Input(UInt(3.W))
-      val outType = Input(UInt(3.W))
-      val aluType = Input(UInt(4.W))
-      val out = Output(UInt(32.W))
-    })
+class IntMacUnit extends Module {
+  val io = IO(new Bundle {
+    val src1 = Input(UInt(32.W))
+    val src2 = Input(UInt(8.W))
+    val src3 = Input(UInt(32.W))
+    val srcType = Input(UInt(3.W))
+    val outType = Input(UInt(3.W))
+    val aluType = Input(UInt(4.W))
+    val out = Output(UInt(32.W))
+  })
 
-    val sMax = WireInit(0.U(32.W))
-    val sMin = WireInit(0.U(32.W))
-    sMax := Mux(io.outType === INT8TYPE, 0x7F.U,
-      Mux(io.outType === INT16TYPE, 0x7FFF.U, 0x7FFFFFFF.U))
-    sMin := Mux(io.outType === INT8TYPE, Fill(24, 1.U(1.W)) ## 0x80.U(8.W),
-      Mux(io.outType === INT16TYPE, Fill(16, 1.U(1.W)) ## 0x8000.U(16.W),
-        1.U(1.W) ## Fill(31, 0.U(1.W))))
+  val sMax = WireInit(0.U(32.W))
+  val sMin = WireInit(0.U(32.W))
+  sMax := Mux(io.outType === INT8TYPE, 0x7F.U,
+    Mux(io.outType === INT16TYPE, 0x7FFF.U, 0x7FFFFFFF.U))
+  sMin := Mux(io.outType === INT8TYPE, Fill(24, 1.U(1.W)) ## 0x80.U(8.W),
+    Mux(io.outType === INT16TYPE, Fill(16, 1.U(1.W)) ## 0x8000.U(16.W),
+      1.U(1.W) ## Fill(31, 0.U(1.W))))
 
-    // macc, mult
-    val lhs = io.src1(7, 0).asSInt
-    val rhs = io.src2(7, 0).asSInt
-    val acc = WireInit(0.U(32.W))
-    acc := Mux(io.outType === INT8TYPE, Fill(24, io.src3(7)) ## io.src3(7, 0),
-      Mux(io.outType === INT16TYPE, Fill(16, io.src3(15)) ## io.src3(15, 0), io.src3))
-    val macc = lhs * rhs +& acc.asSInt
+  // macc, mult
+  val lhs = io.src1(7, 0).asSInt
+  val rhs = io.src2(7, 0).asSInt
+  val acc = WireInit(0.U(32.W))
+  acc := Mux(io.outType === INT8TYPE, Fill(24, io.src3(7)) ## io.src3(7, 0),
+    Mux(io.outType === INT16TYPE, Fill(16, io.src3(15)) ## io.src3(15, 0), io.src3))
+  val macc = lhs * rhs +& acc.asSInt
 
-    // add, sub
-    val in1 = Mux(io.srcType === INT8TYPE, Fill(24, io.src1(7)) ## io.src1(7, 0),
-      Mux(io.srcType === INT16TYPE, Fill(16, io.src1(15)) ## io.src1(15, 0), io.src1))
-    val in2 = Mux(io.srcType === INT8TYPE, Fill(24, io.src3(7)) ## io.src3(7, 0),
-      Mux(io.srcType === INT16TYPE, Fill(16, io.src3(15)) ## io.src3(15, 0), io.src3))
-    val in2_inv = Mux(io.aluType === SUB, ~in2, in2)
-    val adder = in1.asSInt +& in2_inv.asSInt + Mux(io.aluType === SUB, 1.S, 0.S)
+  // add, sub
+  val in1 = Mux(io.srcType === INT8TYPE, Fill(24, io.src1(7)) ## io.src1(7, 0),
+    Mux(io.srcType === INT16TYPE, Fill(16, io.src1(15)) ## io.src1(15, 0), io.src1))
+  val in2 = Mux(io.srcType === INT8TYPE, Fill(24, io.src3(7)) ## io.src3(7, 0),
+    Mux(io.srcType === INT16TYPE, Fill(16, io.src3(15)) ## io.src3(15, 0), io.src3))
+  val in2_inv = Mux(io.aluType === SUB, ~in2, in2)
+  val adder = in1.asSInt +& in2_inv.asSInt + Mux(io.aluType === SUB, 1.S, 0.S)
 
-    val result = Mux(io.aluType(1), adder, macc)
+  val result = Mux(io.aluType(1), adder, macc)
 
-    io.out := Mux(result > sMax.asSInt, sMax,
-      Mux(result < sMin.asSInt, sMin, result(31, 0)))
-  }
+  io.out := Mux(result > sMax.asSInt, sMax,
+    Mux(result < sMin.asSInt, sMin, result(31, 0)))
+}
 
 // may use blackbox hardfloat modules
 class FpMacUnit(
-  val fpLatency: Int = 3,
-  val acc2Wider: Boolean = true
-// )(implicit p: Parameters) extends BoomModule with ShouldBeRetimed {
-)(implicit p: Parameters) extends Module with ShouldBeRetimed {
+                 val fpLatency: Int = 3,
+                 val acc2Wider: Boolean = true
+                 // )(implicit p: Parameters) extends BoomModule with ShouldBeRetimed {
+               )(implicit p: Parameters) extends Module with ShouldBeRetimed {
   val io = IO(new Bundle {
     val validin = Input(Bool())
     val src1 = Input(UInt(32.W))
@@ -338,14 +338,14 @@ class FpMacUnit(
 
   // ----------------- Recoded fp32 + fp32. -----------------
   val bypRecSrcA = Mux(pipeStage1.valid && (pipeStage0.bits.src1idx === pipeStage1.bits.dstRidx), addRecFwd32,
-                   Mux(pipeStage2.valid && (pipeStage0.bits.src1idx === pipeStage2.bits.dstRidx), pipeAddRecFwd32, recA))
+    Mux(pipeStage2.valid && (pipeStage0.bits.src1idx === pipeStage2.bits.dstRidx), pipeAddRecFwd32, recA))
   val bypRecSrcB = Mux(pipeStage1.valid && (pipeStage0.bits.src2idx === pipeStage1.bits.dstRidx), addRecFwd32,
-                   Mux(pipeStage2.valid && (pipeStage0.bits.src2idx === pipeStage2.bits.dstRidx), pipeAddRecFwd32, recC))
+    Mux(pipeStage2.valid && (pipeStage0.bits.src2idx === pipeStage2.bits.dstRidx), pipeAddRecFwd32, recC))
   val addRecSrcA = Mux(pipeStage0.bits.aluType(3), 0.U,
-                   Mux(pipeStage0.bits.aluType(1), if (fpLatency > 1) bypRecSrcA else recA, mulRawToRec32.io.out))
+    Mux(pipeStage0.bits.aluType(1), if (fpLatency > 1) bypRecSrcA else recA, mulRawToRec32.io.out))
   val addRecSrcB = if (fpLatency > 1) {
-                     Mux((pipeStage0.bits.aluType === MULT) || pipeStage0.bits.autoClr, 0.U, bypRecSrcB)
-                   } else recC
+    Mux((pipeStage0.bits.aluType === MULT) || pipeStage0.bits.autoClr, 0.U, bypRecSrcB)
+  } else recC
   val addRawSrcA = rawFloatFromRecFN(S.exp, S.sig, addRecSrcA)
   val addRawSrcB = rawFloatFromRecFN(S.exp, S.sig, addRecSrcB)
   val addSubOp = pipeStage0.bits.aluType === SUB
@@ -373,11 +373,11 @@ class FpMacUnit(
   // ----------------- Output. -----------------
   // Select CVT source.
   val cvtRecSrc1 = Mux(pipeStage2.valid && (pipeStage2.bits.dstRidx === pipeStage0.bits.src1idx),
-                       pipeAddRecOut32, recAFP32)
+    pipeAddRecOut32, recAFP32)
   val pipeCvtRecSrc1 = Pipe(pipeStage0.valid, cvtRecSrc1, pipeLatency).bits
 
   val cvtRecSrc2 = Mux(pipeStage2.valid && (pipeStage2.bits.dstRidx === pipeStage1.bits.src1idx),
-                       pipeAddRecOut32, pipeCvtRecSrc1)
+    pipeAddRecOut32, pipeCvtRecSrc1)
   val pipeCvtRecSrc2 = Pipe(pipeStage1.valid, cvtRecSrc2, pipeLatency).bits
 
   // REC FP32 to REC FP16.
@@ -408,17 +408,17 @@ class FpMacUnit(
 }
 
 /**
-  * A PE implementing a fp16 MAC operation or two int8 MAC operations.
-  * c1 = a1 * b1 + c1 (for fp16 and int8)
-  * c2 = a2 * b2 + c2 (for int8 only)
-  * A PE is located in a two-dimensional MESH, rowIndex and colIndex indicate its location in horizontal and vertical directions.
-  */
+ * A PE implementing a fp16 MAC operation or two int8 MAC operations.
+ * c1 = a1 * b1 + c1 (for fp16 and int8)
+ * c2 = a2 * b2 + c2 (for int8 only)
+ * A PE is located in a two-dimensional MESH, rowIndex and colIndex indicate its location in horizontal and vertical directions.
+ */
 class PE(
           val rowIndex: Int,
           val colIndex: Int,
           val numReadPorts: Int = 1
-  //      )(implicit p: Parameters) extends BoomModule {
-  )(implicit p: Parameters) extends Module {
+          //      )(implicit p: Parameters) extends BoomModule {
+        )(implicit p: Parameters) extends Module {
   val io = IO(new Bundle {
     // matrix multiplication related: mutiply-accumulate
     val macReqIn = Input(Valid(new MacCtrls())) // control signals
@@ -440,24 +440,24 @@ class PE(
     val rowReadResp = Output(Vec(numReadPorts, Valid(new SliceCtrls())))
     val rowReadDout = Output(Vec(numReadPorts, UInt(64.W)))
     // write row slices, control signals propagated vertically
-    val rowWriteReq = Input(Vec(numVLdPorts,Valid(new SliceCtrls())))
-    val rowWriteDin = Input(Vec(numVLdPorts,UInt(64.W)))
-    val rowWriteMask = Input(Vec(numVLdPorts,UInt(2.W)))
-    val rowWriteResp = Output(Vec(numVLdPorts,Valid(new SliceCtrls())))
-    val rowWriteDout = Output(Vec(numVLdPorts,UInt(64.W)))
-    val rowWriteMout = Output(Vec(numVLdPorts,UInt(2.W)))
+    val rowWriteReq = Input(Vec(numVLdPorts, Valid(new SliceCtrls())))
+    val rowWriteDin = Input(Vec(numVLdPorts, UInt(64.W)))
+    val rowWriteMask = Input(Vec(numVLdPorts, UInt(2.W)))
+    val rowWriteResp = Output(Vec(numVLdPorts, Valid(new SliceCtrls())))
+    val rowWriteDout = Output(Vec(numVLdPorts, UInt(64.W)))
+    val rowWriteMout = Output(Vec(numVLdPorts, UInt(2.W)))
     // read col slices, control signals propagated horizontally
     val colReadReq = Input(Vec(numReadPorts, Valid(new SliceCtrls())))
     val colReadDin = Input(Vec(numReadPorts, UInt(32.W)))
     val colReadResp = Output(Vec(numReadPorts, Valid(new SliceCtrls())))
     val colReadDout = Output(Vec(numReadPorts, UInt(32.W)))
     // write col slices, control signals propagated horizontally
-    val colWriteReq = Input(Vec(numVLdPorts,Valid(new SliceCtrls())))
-    val colWriteDin = Input(Vec(numVLdPorts,UInt(32.W)))
-    val colWriteMask = Input(Vec(numVLdPorts,UInt(1.W)))
-    val colWriteResp = Output(Vec(numVLdPorts,Valid(new SliceCtrls())))
-    val colWriteDout = Output(Vec(numVLdPorts,UInt(32.W)))
-    val colWriteMout = Output(Vec(numVLdPorts,UInt(1.W)))
+    val colWriteReq = Input(Vec(numVLdPorts, Valid(new SliceCtrls())))
+    val colWriteDin = Input(Vec(numVLdPorts, UInt(32.W)))
+    val colWriteMask = Input(Vec(numVLdPorts, UInt(1.W)))
+    val colWriteResp = Output(Vec(numVLdPorts, Valid(new SliceCtrls())))
+    val colWriteDout = Output(Vec(numVLdPorts, UInt(32.W)))
+    val colWriteMout = Output(Vec(numVLdPorts, UInt(1.W)))
   })
 
   // acc registers
@@ -478,11 +478,11 @@ class PE(
   fpMac.io.validin := fpMacValid
   fpMac.io.src1 := Mux(macReqCtrls.aluType === MACC && macReqCtrls.dirCal === 0.U, io.macReqSrcA, c0(macReqCtrls.src1Ridx))
 
-  fpMac.io.src2 := Mux(macReqCtrls.dirCal === 1.U,io.macReqSrcC,
-                   Mux(macReqCtrls.dirCal === 2.U, io.macReqSrcA, io.macReqSrcB))
+  fpMac.io.src2 := Mux(macReqCtrls.dirCal === 1.U, io.macReqSrcC,
+    Mux(macReqCtrls.dirCal === 2.U, io.macReqSrcA, io.macReqSrcB))
   fpMac.io.src3 := Mux(macReqCtrls.aluType === MULT, 0.U,
-                   Mux(macReqCtrls.dirCal === 1.U, io.macReqSrcB,
-                   Mux(macReqCtrls.dirCal === 2.U, io.macReqSrcD,c0(macReqCtrls.src2Ridx))))
+    Mux(macReqCtrls.dirCal === 1.U, io.macReqSrcB,
+      Mux(macReqCtrls.dirCal === 2.U, io.macReqSrcD, c0(macReqCtrls.src2Ridx))))
   fpMac.io.srcType := macReqCtrls.outType // Attention here, fpMac support fp16 multiply only
   fpMac.io.outType := macReqCtrls.outType
   fpMac.io.aluType := macReqCtrls.aluType
@@ -513,11 +513,11 @@ class PE(
   intMac1.io.aluType := macReqCtrls.aluType
 
   // TODO: Optimization, latency = 1 for int8 mac; 3 for fp16 mac
-  when (fpMac.io.validout) {
+  when(fpMac.io.validout) {
     c0(fpMac.io.idx) := fpMac.io.out
   }
 
-  when (macReqValid && (!macReqCtrls.srcType(2))) {
+  when(macReqValid && (!macReqCtrls.srcType(2))) {
     c0(macReqCtrls.dstRidx) := intMac0.io.out
     c1(macReqCtrls.dstRidx) := intMac1.io.out
   }
@@ -574,7 +574,7 @@ class PE(
     io.rowWriteResp(w) := io.rowWriteReq(w)
     io.rowWriteDout(w) := io.rowWriteDin(w)
     io.rowWriteMout(w) := io.rowWriteMask(w)
-    }
+  }
   // -----------------------------------------------------------------------------------
   // read col slices
   // -----------------------------------------------------------------------------------
@@ -614,14 +614,14 @@ class PE(
 }
 
 /**
-  * A Tile is a purely combinational 2D array of passThrough PEs.
-  */
+ * A Tile is a purely combinational 2D array of passThrough PEs.
+ */
 class Tile(
             val indexh: Int,
             val indexv: Int,
             val numReadPorts: Int = 1
-  //        )(implicit p: Parameters) extends BoomModule {
-  )(implicit p: Parameters) extends Module {
+            //        )(implicit p: Parameters) extends BoomModule {
+          )(implicit p: Parameters) extends Module {
   val io = IO(new Bundle {
     // matrix multiplication related: mutiply-accumulate
     val macReqIn = Input(Valid(new MacCtrls()))
@@ -643,24 +643,24 @@ class Tile(
     val rowReadResp = Output(Vec(numReadPorts, Valid(new SliceCtrls())))
     val rowReadDout = Output(Vec(numReadPorts, UInt((mxuTileCols * 64).W)))
     // write row slices, control signals propagated vertically
-    val rowWriteReq = Input(Vec(numVLdPorts,Valid(new SliceCtrls())))
-    val rowWriteDin = Input(Vec(numVLdPorts,UInt((mxuTileCols * 64).W)))
-    val rowWriteMask = Input(Vec(numVLdPorts,UInt((mxuTileCols * 2).W)))
-    val rowWriteResp = Output(Vec(numVLdPorts,Valid(new SliceCtrls())))
-    val rowWriteDout = Output(Vec(numVLdPorts,UInt((mxuTileCols * 64).W)))
-    val rowWriteMout = Output(Vec(numVLdPorts,UInt((mxuTileCols * 2).W)))
+    val rowWriteReq = Input(Vec(numVLdPorts, Valid(new SliceCtrls())))
+    val rowWriteDin = Input(Vec(numVLdPorts, UInt((mxuTileCols * 64).W)))
+    val rowWriteMask = Input(Vec(numVLdPorts, UInt((mxuTileCols * 2).W)))
+    val rowWriteResp = Output(Vec(numVLdPorts, Valid(new SliceCtrls())))
+    val rowWriteDout = Output(Vec(numVLdPorts, UInt((mxuTileCols * 64).W)))
+    val rowWriteMout = Output(Vec(numVLdPorts, UInt((mxuTileCols * 2).W)))
     // read col slice, control signals propagated horizontally
     val colReadReq = Input(Vec(numReadPorts, Valid(new SliceCtrls())))
     val colReadDin = Input(Vec(numReadPorts, UInt((mxuTileRows * 32).W)))
     val colReadResp = Output(Vec(numReadPorts, Valid(new SliceCtrls())))
     val colReadDout = Output(Vec(numReadPorts, UInt((mxuTileRows * 32).W)))
     // write col slice, control signals propagated horizontally
-    val colWriteReq = Input(Vec(numVLdPorts,Valid(new SliceCtrls())))
-    val colWriteDin = Input(Vec(numVLdPorts,UInt((mxuTileRows * 32).W)))
-    val colWriteMask = Input(Vec(numVLdPorts,UInt(mxuTileRows.W)))
-    val colWriteResp = Output(Vec(numVLdPorts,Valid(new SliceCtrls())))
-    val colWriteDout = Output(Vec(numVLdPorts,UInt((mxuTileRows * 32).W)))
-    val colWriteMout = Output(Vec(numVLdPorts,UInt(mxuTileRows.W)))
+    val colWriteReq = Input(Vec(numVLdPorts, Valid(new SliceCtrls())))
+    val colWriteDin = Input(Vec(numVLdPorts, UInt((mxuTileRows * 32).W)))
+    val colWriteMask = Input(Vec(numVLdPorts, UInt(mxuTileRows.W)))
+    val colWriteResp = Output(Vec(numVLdPorts, Valid(new SliceCtrls())))
+    val colWriteDout = Output(Vec(numVLdPorts, UInt((mxuTileRows * 32).W)))
+    val colWriteMout = Output(Vec(numVLdPorts, UInt(mxuTileRows.W)))
   })
 
   val tile = Seq.tabulate(mxuTileRows, mxuTileCols)((i, j) => Module(new PE(indexh + i, indexv + j, numReadPorts)))
@@ -800,9 +800,9 @@ class Tile(
   val macOutSrcDMux = WireInit(VecInit(Seq.fill(mxuTileRows)(0.U(16.W))))
   // val colWriteDataMux = WireInit(Vec(numVLdPorts,VecInit(Seq.fill(mxuTileRows)(0.U(32.W)))))
   // val colWriteMaskMux = WireInit(Vec(numVLdPorts,VecInit(Seq.fill(mxuTileRows)(0.U(1.W)))))
-  val colWriteDataMux = Wire(Vec(numVLdPorts,Vec(mxuTileRows,UInt(32.W))))
-  val colWriteMaskMux = Wire(Vec(numVLdPorts,Vec(mxuTileRows,UInt(1.W))))
-  for ( i <- 0 until numVLdPorts) {
+  val colWriteDataMux = Wire(Vec(numVLdPorts, Vec(mxuTileRows, UInt(32.W))))
+  val colWriteMaskMux = Wire(Vec(numVLdPorts, Vec(mxuTileRows, UInt(1.W))))
+  for (i <- 0 until numVLdPorts) {
     for (j <- 0 until mxuTileRows) {
       colWriteDataMux(i)(j) := 0.U
       colWriteMaskMux(i)(j) := 0.U
@@ -811,7 +811,7 @@ class Tile(
   for (r <- 0 until mxuTileRows) {
     macOutSrcAMux(r) := tile(r)(mxuTileCols - 1).io.macOutSrcA
     macOutSrcDMux(r) := tile(r)(mxuTileCols - 1).io.macOutSrcD
-    for (w <- 0 until numVLdPorts){
+    for (w <- 0 until numVLdPorts) {
       colWriteDataMux(w)(r) := tile(r)(mxuTileCols - 1).io.colWriteDout(w)
       colWriteMaskMux(w)(r) := tile(r)(mxuTileCols - 1).io.colWriteMout(w)
     }
@@ -820,9 +820,9 @@ class Tile(
   val macOutSrcBMux = WireInit(VecInit(Seq.fill(mxuTileCols)(0.U(16.W))))
   val macOutSrcCMux = WireInit(VecInit(Seq.fill(mxuTileCols)(0.U(16.W))))
   // val rowWriteDataMux = WireInit(VecInit(Seq.fill(mxuTileCols)(0.U(64.W))))
-  val rowWriteDataMux = Wire(Vec(numVLdPorts,Vec(mxuTileCols,UInt(64.W))))
-  val rowWriteMaskMux = Wire(Vec(numVLdPorts,Vec(mxuTileCols,UInt(2.W))))
-  for ( i <- 0 until numVLdPorts) {
+  val rowWriteDataMux = Wire(Vec(numVLdPorts, Vec(mxuTileCols, UInt(64.W))))
+  val rowWriteMaskMux = Wire(Vec(numVLdPorts, Vec(mxuTileCols, UInt(2.W))))
+  for (i <- 0 until numVLdPorts) {
     for (j <- 0 until mxuTileCols) {
       rowWriteDataMux(i)(j) := 0.U
       rowWriteMaskMux(i)(j) := 0.U
@@ -831,7 +831,7 @@ class Tile(
   for (c <- 0 until mxuTileCols) {
     macOutSrcBMux(c) := tile(mxuTileRows - 1)(c).io.macOutSrcB
     macOutSrcCMux(c) := tile(mxuTileRows - 1)(c).io.macOutSrcC
-    for (w <- 0 until numVLdPorts){
+    for (w <- 0 until numVLdPorts) {
       rowWriteDataMux(w)(c) := tile(mxuTileRows - 1)(c).io.rowWriteDout(w)
       rowWriteMaskMux(w)(c) := tile(mxuTileRows - 1)(c).io.rowWriteMout(w)
     }
@@ -840,7 +840,7 @@ class Tile(
   io.macOutSrcD := macOutSrcDMux.asUInt
   io.macOutSrcB := macOutSrcBMux.asUInt
   io.macOutSrcC := macOutSrcCMux.asUInt
-  for (w <- 0 until numVLdPorts){
+  for (w <- 0 until numVLdPorts) {
     io.colWriteDout(w) := colWriteDataMux(w).asUInt
     io.colWriteMout(w) := colWriteMaskMux(w).asUInt
     io.rowWriteDout(w) := rowWriteDataMux(w).asUInt
@@ -865,7 +865,7 @@ class Tile(
   }
 }
 
-object VerilogMMA  extends App {
+object VerilogMMA extends App {
   println("Generating hardware")
   val p = Parameters.empty
   emitVerilog(new Mesh()(p.alterPartial({ case VFuParamsKey =>
@@ -876,8 +876,8 @@ object VerilogMMA  extends App {
 
 class Mesh(
             val numReadPorts: Int = 1
-  //        )(implicit p: Parameters) extends BoomModule {
-  )(implicit p: Parameters) extends Module {
+            //        )(implicit p: Parameters) extends BoomModule {
+          )(implicit p: Parameters) extends Module {
   val io = IO(new Bundle {
     // matrix multiplication related: mutiply-accumulate
     val macReq = Input(Vec(mxuMeshCols, Valid(new MacCtrls())))
@@ -894,19 +894,19 @@ class Mesh(
     val rowReadResp = Output(Vec(numReadPorts, Valid(new SliceCtrls())))
     val rowReadData = Output(Vec(numReadPorts, UInt((mxuPECols * 32).W)))
     // write row slices, control signals propagated vertically
-    val rowWriteReq = Input(Vec(numVLdPorts,Valid(new SliceCtrls())))
-    val rowWriteData = Input(Vec(numVLdPorts,UInt((mxuPECols * 32).W)))
-    val rowWriteMask = Input(Vec(numVLdPorts,UInt((mxuPECols).W)))
-    val rowWriteResp = Output(Vec(numVLdPorts,Valid(new SliceCtrls())))
+    val rowWriteReq = Input(Vec(numVLdPorts, Valid(new SliceCtrls())))
+    val rowWriteData = Input(Vec(numVLdPorts, UInt((mxuPECols * 32).W)))
+    val rowWriteMask = Input(Vec(numVLdPorts, UInt((mxuPECols).W)))
+    val rowWriteResp = Output(Vec(numVLdPorts, Valid(new SliceCtrls())))
     // read col slice, control signals propagated horizontally
     val colReadReq = Input(Vec(numReadPorts, Valid(new SliceCtrls())))
     val colReadResp = Output(Vec(numReadPorts, Valid(new SliceCtrls())))
     val colReadData = Output(Vec(numReadPorts, UInt((mxuPERows * 32).W)))
     // write col slice, control signals propagated horizontally
-    val colWriteReq = Input(Vec(numVLdPorts,Valid(new SliceCtrls())))
-    val colWriteData = Input(Vec(numVLdPorts,UInt((mxuPERows * 32).W)))
-    val colWriteMask = Input(Vec(numVLdPorts,UInt((mxuPERows).W)))
-    val colWriteResp = Output(Vec(numVLdPorts,Valid(new SliceCtrls())))
+    val colWriteReq = Input(Vec(numVLdPorts, Valid(new SliceCtrls())))
+    val colWriteData = Input(Vec(numVLdPorts, UInt((mxuPERows * 32).W)))
+    val colWriteMask = Input(Vec(numVLdPorts, UInt((mxuPERows).W)))
+    val colWriteResp = Output(Vec(numVLdPorts, Valid(new SliceCtrls())))
   })
 
   val mesh = Seq.tabulate(mxuMeshRows, mxuMeshCols)((i, j) => Module(new Tile(i * mxuTileRows, j * mxuTileCols, numReadPorts)))
@@ -996,15 +996,15 @@ class Mesh(
           tile.io.rowWriteResp(w)
         }
       }
-     // meshT(c).foldLeft(io.rowWriteData(w)(64 * mxuTileCols * (c + 1) - 1, 64 * mxuTileCols * c)) {
-        meshT(c).foldLeft(io.rowWriteData(w)(32 * mxuTileCols * (c + 1) - 1, 32 * mxuTileCols * c)) {
+      // meshT(c).foldLeft(io.rowWriteData(w)(64 * mxuTileCols * (c + 1) - 1, 64 * mxuTileCols * c)) {
+      meshT(c).foldLeft(io.rowWriteData(w)(32 * mxuTileCols * (c + 1) - 1, 32 * mxuTileCols * c)) {
         case (rowWriteData, tile) => {
           tile.io.rowWriteDin(w) := RegNext(rowWriteData)
           tile.io.rowWriteDout(w)
         }
       }
       // meshT(c).foldLeft(io.rowWriteMask(w)(2 * mxuTileCols * (c + 1) - 1, 2 * mxuTileCols * c)) {
-        meshT(c).foldLeft(io.rowWriteMask(w)(1 * mxuTileCols * (c + 1) - 1, 1 * mxuTileCols * c)) {
+      meshT(c).foldLeft(io.rowWriteMask(w)(1 * mxuTileCols * (c + 1) - 1, 1 * mxuTileCols * c)) {
         case (rowWriteMask, tile) => {
           tile.io.rowWriteMask(w) := RegNext(rowWriteMask)
           tile.io.rowWriteMout(w)
@@ -1030,7 +1030,7 @@ class Mesh(
   // bottom IOs
   io.macResp := mesh(mxuMeshRows - 1)(mxuMeshCols - 1).io.macReqOut
   io.clrResp := mesh(mxuMeshRows - 1)(mxuMeshCols - 1).io.clrReqOut
-  for (w <- 0  until numVLdPorts) {
+  for (w <- 0 until numVLdPorts) {
     io.rowWriteResp(w) := RegNext(mesh(mxuMeshRows - 1)(mxuMeshCols - 1).io.rowWriteResp(w))
     io.colWriteResp(w) := RegNext(mesh(mxuMeshRows - 1)(mxuMeshCols - 1).io.colWriteResp(w))
   }
