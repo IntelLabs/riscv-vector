@@ -104,6 +104,10 @@ class RefillMSHRFile extends Bundle() {
   val data    = UInt(mshrDataWidth.W)
 }
 
+class L2Refill extends RefillMSHRFile() {
+  val hasData = Bool()
+}
+
 class ProbeMSHRFile extends Bundle() {
   val valid           = Input(Bool())
   val probePermission = Input(UInt(TLPermissions.bdWidth.W))

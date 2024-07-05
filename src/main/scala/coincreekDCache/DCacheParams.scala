@@ -12,7 +12,7 @@ trait DCacheParams {
   val nBanks            = 8
   val rowBits           = 64
   val blockBytes        = 64
-  val nMSHRs            = 4
+  val nMSHRs            = 8
   val nMMIOs            = 0
   val replacementPolicy = "setlru"
   val beatBytes         = 64
@@ -85,6 +85,8 @@ trait DCacheParams {
   // bit 1: replay req
   // bit 2: probe req
 
+  val refillDataQueueNum   = 8
+  val refillNoDataQueueNum = 8
 }
 
 object MasterSource {

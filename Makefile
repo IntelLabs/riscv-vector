@@ -15,6 +15,10 @@ mshr:
 	mkdir -p $(BUILD_DIR)
 	mill -i $(PRJ)[$(CHISEL_VERSION)].runMain coincreekDCache.MSHRFile --target-dir $(BUILD_DIR)
 
+refill:
+	mkdir -p $(BUILD_DIR)
+	mill -i $(PRJ)[$(CHISEL_VERSION)].runMain coincreekDCache.RefillTest --target-dir $(BUILD_DIR)
+
 help:
 	mill -i $(PRJ).runMain coincreekDCache.DCache --help
 

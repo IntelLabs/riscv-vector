@@ -435,5 +435,5 @@ object MSHRFile extends App {
     ).reduce(_ + "," + _)
   )
 
-  ChiselStage.emitSystemVerilogFile(new MSHRFile, args, firtoolOptions)
+  ChiselStage.emitSystemVerilogFile(new MSHRFile, args, firtoolOptions ++ Array("--disable-all-randomization"))
 }
