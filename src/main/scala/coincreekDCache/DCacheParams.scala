@@ -14,8 +14,11 @@ trait DCacheParams {
   val blockBytes        = 64
   val nMSHRs            = 8
   val nMMIOs            = 0
+  val nWBQEntries       = 10 // writeback queue entries
   val replacementPolicy = "setlru"
   val beatBytes         = 32
+
+  assert(nWBQEntries > nMSHRs)
   // }}}
 
   // lrsc params

@@ -23,7 +23,7 @@ class MissCheck extends Bundle {
   val blockMiss = Output(Bool())
 }
 
-class WriteBackQueue(
+class WritebackEntry(id: Int)(
     implicit edge: TLEdgeOut,
     p:             Parameters,
 ) extends Module {
@@ -83,7 +83,7 @@ class WriteBackQueue(
 
   // probe ack response
   val probeAck = edge.ProbeAck(
-    fromSource = req.source,
+    fromSource = id.U,
     toAddress = releaseAddr,
     lgSize = log2Ceil(blockBytes).U,
     reportPermissions = req.perm,
@@ -91,7 +91,7 @@ class WriteBackQueue(
 
   // probe ack with data
   val probeAckData = edge.ProbeAck(
-    fromSource = req.source,
+    fromSource = id.U,
     toAddress = releaseAddr,
     lgSize = log2Ceil(blockBytes).U,
     reportPermissions = req.perm,
@@ -100,7 +100,7 @@ class WriteBackQueue(
 
   // voluntary release
   val release = edge.Release(
-    fromSource = req.source,
+    fromSource = id.U,
     toAddress = releaseAddr,
     lgSize = log2Ceil(blockBytes).U,
     shrinkPermissions = req.perm,
@@ -108,7 +108,7 @@ class WriteBackQueue(
 
   // voluntary release with data
   val releaseData = edge.Release(
-    fromSource = req.source,
+    fromSource = id.U,
     toAddress = releaseAddr,
     lgSize = log2Ceil(blockBytes).U,
     shrinkPermissions = req.perm,
@@ -128,5 +128,48 @@ class WriteBackQueue(
   io.missCheck.blockMiss := io.missCheck.valid && (state =/= s_invalid) && (io.missCheck.lineAddr === req.lineAddr)
 
   io.req.ready   := (state === s_invalid)
-  io.grant.ready := true.B
+  io.grant.ready := (state === s_release_resp)
+}
+
+class WritebackQueue(
+    implicit edge: TLEdgeOut,
+    p:             Parameters,
+) extends Module {
+  val io = IO(new Bundle {
+    val req       = Flipped(Decoupled(new WritebackReq(edge.bundle)))
+    val missCheck = new MissCheck()
+    val release   = Decoupled(new TLBundleC(edge.bundle))
+    val grant     = Flipped(Decoupled(new TLBundleD(edge.bundle)))
+  })
+
+  val wbqReadyVec  = Wire(Vec(nWBQEntries, Bool()))
+  val blockMissVec = Wire(Vec(nWBQEntries, Bool()))
+
+  val wbqEntries = (0 until nWBQEntries).map { i =>
+    val entryId = nMSHRs + nMMIOs + i
+    val entry   = Module(new WritebackEntry(entryId)(edge, p))
+
+    entry.io.missCheck.valid    := io.missCheck.valid
+    entry.io.missCheck.lineAddr := io.missCheck.lineAddr
+    entry.io.grant.valid        := (io.grant.valid && io.grant.bits.source === entryId.U)
+    entry.io.grant.bits         := io.grant.bits
+
+    wbqReadyVec(i)  := entry.io.req.ready
+    blockMissVec(i) := entry.io.missCheck.blockMiss
+
+    entry
+  }
+
+  val allocEntry = PriorityEncoder(wbqReadyVec)
+  wbqEntries.zipWithIndex.foreach { case (entry, i) =>
+    entry.io.req.valid := io.req.valid && (allocEntry === i.U)
+    entry.io.req.bits  := io.req.bits
+  }
+
+  TLArbiter.robin(edge, io.release, wbqEntries.map(_.io.release): _*)
+
+  io.missCheck.blockMiss := blockMissVec.reduce(_ || _)
+  io.req.ready           := wbqReadyVec.reduce(_ || _)
+  io.grant.ready         := true.B
+
 }

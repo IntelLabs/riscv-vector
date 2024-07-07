@@ -21,7 +21,7 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val metaArray  = Module(new MetaArray[Metadata](() => onReset))
   val dataArray  = Module(new DataArray)
   val mshrs      = Module(new MSHRFile)
-  val wbQueue    = Module(new WriteBackQueue)
+  val wbQueue    = Module(new WritebackQueue)
   val probeQueue = Module(new ProbeQueue)
   val mainReqArb = Module(new Arbiter(new MainPipeReq, 3))
 
