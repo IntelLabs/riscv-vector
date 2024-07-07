@@ -12,9 +12,9 @@ class WritebackReq(params: TLBundleParameters) extends Bundle {
   val voluntary = Bool()
   val lineAddr  = UInt((paddrWidth - blockOffBits).W)
   val perm      = UInt(TLPermissions.cWidth.W)
-  val source    = UInt(params.sourceBits.W) // tilelink source
   val hasData   = Bool()
   val data      = UInt(dataWidth.W)
+  // val source    = UInt(params.sourceBits.W) // tilelink source
 }
 
 class MissCheck extends Bundle {

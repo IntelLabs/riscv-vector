@@ -104,4 +104,30 @@ class DcacheMissTest extends AnyFlatSpec with ChiselScalatestTester {
     }
   }
 
+  it should "Block miss that is in WBQ" in {
+    test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+      Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
+    ) { dut =>
+      initializeDut(dut)
+
+      dut.io.req.valid.poke(true.B)
+      dut.io.req.bits.signed.poke(false.B)
+      dut.io.req.bits.paddr.poke("h8000c000".U)
+      dut.io.req.bits.wdata.poke("h12345678".U)
+      dut.io.req.bits.isRefill.poke(true.B)
+      dut.io.req.bits.refillWay.poke(1.U)
+      dut.io.req.bits.refillCoh.poke(ClientStates.Dirty)
+
+      dut.clock.step(1)
+      dut.io.req.bits.isRefill.poke(false.B)
+      // s2->s1 replace load bypass
+      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
+      dut.io.req.bits.paddr.poke("h80004000".U)
+
+      dut.clock.step(1)
+      dut.io.resp.valid.expect(true.B)
+      dut.io.resp.bits.status.expect(CacheRespStatus.replay)
+    }
+  }
+
 }

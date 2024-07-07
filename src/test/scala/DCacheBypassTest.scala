@@ -32,7 +32,7 @@ class DcacheBypassTest extends AnyFlatSpec with ChiselScalatestTester {
     dut.io.req.bits.noAlloc.poke(false.B)
     dut.io.req.bits.isRefill.poke(true.B)
     dut.io.req.bits.refillWay.poke(1.U)
-    dut.io.req.bits.refillCoh.poke(ClientStates.Dirty)
+    dut.io.req.bits.refillCoh.poke(ClientStates.Trunk)
 
     dut.clock.step(1)
     dut.io.req.bits.paddr.poke("h80006000".U)
@@ -189,14 +189,14 @@ class DcacheBypassTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.req.bits.paddr.poke("h8000c000".U)
       dut.io.req.bits.wdata.poke("h12345678".U)
       dut.io.req.bits.isRefill.poke(true.B)
-      dut.io.req.bits.refillWay.poke(1.U)
+      dut.io.req.bits.refillWay.poke(0.U)
       dut.io.req.bits.refillCoh.poke(ClientStates.Dirty)
 
       dut.clock.step(1)
       dut.io.req.bits.isRefill.poke(false.B)
       // s2->s1 replace load bypass
       dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-      dut.io.req.bits.paddr.poke("h80004000".U)
+      dut.io.req.bits.paddr.poke("h8000a000".U)
 
       dut.clock.step(1)
       dut.io.resp.valid.expect(true.B)
@@ -204,7 +204,7 @@ class DcacheBypassTest extends AnyFlatSpec with ChiselScalatestTester {
 
       // s3->s1 replace load bypass
       dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-      dut.io.req.bits.paddr.poke("h80004000".U)
+      dut.io.req.bits.paddr.poke("h8000a000".U)
 
       dut.clock.step(1)
       dut.io.resp.valid.expect(true.B)
@@ -212,7 +212,7 @@ class DcacheBypassTest extends AnyFlatSpec with ChiselScalatestTester {
 
       // directly read meta array
       dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-      dut.io.req.bits.paddr.poke("h80004000".U)
+      dut.io.req.bits.paddr.poke("h8000a000".U)
 
       dut.clock.step(1)
       dut.io.resp.valid.expect(true.B)
