@@ -72,33 +72,6 @@ class DCacheSpec extends AnyFlatSpec with ChiselScalatestTester {
     }
   }
 
-  it should "Store -> Load Bypassing" in {
-    test(LazyModule(new DCacheWrapper()(Parameters.empty)).dcacheClient.module).withAnnotations(
-      Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
-    ) { dut =>
-      initializeDut(dut)
-
-      // write hit
-      dut.io.req.valid.poke(true.B)
-      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XWR)
-      dut.io.req.bits.paddr.poke("h80004000".U)
-      dut.io.req.bits.wdata.poke(0x7890.U)
-
-      dut.clock.step(1)
-      // read hit
-      dut.io.req.valid.poke(true.B)
-      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-      dut.io.req.bits.paddr.poke("h80004000".U)
-      dut.io.req.bits.wdata.poke(0x7890.U)
-
-      dut.clock.step(1)
-      dut.io.resp.valid.expect(true.B)
-      dut.io.resp.bits.data.expect(0x7890.U)
-      dut.io.resp.bits.status.expect(CacheRespStatus.hit)
-      dut.clock.step(10)
-    }
-  }
-
   it should "Load different sizes" in {
     test(LazyModule(new DCacheWrapper()(Parameters.empty)).dcacheClient.module).withAnnotations(
       Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)

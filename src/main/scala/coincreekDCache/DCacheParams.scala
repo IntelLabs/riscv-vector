@@ -15,7 +15,7 @@ trait DCacheParams {
   val nMSHRs            = 8
   val nMMIOs            = 0
   val replacementPolicy = "setlru"
-  val beatBytes         = 64
+  val beatBytes         = 32
   // }}}
 
   // lrsc params

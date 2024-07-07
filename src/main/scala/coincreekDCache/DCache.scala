@@ -27,13 +27,30 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // * Signal Define Begin
   // Store -> Load Bypassing
-  val s1_storeBypass      = RegInit(false.B)
-  val s1_storeBypassData  = RegInit(0.U(dataWidth.W))
-  val s1_storeBypassCoh   = RegInit(0.U(cohBits.W))
-  val s1_storeBypassWayEn = RegInit(0.U(nWays.W))
-  val s1_cacheResp        = Wire(Valid(new DataExchangeResp))
-  val mshrsResp           = Wire(Valid(new DataExchangeResp))
-  val victimWay           = WireInit(0.U(log2Up(nWays).W))
+
+  class BypassStore extends Bundle {
+    val data  = UInt(dataWidth.W)
+    val tag   = UInt(tagBits.W)
+    val coh   = UInt(cohBits.W)
+    val wayEn = UInt(nWays.W)
+  }
+  // Define a function to create and configure a BypassStore
+  def createBypassStore(data: UInt, tag: UInt, coh: UInt, wayEn: UInt): BypassStore = {
+    val bypassStoreCandidate = Wire(new BypassStore)
+    bypassStoreCandidate.data  := data
+    bypassStoreCandidate.tag   := tag
+    bypassStoreCandidate.coh   := coh
+    bypassStoreCandidate.wayEn := wayEn
+    bypassStoreCandidate
+  }
+
+  val s1_bypassStore   = Reg(Valid(new BypassStore))
+  val s1_bypassReplace = RegInit(false.B)
+
+  val s1_cacheResp = Wire(Valid(new DataExchangeResp))
+  val mshrsResp    = Wire(Valid(new DataExchangeResp))
+
+  val victimWay = WireInit(0.U(log2Up(nWays).W))
   // * Signal Define End
 
   // * pipeline stage 0 Begin
@@ -82,28 +99,55 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_dataArrayResp = dataArray.io.resp // nways nbanks data
   val s1_metaArrayResp = metaArray.io.resp // nways meta
 
-  // tag & coh match
-  val s1_tagMatchWayVec = Mux(
-    s1_storeBypass,
-    VecInit(s1_storeBypassWayEn.asBools),
-    VecInit((0 until nWays).map(w =>
-      s1_metaArrayResp(w).tag === AddrDecoder.getTag(s1_req.paddr) && s1_metaArrayResp(w).coh > 0.U
-    )),
-  )
-  val s1_tagMatch = Mux(s1_storeBypass, s1_storeBypassCoh > 0.U, s1_tagMatchWayVec.asUInt.orR)
-  val s1_cohMeta =
-    ClientMetadata(Mux(s1_storeBypass, s1_storeBypassCoh, Mux1H(s1_tagMatchWayVec, s1_metaArrayResp.map(_.coh))))
+  // obtain tag for load/store/probe
 
+  val s1_tagMatchWayPreBypassVec = VecInit((0 until nWays).map(w =>
+    s1_metaArrayResp(w).tag === AddrDecoder.getTag(s1_req.paddr) && s1_metaArrayResp(w).coh > 0.U
+  ))
+
+  val s1_tagMatchWayVec = MuxCase(
+    s1_tagMatchWayPreBypassVec,
+    Seq(
+      s1_bypassReplace -> VecInit(Seq.fill(nWays)(false.B)),
+      s1_bypassStore.valid -> VecInit(
+        (0 until nWays).map(w =>
+          s1_bypassStore.bits.wayEn(w) && s1_bypassStore.bits.coh > 0.U
+        )
+      ),
+    ),
+  )
+
+  val s1_tagMatch = s1_tagMatchWayVec.asUInt.orR
+
+  val s1_metaPreBypass = Mux(
+    s1_req.isRefill,
+    s1_metaArrayResp(s1_req.refillWay),
+    Mux1H(s1_tagMatchWayPreBypassVec, s1_metaArrayResp),
+  )
+
+  val s1_meta = MuxCase(
+    s1_metaPreBypass,
+    Seq(
+      s1_bypassReplace     -> Metadata(0.U, 0.U),
+      s1_bypassStore.valid -> Metadata(s1_bypassStore.bits.tag, s1_bypassStore.bits.coh),
+    ),
+  )
+
+  val s1_tag     = s1_meta.tag
+  val s1_cohMeta = ClientMetadata(s1_meta.coh) // obtain coh for load/store/probe/replace
+
+  // hit / miss for load/store
   val (s1_hasPerm, _, s1_newHitCohMeta) = s1_cohMeta.onAccess(s1_req.cmd)
   val s1_hit                            = s1_valid && s1_tagMatch && s1_hasPerm
-  val s1_noDataMiss                     = s1_valid && !s1_tagMatch               // e.g. N->B or N->T miss
-  val s1_upgradePermMiss                = s1_valid && s1_tagMatch && !s1_hasPerm // e.g. B->T miss
+  val s1_upgradePermHit                 = s1_hit && s1_newHitCohMeta =/= s1_cohMeta // e.g. T->Dirty hit
+  val s1_noDataMiss                     = s1_valid && !s1_tagMatch                  // e.g. N->B or N->T miss
+  val s1_upgradePermMiss                = s1_valid && s1_tagMatch && !s1_hasPerm    // e.g. B->T miss
 
   // organize read data
-  val s1_dataPreBypass = Mux1H(s1_tagMatchWayVec, s1_dataArrayResp).asUInt
-  val s1_data          = Mux(s1_storeBypass, s1_storeBypassData, s1_dataPreBypass)
-  val loadGen          = new LoadGen(s1_req.size, s1_req.signed, s1_req.paddr, s1_data, false.B, dataBytes)
-  // val s1_cohBypass    = Mux(s1_storeBypass, ClientMetadata.onReset, s1_cohMeta)
+  val s1_dataPreBypass =
+    Mux(s1_req.isRefill, s1_dataArrayResp(s1_req.refillWay), Mux1H(s1_tagMatchWayPreBypassVec, s1_dataArrayResp)).asUInt
+  val s1_data = Mux(s1_bypassStore.valid, s1_bypassStore.bits.data, s1_dataPreBypass)
+  val loadGen = new LoadGen(s1_req.size, s1_req.signed, s1_req.paddr, s1_data, false.B, dataBytes)
 
   // organize store data
   val s1_storeGenMask = new StoreGen(s1_req.size, s1_req.paddr, 0.U, dataBytes).mask
@@ -113,7 +157,7 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     Mux(s1_req.cmd === MemoryOpConstants.M_PWR, s1_req.wmask, s1_storeGenMask), // FIXME wmask
   )
   val s1_mask           = FillInterleaved(8, s1_maskInBytes)
-  val s1_mergeStoreData = s1_req.wdata & s1_mask | s1_data & ~s1_mask
+  val s1_mergeStoreData = s1_req.wdata & s1_mask | s1_data & ~s1_mask // FIXME wdata incorrect
   // TODO: PWR assertion
   // TODO: Merge Store & AMO Store
 
@@ -149,22 +193,19 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     ),
   )
 
-  val s1_storeUpdateMeta =
-    s1_hit && (s1_cohMeta =/= s1_newHitCohMeta) && MemoryOpConstants.isWrite(s1_req.cmd) // hit but need to upgrade perm
-  val s1_storeClearMeta  = s1_upgradePermMiss
+  val s1_storeUpdateMeta = s1_upgradePermHit || s1_upgradePermMiss
   val s1_storeUpdateData = (s1_hit && MemoryOpConstants.isWrite(s1_req.cmd)) || (s1_sc && ~s1_scFail)
 
   // probe
   val s1_probeDirty      = s1_cohMeta.onProbe(s1_req.probePerm)._1
   val s1_newProbeCoh     = s1_cohMeta.onProbe(s1_req.probePerm)._3
   val s1_probeUpdateMeta = s1_validProbe && s1_tagMatch                  // probe should update meta
-  val s1_probeWb         = s1_validProbe
+  val s1_probeWb         = s1_validProbe                                 // probe should send probeAck
   val s1_probeWbData     = s1_validProbe && s1_tagMatch && s1_probeDirty // probe has data
 
   // replace
-  val s1_repLineAddr      = Cat(s1_metaArrayResp(s1_req.refillWay).tag, AddrDecoder.getSetIdx(s1_req.paddr))
-  val s1_repData          = s1_dataArrayResp(s1_req.refillWay).asUInt
-  val s1_repMeta          = ClientMetadata(s1_metaArrayResp(s1_req.refillWay).coh)
+  val s1_repLineAddr      = Cat(s1_tag, AddrDecoder.getSetIdx(s1_req.paddr)) // FIXME
+  val s1_repMeta          = s1_cohMeta
   val (s1_repDirty, _, _) = s1_repMeta.onCacheControl(MemoryOpConstants.M_FLUSH)
 
   val s1_refillUpdateMeta = s1_validRefill
@@ -174,9 +215,10 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_replaceWbData    = s1_validRefill && s1_repDirty
 
   // prepare for s2
-  val s1_updateMeta = s1_storeUpdateMeta || s1_storeClearMeta || s1_probeUpdateMeta || s1_refillUpdateMeta
+  val s1_updateMeta = s1_storeUpdateMeta || s1_probeUpdateMeta || s1_refillUpdateMeta
   val s1_updateData = s1_storeUpdateData || s1_refillUpdateData
 
+  // FIXME mask
   val s1_storeData =
     Mux(s1_req.isRefill, s1_req.wdata, Mux(MemoryOpConstants.isAMO(s1_req.cmd), s1_amoStoreData, s1_mergeStoreData))
 
@@ -199,19 +241,20 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     ),
   ).asUInt
 
+  val s1_updateReplacer = s1_hit || s1_validRefill
+
   // * pipeline stage 1 End
 
   // * pipeline stage 2 Begin
-  val s2_valid          = RegNext(s1_updateMeta || s1_updateData)
-  val s2_req            = Reg(new MainPipeReq)
-  val s2_wayEn          = RegInit(0.U(nWays.W))
-  val s2_newCoh         = RegInit(0.U(cohBits.W))
-  val s2_updateMeta     = RegNext(s1_updateMeta)
-  val s2_updateData     = RegNext(s1_updateData)
-  val s2_updateReplacer = RegNext(s1_hit || s1_validRefill)
-  val s2_refillFinish   = RegNext(s1_validRefill)
+  val s2_valid        = RegNext(s1_updateMeta || s1_updateData)
+  val s2_req          = Reg(new MainPipeReq)
+  val s2_wayEn        = RegInit(0.U(nWays.W))
+  val s2_newCoh       = RegInit(0.U(cohBits.W))
+  val s2_updateMeta   = RegNext(s1_updateMeta)
+  val s2_updateData   = RegNext(s1_updateData)
+  val s2_refillFinish = RegNext(s1_validRefill)
 
-  when(s1_updateMeta || s1_updateData || s2_updateReplacer) {
+  when(s1_updateMeta || s1_updateData) {
     s2_req       := s1_req
     s2_newCoh    := s1_newCoh
     s2_wayEn     := s1_wayEn
@@ -235,43 +278,54 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // * pipeline stage 2 End
 
-  // * pipeline stage 3 Begin
-  val s3_valid  = RegNext(s2_valid, false.B)
-  val s3_req    = RegEnable(s2_req, s2_valid)
-  val s3_newCoh = RegEnable(s2_newCoh, s2_valid)
-  val s3_wayEn  = RegEnable(s2_wayEn, s2_valid)
-  // * pipeline stage 3 End
-
   // *  Store -> Load Bypassing Begin
-  // bypass list (valid, req, data, coh, wayEn)
-  val bypassDataList = List(
-    (s1_updateMeta || s1_updateData, s1_req, s1_storeData, s1_newCoh, s1_wayEn),
-    (s2_valid, s2_req, s2_req.wdata, s2_newCoh, s2_wayEn),
-    (s3_valid, s3_req, s3_req.wdata, s3_newCoh, s3_wayEn),
+
+  // store/probe/refill -> load/store bypassing
+  // bypass list (valid, req, data, (coh, wayEn))
+
+  val s1_bypassStoreCandidate = createBypassStore(s1_storeData, AddrDecoder.getTag(s1_req.paddr), s1_newCoh, s1_wayEn)
+  val s2_bypassStoreCandidate = createBypassStore(s2_req.wdata, AddrDecoder.getTag(s2_req.paddr), s2_newCoh, s2_wayEn)
+
+  val bypassStoreList = List(
+    (s1_updateMeta || s1_updateData, s1_req, s1_bypassStoreCandidate),
+    (s2_valid, s2_req, s2_bypassStoreCandidate),
   ).map(r =>
     (
-      r._1 && s1_req.paddr >> blockOffBits === r._2.paddr >> blockOffBits && MemoryOpConstants.isWrite(r._2.cmd),
+      r._1 && MemoryOpConstants.isWrite(r._2.cmd)
+        && (s0_req.paddr >> blockOffBits === r._2.paddr >> blockOffBits
+          || (s0_req.isRefill && s0_req.refillWay === r._3.wayEn
+            && AddrDecoder.getSetIdx(s0_req.paddr) === AddrDecoder.getSetIdx(r._2.paddr))),
       r._3,
-      r._4,
-      r._5,
     )
   )
 
-  s1_storeBypass      := bypassDataList.map(_._1).reduce(_ || _)
-  s1_storeBypassData  := PriorityMux(bypassDataList.map(d => (d._1, d._2)))
-  s1_storeBypassCoh   := PriorityMux(bypassDataList.map(d => (d._1, d._3)))
-  s1_storeBypassWayEn := PriorityMux(bypassDataList.map(d => (d._1, d._4)))
+  s1_bypassStore.valid := bypassStoreList.map(_._1).reduce(_ || _)
+  s1_bypassStore.bits  := PriorityMux(bypassStoreList.map(d => (d._1, d._2)))
+
+  // replace -> load/store bypassing
+  // list (valid, setIdx, tag)
+  val bypassReplaceList = List(
+    (s1_validRefill, s1_req, s1_req.refillWay, s1_tag),
+    (s2_valid && s2_req.isRefill, s2_req, s2_req.refillWay, RegNext(s1_tag)),
+  )
+
+  s1_bypassReplace := bypassReplaceList.map(r =>
+    r._1
+      && AddrDecoder.getSetIdx(r._2.paddr) === AddrDecoder.getSetIdx(s0_req.paddr)
+      && AddrDecoder.getTag(s0_req.paddr) === r._4
+  ).reduce(_ || _)
+
   // * Store -> Load Bypassing End
 
   // * Replacer Begin
 
   val replacer = ReplacementPolicy.fromString(replacementPolicy, nWays, nSets)
 
-  val touchWay = OHToUInt(s2_wayEn)
-  val touchSet = AddrDecoder.getSetIdx(s2_req.paddr)
+  val touchWay = OHToUInt(s1_wayEn)
+  val touchSet = AddrDecoder.getSetIdx(s1_req.paddr)
 
-  // pipeline stage 2 -> hit update replacer
-  when(s2_updateReplacer) {
+  // pipeline stage 1 -> hit update replacer
+  when(s1_updateReplacer) {
     replacer.access(touchSet, touchWay)
   }
 
@@ -332,7 +386,7 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   wbQueue.io.req.bits.voluntary := s1_req.isRefill
   wbQueue.io.req.bits.lineAddr  := Mux(s1_probeWb, AddrDecoder.getLineAddr(s1_req.paddr), s1_repLineAddr)
   wbQueue.io.req.bits.hasData   := Mux(s1_probeWb, s1_probeWbData, s1_replaceWbData)
-  wbQueue.io.req.bits.data      := Mux(s1_probeWb, s1_data, s1_repData)
+  wbQueue.io.req.bits.data      := s1_data
 
   wbQueue.io.missCheck.valid    := false.B
   wbQueue.io.missCheck.lineAddr := DontCare
