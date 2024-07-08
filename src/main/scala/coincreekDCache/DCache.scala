@@ -18,13 +18,14 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   dontTouch(io)
 
-  def onReset    = Metadata(0.U, ClientMetadata.onReset.state)
-  val metaArray  = Module(new MetaArray[Metadata](() => onReset))
-  val dataArray  = Module(new DataArray)
-  val mshrs      = Module(new MSHRFile)
-  val wbQueue    = Module(new WritebackQueue)
-  val probeQueue = Module(new ProbeQueue)
-  val mainReqArb = Module(new Arbiter(new MainPipeReq, 3))
+  def onReset     = Metadata(0.U, ClientMetadata.onReset.state)
+  val metaArray   = Module(new MetaArray[Metadata](() => onReset))
+  val dataArray   = Module(new DataArray)
+  val mshrs       = Module(new MSHRFile)
+  val wbQueue     = Module(new WritebackQueue)
+  val probeQueue  = Module(new ProbeQueue)
+  val refillQueue = Module(new RefillQueue)
+  val mainReqArb  = Module(new Arbiter(new MainPipeReq, 3))
 
   // * Signal Define Begin
   // Store -> Load Bypassing
@@ -366,10 +367,8 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     growPermissions = mshrs.io.toL2Req.bits.perm,
   )._2
 
-  // L2 send data to mshr
-  mshrs.io.fromRefill.valid        := tl_out.d.valid
-  mshrs.io.fromRefill.bits.data    := tl_out.d.bits.data
-  mshrs.io.fromRefill.bits.entryId := tl_out.d.bits.source
+  // refillQueue -> mshr
+  mshrs.io.fromRefill <> refillQueue.io.toCore
 
   // mshr send replace req to pipeline
   mshrs.io.toReplace.ready := true.B
@@ -382,16 +381,25 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // * MSHR End
 
+  // * Refill Begin
+
+  refillQueue.io.fromL2.valid        := tl_out.d.valid
+  refillQueue.io.fromL2.bits.data    := tl_out.d.bits.data
+  refillQueue.io.fromL2.bits.entryId := tl_out.d.bits.source
+  refillQueue.io.fromL2.bits.hasData := tl_out.d.bits.opcode === TLMessages.GrantData
+
+  // * Refill End
+
   // * Writeback Begin
 
   // wb in pipeline stage 1
 
   wbQueue.io.req.valid          := s1_probeWb || s1_replaceWb
-  wbQueue.io.req.bits.perm      := Mux(s1_probeWb, s1_probeReportParam, s1_repShrinkParam)
   wbQueue.io.req.bits.voluntary := s1_req.isRefill
+  wbQueue.io.req.bits.data      := s1_data
+  wbQueue.io.req.bits.perm      := Mux(s1_probeWb, s1_probeReportParam, s1_repShrinkParam)
   wbQueue.io.req.bits.lineAddr  := Mux(s1_probeWb, getLineAddr(s1_req.paddr), s1_repLineAddr)
   wbQueue.io.req.bits.hasData   := Mux(s1_probeWb, s1_probeWbData, s1_replaceWbData)
-  wbQueue.io.req.bits.data      := s1_data
 
   wbQueue.io.missCheck.valid    := s1_valid && ~s1_hit
   wbQueue.io.missCheck.lineAddr := getLineAddr(s1_req.paddr)
