@@ -93,7 +93,7 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // 3. Return Resp
 
   val s1_valid = RegNext(s0_valid) & ~io.s1_kill
-  val s1_req   = RegNext(s0_req)
+  val s1_req   = RegEnable(s0_req, s0_valid)
 
   val s1_validFromCore = s1_valid && s1_req.isFromCore
   val s1_validProbe    = s1_valid && s1_req.isProbe
@@ -167,12 +167,13 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // TODO: Merge Store & AMO Store
 
   // amo store data
-  val amoalu          = Module(new AMOALU(dataWidth))
-  val s1_amoStoreData = amoalu.io.out
+  val amoalu          = Module(new AMOALU(XLEN))
+  val s1_blockOffset  = getBlockOffset(s1_req.paddr)
+  val s1_amoStoreData = (amoalu.io.out << (s1_blockOffset << 3) & s1_mask) | s1_data & ~s1_mask
 
-  amoalu.io.mask := s1_maskInBytes
+  amoalu.io.mask := new StoreGen(s1_req.size, s1_req.paddr, 0.U, XLEN).mask
   amoalu.io.cmd  := s1_req.cmd
-  amoalu.io.lhs  := s1_data
+  amoalu.io.lhs  := (s1_data >> (s1_blockOffset << 3))(XLEN - 1, 0)
   amoalu.io.rhs  := s1_req.wdata
 
   // lrsc
@@ -198,8 +199,8 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     ),
   )
 
-  val s1_storeUpdateMeta = s1_upgradePermHit || s1_upgradePermMiss
-  val s1_storeUpdateData = (s1_hit && MemoryOpConstants.isWrite(s1_req.cmd)) || (s1_sc && ~s1_scFail)
+  val s1_storeUpdateMeta = (s1_upgradePermHit || s1_upgradePermMiss) && !s1_scFail
+  val s1_storeUpdateData = (s1_hit && MemoryOpConstants.isWrite(s1_req.cmd)) && !s1_scFail
 
   // probe
   val s1_probeDirty       = s1_cohMeta.onProbe(s1_req.probePerm)._1
@@ -345,7 +346,10 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   dontTouch(mshrs.io)
 
   // pipeline miss -> mshr
-  mshrs.io.pipelineReq.valid              := s1_validFromCore && ~s1_hit // FIXME
+  val s1_mshrAlloc     = s1_validFromCore && ~s1_hit && ~s1_scFail
+  val s1_mshrAllocFail = s1_mshrAlloc && !mshrs.io.pipelineReq.ready
+
+  mshrs.io.pipelineReq.valid              := s1_mshrAlloc
   mshrs.io.pipelineReq.bits.isUpgrade     := s1_upgradePermMiss
   mshrs.io.pipelineReq.bits.data          := s1_storeData
   mshrs.io.pipelineReq.bits.mask          := s1_req.wmask
@@ -434,8 +438,9 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   s1_cacheResp.bits.status := MuxCase(
     CacheRespStatus.miss,
     Seq(
-      s1_hit          -> CacheRespStatus.hit,
-      s1_wbqBlockMiss -> CacheRespStatus.replay,
+      s1_hit           -> CacheRespStatus.hit,
+      s1_wbqBlockMiss  -> CacheRespStatus.replay,
+      s1_mshrAllocFail -> CacheRespStatus.replay,
     ),
   )
 
