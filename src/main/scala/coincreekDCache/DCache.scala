@@ -139,7 +139,7 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_tag     = s1_meta.tag
   val s1_cohMeta = ClientMetadata(s1_meta.coh) // obtain coh for load/store/probe/replace
 
-  // hit / miss for load/store
+  // hit/miss for load/store
   val s1_hasPerm         = s1_cohMeta.onAccess(s1_req.cmd)._1
   val s1_newHitCohMeta   = s1_cohMeta.onAccess(s1_req.cmd)._3
   val s1_hit             = s1_valid && s1_tagMatch && s1_hasPerm
@@ -409,8 +409,8 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // * Probe Begin
   probeQueue.io.memProbe <> tl_out.b
 
-  probeQueue.io.lsrcValid             := false.B
-  probeQueue.io.lsrcLineAddr          := DontCare
+  probeQueue.io.lsrcValid             := lrscValid
+  probeQueue.io.lsrcLineAddr          := getLineAddr(lrscAddr)
   probeQueue.io.probeCheck.blockProbe := false.B
   probeQueue.io.wbReady               := true.B
   // * Probe End
