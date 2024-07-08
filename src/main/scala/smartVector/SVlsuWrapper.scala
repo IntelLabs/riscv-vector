@@ -19,6 +19,7 @@ class SVlsuWrapper(implicit p: Parameters) extends Module {
     val uopEndInQ = RegInit(false.B)
 
     io.lsuReady := vLsu.io.lsuReady && hLsu.io.lsuReady && !uopEndInQ
+    io.lsuEmpty := vLsu.io.lsuEmpty && hLsu.io.lsuEmpty
 
     hLsu.io.mUop            <> io.mUop
     hLsu.io.mUopMergeAttr   <> io.mUopMergeAttr

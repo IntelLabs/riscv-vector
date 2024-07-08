@@ -30,7 +30,8 @@ class SVVLsu(implicit p: Parameters) extends Module {
 
     // * signal define
     // * END
-    io.lsuReady      := !ldstQueueFull
+    io.lsuReady := !ldstQueueFull
+    io.lsuEmpty := (ldstQueueCnt === 0.U)
 
     // decode nfield / indexed / unit-stride / strided
     val (vstart, vl)     = (io.mUop.bits.uop.info.vstart, io.mUop.bits.uop.info.vl)

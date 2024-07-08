@@ -84,6 +84,7 @@ class SVHLsu(implicit p: Parameters) extends Module {
     val mUopInfo = mUopInfoSelecter(io.mUop.bits, io.mUopMergeAttr.bits)
 
     io.lsuReady := Mux(uopState === uop_idle, true.B, false.B)
+    io.lsuEmpty := io.lsuReady
     // SPLIT FSM -- decide next state
     when (uopState === uop_idle) {
         when (io.mUop.valid && io.mUop.bits.uop.ctrl.isLdst && ldstCtrl.nfield === 1.U) { // not segment

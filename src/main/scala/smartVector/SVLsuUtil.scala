@@ -35,6 +35,7 @@ class LdstIO(implicit p: Parameters) extends ParameterizedBundle()(p) {
     val lsuOut          = Output(ValidIO(new LsuOutput))
     val dataExchange    = new RVUMemory()
     val lsuReady        = Output(Bool())
+    val lsuEmpty        = Output(Bool())
 }
 
 object VRegSegmentStatus {
