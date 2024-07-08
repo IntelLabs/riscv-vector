@@ -7,12 +7,7 @@ import freechips.rocketchip.tilelink.TLPermissions._
 import freechips.rocketchip.tilelink.{TLArbiter, TLBundleC, TLBundleD, TLEdgeOut}
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
-
-class ProbeAddrCheck extends Bundle {
-  val valid      = Output(Bool())
-  val addr       = Output(UInt(paddrWidth.W))
-  val blockProbe = Input(Bool())
-}
+import AddrDecoder._
 
 class ProbeQueue(
     implicit edge: TLEdgeOut,
@@ -22,9 +17,8 @@ class ProbeQueue(
     val memProbe    = Flipped(Decoupled(new TLBundleB(edge.bundle)))
     val mainPipeReq = Decoupled(new MainPipeReq)
 
-    val lsrcValid    = Input(Bool())
-    val lsrcLineAddr = Input(UInt((paddrWidth - blockOffBits).W))
-    val probeCheck   = new ProbeAddrCheck()
+    val lrscAddr   = Input(Valid(UInt(lineAddrWidth.W)))
+    val probeCheck = Flipped(new ProbeMSHRFile())
 
     val wbReady = Input(Bool())
   })
@@ -54,13 +48,14 @@ class ProbeQueue(
   }
 
   // check mshr addr
-  io.probeCheck.valid := (state === s_pipe_req)
-  io.probeCheck.addr  := probeReq.address
+  io.probeCheck.valid           := (state === s_pipe_req)
+  io.probeCheck.lineAddr        := getLineAddr(probeReq.address)
+  io.probeCheck.probePermission := probeReq.param
 
   // orgranize probe req sent to pipeline
   val mainPipeReq = MainPipeReqConverter(probeReq)
 
-  io.mainPipeReq.valid := (state === s_pipe_req) && !io.probeCheck.blockProbe & io.wbReady
+  io.mainPipeReq.valid := (state === s_pipe_req) && !io.probeCheck.probeBlock & io.wbReady & !io.lrscAddr.valid
   io.mainPipeReq.bits  := mainPipeReq
 
   io.memProbe.ready := true.B

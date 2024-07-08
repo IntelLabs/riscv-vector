@@ -409,10 +409,10 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // * Probe Begin
   probeQueue.io.memProbe <> tl_out.b
 
-  probeQueue.io.lsrcValid             := lrscValid
-  probeQueue.io.lsrcLineAddr          := getLineAddr(lrscAddr)
-  probeQueue.io.probeCheck.blockProbe := false.B
-  probeQueue.io.wbReady               := true.B
+  probeQueue.io.lrscAddr.valid := lrscValid
+  probeQueue.io.lrscAddr.bits  := lrscAddr
+  probeQueue.io.probeCheck <> mshrs.io.fromProbe
+  probeQueue.io.wbReady := true.B
   // * Probe End
 
   // * Resp Begin
