@@ -11,223 +11,210 @@ import org.chipsalliance.cde.config.{Parameters, Field}
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
 
-class DcacheBypassTest extends AnyFlatSpec with ChiselScalatestTester {
-  behavior.of("DCacheWrapper")
+trait DCacheBypassTestTrait {
+  this: AnyFlatSpec with ChiselScalatestTester with BundleGenHelper =>
 
-  val initilizeData =
-    "h0123456789abcdef_fedcba9876543210_0011223344556677_8899aabbccddeeff_7766554433221100_ffeeddccbbaa9988_1010101010101010_2323232323232323"
+  val cacheReqDefault = CacheReqBundle()
 
-  def initializeDut(dut: DCacheWrapperImp): Unit = {
-    dut.io.req.valid.poke(false.B)
-    dut.clock.step(150)
+  implicit val valName = ValName("DCacheBypassTest")
 
-    dut.io.req.valid.poke(true.B)
-    dut.io.req.bits.source.poke(1.U)
-    dut.io.req.bits.paddr.poke("h80004000".U)
-    dut.io.req.bits.cmd.poke(0.U) // dontcare
-    dut.io.req.bits.size.poke(6.U)
-    dut.io.req.bits.signed.poke(false.B)
-    dut.io.req.bits.wdata.poke(initilizeData.U)
-    dut.io.req.bits.wmask.poke(0.U)
-    dut.io.req.bits.noAlloc.poke(false.B)
-    dut.io.req.bits.isRefill.poke(true.B)
-    dut.io.req.bits.refillWay.poke(1.U)
-    dut.io.req.bits.refillCoh.poke(ClientStates.Trunk)
+  def cacheTest0(): Unit =
+    it should "pass: N->Dirty store->load bypassing" in {
+      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+        Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
+      ) { dut =>
+        val cacheReq = CacheReqBundle(
+          paddr = "h80004000",
+          cmd = MemoryOpConstants.M_XRD,
+        )
 
-    dut.clock.step(1)
-    dut.io.req.bits.paddr.poke("h80006000".U)
-    dut.io.req.bits.refillWay.poke(2.U)
-    dut.io.req.bits.refillCoh.poke(ClientStates.Dirty)
+        DCacheInit.initDut(dut)
 
-    dut.clock.step(1)
-    dut.io.req.bits.paddr.poke("h80008000".U)
-    dut.io.req.bits.refillWay.poke(3.U)
-    dut.io.req.bits.refillCoh.poke(ClientStates.Trunk)
+        dut.io.req.valid.poke(true.B)
+        dut.io.req.bits.poke(genReq(cacheReq.copy(
+          cmd = MemoryOpConstants.M_XWR,
+          wdata = "h12345678",
+        )))
 
-    dut.clock.step(1)
-    dut.io.req.bits.paddr.poke("h8000a000".U)
-    dut.io.req.bits.refillWay.poke(0.U)
-    dut.io.req.bits.refillCoh.poke(ClientStates.Branch)
+        dut.clock.step(1)
+        // s2->s1 store load bypass
+        dut.io.req.bits.poke(genReq(cacheReq))
 
-    dut.clock.step(1)
-    dut.io.req.valid.poke(false.B)
-    dut.io.req.bits.isRefill.poke(false.B)
-    dut.clock.step(5)
-  }
+        dut.clock.step(1)
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.data.expect("h12345678".U)
+        dut.io.resp.bits.status.expect(CacheRespStatus.hit)
 
-  it should "Store->Load Bypassing" in {
-    test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
-      Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
-    ) { dut =>
-      initializeDut(dut)
+        // s3->s1 store load bypass
+        dut.io.req.bits.poke(genReq(cacheReq))
 
-      dut.io.req.valid.poke(true.B)
-      dut.io.req.bits.signed.poke(false.B)
-      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XWR)
-      dut.io.req.bits.wdata.poke("h12345678".U)
-      dut.io.req.bits.paddr.poke("h80004000".U)
+        dut.clock.step(1)
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.data.expect("h12345678".U)
+        dut.io.resp.bits.status.expect(CacheRespStatus.hit)
 
-      dut.clock.step(1)
-      // s2->s1 store load bypass
-      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-      dut.io.req.bits.paddr.poke("h80004000".U)
+        // directly read meta array
+        dut.io.req.bits.poke(genReq(cacheReq))
 
-      dut.clock.step(1)
-      dut.io.resp.valid.expect(true.B)
-      dut.io.resp.bits.data.expect("h12345678".U)
-      dut.io.resp.bits.status.expect(CacheRespStatus.hit)
-
-      // s3->s1 store load bypass
-      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-      dut.io.req.bits.paddr.poke("h80004000".U)
-
-      dut.clock.step(1)
-      dut.io.resp.valid.expect(true.B)
-      dut.io.resp.bits.data.expect("h12345678".U)
-      dut.io.resp.bits.status.expect(CacheRespStatus.hit)
-
-      // directly read meta array
-      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-      dut.io.req.bits.paddr.poke("h80004000".U)
-
-      dut.clock.step(1)
-      dut.io.resp.valid.expect(true.B)
-      dut.io.resp.bits.data.expect("h12345678".U)
-      dut.io.resp.bits.status.expect(CacheRespStatus.hit)
+        dut.clock.step(1)
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.data.expect("h12345678".U)
+        dut.io.resp.bits.status.expect(CacheRespStatus.hit)
+      }
     }
-  }
 
-  it should "T->Dirty Store->Load Bypassing" in {
-    test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
-      Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
-    ) { dut =>
-      initializeDut(dut)
+  def cacheTest1(): Unit =
+    it should "pass: T->Dirty store->load bypassing" in {
+      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+        Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
+      ) { dut =>
+        val cacheReq = CacheReqBundle(
+          paddr = "h80008000",
+          cmd = MemoryOpConstants.M_XRD,
+        )
 
-      dut.io.req.valid.poke(true.B)
-      dut.io.req.bits.signed.poke(false.B)
-      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XWR)
-      dut.io.req.bits.wdata.poke("h12345678".U)
-      dut.io.req.bits.paddr.poke("h80008000".U)
+        DCacheInit.initDut(dut)
 
-      dut.clock.step(1)
-      // s2->s1 store load bypass
-      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-      dut.io.req.bits.paddr.poke("h80008000".U)
+        dut.io.req.valid.poke(true.B)
+        dut.io.req.bits.poke(genReq(cacheReq.copy(
+          cmd = MemoryOpConstants.M_XWR,
+          wdata = "h12345678",
+        )))
 
-      dut.clock.step(1)
-      dut.io.resp.valid.expect(true.B)
-      dut.io.resp.bits.data.expect("h12345678".U)
-      dut.io.resp.bits.status.expect(CacheRespStatus.hit)
+        dut.clock.step(1)
+        // s2->s1 store load bypass
+        dut.io.req.bits.poke(genReq(cacheReq))
 
-      // s3->s1 store load bypass
-      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-      dut.io.req.bits.paddr.poke("h80008000".U)
+        dut.clock.step(1)
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.data.expect("h12345678".U)
+        dut.io.resp.bits.status.expect(CacheRespStatus.hit)
 
-      dut.clock.step(1)
-      dut.io.resp.valid.expect(true.B)
-      dut.io.resp.bits.data.expect("h12345678".U)
-      dut.io.resp.bits.status.expect(CacheRespStatus.hit)
+        // s3->s1 store load bypass
+        dut.io.req.bits.poke(genReq(cacheReq))
 
-      // directly read meta array
-      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-      dut.io.req.bits.paddr.poke("h80008000".U)
+        dut.clock.step(1)
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.data.expect("h12345678".U)
+        dut.io.resp.bits.status.expect(CacheRespStatus.hit)
 
-      dut.clock.step(1)
-      dut.io.resp.valid.expect(true.B)
-      dut.io.resp.bits.data.expect("h12345678".U)
-      dut.io.resp.bits.status.expect(CacheRespStatus.hit)
+        // directly read meta array
+        dut.io.req.bits.poke(genReq(cacheReq))
+
+        dut.clock.step(1)
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.data.expect("h12345678".U)
+        dut.io.resp.bits.status.expect(CacheRespStatus.hit)
+      }
     }
-  }
 
-  it should "B->Dirty Store->Load Bypassing" in {
-    test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
-      Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
-    ) { dut =>
-      initializeDut(dut)
+  def cacheTest2(): Unit =
+    it should "pass: B->Dirty store->load bypassing" in {
+      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+        Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
+      ) { dut =>
+        val cacheReq = CacheReqBundle(
+          paddr = "h8000a000",
+          cmd = MemoryOpConstants.M_XRD,
+        )
 
-      dut.io.req.valid.poke(true.B)
-      dut.io.req.bits.signed.poke(false.B)
-      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XWR)
-      dut.io.req.bits.wdata.poke("h12345678".U)
-      dut.io.req.bits.paddr.poke("h8000a000".U)
+        DCacheInit.initDut(dut)
 
-      dut.clock.step(1)
-      // s2->s1 store load bypass
-      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-      dut.io.req.bits.paddr.poke("h8000a000".U)
+        dut.io.req.valid.poke(true.B)
+        dut.io.req.bits.poke(genReq(cacheReq.copy(
+          cmd = MemoryOpConstants.M_XWR,
+          wdata = "h12345678",
+        )))
 
-      dut.clock.step(1)
-      dut.io.resp.valid.expect(true.B)
-      dut.io.resp.bits.status.expect(CacheRespStatus.miss)
+        dut.clock.step(1)
+        // s2->s1 store load bypass
+        dut.io.req.bits.poke(genReq(cacheReq))
 
-      // s3->s1 store load bypass
-      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-      dut.io.req.bits.paddr.poke("h8000a000".U)
+        dut.clock.step(1)
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
 
-      dut.clock.step(1)
-      dut.io.resp.valid.expect(true.B)
-      dut.io.resp.bits.status.expect(CacheRespStatus.miss)
+        // s3->s1 store load bypass
+        dut.io.req.bits.poke(genReq(cacheReq))
 
-      // directly read meta array
-      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-      dut.io.req.bits.paddr.poke("h8000a000".U)
+        dut.clock.step(1)
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.data.expect("h12345678".U)
+        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
 
-      dut.clock.step(1)
-      dut.io.resp.valid.expect(true.B)
-      dut.io.resp.bits.status.expect(CacheRespStatus.miss)
+        // directly read meta array
+        dut.io.req.bits.poke(genReq(cacheReq))
+
+        dut.clock.step(1)
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
+      }
     }
-  }
 
-  it should "Replace->Load Bypassing" in {
-    test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
-      Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
-    ) { dut =>
-      initializeDut(dut)
+  def cacheTest3(): Unit =
+    it should "pass: replace->load bypassing" in {
+      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+        Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
+      ) { dut =>
+        val cacheReq = CacheReqBundle(
+          paddr = "h80004000",
+          cmd = MemoryOpConstants.M_XRD,
+        )
 
-      dut.io.req.valid.poke(true.B)
-      dut.io.req.bits.signed.poke(false.B)
-      dut.io.req.bits.paddr.poke("h8000c000".U)
-      dut.io.req.bits.wdata.poke("h12345678".U)
-      dut.io.req.bits.isRefill.poke(true.B)
-      dut.io.req.bits.refillWay.poke(0.U)
-      dut.io.req.bits.refillCoh.poke(ClientStates.Dirty)
+        DCacheInit.initDut(dut)
 
-      dut.clock.step(1)
-      dut.io.req.bits.isRefill.poke(false.B)
-      // s2->s1 replace load bypass
-      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-      dut.io.req.bits.paddr.poke("h8000a000".U)
+        dut.io.req.valid.poke(true.B)
+        dut.io.req.bits.poke(genReq(cacheReq.copy(
+          paddr = "h8000c000",
+          isRefill = true,
+          refillWay = 0,
+          refillCoh = ClientStates.Dirty,
+          wdata = "h12345678",
+        )))
 
-      dut.clock.step(1)
-      dut.io.resp.valid.expect(true.B)
-      dut.io.resp.bits.status.expect(CacheRespStatus.miss)
+        dut.clock.step(1)
+        // s2->s1 replace load bypass
+        dut.io.req.bits.poke(genReq(cacheReq))
 
-      // s3->s1 replace load bypass
-      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-      dut.io.req.bits.paddr.poke("h8000a000".U)
+        dut.clock.step(1)
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
 
-      dut.clock.step(1)
-      dut.io.resp.valid.expect(true.B)
-      dut.io.resp.bits.status.expect(CacheRespStatus.miss)
+        // s3->s1 replace load bypass
+        dut.io.req.bits.poke(genReq(cacheReq))
 
-      // directly read meta array
-      dut.io.req.bits.cmd.poke(MemoryOpConstants.M_XRD)
-      dut.io.req.bits.paddr.poke("h8000a000".U)
+        dut.clock.step(1)
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
 
-      dut.clock.step(1)
-      dut.io.resp.valid.expect(true.B)
-      dut.io.resp.bits.status.expect(CacheRespStatus.miss)
+        // directly read meta array
+        dut.io.req.bits.poke(genReq(cacheReq))
+
+        dut.clock.step(1)
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
+      }
+
     }
-  }
 
-  it should "Probe->Load Bypassing" in {
-    test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
-      Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
-    ) { dut =>
-      initializeDut(dut)
+  def cacheTest4(): Unit =
+    it should "pass: probe->load bypassing" in {
+      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+        Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
+      ) { dut =>
+        DCacheInit.initDut(dut)
 
-      // TODO
+        // TODO
+      }
     }
-  }
+}
 
+class DCacheBypassTest extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with DCacheBypassTestTrait {
+  behavior of "DCache Bypass Test"
+
+  it should behave like cacheTest0() //
+  it should behave like cacheTest1() //
+  it should behave like cacheTest2() //
+  it should behave like cacheTest3() //
+  it should behave like cacheTest4() //
 }

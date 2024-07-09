@@ -11,7 +11,7 @@ import chiseltest.{VerilatorBackendAnnotation, WriteVcdAnnotation}
 class MetaArrayTest extends AnyFlatSpec with ChiselScalatestTester {
   behavior.of("MetaArray")
 
-  it should "write and read metadata " in {
+  it should "pass: write and read metadata " in {
     test(new MetaArray[Metadata](Metadata.onReset)).withAnnotations(
       Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
     ) {
@@ -42,7 +42,7 @@ class MetaArrayTest extends AnyFlatSpec with ChiselScalatestTester {
     }
   }
 
-  it should "write and read metadata simultaneously" in {
+  it should "pass: write and read metadata simultaneously" in {
     test(new MetaArray[Metadata](Metadata.onReset)).withAnnotations(
       Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
     ) {

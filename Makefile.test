@@ -1,17 +1,17 @@
+test_all:
+	mill -i $(PRJ)[$(CHISEL_VERSION)].test.testOnly $(PRJ).*Test
+
 test_dcache:
-	mill -i $(PRJ)[$(CHISEL_VERSION)].test.testOnly $(PRJ).DCacheSpec
+	mill -i $(PRJ)[$(CHISEL_VERSION)].test.testOnly $(PRJ).DCacheTest
+
+test_amo:
+	mill -i $(PRJ)[$(CHISEL_VERSION)].test.testOnly $(PRJ).DCacheAMOTest
+
+test_bypass:
+	mill -i $(PRJ)[$(CHISEL_VERSION)].test.testOnly $(PRJ).DCacheBypassTest
 
 test_meta:
 	mill -i $(PRJ)[$(CHISEL_VERSION)].test.testOnly $(PRJ).MetaArrayTest
 
 test_data:
 	mill -i $(PRJ)[$(CHISEL_VERSION)].test.testOnly $(PRJ).DataArrayTest
-
-test_wbu:
-	mill -i $(PRJ)[$(CHISEL_VERSION)].test.testOnly $(PRJ).WriteBackTest
-
-test_miss:
-	mill -i $(PRJ)[$(CHISEL_VERSION)].test.testOnly $(PRJ).DcacheMissTest
-
-test_bypass:
-	mill -i $(PRJ)[$(CHISEL_VERSION)].test.testOnly $(PRJ).DcacheBypassTest

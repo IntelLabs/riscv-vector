@@ -8,7 +8,7 @@ import chiseltest.{VerilatorBackendAnnotation, WriteVcdAnnotation}
 class DataArrayTest extends AnyFlatSpec with ChiselScalatestTester {
   behavior.of("DataArray")
 
-  it should "write and read data array " in {
+  it should "pass: write and read data array " in {
     test(new DataArray()).withAnnotations(
       Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
     ) {
