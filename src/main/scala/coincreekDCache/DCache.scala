@@ -373,6 +373,7 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // refillQueue -> mshr
   mshrs.io.fromRefill <> refillQueue.io.toCore
+  mshrs.io.probeRefill <> refillQueue.io.fromProbe
 
   // mshr send replace req to pipeline
   mshrs.io.toReplace.ready := true.B
@@ -387,10 +388,11 @@ class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // * Refill Begin
 
-  refillQueue.io.fromL2.valid        := tl_out.d.valid
-  refillQueue.io.fromL2.bits.data    := tl_out.d.bits.data
-  refillQueue.io.fromL2.bits.entryId := tl_out.d.bits.source
-  refillQueue.io.fromL2.bits.hasData := tl_out.d.bits.opcode === TLMessages.GrantData
+  refillQueue.io.fromL2.valid           := tl_out.d.valid
+  refillQueue.io.fromL2.bits.data       := tl_out.d.bits.data
+  refillQueue.io.fromL2.bits.entryId    := tl_out.d.bits.source
+  refillQueue.io.fromL2.bits.hasData    := tl_out.d.bits.opcode === TLMessages.GrantData
+  refillQueue.io.fromL2.bits.probeMatch := DontCare
 
   // * Refill End
 

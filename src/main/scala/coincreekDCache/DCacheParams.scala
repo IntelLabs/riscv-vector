@@ -98,3 +98,12 @@ object MasterSource {
   def Core   = 0.U(width.W)
   def Vector = 2.U(width.W)
 }
+
+object ProbeMSHRState {
+  val width = 2
+
+  def miss      = 0.U(width.W)
+  def hitGo     = 1.U(width.W)
+  def hitBlockN = 2.U(width.W)
+  def hitBlockB = 3.U(width.W)
+}

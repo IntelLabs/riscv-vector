@@ -55,8 +55,8 @@ class ProbeQueue(
   // orgranize probe req sent to pipeline
   val mainPipeReq = MainPipeReqConverter(probeReq)
 
-  io.mainPipeReq.valid := (state === s_pipe_req) && !io.probeCheck.probeBlock & io.wbReady & !io.lrscAddr.valid
-  io.mainPipeReq.bits  := mainPipeReq
+  io.mainPipeReq.valid := (state === s_pipe_req) && (!io.probeCheck.hit || (io.probeCheck.hit && io.probeCheck.hitGo)) & io.wbReady & !io.lrscAddr.valid
+  io.mainPipeReq.bits := mainPipeReq
 
   io.memProbe.ready := true.B
 

@@ -30,7 +30,7 @@ class MSHREntryIO extends Bundle() {
 
   // probe permission
   val probePermission = Input(UInt(TLPermissions.bdWidth.W))
-  val probeBlock      = Output(Bool())
+  val probeState      = Output(UInt(ProbeMSHRState.width.W))
 }
 
 /////// replay reg IOs
@@ -102,6 +102,8 @@ class MSHRFileL2 extends Bundle() {
 class RefillMSHRFile extends Bundle() {
   val entryId = UInt(log2Up(mshrEntryNum).W)
   val data    = UInt(mshrDataWidth.W)
+
+  val probeMatch = Bool()
 }
 
 class L2Refill extends RefillMSHRFile() {
@@ -112,6 +114,13 @@ class ProbeMSHRFile extends Bundle() {
   val valid           = Input(Bool())
   val probePermission = Input(UInt(TLPermissions.bdWidth.W))
   val lineAddr        = Input(UInt(lineAddrWidth.W))
-  val probeMatch      = Output(Bool())
-  val probeBlock      = Output(Bool())
+
+  val hitGo      = Output(Bool())
+  val hit        = Output(Bool())
+
+  val replaceFinish = Output(Bool())
+}
+
+class ProbeRefill extends Bundle() {
+  val entryId = UInt(log2Up(mshrEntryNum).W)
 }

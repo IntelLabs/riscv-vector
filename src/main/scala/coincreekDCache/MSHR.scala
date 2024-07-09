@@ -34,8 +34,26 @@ class MSHR(id: Int) extends Module() {
   // it is not allowed for write -> read -> write
   val readAfterWriteFlag = RegInit(false.B)
   val wrwErr             = readAfterWriteFlag && io.reqType.asBool
-  val probeBlock         = probeReq && io.probePermission === TLPermissions.toB && sentPermission =/= TLPermissions.NtoB
-  io.probeBlock := probeBlock && probeReq
+  val probeState = Mux(
+    lineAddrMatch,
+    ProbeMSHRState.miss,
+    Mux(
+      state >= mode_resp_wait,
+      ProbeMSHRState.hitBlockB,
+      MuxLookup(io.probePermission, ProbeMSHRState.hitBlockB)(
+        Seq(
+          TLPermissions.toN -> ProbeMSHRState.hitBlockN,
+          TLPermissions.toB -> Mux(
+            sentPermission === TLPermissions.NtoB,
+            ProbeMSHRState.hitGo,
+            ProbeMSHRState.hitBlockB,
+          ),
+        )
+      ),
+    ),
+  )
+//    === TLPermissions.toB && sentPermission =/= TLPermissions.NtoB
+  io.probeState := Mux(probeReq, probeState, ProbeMSHRState.miss)
 
   readAfterWriteFlag := MuxCase(
     readAfterWriteFlag,
@@ -234,6 +252,7 @@ class MSHRFile extends Module() {
       val toL2Req     = DecoupledIO(new MSHRFileL2)              // TL A
       val fromRefill  = Flipped(DecoupledIO(new RefillMSHRFile)) // TL D/E
       val fromProbe   = new ProbeMSHRFile
+      val probeRefill = ValidIO(new ProbeRefill)
 
       val toPipeline    = DecoupledIO(new MSHRPipeResp()) // read resp
       val toReplace     = DecoupledIO(new MSHRReplace())
@@ -269,9 +288,15 @@ class MSHRFile extends Module() {
 
   // interface for probe
   val probeReq       = io.fromProbe.valid
-  val probeBlockList = Wire(Vec(mshrEntryNum, Bool()))
-  io.fromProbe.probeMatch := probeReq && lineAddrMatch
-  io.fromProbe.probeBlock := probeReq && (probeBlockList.asUInt | lineAddrMatchList.asUInt).orR
+  val probeStateList = Wire(Vec(mshrEntryNum, UInt(ProbeMSHRState.width.W)))
+  val probeState     = probeStateList.reduce(_ | _)
+  io.fromProbe.replaceFinish := io.replaceFinish
+
+  io.probeRefill.valid        := io.fromProbe.valid
+  io.probeRefill.bits.entryId := lineAddrMatchIdx
+
+  io.fromProbe.hitGo := probeReq && (probeState === ProbeMSHRState.hitGo | (probeState === ProbeMSHRState.hitBlockN && !io.fromRefill.bits.probeMatch))
+  io.fromProbe.hit := probeReq && lineAddrMatch
 
   // interface for replay
   val replayReq = io.fromRefill.valid
@@ -324,7 +349,7 @@ class MSHRFile extends Module() {
       lineAddrMatchIdxList(i) := Mux(mshr.io.lineAddrMatch, i.asUInt, 0.U)
 
       // probe signal
-      probeBlockList(i)       := mshr.io.probeBlock
+      probeStateList(i)       := mshr.io.probeState
       mshr.io.probePermission := io.fromProbe.probePermission
 
       // replay & refill signal
