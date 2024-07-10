@@ -82,10 +82,9 @@ class RefillQueue extends Module {
   noDataQueue.io.searchIdx  := io.fromProbe.bits.entryId
   io.toCore.bits.probeMatch := io.fromProbe.valid && (dataIdxQueue.io.idxMatch || noDataQueue.io.idxMatch)
 
-  dataQueue.io.deq.ready := io.toCore.ready && dataQueue.io.deq.valid && (!priv || (priv && !noDataQueue.io.deq.valid))
-  dataIdxQueue.io.deq.ready := io.toCore.ready && dataQueue.io.deq.valid && (!priv || (priv && !noDataQueue.io.deq.valid))
-  noDataQueue.io.deq.ready := io.toCore.ready && noDataQueue.io.deq.valid && (priv || (!priv && dataQueue.io.deq.valid))
-
+  noDataQueue.io.deq.ready  := io.toCore.ready && (!priv || (priv && !noDataQueue.io.deq.valid))
+  dataQueue.io.deq.ready    := io.toCore.ready && (priv || (!priv && dataQueue.io.deq.valid))
+  dataIdxQueue.io.deq.ready := io.toCore.ready && (!priv || (priv && !noDataQueue.io.deq.valid))
 }
 
 //class RefillTest
