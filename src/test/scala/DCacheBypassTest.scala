@@ -138,16 +138,35 @@ trait DCacheBypassTestTrait {
         dut.io.req.bits.poke(genReq(cacheReq))
 
         dut.clock.step(1)
+        dut.io.req.valid.poke(false.B)
         dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.data.expect("h12345678".U)
         dut.io.resp.bits.status.expect(CacheRespStatus.miss)
 
+        dut.clock.step(1)
         // directly read meta array
-        dut.io.req.bits.poke(genReq(cacheReq))
+
+        while (!dut.io.resp.valid.peekBoolean()) {
+          dut.clock.step(1)
+        }
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.status.expect(CacheRespStatus.refill)
+        dut.io.resp.bits.data.expect("h12345678".U)
 
         dut.clock.step(1)
         dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
+        dut.io.resp.bits.status.expect(CacheRespStatus.refill)
+        dut.io.resp.bits.data.expect("h12345678".U)
+
+        dut.clock.step(20)
+
+        dut.io.req.valid.poke(true.B)
+        dut.io.req.bits.poke(genReq(cacheReq))
+
+        dut.clock.step(1)
+        dut.io.req.valid.poke(false.B)
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.data.expect("h12345678".U)
+        dut.io.resp.bits.status.expect(CacheRespStatus.hit)
       }
     }
 
@@ -157,7 +176,7 @@ trait DCacheBypassTestTrait {
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
         val cacheReq = CacheReqBundle(
-          paddr = "h80004000",
+          paddr = "h8000a000",
           cmd = MemoryOpConstants.M_XRD,
         )
 
@@ -165,9 +184,9 @@ trait DCacheBypassTestTrait {
 
         dut.io.req.valid.poke(true.B)
         dut.io.req.bits.poke(genReq(cacheReq.copy(
-          paddr = "h8000c000",
+          paddr = "h8000e000",
           isRefill = true,
-          refillWay = 0,
+          refillWay = 3,
           refillCoh = ClientStates.Dirty,
           wdata = "h12345678",
         )))

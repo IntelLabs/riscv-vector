@@ -1,6 +1,6 @@
 
 BUILD_DIR = ./build
-CHISEL_VERSION = chisel
+CHISEL_VERSION = chisel3
 
 PRJ = coincreekDCache
 

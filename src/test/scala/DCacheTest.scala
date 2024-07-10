@@ -122,7 +122,7 @@ trait DCacheTestTrait {
         }
         dut.io.resp.valid.expect(true.B)
         dut.io.resp.bits.status.expect(CacheRespStatus.refill)
-        dut.io.resp.bits.data.expect("h22334455".U)
+        dut.io.resp.bits.data.expect(0.U)
         dut.clock.step(10)
 
         // read hit after refill
@@ -132,9 +132,11 @@ trait DCacheTestTrait {
         dut.clock.step(1)
         dut.io.req.valid.poke(false.B)
         dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.data.expect("h22334455".U)
+        dut.io.resp.bits.data.expect(0.U)
         dut.io.resp.bits.status.expect(CacheRespStatus.hit)
         dut.clock.step(1)
+
+        dut.clock.step(200) // writeback
 
         // read miss after replace
         dut.io.req.valid.poke(true.B)
@@ -144,6 +146,16 @@ trait DCacheTestTrait {
         dut.io.req.valid.poke(false.B)
         dut.io.resp.valid.expect(true.B)
         dut.io.resp.bits.status.expect(CacheRespStatus.miss)
+        dut.clock.step(1)
+
+        // refill resp
+        while (!dut.io.resp.valid.peekBoolean()) {
+          dut.clock.step(1)
+        }
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.status.expect(CacheRespStatus.refill)
+        dut.io.resp.bits.data.expect(DCacheInit.initData.U)
+        dut.clock.step(10)
         dut.clock.step(10)
 
       }

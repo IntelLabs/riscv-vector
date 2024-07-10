@@ -10,6 +10,7 @@ import chiseltest.{VerilatorBackendAnnotation, WriteVcdAnnotation}
 import org.chipsalliance.cde.config.{Parameters, Field}
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
+import MemoryOpConstants._
 
 case class CacheReqBundle(
     source:    Int = 0,
@@ -62,7 +63,7 @@ object DCacheInit extends BundleGenHelper {
       cacheRefillDefault.copy(
         paddr = "h80004000",
         refillWay = 0,
-        refillCoh = ClientStates.Trunk,
+        refillCoh = ClientStates.Dirty,
       ),
       cacheRefillDefault.copy(
         paddr = "h80006000",
@@ -84,6 +85,8 @@ object DCacheInit extends BundleGenHelper {
     cacheRefillSeq.foreach { req =>
       dut.io.req.valid.poke(true.B)
       dut.io.req.bits.poke(genReq(req))
+      dut.clock.step(1)
+      dut.io.req.valid.poke(false.B)
       dut.clock.step(1)
     }
 
