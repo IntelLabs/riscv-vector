@@ -56,10 +56,10 @@ object AccTileConstants {
   val vstqAddrSz = 3
   val rLen = 128
   val numVLdPorts = 1
-  val mxuPERows = 1
-  val mxuPECols = 1
-  val mxuTileRows = 1
-  val mxuTileCols = 1
+  val mxuPERows = 8
+  val mxuPECols = 8
+  val mxuTileRows = 8
+  val mxuTileCols = 8
   val mxuMeshRows = 1
   val mxuMeshCols = 1
   val rLenb = 16
@@ -143,7 +143,7 @@ class FpMacPipe(implicit p: Parameters) extends Bundle {
 class IntMacUnit extends Module {
   val io = IO(new Bundle {
     val src1 = Input(UInt(32.W))
-    val src2 = Input(UInt(8.W))
+    val src2 = Input(UInt(32.W))
     val src3 = Input(UInt(32.W))
     val srcType = Input(UInt(3.W))
     val outType = Input(UInt(3.W))
@@ -160,12 +160,19 @@ class IntMacUnit extends Module {
       1.U(1.W) ## Fill(31, 0.U(1.W))))
 
   // macc, mult
-  val lhs = io.src1(7, 0).asSInt
-  val rhs = io.src2(7, 0).asSInt
+  val lhs0 = io.src1(7, 0).asSInt
+  val rhs0 = io.src2(7, 0).asSInt
+  val lhs1 = io.src1(15, 8).asSInt
+  val rhs1 = io.src2(15, 8).asSInt
+  val lhs2 = io.src1(23, 16).asSInt
+  val rhs2 = io.src2(23, 16).asSInt
+  val lhs3 = io.src1(31, 24).asSInt
+  val rhs3 = io.src2(31, 24).asSInt
+
   val acc = WireInit(0.U(32.W))
   acc := Mux(io.outType === INT8TYPE, Fill(24, io.src3(7)) ## io.src3(7, 0),
     Mux(io.outType === INT16TYPE, Fill(16, io.src3(15)) ## io.src3(15, 0), io.src3))
-  val macc = lhs * rhs +& acc.asSInt
+  val macc = lhs0 * rhs0 +& lhs1 * rhs1 +& lhs2 * rhs2 +& lhs3 * rhs3 +& acc.asSInt
 
   // add, sub
   val in1 = Mux(io.srcType === INT8TYPE, Fill(24, io.src1(7)) ## io.src1(7, 0),
@@ -422,13 +429,13 @@ class PE(
   val io = IO(new Bundle {
     // matrix multiplication related: mutiply-accumulate
     val macReqIn = Input(Valid(new MacCtrls())) // control signals
-    val macReqSrcA = Input(UInt(16.W))
-    val macReqSrcB = Input(UInt(16.W))
+    val macReqSrcA = Input(UInt(32.W))
+    val macReqSrcB = Input(UInt(32.W))
     val macReqSrcC = Input(UInt(16.W))
     val macReqSrcD = Input(UInt(16.W))
     val macReqOut = Output(Valid(new MacCtrls()))
-    val macOutSrcA = Output(UInt(16.W)) // for systolic horizontally
-    val macOutSrcB = Output(UInt(16.W)) // for systolic vertically
+    val macOutSrcA = Output(UInt(32.W)) // for systolic horizontally
+    val macOutSrcB = Output(UInt(32.W)) // for systolic vertically
     val macOutSrcC = Output(UInt(16.W)) // for systolic vertically
     val macOutSrcD = Output(UInt(16.W)) // for systolic horizontally
     // clear tile slices, control signals propagated vertically
@@ -479,7 +486,7 @@ class PE(
   fpMac.io.src1 := Mux(macReqCtrls.aluType === MACC && macReqCtrls.dirCal === 0.U, io.macReqSrcA, c0(macReqCtrls.src1Ridx))
 
   fpMac.io.src2 := Mux(macReqCtrls.dirCal === 1.U, io.macReqSrcC,
-    Mux(macReqCtrls.dirCal === 2.U, io.macReqSrcA, io.macReqSrcB))
+    Mux(macReqCtrls.dirCal === 2.U, io.macReqSrcA, io.macReqSrcB(15,0)))
   fpMac.io.src3 := Mux(macReqCtrls.aluType === MULT, 0.U,
     Mux(macReqCtrls.dirCal === 1.U, io.macReqSrcB,
       Mux(macReqCtrls.dirCal === 2.U, io.macReqSrcD, c0(macReqCtrls.src2Ridx))))
@@ -497,20 +504,13 @@ class PE(
   fpMac.io.detectTininess := hardfloat.consts.tininess_afterRounding
 
   // int8 MAC function units
-  val intMac0 = Module(new IntMacUnit())
-  val intMac1 = Module(new IntMacUnit())
-  intMac0.io.src1 := Mux(macReqCtrls.aluType === MACC, io.macReqSrcA(7, 0), c0(macReqCtrls.src1Ridx))
-  intMac0.io.src2 := io.macReqSrcB(7, 0)
-  intMac0.io.src3 := Mux(macReqCtrls.aluType === MULT, 0.U, c0(macReqCtrls.src2Ridx))
-  intMac0.io.srcType := macReqCtrls.outType
-  intMac0.io.outType := macReqCtrls.outType
-  intMac0.io.aluType := macReqCtrls.aluType
-  intMac1.io.src1 := Mux(macReqCtrls.aluType === MACC, io.macReqSrcA(7, 0), c1(macReqCtrls.src1Ridx))
-  intMac1.io.src2 := io.macReqSrcB(15, 8)
-  intMac1.io.src3 := Mux(macReqCtrls.aluType === MULT, 0.U, c1(macReqCtrls.src2Ridx))
-  intMac1.io.srcType := macReqCtrls.outType
-  intMac1.io.outType := macReqCtrls.outType
-  intMac1.io.aluType := macReqCtrls.aluType
+  val intMac = Module(new IntMacUnit())
+  intMac.io.src1 := Mux(macReqCtrls.aluType === MACC, io.macReqSrcA, c0(macReqCtrls.src1Ridx))
+  intMac.io.src2 := io.macReqSrcB
+  intMac.io.src3 := Mux(macReqCtrls.aluType === MULT, 0.U, c0(macReqCtrls.src2Ridx))
+  intMac.io.srcType := macReqCtrls.outType
+  intMac.io.outType := macReqCtrls.outType
+  intMac.io.aluType := macReqCtrls.aluType
 
   // TODO: Optimization, latency = 1 for int8 mac; 3 for fp16 mac
   when(fpMac.io.validout) {
@@ -518,8 +518,7 @@ class PE(
   }
 
   when(macReqValid && (!macReqCtrls.srcType(2))) {
-    c0(macReqCtrls.dstRidx) := intMac0.io.out
-    c1(macReqCtrls.dstRidx) := intMac1.io.out
+    c0(macReqCtrls.dstRidx) := intMac.io.out
   }
 
   io.macReqOut := io.macReqIn
@@ -620,18 +619,17 @@ class Tile(
             val indexh: Int,
             val indexv: Int,
             val numReadPorts: Int = 1
-            //        )(implicit p: Parameters) extends BoomModule {
           )(implicit p: Parameters) extends Module {
   val io = IO(new Bundle {
     // matrix multiplication related: mutiply-accumulate
     val macReqIn = Input(Valid(new MacCtrls()))
-    val macReqSrcA = Input(UInt((mxuTileRows * 16).W))
-    val macReqSrcB = Input(UInt((mxuTileCols * 16).W))
+    val macReqSrcA = Input(UInt((mxuTileRows * 32).W))
+    val macReqSrcB = Input(UInt((mxuTileCols * 32).W))
     val macReqSrcC = Input(UInt((mxuTileCols * 16).W))
     val macReqSrcD = Input(UInt((mxuTileRows * 16).W))
     val macReqOut = Output(Valid(new MacCtrls()))
-    val macOutSrcA = Output(UInt((mxuTileRows * 16).W))
-    val macOutSrcB = Output(UInt((mxuTileCols * 16).W))
+    val macOutSrcA = Output(UInt((mxuTileRows * 32).W))
+    val macOutSrcB = Output(UInt((mxuTileCols * 32).W))
     val macOutSrcC = Output(UInt((mxuTileCols * 16).W))
     val macOutSrcD = Output(UInt((mxuTileRows * 16).W))
     // clear tile slices, control signals propagated vertically
@@ -668,7 +666,7 @@ class Tile(
 
   // broadcast horizontally across the tile
   for (r <- 0 until mxuTileRows) {
-    val peSrcA = io.macReqSrcA(16 * r + 15, 16 * r)
+    val peSrcA = io.macReqSrcA(32 * r + 31, 32 * r)
     tile(r).foldLeft(peSrcA) {
       case (macReqSrcA, pe) => {
         pe.io.macReqSrcA := macReqSrcA
@@ -730,7 +728,7 @@ class Tile(
         pe.io.macReqOut
       }
     }
-    val peSrcB = io.macReqSrcB(16 * c + 15, 16 * c)
+    val peSrcB = io.macReqSrcB(32 * c + 31, 32 * c)
     tileT(c).foldLeft(peSrcB) {
       case (macReqSrcB, pe) => {
         pe.io.macReqSrcB := macReqSrcB
@@ -881,8 +879,8 @@ class Mesh(
   val io = IO(new Bundle {
     // matrix multiplication related: mutiply-accumulate
     val macReq = Input(Vec(mxuMeshCols, Valid(new MacCtrls())))
-    val macReqSrcA = Input(Vec(mxuMeshRows, UInt((mxuTileRows * 16).W)))
-    val macReqSrcB = Input(Vec(mxuMeshCols, UInt((mxuTileCols * 16).W)))
+    val macReqSrcA = Input(Vec(mxuMeshRows, UInt((mxuTileRows * 32).W)))
+    val macReqSrcB = Input(Vec(mxuMeshCols, UInt((mxuTileCols * 32).W)))
     val macReqSrcC = Input(Vec(mxuMeshCols, UInt((mxuTileCols * 16).W)))
     val macReqSrcD = Input(Vec(mxuMeshRows, UInt((mxuTileRows * 16).W)))
     val macResp = Output(Valid(new MacCtrls()))
