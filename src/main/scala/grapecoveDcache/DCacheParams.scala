@@ -34,7 +34,7 @@ trait DCacheParams {
   val paddrWidth    = 39
   val regAddrWidth  = 5
   val vLsqSizeWidth = 5
-  val srcWidth      = 8
+  val srcWidth      = 2
 
   val destWidth = max(regAddrWidth, vLsqSizeWidth)
   val dataWidth = max(XLEN, VLEN)

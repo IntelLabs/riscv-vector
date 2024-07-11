@@ -34,6 +34,7 @@ checkformat:
 
 clean:
 	-rm -rf $(BUILD_DIR)
+	rm -rf ./out
 
 include Makefile.test
 

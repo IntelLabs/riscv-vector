@@ -3,7 +3,6 @@ package grapecoveDCache
 import chisel3._
 import util._
 import freechips.rocketchip.tilelink._
-import grapecoveDCache.util._
 import _root_.circt.stage.ChiselStage
 import org.chipsalliance.cde.config.Parameters
 

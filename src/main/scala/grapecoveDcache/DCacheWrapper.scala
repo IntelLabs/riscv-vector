@@ -35,6 +35,7 @@ object Main extends App {
   val firtoolOptions = Array(
     "--lowering-options=" + List(
       "disallowLocalVariables",
+      "disallowPortDeclSharing",
       "locationInfoStyle=wrapInAtSquareBracket",
     ).reduce(_ + "," + _),
     "--disable-annotation-unknown",
