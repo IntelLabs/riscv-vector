@@ -4,6 +4,9 @@ CHISEL_VERSION = chisel3
 
 PRJ = coincreekDCache
 
+init:
+	git submodule update --init
+
 test:
 	mill -i $(PRJ)[$(CHISEL_VERSION)].test
 

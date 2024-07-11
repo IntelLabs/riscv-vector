@@ -1,6 +1,3 @@
-test_all:
-	mill -i $(PRJ)[$(CHISEL_VERSION)].test.testOnly $(PRJ).*Test
-
 test_dcache:
 	mill -i $(PRJ)[$(CHISEL_VERSION)].test.testOnly $(PRJ).DCacheTest
 
