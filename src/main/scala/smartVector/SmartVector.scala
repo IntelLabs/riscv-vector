@@ -92,8 +92,8 @@ class SmartVector extends Module {
     split.io.in.decodeIn <> decoder.io.out
     split.io.in.regFileIn <> regFile.io.out
     iex.io.in <> split.io.out.mUop
-    merge.io.in.aluIn <> iex.io.out
-    merge.io.in.permIn <> iex.io.permOut
+    merge.io.in.iexIn <> iex.io.out
+    //merge.io.in.permIn <> iex.io.permOut
     commit.io.in.commitInfo <> merge.io.out.commitInfo
     commit.io.in.excpInfo <> split.io.excpInfo
     io.out.rvuCommit <> commit.io.out.commitInfo
@@ -106,7 +106,7 @@ class SmartVector extends Module {
     split.io.lsuStallSplit := ~svlsuWrapper.io.lsuReady
     merge.io.in.lsuIn <> svlsuWrapper.io.lsuOut
     
-    merge.io.in.mergeInfo <> split.io.out.mUopMergeAttr  
+    //merge.io.in.mergeInfo <> split.io.out.mUopMergeAttr  
     regFile.io.in.readIn  <> split.io.out.toRegFileRead
     regFile.io.in.writeIn <> merge.io.out.toRegFileWrite
 

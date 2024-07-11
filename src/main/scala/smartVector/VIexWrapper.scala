@@ -23,11 +23,21 @@ class VPermRegIn extends Bundle{
   val rvalid = Bool()
 }
 
+class IexOut(implicit p : Parameters) extends Bundle{
+  val toRegFileWrite = new regWriteIn
+  val commitInfo =  ValidIO(new CommitInfo)
+}
+
+class IexIn(implicit p : Parameters) extends Bundle{
+  val mUop = Input(new Muop)
+  val mergeInfo = Input(new MuopMergeAttr)
+}
+
 class VIexWrapper(implicit p : Parameters) extends Module {
   
   val io = IO(new Bundle {
-    val in = Input(ValidIO(new Muop))
-    val out = ValidIO(new IexOutput)
+    val in = Input(ValidIO(new IexIn))
+    val out = Output(ValidIO(new IexOut))
     val permOut = new(VPermOutput)
     val permRegIn = Input(new(VPermRegIn))
     val iexNeedStall = Output(Bool())
@@ -48,7 +58,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
 
   // IEX input source
   //val mUop = io.in.bits
-  val mUopValid = io.in.valid && ~io.in.bits.uop.ctrl.isLdst
+  val mUopValid = io.in.valid && ~io.in.bits.mUop.uop.ctrl.isLdst
 
   //generate buffer
   val bufferReg = RegInit(0.U.asTypeOf(new Muop))
@@ -57,13 +67,22 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   //set buffer
   val sameType = Wire(Bool())
   val currentModuleReg = RegInit(0.U(3.W))
-  sameType := (io.in.bits.uop.ctrl.alu || io.in.bits.uop.ctrl.mask) && currentModuleReg === 1.U ||
-              (io.in.bits.uop.ctrl.mul || io.in.bits.uop.ctrl.redu) && currentModuleReg === 2.U ||
-              io.in.bits.uop.ctrl.div && currentModuleReg === 3.U && SVDiv.io.in.ready ||
-              io.in.bits.uop.ctrl.fp  && currentModuleReg === 4.U && SVFpu.io.in.ready ||
-              io.in.bits.uop.ctrl.perm && currentModuleReg === 5.U && ~SVPerm.io.out.perm_busy
+  sameType := (io.in.bits.mUop.uop.ctrl.alu || io.in.bits.mUop.uop.ctrl.mask) && currentModuleReg === 1.U ||
+              (io.in.bits.mUop.uop.ctrl.mul || io.in.bits.mUop.uop.ctrl.redu) && currentModuleReg === 2.U ||
+               io.in.bits.mUop.uop.ctrl.div && currentModuleReg === 3.U && SVDiv.io.in.ready ||
+               io.in.bits.mUop.uop.ctrl.fp  && currentModuleReg === 4.U && SVFpu.io.in.ready ||
+               io.in.bits.mUop.uop.ctrl.perm && currentModuleReg === 5.U && ~SVPerm.io.perm_busy
 
-  when(!bufferValidReg && mUopValid && ~sameType && currentState === ongoing){
+  // FIFO队列用于维护指令计数
+  //val maxInstructions : Int = 16
+  //val instructionQueue = Module(new Queue(new Bundle {
+  //  val uopEnd = Bool()
+  //}, maxInstructions))
+  //val instructionCounter = instructionQueue.io.count
+  val instNum = RegInit(0.U(5.W))
+
+  //when(!bufferValidReg && mUopValid && (~sameType && currentState === ongoing || instructionQueue.io.count === 16.U)){
+  when(!bufferValidReg && mUopValid && (~sameType && currentState === ongoing || instNum === 31.U)){
     bufferValidReg := mUopValid
     bufferReg := io.in.bits
   }
@@ -74,69 +93,56 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   }
 
   //Mux data from input and buffer
-  val muxData = Wire(new Muop)
+  val muxData = Wire(new IexIn)
   val muxValid = Wire(Bool())
 
   muxData := Mux(bufferValidReg, bufferReg, io.in.bits)
   muxValid := Mux(bufferValidReg, bufferValidReg, mUopValid)
 
-  // val divNotReady  = ~SVDiv.io.in.ready
-  // val fpuNotReady  = ~SVFpu.io.in.ready
-  // val permNotReady = SVPerm.io.out.perm_busy
-  // val ready    = ~(divNotReady || fpuNotReady || permNotReady)
-
   val outValid = SValu.io.out.valid || SVMac.io.out.valid || SVMask.io.out.valid || 
-                 SVReduc.io.out.valid || SVDiv.io.out.valid || SVFpu.io.out.valid
+                 SVReduc.io.out.valid || SVDiv.io.out.valid || SVFpu.io.out.valid || SVPerm.io.out.valid
 
-  val permDone = Wire(Bool())
-  val permWriteNum = RegInit(0.U(4.W))
-  when(SVPerm.io.out.wb_vld){
-      permWriteNum := permWriteNum + 1.U
-  }
+  val resultNarrowTo1 = muxData.mUop.uop.ctrl.narrow_to_1 || muxData.mUop.uop.ctrl.floatRed
 
-  when(SVPerm.io.out.wb_vld && (permWriteNum + 1.U === Vlmul_to_lmul(SVPerm.io.out.uop.info.vlmul))){
-      permWriteNum := 0.U
-      permDone := true.B
-  }.otherwise{
-      permDone := false.B
-  }
 
-  val oneCycleLatIn = muxValid & (muxData.uop.ctrl.alu || muxData.uop.ctrl.mask)
-  val twoCycleLatIn = muxValid & (muxData.uop.ctrl.mul || muxData.uop.ctrl.redu)
-  val noFixLatIn    = muxValid & (muxData.uop.ctrl.div || muxData.uop.ctrl.perm || muxData.uop.ctrl.fp)
-  val twoCycleReg   = RegEnable(twoCycleLatIn, muxValid)
-  val fixLatVld     = SVDiv.io.out.valid || permDone || SVFpu.io.out.valid
-
+  
   switch(currentState){
     is(empty){
-      when(muxValid && ~muxData.uop.ctrl.alu && ~muxData.uop.ctrl.mask){
-      //&& ~(muxData.uop.ctrl.narrow_to_1 && ~muxData.uop.uopEnd)){
-        currentStateNext := ongoing
-      }.otherwise{
-        currentStateNext := empty
+      when(muxValid && (~resultNarrowTo1 || muxData.mUop.uop.uopEnd)){
+          //instructionQueue.io.enq.valid := true.B
+          //instructionQueue.io.enq.bits.uopEnd := io.in.bits.uop.uopEnd
+          instNum := instNum + 1.U       
       }
     }
     is(ongoing){
-      when(muxValid && ~muxData.uop.ctrl.alu && ~muxData.uop.ctrl.mask){
-        currentStateNext := ongoing
-      }.elsewhen(twoCycleReg || fixLatVld){
-      //when(twoCycleReg || fixLatVld  || (muxData.uop.ctrl.floatRed && SVFpu.io.in.ready && ~(muxData.uop.uopIdx === 0.U))){
-          currentStateNext := empty
-      }.otherwise{
-          currentStateNext := ongoing
+      when(muxValid && (~resultNarrowTo1 || muxData.mUop.uop.uopEnd)){
+          //instructionQueue.io.enq.valid := true.B
+          //instructionQueue.io.enq.bits.uopEnd := io.in.bits.uop.uopEnd
+          instNum := instNum + 1.U 
+      }.elsewhen(outValid){
+        //instructionQueue.io.deq.valid := true.B
+        //instructionQueue.io.deq.bits     
+        instNum := instNum - 1.U
       }
     }
+  }
+
+  //when(instructionCounter === 0.U){
+  when(instNum === 0.U){
+    currentStateNext := empty
+  }.otherwise{
+    currentStateNext := ongoing
   } 
 
   currentState := currentStateNext
  
-  SValu.io.in.valid   := muxValid && muxData.uop.ctrl.alu
-  SVMac.io.in.valid   := muxValid && muxData.uop.ctrl.mul
-  SVMask.io.in.valid  := muxValid && muxData.uop.ctrl.mask
-  SVReduc.io.in.valid := muxValid && muxData.uop.ctrl.redu
-  SVDiv.io.in.valid   := muxValid && muxData.uop.ctrl.div
-  SVPerm.io.in.rvalid := muxValid && muxData.uop.ctrl.perm
-  SVFpu.io.in.valid   := muxValid && muxData.uop.ctrl.fp
+  SValu.io.in.valid   := muxValid && muxData.mUop.uop.ctrl.alu
+  SVMac.io.in.valid   := muxValid && muxData.mUop.uop.ctrl.mul
+  SVMask.io.in.valid  := muxValid && muxData.mUop.uop.ctrl.mask
+  SVReduc.io.in.valid := muxValid && muxData.mUop.uop.ctrl.redu
+  SVDiv.io.in.valid   := muxValid && muxData.mUop.uop.ctrl.div
+  SVPerm.io.in.rvalid := muxValid && muxData.mUop.uop.ctrl.perm
+  SVFpu.io.in.valid   := muxValid && muxData.mUop.uop.ctrl.fp
 
   when(SValu.io.in.valid || SVMask.io.in.valid){
     currentModuleReg := 1.U
@@ -154,63 +160,62 @@ class VIexWrapper(implicit p : Parameters) extends Module {
 
 
   Seq(SValu.io.in.bits, SVMac.io.in.bits, SVMask.io.in.bits, SVReduc.io.in.bits, SVDiv.io.in.bits, SVFpu.io.in.bits).foreach {iex =>
-    iex.uop   := muxData.uop
-    iex.vs1   := muxData.uopRegInfo.vs1
-    iex.vs2   := muxData.uopRegInfo.vs2
-    iex.rs1   := muxData.scalar_opnd_1
-    iex.oldVd := muxData.uopRegInfo.old_vd
-    iex.mask  := muxData.uopRegInfo.mask
+    iex.uop.ctrl             := muxData.mUop.uop.ctrl
+    iex.uop.info             := muxData.mUop.uop.info
+    iex.uop.uopIdx           := muxData.mUop.uop.uopIdx
+    iex.uop.uopEnd           := muxData.mUop.uop.uopEnd
+    iex.uop.scalarRegWriteEn := muxData.mergeInfo.scalarRegWriteEn
+    iex.uop.floatRegWriteEn  := muxData.mergeInfo.floatRegWriteEn
+    iex.uop.rfWriteEn        := muxData.mergeInfo.rfWriteEn
+    iex.uop.ldest            := muxData.mergeInfo.ldest
+    iex.uop.permExpdLen      := muxData.mergeInfo.permExpdLen
+    iex.uop.regDstIdx        := muxData.mergeInfo.regDstIdx
+    iex.uop.regCount         := muxData.mergeInfo.regCount
+    iex.uop.sysUop           := muxData.mUop.uop.sysUop
+    iex.vs1   := muxData.mUop.uopRegInfo.vs1
+    iex.vs2   := muxData.mUop.uopRegInfo.vs2
+    iex.rs1   := muxData.mUop.scalar_opnd_1
+    iex.oldVd := muxData.mUop.uopRegInfo.old_vd
+    iex.mask  := muxData.mUop.uopRegInfo.mask
   }
 
-  SVPerm.io.in.uop := muxData.uop
+  Seq(SValu.io.mergeInfo, SVMac.io.mergeInfo, SVMask.io.mergeInfo, SVReduc.io.mergeInfo).foreach {iex =>
+    iex       := muxData.mergeInfo
+  }
+  SVPerm.io.in.uop := muxData.mUop.uop
   //TODO: when id float inst, the rs1 should read from float register file
-  SVPerm.io.in.rs1 := muxData.scalar_opnd_1 // || float
+  SVPerm.io.in.rs1 := muxData.mUop.scalar_opnd_1 // || float
 
-  SVPerm.io.in.vs1_preg_idx    := VecInit(Seq.tabulate(8)(i => muxData.uop.ctrl.lsrc(0) +
-                                  Mux(io.in.bits.uop.ctrl.vGatherEi16EEW32, i.U >> 1, 
-                                  Mux(io.in.bits.uop.ctrl.vGatherEi16EEW64, i.U >> 2, i.U))))
-  SVPerm.io.in.vs2_preg_idx    := VecInit(Seq.tabulate(8)(i => muxData.uop.ctrl.lsrc(1) + i.U))
-  SVPerm.io.in.old_vd_preg_idx := VecInit(Seq.tabulate(8)(i => muxData.uop.ctrl.ldest   + 
-                                  Mux(io.in.bits.uop.ctrl.vGatherEi16EEW8, i.U >> 1, i.U)))
+  SVPerm.io.in.vs1_preg_idx    := VecInit(Seq.tabulate(8)(i => muxData.mUop.uop.ctrl.lsrc(0) +
+                                  Mux(io.in.bits.mUop.uop.ctrl.vGatherEi16EEW32, i.U >> 1, 
+                                  Mux(io.in.bits.mUop.uop.ctrl.vGatherEi16EEW64, i.U >> 2, i.U))))
+  SVPerm.io.in.vs2_preg_idx    := VecInit(Seq.tabulate(8)(i => muxData.mUop.uop.ctrl.lsrc(1) + i.U))
+  SVPerm.io.in.old_vd_preg_idx := VecInit(Seq.tabulate(8)(i => muxData.mUop.uop.ctrl.ldest   + 
+                                  Mux(io.in.bits.mUop.uop.ctrl.vGatherEi16EEW8, i.U >> 1, i.U)))
   SVPerm.io.in.mask_preg_idx := 0.U
-  SVPerm.io.in.uop_valid := muxValid & muxData.uop.ctrl.perm
+  SVPerm.io.in.uop_valid := muxValid & muxData.mUop.uop.ctrl.perm
   SVPerm.io.in.rdata := io.permRegIn.rdata
   SVPerm.io.in.rvalid := io.permRegIn.rvalid
   SVPerm.io.redirect.valid := false.B
   SVPerm.io.redirect.bits := DontCare
 
   io.permOut := SVPerm.io.out
+ 
 
-  val fixCycleResult = Wire(new VAluOutput)
+  val Result = Wire(new IexOut)
 
-  val fixCycleVld1H = Seq(SValu.io.out.valid, SVMac.io.out.valid, SVMask.io.out.valid, 
-                          SVReduc.io.out.valid)
+  val CycleVld1H = Seq(SValu.io.out.valid, SVMac.io.out.valid, SVMask.io.out.valid, SVReduc.io.out.valid,
+                       SVDiv.io.out.valid, SVFpu.io.out.valid, SVPerm.io.out.valid)
 
-  val fixCycleResult1H = Seq(SValu.io.out.bits, SVMac.io.out.bits, SVMask.io.out.bits,
-                             SVReduc.io.out.bits)
+  val CycleResult1H = Seq(SValu.io.out.bits, SVMac.io.out.bits, SVMask.io.out.bits, SVReduc.io.out.bits,
+                       SVDiv.io.out.bits, SVFpu.io.out.bits, SVPerm.io.out.bits)
 
-  fixCycleResult  := Mux1H(fixCycleVld1H, fixCycleResult1H)
+  Result  := Mux1H(CycleVld1H, CycleResult1H)
 
   val fixCycleValid = SValu.io.out.valid || SVMac.io.out.valid || SVMask.io.out.valid || SVReduc.io.out.valid
   
-  when(fixCycleValid){
-    io.out.bits.fflags := 0.U
-    io.out.bits.vd     := fixCycleResult.vd
-    io.out.bits.vxsat  := fixCycleResult.vxsat
-  }.elsewhen(SVDiv.io.out.valid){
-    io.out.bits.fflags := SVDiv.io.out.bits.fflags
-    io.out.bits.vd     := SVDiv.io.out.bits.vd
-    io.out.bits.vxsat  := false.B
-  }.elsewhen(SVFpu.io.out.valid){
-    io.out.bits.fflags := SVFpu.io.out.bits.fflags
-    io.out.bits.vd     := SVFpu.io.out.bits.vd
-    io.out.bits.vxsat  := false.B
-  }otherwise{
-    io.out.bits.fflags := 0.U
-    io.out.bits.vd     := 0.U
-    io.out.bits.vxsat  := false.B
-  }
-  io.out.valid := outValid
+  io.out.bits := Result
+  io.out.valid := fixCycleValid || SVPerm.io.out.valid || SVFpu.io.out.valid || SVPerm.io.out.valid
 
   io.iexNeedStall := bufferValidReg
 }

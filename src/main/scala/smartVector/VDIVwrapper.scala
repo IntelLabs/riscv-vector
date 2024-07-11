@@ -14,7 +14,7 @@ class VDivWrapper (implicit p : Parameters) extends Module {
 
   val io = IO(new Bundle {
     val in  = Flipped(Decoupled((new VFuInput)))
-    val out = ValidIO(new VFpuOutput)
+    val out = Output(ValidIO(new IexOut)) 
   })
 
   val vDiv = Module(new VDiv)
@@ -23,8 +23,31 @@ class VDivWrapper (implicit p : Parameters) extends Module {
   vDiv.io.redirect.valid := false.B 
   vDiv.io.redirect.bits := DontCare
   vDiv.io.in.bits  := io.in.bits
+  
+  val fflagsBuffer   = RegInit(0.U(5.W))
+  val fflagsBufferIn = Wire(UInt(5.W))
 
-  io.out.bits  := vDiv.io.out.bits
+  when(vDiv.io.out.valid){
+      io.out.bits.toRegFileWrite.rfWriteEn         := vDiv.io.out.bits.uop.rfWriteEn
+      io.out.bits.toRegFileWrite.rfWriteMask       := Fill(128/8, 0.U)
+      io.out.bits.toRegFileWrite.rfWriteIdx        := vDiv.io.out.bits.uop.ldest
+      io.out.bits.toRegFileWrite.rfWriteData       := vDiv.io.out.bits.vd
+      io.out.bits.commitInfo.valid                 := vDiv.io.out.bits.uop.uopEnd
+      io.out.bits.commitInfo.bits.scalarRegWriteEn := vDiv.io.out.bits.uop.scalarRegWriteEn
+      io.out.bits.commitInfo.bits.floatRegWriteEn  := vDiv.io.out.bits.uop.floatRegWriteEn
+      io.out.bits.commitInfo.bits.ldest            := vDiv.io.out.bits.uop.ldest
+      io.out.bits.commitInfo.bits.data             := vDiv.io.out.bits.vd
+      io.out.bits.commitInfo.bits.fflags           := fflagsBuffer | vDiv.io.out.bits.fflags
+      fflagsBuffer                            := fflagsBuffer | vDiv.io.out.bits.fflags
+  }.otherwise{
+      io.out.bits.toRegFileWrite := 0.U.asTypeOf(new regWriteIn)
+      io.out.bits.commitInfo     := 0.U.asTypeOf(Valid(new CommitInfo))
+  }
+
+  when(vDiv.io.out.valid & vDiv.io.out.bits.uop.uopEnd){
+      fflagsBufferIn := false.B
+  }
+
   io.out.valid := vDiv.io.out.valid
   io.in.ready  := vDiv.io.in.ready
 
