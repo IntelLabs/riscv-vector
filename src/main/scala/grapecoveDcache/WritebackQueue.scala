@@ -7,6 +7,7 @@ import freechips.rocketchip.tilelink.TLPermissions._
 import freechips.rocketchip.tilelink.{TLArbiter, TLBundleC, TLBundleD, TLEdgeOut}
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
+import utility._
 
 class WritebackReq(params: TLBundleParameters) extends Bundle {
   val voluntary = Bool()
@@ -19,7 +20,7 @@ class WritebackReq(params: TLBundleParameters) extends Bundle {
 
 class MissCheck extends Bundle {
   val valid     = Input(Bool())
-  val lineAddr  = Input(UInt((paddrWidth - blockOffBits).W))
+  val lineAddr  = Input(UInt(lineAddrWidth.W))
   val blockMiss = Output(Bool())
 }
 
@@ -32,6 +33,7 @@ class WritebackEntry(id: Int)(
     val missCheck = new MissCheck()
     val release   = Decoupled(new TLBundleC(edge.bundle))
     val grant     = Flipped(Decoupled(new TLBundleD(edge.bundle)))
+    val wbFinish  = Output(Bool())
   })
 
   def getBeatData(count: UInt, data: UInt): UInt = {
@@ -122,7 +124,8 @@ class WritebackEntry(id: Int)(
     Mux(req.hasData, probeAckData, probeAck),
   )
 
-  dontTouch(io.release) // TODO: Delete
+  io.wbFinish := ((state === s_release_resp) && io.grant.fire) ||
+    (state === s_release_req && allBeatDone && !req.hasData)
 
   // cache miss & addr is in wbq -> block the miss req
   io.missCheck.blockMiss := io.missCheck.valid && (state =/= s_invalid) && (io.missCheck.lineAddr === req.lineAddr)
@@ -131,10 +134,12 @@ class WritebackEntry(id: Int)(
   io.grant.ready := (state === s_release_resp)
 }
 
+class WritebackQueuePtr extends CircularQueuePtr[WritebackQueuePtr](nWBQEntries)
+
 class WritebackQueue(
     implicit edge: TLEdgeOut,
     p:             Parameters,
-) extends Module {
+) extends Module with HasCircularQueuePtrHelper {
   val io = IO(new Bundle {
     val req       = Flipped(Decoupled(new WritebackReq(edge.bundle)))
     val missCheck = new MissCheck()
@@ -142,7 +147,10 @@ class WritebackQueue(
     val grant     = Flipped(Decoupled(new TLBundleD(edge.bundle)))
   })
 
-  val wbqReadyVec  = Wire(Vec(nWBQEntries, Bool()))
+  val enqPtr     = RegInit(0.U.asTypeOf(new WritebackQueuePtr))
+  val releasePtr = RegInit(0.U.asTypeOf(new WritebackQueuePtr))
+  val deqPtr     = RegInit(0.U.asTypeOf(new WritebackQueuePtr))
+
   val blockMissVec = Wire(Vec(nWBQEntries, Bool()))
 
   val wbqEntries = (0 until nWBQEntries).map { i =>
@@ -154,22 +162,44 @@ class WritebackQueue(
     entry.io.grant.valid        := (io.grant.valid && io.grant.bits.source === entryId.U)
     entry.io.grant.bits         := io.grant.bits
 
-    wbqReadyVec(i)  := entry.io.req.ready
     blockMissVec(i) := entry.io.missCheck.blockMiss
 
     entry
   }
 
-  val allocEntry = PriorityEncoder(wbqReadyVec)
+  // update enqPtr
   wbqEntries.zipWithIndex.foreach { case (entry, i) =>
-    entry.io.req.valid := io.req.valid && (allocEntry === i.U)
+    entry.io.req.valid := io.req.valid && (enqPtr.value === i.U)
     entry.io.req.bits  := io.req.bits
   }
 
-  TLArbiter.robin(edge, io.release, wbqEntries.map(_.io.release): _*)
+  when(io.req.fire) {
+    enqPtr := enqPtr + 1.U
+  }
+
+  // update releasePtr
+  val releaseSources = VecInit(wbqEntries.map(_.io.release))
+  releaseSources.zipWithIndex.foreach { case (source, i) =>
+    source.ready := (releasePtr.value === i.U) && io.release.ready
+  }
+
+  io.release.valid := releaseSources(releasePtr.value).valid
+  io.release.bits  := releaseSources(releasePtr.value).bits
+
+  val releaseLast = edge.firstlast(io.release)._2
+  when(io.release.fire && releaseLast) {
+    releasePtr := releasePtr + 1.U
+  }
+
+  // update deqPtr
+  val wbFinishSources = VecInit(wbqEntries.map(_.io.wbFinish))
+
+  when(wbFinishSources(deqPtr.value)) {
+    deqPtr := deqPtr + 1.U
+  }
 
   io.missCheck.blockMiss := blockMissVec.reduce(_ || _)
-  io.req.ready           := wbqReadyVec.reduce(_ || _)
-  io.grant.ready         := true.B
 
+  io.grant.ready := true.B
+  io.req.ready   := !isFull(enqPtr, deqPtr)
 }

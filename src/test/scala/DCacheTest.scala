@@ -193,10 +193,11 @@ trait DCacheTestTrait {
         dut.io.req.valid.poke(false.B)
         dut.io.resp.valid.expect(true.B)
         dut.io.resp.bits.status.expect(CacheRespStatus.replay)
-        dut.clock.step(10)
+        dut.clock.step(50)
 
       }
     }
+
 }
 class DCacheTest extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with DCacheTestTrait {
   behavior of "DCache Test"

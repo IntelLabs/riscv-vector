@@ -11,14 +11,14 @@ class BaseDCache()(
 ) extends LazyModule {
 
   protected def cacheClientParameters = Seq(TLMasterParameters.v1(
-    name = "dcache",
-    sourceId = IdRange(0, 1 max nMSHRs),
+    name = "Dcache",
+    sourceId = IdRange(0, 1 max nMSHRs + nWBQEntries),
     supportsProbe = TransferSizes(blockBytes, blockBytes),
   ))
 
   protected def mmioClientParameters = Seq(TLMasterParameters.v1(
     name = "Dcache MMIO",
-    sourceId = IdRange(nMSHRs, nMSHRs + nMMIOs),
+    sourceId = IdRange(nMSHRs + nWBQEntries, nMSHRs + nWBQEntries + nMMIOs),
     requestFifo = true,
   ))
 
