@@ -104,7 +104,11 @@ class VIllegalInstrn extends Module {
   //val vfncvt_f_x  = ctrl.fp && ctrl.funct6 === "b010010".U && ctrl.lsrc(0) === "b10011".U
   //val vfncvt_f_f = ctrl.fp && ctrl.funct6 === "b010010".U && ctrl.lsrc(0) === "b10100".U
   //val vfncvt_rod_f_f = ctrl.fp && ctrl.funct6 === "b010010".U && ctrl.lsrc(0) === "b10101".U
-  val vfwcvt_f_x = ctrl.fp && ctrl.funct6 === "b010010".U && ctrl.widen && (ctrl.lsrc(0) === "b01010".U || ctrl.lsrc(0) === "b01011".U)
+  val vfwcvt_f_x = ctrl.fp && ctrl.funct6 === "b010010".U && ctrl.widen && 
+                   (ctrl.lsrc(0) === "b01010".U || ctrl.lsrc(0) === "b01011".U)
+
+  val vrgather = ctrl.perm && (ctrl.funct6 === "b001100".U || ctrl.funct6 === "b001110".U && ctrl.funct3 === "b000".U)
+  val viota    = ctrl.mask && ctrl.funct6 === "b010100".U && ctrl.lsrc(0) === "b10000".U
 
   val convertToInt = vfncvt_xu_f || vfncvt_x_f || vfncvt_rtz_xu_f || vfncvt_rtz_x_f // || vfncvt_f_xu || vfncvt_f_x
 
@@ -153,11 +157,11 @@ class VIllegalInstrn extends Module {
   }
   // illegal overlap = vd/vs1_overlap || vd/vs2_overlap || vd/vmask_overlap
   val ill_regOverlap_1 = overlap(vs1, vs1End, ctrl.lsrcVal(0), vd, vdEnd, ctrl.ldestVal) &&
-                        !overlap_isLegal(vs1, vs1End, veewVs1, vemulVs1, vd, vdEnd, veewVd)
+                        (!overlap_isLegal(vs1, vs1End, veewVs1, vemulVs1, vd, vdEnd, veewVd) || vrgather || viota)
   val ill_regOverlap_2 = overlap(vs2, vs2End, ctrl.lsrcVal(1), vd, vdEnd, ctrl.ldestVal) &&
-                        !overlap_isLegal(vs2, vs2End, veewVs2, vemulVs2, vd, vdEnd, veewVd)
+                        (!overlap_isLegal(vs2, vs2End, veewVs2, vemulVs2, vd, vdEnd, veewVd) || vrgather || viota)
   val ill_regOverlap_m = overlap(0.U, 0.U, !ctrl.vm, vd, vdEnd, ctrl.ldestVal) &&
-                        !overlap_isLegal(0.U, 0.U, 7.U, 0.U, vd, vdEnd, veewVd)
+                        (!overlap_isLegal(0.U, 0.U, 7.U, 0.U, vd, vdEnd, veewVd) || viota)
   val ill_regOverlap = ill_regOverlap_1 || ill_regOverlap_2 || ill_regOverlap_m
 
   // Segment: for indexed segment, vd reg-group cannot overlap vs2 reg-group
