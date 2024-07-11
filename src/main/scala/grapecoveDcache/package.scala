@@ -1,7 +1,7 @@
 import chisel3._
 import chisel3.util._
 
-package object coincreekDCache extends DCacheParams {
+package object grapecoveDCache extends DCacheParams {
 
   def toInt(in: UInt): Int = {
     var out: Int = 0

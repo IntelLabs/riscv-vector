@@ -1,10 +1,10 @@
-package coincreekDCache
+package grapecoveDCache
 
 import chisel3._
 import chisel3.util._
 import util._
 import freechips.rocketchip.tilelink._
-import coincreekDCache.util._
+import grapecoveDCache.util._
 import _root_.circt.stage.ChiselStage
 
 class MSHR(id: Int) extends Module() {

@@ -99,8 +99,8 @@ trait Utility extends HasChisel {
 
 }
 
-// extends this trait to use coincreekDCache in other projects
-trait coincreekDCacheModule extends ScalaModule {
+// extends this trait to use grapecoveDCache in other projects
+trait grapecoveDCacheModule extends ScalaModule {
 
   def rocketModule:  ScalaModule
   def utilityModule: ScalaModule
@@ -116,9 +116,9 @@ trait coincreekDCacheModule extends ScalaModule {
   override def forkEnv = Map("PATH" -> envPATH)
 }
 
-object coincreekDCache extends Cross[coincreekDCache]("chisel", "chisel3")
+object grapecoveDCache extends Cross[grapecoveDCache]("chisel", "chisel3")
 
-trait coincreekDCache extends coincreekDCacheModule with HasChisel {
+trait grapecoveDCache extends grapecoveDCacheModule with HasChisel {
 
   override def millSourcePath = os.pwd
 

@@ -1,4 +1,4 @@
-package coincreekDCache
+package grapecoveDCache
 import chisel3._
 import chisel3.util._
 import org.chipsalliance.cde.config.{Parameters, Field}
@@ -11,7 +11,7 @@ class DCacheWrapper()(
     implicit p: Parameters
 ) extends LazyModule {
 
-  val dcacheClient = LazyModule(new CCDCache()(p))
+  val dcacheClient = LazyModule(new GPCDCache()(p))
 
   val ram = LazyModule(new TLRAM(AddressSet(0x80000000L, 0xffffL), beatBytes = beatBytes))
 

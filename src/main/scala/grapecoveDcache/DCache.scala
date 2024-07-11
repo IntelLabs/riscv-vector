@@ -1,4 +1,4 @@
-package coincreekDCache
+package grapecoveDCache
 
 import chisel3._
 import chisel3.util._
@@ -8,13 +8,13 @@ import freechips.rocketchip.tilelink._
 import utility._
 import AddrDecoder._
 
-class CCDCache()(
+class GPCDCache()(
     implicit p: Parameters
 ) extends BaseDCache {
-  override lazy val module = new CCDCacheImp(this)
+  override lazy val module = new GPCDCacheImp(this)
 }
 
-class CCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
+class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   dontTouch(io)
 

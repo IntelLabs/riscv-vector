@@ -1,4 +1,4 @@
-package coincreekDCache
+package grapecoveDCache
 
 import chisel3._
 import chisel3.util._
@@ -115,8 +115,8 @@ class ProbeMSHRFile extends Bundle() {
   val probePermission = Input(UInt(TLPermissions.bdWidth.W))
   val lineAddr        = Input(UInt(lineAddrWidth.W))
 
-  val hitGo      = Output(Bool())
-  val hit        = Output(Bool())
+  val hitGo = Output(Bool())
+  val hit   = Output(Bool())
 
   val replaceFinish = Output(Bool())
 }

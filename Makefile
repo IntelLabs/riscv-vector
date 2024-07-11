@@ -2,28 +2,29 @@
 BUILD_DIR = ./build
 CHISEL_VERSION = chisel3
 
-PRJ = coincreekDCache
+PRJ = grapecoveDCache
 
 init:
 	git submodule update --init
+	cd rocket-chip && git submodule update --init hardfloat cde
 
 test:
 	mill -i $(PRJ)[$(CHISEL_VERSION)].test
 
 dcache:
 	mkdir -p $(BUILD_DIR)
-	mill -i $(PRJ)[$(CHISEL_VERSION)].runMain coincreekDCache.Main --target-dir $(BUILD_DIR)
+	mill -i $(PRJ)[$(CHISEL_VERSION)].runMain grapecoveDCache.Main --target-dir $(BUILD_DIR)
 
 mshr:
 	mkdir -p $(BUILD_DIR)
-	mill -i $(PRJ)[$(CHISEL_VERSION)].runMain coincreekDCache.MSHRFile --target-dir $(BUILD_DIR)
+	mill -i $(PRJ)[$(CHISEL_VERSION)].runMain grapecoveDCache.MSHRFile --target-dir $(BUILD_DIR)
 
 refill:
 	mkdir -p $(BUILD_DIR)
-	mill -i $(PRJ)[$(CHISEL_VERSION)].runMain coincreekDCache.RefillTest --target-dir $(BUILD_DIR)
+	mill -i $(PRJ)[$(CHISEL_VERSION)].runMain grapecoveDCache.RefillTest --target-dir $(BUILD_DIR)
 
 help:
-	mill -i $(PRJ).runMain coincreekDCache.DCache --help
+	mill -i $(PRJ).runMain grapecoveDCache.DCache --help
 
 reformat:
 	mill -i __.reformat
