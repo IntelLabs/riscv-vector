@@ -400,12 +400,22 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // wb in pipeline stage 1
 
-  wbQueue.io.req.valid          := s1_probeWb || s1_replaceWb
-  wbQueue.io.req.bits.voluntary := s1_req.isRefill
-  wbQueue.io.req.bits.data      := s1_data
-  wbQueue.io.req.bits.perm      := Mux(s1_probeWb, s1_probeReportParam, s1_repShrinkParam)
-  wbQueue.io.req.bits.lineAddr  := Mux(s1_probeWb, getLineAddr(s1_req.paddr), s1_repLineAddr)
-  wbQueue.io.req.bits.hasData   := Mux(s1_probeWb, s1_probeWbData, s1_replaceWbData)
+  // source 0: probe
+  // source 1: main pipeline
+  val wbArbiter = Module(new Arbiter(new WritebackReq(edge.bundle), 2))
+
+  val wbPipeReq = WireInit(0.U.asTypeOf(Decoupled(new WritebackReq(edge.bundle))))
+  wbPipeReq.valid          := s1_probeWb || s1_replaceWb
+  wbPipeReq.bits.voluntary := s1_req.isRefill
+  wbPipeReq.bits.data      := s1_data
+  wbPipeReq.bits.perm      := Mux(s1_probeWb, s1_probeReportParam, s1_repShrinkParam)
+  wbPipeReq.bits.lineAddr  := Mux(s1_probeWb, getLineAddr(s1_req.paddr), s1_repLineAddr)
+  wbPipeReq.bits.hasData   := Mux(s1_probeWb, s1_probeWbData, s1_replaceWbData)
+
+  wbArbiter.io.in(0) <> wbPipeReq
+  wbArbiter.io.in(1) <> probeQueue.io.wbReq
+
+  wbQueue.io.req <> wbArbiter.io.out
 
   wbQueue.io.missCheck.valid    := s1_valid && ~s1_hit
   wbQueue.io.missCheck.lineAddr := getLineAddr(s1_req.paddr)
@@ -426,7 +436,12 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   probeQueue.io.lrscAddr.valid := lrscValid
   probeQueue.io.lrscAddr.bits  := lrscAddr
   probeQueue.io.probeCheck <> mshrs.io.fromProbe
-  probeQueue.io.wbReady := true.B
+
+  probeQueue.io.probeResp := Mux(
+    !s1_probeWb,
+    ProbeRespStatus.probe_invalid,
+    Mux(wbPipeReq.fire, ProbeRespStatus.probe_finish, ProbeRespStatus.probe_replay),
+  )
   // * Probe End
 
   // * Resp Begin
