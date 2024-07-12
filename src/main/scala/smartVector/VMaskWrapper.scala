@@ -43,6 +43,8 @@ class VMaskWrapper (implicit p : Parameters) extends Module {
   when(vMask.io.out.valid && !muopEnd){
     vxsatBufferIn := vMask.io.out.bits.vxsat  || vxsatBuffer
     vxsatBuffer := vxsatBufferIn
+  }.otherwise{
+    vxsatBufferIn := vxsatBuffer
   }
 
   when(vMask.io.out.valid && muopEnd){

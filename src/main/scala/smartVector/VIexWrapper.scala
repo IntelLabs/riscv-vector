@@ -29,8 +29,8 @@ class IexOut(implicit p : Parameters) extends Bundle{
 }
 
 class IexIn(implicit p : Parameters) extends Bundle{
-  val mUop = Input(new Muop)
-  val mergeInfo = Input(new MuopMergeAttr)
+  val mUop = new Muop
+  val mergeInfo = new MuopMergeAttr
 }
 
 class VIexWrapper(implicit p : Parameters) extends Module {
@@ -38,7 +38,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   val io = IO(new Bundle {
     val in = Input(ValidIO(new IexIn))
     val out = Output(ValidIO(new IexOut))
-    val permOut = new(VPermOutput)
+    val permOut = new PermReadRF
     val permRegIn = Input(new(VPermRegIn))
     val iexNeedStall = Output(Bool())
   })
@@ -61,7 +61,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   val mUopValid = io.in.valid && ~io.in.bits.mUop.uop.ctrl.isLdst
 
   //generate buffer
-  val bufferReg = RegInit(0.U.asTypeOf(new Muop))
+  val bufferReg = RegInit(0.U.asTypeOf(new IexIn))
   val bufferValidReg = RegInit(false.B)
 
   //set buffer
@@ -104,8 +104,6 @@ class VIexWrapper(implicit p : Parameters) extends Module {
 
   val resultNarrowTo1 = muxData.mUop.uop.ctrl.narrow_to_1 || muxData.mUop.uop.ctrl.floatRed
 
-
-  
   switch(currentState){
     is(empty){
       when(muxValid && (~resultNarrowTo1 || muxData.mUop.uop.uopEnd)){
@@ -182,7 +180,18 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   Seq(SValu.io.mergeInfo, SVMac.io.mergeInfo, SVMask.io.mergeInfo, SVReduc.io.mergeInfo).foreach {iex =>
     iex       := muxData.mergeInfo
   }
-  SVPerm.io.in.uop := muxData.mUop.uop
+  SVPerm.io.in.uop.ctrl             := muxData.mUop.uop.ctrl
+  SVPerm.io.in.uop.info             := muxData.mUop.uop.info
+  SVPerm.io.in.uop.uopIdx           := muxData.mUop.uop.uopIdx
+  SVPerm.io.in.uop.uopEnd           := muxData.mUop.uop.uopEnd
+  SVPerm.io.in.uop.scalarRegWriteEn := muxData.mergeInfo.scalarRegWriteEn
+  SVPerm.io.in.uop.floatRegWriteEn  := muxData.mergeInfo.floatRegWriteEn
+  SVPerm.io.in.uop.rfWriteEn        := muxData.mergeInfo.rfWriteEn
+  SVPerm.io.in.uop.ldest            := muxData.mergeInfo.ldest
+  SVPerm.io.in.uop.permExpdLen      := muxData.mergeInfo.permExpdLen
+  SVPerm.io.in.uop.regDstIdx        := muxData.mergeInfo.regDstIdx
+  SVPerm.io.in.uop.regCount         := muxData.mergeInfo.regCount
+  SVPerm.io.in.uop.sysUop           := muxData.mUop.uop.sysUop
   //TODO: when id float inst, the rs1 should read from float register file
   SVPerm.io.in.rs1 := muxData.mUop.scalar_opnd_1 // || float
 
@@ -199,7 +208,8 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   SVPerm.io.redirect.valid := false.B
   SVPerm.io.redirect.bits := DontCare
 
-  io.permOut := SVPerm.io.out
+  io.permOut.rd_en  := SVPerm.io.permReadRF.rd_en
+  io.permOut.rd_preg_idx := SVPerm.io.permReadRF.rd_preg_idx
  
 
   val Result = Wire(new IexOut)

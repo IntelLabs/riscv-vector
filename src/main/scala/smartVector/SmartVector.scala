@@ -91,7 +91,9 @@ class SmartVector extends Module {
     decoder.io.in.valid := io.in.valid & io.in.ready
     split.io.in.decodeIn <> decoder.io.out
     split.io.in.regFileIn <> regFile.io.out
-    iex.io.in <> split.io.out.mUop
+    iex.io.in.bits.mUop <> split.io.out.mUop.bits
+    iex.io.in.valid := split.io.out.mUop.valid
+    iex.io.in.bits.mergeInfo <> split.io.out.mUopMergeAttr.bits
     merge.io.in.iexIn <> iex.io.out
     //merge.io.in.permIn <> iex.io.permOut
     commit.io.in.commitInfo <> merge.io.out.commitInfo

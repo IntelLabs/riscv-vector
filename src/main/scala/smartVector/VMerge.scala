@@ -17,7 +17,7 @@ class VMerge (implicit p : Parameters) extends Module {
             //val mergeInfo = Input(ValidIO(new MuopMergeAttr))
             val iexIn = Input(ValidIO(new IexOut))
             val lsuIn = Input(ValidIO(new LsuOutput))                                                                                                        
-            val permIn = Input(new VPermOutput)
+            //val permIn = Input(new VPermOutput)
         }
         val out = new Bundle{
             //update register file

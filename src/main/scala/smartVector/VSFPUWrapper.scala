@@ -41,7 +41,7 @@ class VSFPUWrapper (implicit p : Parameters) extends VFuModule {
   io.out.valid := vFPu.io.out.valid
 
   val fflagsBuffer   = RegInit(0.U(5.W))
-  val fflagsBufferIn = Wire(UInt(5.W))
+  //val fflagsBufferIn = Wire(UInt(5.W))
 
   when(vFPu.io.out.valid){
       io.out.bits.toRegFileWrite.rfWriteEn         := vFPu.io.out.bits.uop.rfWriteEn
@@ -54,14 +54,15 @@ class VSFPUWrapper (implicit p : Parameters) extends VFuModule {
       io.out.bits.commitInfo.bits.ldest            := vFPu.io.out.bits.uop.ldest
       io.out.bits.commitInfo.bits.data             := vFPu.io.out.bits.vd
       io.out.bits.commitInfo.bits.fflags           := fflagsBuffer | vFPu.io.out.bits.fflags
-      fflagsBuffer                            := fflagsBuffer | vFPu.io.out.bits.fflags
+      fflagsBuffer                                 := fflagsBuffer | vFPu.io.out.bits.fflags
   }.otherwise{
       io.out.bits.toRegFileWrite := 0.U.asTypeOf(new regWriteIn)
       io.out.bits.commitInfo     := 0.U.asTypeOf(Valid(new CommitInfo))
   }
 
-  when(vFPu.io.out.valid & vFPu.io.out.bits.uop.uopEnd){
-      fflagsBufferIn := false.B
-  }
+  //when(vFPu.io.out.valid & !vFPu.io.out.bits.uop.uopEnd){
+  //    fflagsBufferIn := false.B
+  //}
+  io.out.bits.commitInfo.bits.vxsat := false.B
 
 }

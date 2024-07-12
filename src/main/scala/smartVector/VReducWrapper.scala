@@ -44,6 +44,8 @@ class VReducWrapper (implicit p : Parameters) extends Module {
   when(vReduc.io.out.valid && !muopEnd){
     vxsatBufferIn := vReduc.io.out.bits.vxsat  || vxsatBuffer
     vxsatBuffer := vxsatBufferIn
+  }.otherwise{
+    vxsatBufferIn := vxsatBuffer
   }
 
   when(vReduc.io.out.valid && muopEnd){

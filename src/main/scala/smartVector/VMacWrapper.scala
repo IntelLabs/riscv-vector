@@ -43,6 +43,8 @@ class VMacWrapper (implicit p : Parameters) extends Module {
   when(vMac.io.out.valid && !muopEnd){
     vxsatBufferIn := vMac.io.out.bits.vxsat  || vxsatBuffer
     vxsatBuffer := vxsatBufferIn
+  }.otherwise{
+    vxsatBufferIn := vxsatBuffer
   }
 
   when(vMac.io.out.valid && muopEnd){

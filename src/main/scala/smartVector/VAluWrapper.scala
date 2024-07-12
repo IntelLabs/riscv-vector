@@ -62,13 +62,23 @@ class VAluWrapper (implicit p : Parameters) extends VFuModule {
           io.out.bits.toRegFileWrite.rfWriteData := 
           Cat(vAlu.io.out.bits.vd(127,64), regDataBuffer(63,0))
         }
-    }
+    }.otherwise{
+          io.out.bits.commitInfo.valid  := false.B
+                regDataBuffer := vAlu.io.out.bits.vd
+                io.out.bits.toRegFileWrite := 0.U.asTypeOf(new regWriteIn)
+        }
+  }.otherwise{
+          io.out.bits.commitInfo.valid  := false.B
+                regDataBuffer := vAlu.io.out.bits.vd
+                io.out.bits.toRegFileWrite := 0.U.asTypeOf(new regWriteIn)
   }
 
   val vxsatBufferIn = Wire(Bool())
   when(vAlu.io.out.valid && !muopEnd){
     vxsatBufferIn := vAlu.io.out.bits.vxsat  || vxsatBuffer
     vxsatBuffer := vxsatBufferIn
+  }.otherwise{
+    vxsatBufferIn := vxsatBuffer
   }
 
   when(vAlu.io.out.valid && muopEnd){

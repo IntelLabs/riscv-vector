@@ -11,13 +11,12 @@ import xiangshan.Redirect
 import darecreek.exu.vfu.perm.Permutation
 
 
+class PermReadRF extends Bundle{
+  val rd_en = Bool()
+  val rd_preg_idx = UInt(8.W)
+}
+
 class VPermWrapper (implicit p : Parameters) extends Module {
-
-  class PermReadRF extends Bundle{
-    val rd_en = Bool()
-    val rd_preg_idx = UInt(8.W)
-  }
-
   val io = IO(new Bundle {
     val in = Input(new VPermInput)
     val redirect = Input(ValidIO(new Redirect))
@@ -49,8 +48,11 @@ class VPermWrapper (implicit p : Parameters) extends Module {
       io.out.bits.commitInfo.bits.floatRegWriteEn  := vPerm.io.out.uop.floatRegWriteEn
       io.out.bits.commitInfo.bits.ldest            := vPerm.io.out.uop.ldest
       io.out.bits.commitInfo.bits.data             := vPerm.io.out.wb_data
+      io.out.bits.commitInfo.bits.fflags           := 0.U
+      io.out.bits.commitInfo.bits.vxsat            := false.B
   }.otherwise{
       io.out.bits.commitInfo.valid := false.B
+      io.out.bits.commitInfo.bits  := 0.U.asTypeOf(new CommitInfo)
   }
 
   io.out.valid := vPerm.io.out.wb_vld

@@ -6,7 +6,6 @@ import darecreek.exu.vfu.VAluOutput
 import chipsalliance.rocketchip.config
 import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import SmartParam._
-import darecreek.exu.vfu.VPermOutput
 
 
 class SVRegFileWrapper(implicit p : Parameters) extends Module{ 
@@ -15,7 +14,7 @@ class SVRegFileWrapper(implicit p : Parameters) extends Module{
         val in = new Bundle{
             val readIn = Input(new regReadIn)
             val writeIn = Input(new regWriteIn)
-            val permReadIn = Input(new VPermOutput)
+            val permReadIn = Input(new PermReadRF)
         }
         val out = Output(new regOut)
         val permReadOut = Output(new VPermRegIn)

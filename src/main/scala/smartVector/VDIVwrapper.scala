@@ -25,7 +25,7 @@ class VDivWrapper (implicit p : Parameters) extends Module {
   vDiv.io.in.bits  := io.in.bits
   
   val fflagsBuffer   = RegInit(0.U(5.W))
-  val fflagsBufferIn = Wire(UInt(5.W))
+  //val fflagsBufferIn = Wire(UInt(5.W))
 
   when(vDiv.io.out.valid){
       io.out.bits.toRegFileWrite.rfWriteEn         := vDiv.io.out.bits.uop.rfWriteEn
@@ -38,14 +38,15 @@ class VDivWrapper (implicit p : Parameters) extends Module {
       io.out.bits.commitInfo.bits.ldest            := vDiv.io.out.bits.uop.ldest
       io.out.bits.commitInfo.bits.data             := vDiv.io.out.bits.vd
       io.out.bits.commitInfo.bits.fflags           := fflagsBuffer | vDiv.io.out.bits.fflags
-      fflagsBuffer                            := fflagsBuffer | vDiv.io.out.bits.fflags
+      fflagsBuffer                                 := fflagsBuffer | vDiv.io.out.bits.fflags
+      io.out.bits.commitInfo.bits.vxsat            := false.B
   }.otherwise{
       io.out.bits.toRegFileWrite := 0.U.asTypeOf(new regWriteIn)
       io.out.bits.commitInfo     := 0.U.asTypeOf(Valid(new CommitInfo))
   }
 
   when(vDiv.io.out.valid & vDiv.io.out.bits.uop.uopEnd){
-      fflagsBufferIn := false.B
+      fflagsBuffer := false.B
   }
 
   io.out.valid := vDiv.io.out.valid
