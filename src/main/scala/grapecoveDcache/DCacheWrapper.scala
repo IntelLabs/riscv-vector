@@ -39,6 +39,7 @@ object Main extends App {
       "locationInfoStyle=wrapInAtSquareBracket",
     ).reduce(_ + "," + _),
     "--disable-annotation-unknown",
+    "--disable-all-randomization",
   )
 
   lazy val dcacheWrapper = LazyModule(new DCacheWrapper()(Parameters.empty))

@@ -24,7 +24,7 @@ class MSHR(id: Int) extends Module() {
   val metaCounter = RegInit(0.U(log2Up(mshrEntryMetaNum).W))
 
   // match & output
-  val lineAddrMatch = lineAddrReg === io.reqLineAddr
+  val lineAddrMatch = lineAddrReg === io.reqLineAddr && state =/= mode_idle && io.req.orR
   io.lineAddrMatch := lineAddrMatch
 
   /////////////// allocate state flag
@@ -35,7 +35,6 @@ class MSHR(id: Int) extends Module() {
   val wrwErr             = readAfterWriteFlag && io.reqType.asBool
   val probeState = Mux(
     lineAddrMatch,
-    ProbeMSHRState.miss,
     Mux(
       state >= mode_resp_wait,
       ProbeMSHRState.hitBlockB,
@@ -50,6 +49,7 @@ class MSHR(id: Int) extends Module() {
         )
       ),
     ),
+    ProbeMSHRState.miss,
   )
 //    === TLPermissions.toB && sentPermission =/= TLPermissions.NtoB
   io.probeState := Mux(probeReq, probeState, ProbeMSHRState.miss)
@@ -78,6 +78,8 @@ class MSHR(id: Int) extends Module() {
       lineAddrMatch && !stallReq && !io.maskConflict &&
         (!io.reqType.asBool || (io.reqType.asBool && !sentPermission =/= TLPermissions.NtoT))
     ) {
+      metaCounter := metaCounter + 1.U
+    }.elsewhen(state === mode_idle) {
       metaCounter := metaCounter + 1.U
     }
   }.elsewhen(state === mode_clear) {
@@ -310,6 +312,7 @@ class MSHRFile extends Module() {
 
   val allocateArb = Module(new Arbiter(Bool(), mshrEntryNum))
   allocateArb.io.in.foreach(_.bits := DontCare)
+  allocateArb.io.out.ready := !lineAddrMatch
 
   val metaWriteIdx = metaCounterList(lineAddrMatchIdx)
 
@@ -339,7 +342,7 @@ class MSHRFile extends Module() {
     i =>
       val mshr = Module(new MSHR(i))
 
-      mshr.io.req         := Cat(io.fromProbe.valid, io.fromRefill.valid, allocateArb.io.in(i).ready)
+      mshr.io.req         := Cat(io.fromProbe.valid, io.fromRefill.valid, allocateArb.io.in(i).fire)
       mshr.io.reqLineAddr := reqLineAddr
       mshr.io.reqType     := io.pipelineReq.bits.meta.rwType
       mshr.io.isUpgrade   := io.pipelineReq.bits.isUpgrade
@@ -357,7 +360,7 @@ class MSHRFile extends Module() {
       mshr.io.replayFinish := replayFinishRespList(i)
 
       // allocate signal
-      allocateArb.io.in(i).valid := mshr.io.isEmpty & !lineAddrMatch
+      allocateArb.io.in(i).valid := mshr.io.isEmpty
 
       stallReqList(i)      := mshr.io.stallReq
       mshr.io.maskConflict := maskConflict

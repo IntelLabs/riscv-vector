@@ -25,6 +25,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val wbQueue     = Module(new WritebackQueue)
   val probeQueue  = Module(new ProbeQueue)
   val refillQueue = Module(new RefillQueue)
+  val refillInter = Module(new TLDInterface)
   val mainReqArb  = Module(new Arbiter(new MainPipeReq, 3))
 
   // * Signal Define Begin
@@ -388,11 +389,12 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // * Refill Begin
 
-  refillQueue.io.fromL2.valid           := tl_out.d.valid
-  refillQueue.io.fromL2.bits.data       := tl_out.d.bits.data
-  refillQueue.io.fromL2.bits.entryId    := tl_out.d.bits.source
-  refillQueue.io.fromL2.bits.hasData    := tl_out.d.bits.opcode === TLMessages.GrantData
-  refillQueue.io.fromL2.bits.probeMatch := DontCare
+  refillInter.io.fromL2.valid       := tl_out.d.valid
+  refillInter.io.fromL2.bits.data   := tl_out.d.bits.data
+  refillInter.io.fromL2.bits.source := tl_out.d.bits.source
+  refillInter.io.fromL2.bits.opcode := tl_out.d.bits.opcode
+
+  refillInter.io.toRefill <> refillQueue.io.fromL2
 
   // * Refill End
 
