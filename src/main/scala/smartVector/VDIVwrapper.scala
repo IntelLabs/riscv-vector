@@ -28,14 +28,14 @@ class VDivWrapper (implicit p : Parameters) extends Module {
   //val fflagsBufferIn = Wire(UInt(5.W))
 
   when(vDiv.io.out.valid){
-      io.out.bits.toRegFileWrite.rfWriteEn         := vDiv.io.out.bits.uop.rfWriteEn
+      io.out.bits.toRegFileWrite.rfWriteEn         := vDiv.io.out.bits.uop.sysUop.rfWriteEn
       io.out.bits.toRegFileWrite.rfWriteMask       := Fill(128/8, 0.U)
-      io.out.bits.toRegFileWrite.rfWriteIdx        := vDiv.io.out.bits.uop.ldest
+      io.out.bits.toRegFileWrite.rfWriteIdx        := vDiv.io.out.bits.uop.sysUop.ldest
       io.out.bits.toRegFileWrite.rfWriteData       := vDiv.io.out.bits.vd
       io.out.bits.commitInfo.valid                 := vDiv.io.out.bits.uop.uopEnd
-      io.out.bits.commitInfo.bits.scalarRegWriteEn := vDiv.io.out.bits.uop.scalarRegWriteEn
-      io.out.bits.commitInfo.bits.floatRegWriteEn  := vDiv.io.out.bits.uop.floatRegWriteEn
-      io.out.bits.commitInfo.bits.ldest            := vDiv.io.out.bits.uop.ldest
+      io.out.bits.commitInfo.bits.scalarRegWriteEn := vDiv.io.out.bits.uop.sysUop.scalarRegWriteEn
+      io.out.bits.commitInfo.bits.floatRegWriteEn  := vDiv.io.out.bits.uop.sysUop.floatRegWriteEn
+      io.out.bits.commitInfo.bits.ldest            := vDiv.io.out.bits.uop.sysUop.ldest
       io.out.bits.commitInfo.bits.data             := vDiv.io.out.bits.vd
       io.out.bits.commitInfo.bits.fflags           := fflagsBuffer | vDiv.io.out.bits.fflags
       fflagsBuffer                                 := fflagsBuffer | vDiv.io.out.bits.fflags

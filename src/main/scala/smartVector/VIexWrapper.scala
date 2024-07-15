@@ -11,6 +11,7 @@ import darecreek.exu.vfu.VInstructions._
 import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import chipsalliance.rocketchip.config
 import darecreek.Vlmul_to_lmul
+import xiangshan.backend.rob.RobPtr
 
 class IexOutput extends Bundle {
   val vd = UInt(128.W)
@@ -158,18 +159,18 @@ class VIexWrapper(implicit p : Parameters) extends Module {
 
 
   Seq(SValu.io.in.bits, SVMac.io.in.bits, SVMask.io.in.bits, SVReduc.io.in.bits, SVDiv.io.in.bits, SVFpu.io.in.bits).foreach {iex =>
-    iex.uop.ctrl             := muxData.mUop.uop.ctrl
-    iex.uop.info             := muxData.mUop.uop.info
-    iex.uop.uopIdx           := muxData.mUop.uop.uopIdx
-    iex.uop.uopEnd           := muxData.mUop.uop.uopEnd
-    iex.uop.scalarRegWriteEn := muxData.mergeInfo.scalarRegWriteEn
-    iex.uop.floatRegWriteEn  := muxData.mergeInfo.floatRegWriteEn
-    iex.uop.rfWriteEn        := muxData.mergeInfo.rfWriteEn
-    iex.uop.ldest            := muxData.mergeInfo.ldest
-    iex.uop.permExpdLen      := muxData.mergeInfo.permExpdLen
-    iex.uop.regDstIdx        := muxData.mergeInfo.regDstIdx
-    iex.uop.regCount         := muxData.mergeInfo.regCount
-    iex.uop.sysUop           := muxData.mUop.uop.sysUop
+    iex.uop.ctrl                    := muxData.mUop.uop.ctrl
+    iex.uop.info                    := muxData.mUop.uop.info
+    iex.uop.uopIdx                  := muxData.mUop.uop.uopIdx
+    iex.uop.uopEnd                  := muxData.mUop.uop.uopEnd
+    iex.uop.sysUop.scalarRegWriteEn := muxData.mergeInfo.scalarRegWriteEn
+    iex.uop.sysUop.floatRegWriteEn  := muxData.mergeInfo.floatRegWriteEn
+    iex.uop.sysUop.rfWriteEn        := muxData.mergeInfo.rfWriteEn
+    iex.uop.sysUop.ldest            := muxData.mergeInfo.ldest
+    iex.uop.sysUop.permExpdLen      := muxData.mergeInfo.permExpdLen
+    iex.uop.sysUop.regDstIdx        := muxData.mergeInfo.regDstIdx
+    iex.uop.sysUop.regCount         := muxData.mergeInfo.regCount
+    iex.uop.sysUop.robIdx           := 0.U.asTypeOf(new RobPtr)
     iex.vs1   := muxData.mUop.uopRegInfo.vs1
     iex.vs2   := muxData.mUop.uopRegInfo.vs2
     iex.rs1   := muxData.mUop.scalar_opnd_1
@@ -180,18 +181,18 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   Seq(SValu.io.mergeInfo, SVMac.io.mergeInfo, SVMask.io.mergeInfo, SVReduc.io.mergeInfo).foreach {iex =>
     iex       := muxData.mergeInfo
   }
-  SVPerm.io.in.uop.ctrl             := muxData.mUop.uop.ctrl
-  SVPerm.io.in.uop.info             := muxData.mUop.uop.info
-  SVPerm.io.in.uop.uopIdx           := muxData.mUop.uop.uopIdx
-  SVPerm.io.in.uop.uopEnd           := muxData.mUop.uop.uopEnd
-  SVPerm.io.in.uop.scalarRegWriteEn := muxData.mergeInfo.scalarRegWriteEn
-  SVPerm.io.in.uop.floatRegWriteEn  := muxData.mergeInfo.floatRegWriteEn
-  SVPerm.io.in.uop.rfWriteEn        := muxData.mergeInfo.rfWriteEn
-  SVPerm.io.in.uop.ldest            := muxData.mergeInfo.ldest
-  SVPerm.io.in.uop.permExpdLen      := muxData.mergeInfo.permExpdLen
-  SVPerm.io.in.uop.regDstIdx        := muxData.mergeInfo.regDstIdx
-  SVPerm.io.in.uop.regCount         := muxData.mergeInfo.regCount
-  SVPerm.io.in.uop.sysUop           := muxData.mUop.uop.sysUop
+  SVPerm.io.in.uop.ctrl                    := muxData.mUop.uop.ctrl
+  SVPerm.io.in.uop.info                    := muxData.mUop.uop.info
+  SVPerm.io.in.uop.uopIdx                  := muxData.mUop.uop.uopIdx
+  SVPerm.io.in.uop.uopEnd                  := muxData.mUop.uop.uopEnd
+  SVPerm.io.in.uop.sysUop.scalarRegWriteEn := muxData.mergeInfo.scalarRegWriteEn
+  SVPerm.io.in.uop.sysUop.floatRegWriteEn  := muxData.mergeInfo.floatRegWriteEn
+  SVPerm.io.in.uop.sysUop.rfWriteEn        := muxData.mergeInfo.rfWriteEn
+  SVPerm.io.in.uop.sysUop.ldest            := muxData.mergeInfo.ldest
+  SVPerm.io.in.uop.sysUop.permExpdLen      := muxData.mergeInfo.permExpdLen
+  SVPerm.io.in.uop.sysUop.regDstIdx        := muxData.mergeInfo.regDstIdx
+  SVPerm.io.in.uop.sysUop.regCount         := muxData.mergeInfo.regCount
+  SVPerm.io.in.uop.sysUop.robIdx           := 0.U.asTypeOf(new RobPtr)
   //TODO: when id float inst, the rs1 should read from float register file
   SVPerm.io.in.rs1 := muxData.mUop.scalar_opnd_1 // || float
 

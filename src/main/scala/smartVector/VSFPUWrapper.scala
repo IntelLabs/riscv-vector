@@ -44,14 +44,14 @@ class VSFPUWrapper (implicit p : Parameters) extends VFuModule {
   //val fflagsBufferIn = Wire(UInt(5.W))
 
   when(vFPu.io.out.valid){
-      io.out.bits.toRegFileWrite.rfWriteEn         := vFPu.io.out.bits.uop.rfWriteEn
+      io.out.bits.toRegFileWrite.rfWriteEn         := vFPu.io.out.bits.uop.sysUop.rfWriteEn
       io.out.bits.toRegFileWrite.rfWriteMask       := Fill(128/8, 0.U)
-      io.out.bits.toRegFileWrite.rfWriteIdx        := vFPu.io.out.bits.uop.ldest
+      io.out.bits.toRegFileWrite.rfWriteIdx        := vFPu.io.out.bits.uop.sysUop.ldest
       io.out.bits.toRegFileWrite.rfWriteData       := vFPu.io.out.bits.vd
       io.out.bits.commitInfo.valid                 := vFPu.io.out.bits.uop.uopEnd
-      io.out.bits.commitInfo.bits.scalarRegWriteEn := vFPu.io.out.bits.uop.scalarRegWriteEn
-      io.out.bits.commitInfo.bits.floatRegWriteEn  := vFPu.io.out.bits.uop.floatRegWriteEn
-      io.out.bits.commitInfo.bits.ldest            := vFPu.io.out.bits.uop.ldest
+      io.out.bits.commitInfo.bits.scalarRegWriteEn := vFPu.io.out.bits.uop.sysUop.scalarRegWriteEn
+      io.out.bits.commitInfo.bits.floatRegWriteEn  := vFPu.io.out.bits.uop.sysUop.floatRegWriteEn
+      io.out.bits.commitInfo.bits.ldest            := vFPu.io.out.bits.uop.sysUop.ldest
       io.out.bits.commitInfo.bits.data             := vFPu.io.out.bits.vd
       io.out.bits.commitInfo.bits.fflags           := fflagsBuffer | vFPu.io.out.bits.fflags
       fflagsBuffer                                 := fflagsBuffer | vFPu.io.out.bits.fflags

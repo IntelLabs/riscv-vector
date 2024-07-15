@@ -48,14 +48,6 @@ class VUop(implicit p: Parameters) extends Bundle with ConnectFromLaneUop {
   val info = new VUopInfo
   val uopIdx = UInt(3.W)
   val uopEnd = Bool()
-  val scalarRegWriteEn = Bool()
-  val floatRegWriteEn = Bool()
-  val rfWriteEn = Bool()
-  val ldest = UInt(5.W)
-  //For Permutation
-  val permExpdLen = UInt(4.W)
-  val regDstIdx = UInt(5.W)
-  val regCount  = UInt(4.W)
   // Temp: system uop
   val sysUop = new MicroOp
 }

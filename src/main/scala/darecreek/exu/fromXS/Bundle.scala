@@ -57,6 +57,14 @@ object ValidUndirectioned {
 
 class MicroOp(implicit p: Parameters) extends Bundle {
   val robIdx = new RobPtr
+  val scalarRegWriteEn = Bool()
+  val floatRegWriteEn = Bool()
+  val rfWriteEn = Bool()
+  val ldest = UInt(5.W)
+  //For Permutation
+  val permExpdLen = UInt(4.W)
+  val regDstIdx = UInt(5.W)
+  val regCount  = UInt(4.W)
 }
 
 class Redirect(implicit p: Parameters) extends Bundle {

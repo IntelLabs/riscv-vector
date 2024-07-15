@@ -33,20 +33,20 @@ class VPermWrapper (implicit p : Parameters) extends Module {
   when(vPerm.io.out.wb_vld){
       io.out.bits.toRegFileWrite.rfWriteEn   := true.B
       io.out.bits.toRegFileWrite.rfWriteMask := Fill(128/8, 0.U)
-      io.out.bits.toRegFileWrite.rfWriteIdx  := vPerm.io.out.uop.regDstIdx + permWriteNum
+      io.out.bits.toRegFileWrite.rfWriteIdx  := vPerm.io.out.uop.sysUop.regDstIdx + permWriteNum
       io.out.bits.toRegFileWrite.rfWriteData := vPerm.io.out.wb_data
       permWriteNum := permWriteNum + 1.U
   }.otherwise{
       io.out.bits.toRegFileWrite := 0.U.asTypeOf(new regWriteIn)
   }
 
-  val permDone = permWriteNum + 1.U === vPerm.io.out.uop.permExpdLen
+  val permDone = permWriteNum + 1.U === vPerm.io.out.uop.sysUop.permExpdLen
   when(vPerm.io.out.wb_vld && permDone){
       permWriteNum := 0.U
       io.out.bits.commitInfo.valid := true.B
-      io.out.bits.commitInfo.bits.scalarRegWriteEn := vPerm.io.out.uop.scalarRegWriteEn
-      io.out.bits.commitInfo.bits.floatRegWriteEn  := vPerm.io.out.uop.floatRegWriteEn
-      io.out.bits.commitInfo.bits.ldest            := vPerm.io.out.uop.ldest
+      io.out.bits.commitInfo.bits.scalarRegWriteEn := vPerm.io.out.uop.sysUop.scalarRegWriteEn
+      io.out.bits.commitInfo.bits.floatRegWriteEn  := vPerm.io.out.uop.sysUop.floatRegWriteEn
+      io.out.bits.commitInfo.bits.ldest            := vPerm.io.out.uop.sysUop.ldest
       io.out.bits.commitInfo.bits.data             := vPerm.io.out.wb_data
       io.out.bits.commitInfo.bits.fflags           := 0.U
       io.out.bits.commitInfo.bits.vxsat            := false.B
