@@ -123,7 +123,8 @@ class Vsplit(implicit p : Parameters) extends Module {
         }
         val scoreBoardSetIO = Flipped(new ScoreboardSetIO)
         val scoreBoardReadIO = Flipped(new ScoreboardReadIO)
-        val lsuStallSplit = Input(Bool()) 
+        val lsuStallSplit = Input(Bool())
+        val lsuEmpty      = Input(Bool()) 
         val iexNeedStall  = Input(Bool())
         val vLSUXcpt = Input (new VLSUXcpt)
         val excpInfo = Output(new ExcpInfo)
@@ -150,7 +151,8 @@ class Vsplit(implicit p : Parameters) extends Module {
     val fire2PipeReg = Wire(Bool())
 
     val pipeRegReady    = WireInit(false.B)
-    val exuReady        = ~io.lsuStallSplit && ~io.iexNeedStall
+    //val exuReady        = ~io.lsuStallSplit && ~io.iexNeedStall
+    val exuReady        = io.lsuEmpty && ~io.iexNeedStall
 
     //when (instFirstIn){       
     //    vCtrl(0)            := io.in.decodeIn.bits.vCtrl
