@@ -11,7 +11,7 @@ import utility._
 
 class WritebackReq(params: TLBundleParameters) extends Bundle {
   val voluntary = Bool()
-  val lineAddr  = UInt((paddrWidth - blockOffBits).W)
+  val lineAddr  = UInt(lineAddrWidth.W)
   val perm      = UInt(TLPermissions.cWidth.W)
   val hasData   = Bool()
   val data      = UInt(dataWidth.W)
@@ -128,7 +128,8 @@ class WritebackEntry(id: Int)(
     (state === s_release_req && allBeatDone && !req.hasData)
 
   // cache miss & addr is in wbq -> block the miss req
-  io.missCheck.blockMiss := io.missCheck.valid && (state =/= s_invalid) && (io.missCheck.lineAddr === req.lineAddr)
+  io.missCheck.blockMiss := io.missCheck.valid && (state =/= s_invalid) &&
+    (io.missCheck.lineAddr === req.lineAddr)
 
   io.req.ready   := (state === s_invalid)
   io.grant.ready := (state === s_release_resp)

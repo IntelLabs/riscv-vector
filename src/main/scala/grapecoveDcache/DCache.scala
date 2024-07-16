@@ -26,7 +26,6 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val probeQueue  = Module(new ProbeQueue)
   val refillQueue = Module(new RefillQueue)
   val refillInter = Module(new TLDInterface)
-  val mainReqArb  = Module(new Arbiter(new MainPipeReq, 3))
 
   // * Signal Define Begin
   // Store -> Load Bypassing
@@ -56,21 +55,25 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val victimWay = WireInit(0.U(log2Up(nWays).W))
 
   val s1_wbqBlockMiss = WireInit(false.B)
+
+  val blockReq = io.nextCycleWb || (io.resp.valid && io.resp.bits.status === CacheRespStatus.replay)
   // * Signal Define End
 
   // * pipeline stage 0 Begin
 
   // req arbiter
+  val mainReqArb = Module(new Arbiter(new MainPipeReq, 3))
+
   mainReqArb.io.in(0) <> probeQueue.io.mainPipeReq
   mainReqArb.io.in(1).valid := mshrs.io.toReplace.valid
   mainReqArb.io.in(1).bits  := MainPipeReqConverter(mshrs.io.toReplace.bits, victimWay)
-  mainReqArb.io.in(2).valid := io.req.valid
+  mainReqArb.io.in(2).valid := io.req.valid & !blockReq
   mainReqArb.io.in(2).bits  := MainPipeReqConverter(io.req.bits)
   mainReqArb.io.out.ready   := true.B
 
   probeQueue.io.mainPipeReq.ready := mainReqArb.io.in(0).ready
   mshrs.io.toReplace.ready        := mainReqArb.io.in(1).ready
-  io.req.ready                    := mainReqArb.io.in(2).ready
+  io.req.ready                    := mainReqArb.io.in(2).ready & !blockReq
 
   // get s0 req
   val s0_req   = mainReqArb.io.out.bits
@@ -93,8 +96,8 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // 2. Organize Data
   // 3. Return Resp
 
-  val s1_valid = RegNext(s0_valid) & ~io.s1_kill
   val s1_req   = RegEnable(s0_req, s0_valid)
+  val s1_valid = RegNext(s0_valid) & ~(io.s1_kill && s1_req.isFromCore)
 
   val s1_validFromCore = s1_valid && s1_req.isFromCore
   val s1_validProbe    = s1_valid && s1_req.isProbe
@@ -255,13 +258,13 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // * pipeline stage 1 End
 
   // * pipeline stage 2 Begin
-  val s2_valid        = RegNext(s1_updateMeta || s1_updateData)
-  val s2_req          = Reg(new MainPipeReq)
-  val s2_wayEn        = RegInit(0.U(nWays.W))
-  val s2_newCoh       = RegInit(0.U(cohBits.W))
-  val s2_updateMeta   = RegNext(s1_updateMeta)
-  val s2_updateData   = RegNext(s1_updateData)
-  val s2_refillFinish = RegNext(s1_validRefill)
+  val s2_valid       = RegNext(s1_updateMeta || s1_updateData)
+  val s2_req         = Reg(new MainPipeReq)
+  val s2_wayEn       = RegInit(0.U(nWays.W))
+  val s2_newCoh      = RegInit(0.U(cohBits.W))
+  val s2_updateMeta  = RegNext(s1_updateMeta)
+  val s2_updateData  = RegNext(s1_updateData)
+  val s2_validRefill = RegNext(s1_validRefill)
 
   when(s1_updateMeta || s1_updateData) {
     s2_req       := s1_req
@@ -300,10 +303,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     (s2_valid, s2_req, s2_bypassStoreCandidate),
   ).map(r =>
     (
-      r._1 && MemoryOpConstants.isWrite(r._2.cmd)
-        && (s0_req.paddr >> blockOffBits === r._2.paddr >> blockOffBits
-          || (s0_req.isRefill && s0_req.refillWay === r._3.wayEn
-            && getSetIdx(s0_req.paddr) === getSetIdx(r._2.paddr))),
+      r._1 && MemoryOpConstants.isWrite(r._2.cmd) && getLineAddr(s0_req.paddr) === getLineAddr(r._2.paddr),
       r._3,
     )
   )
@@ -312,16 +312,14 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   s1_bypassStore.bits  := PriorityMux(bypassStoreList.map(d => (d._1, d._2)))
 
   // replace -> load/store bypassing
-  // list (valid, setIdx, tag)
+  // list (valid, req, refillWay, replace tag)
   val bypassReplaceList = List(
     (s1_validRefill, s1_req, s1_req.refillWay, s1_tag),
-    (s2_valid && s2_req.isRefill, s2_req, s2_req.refillWay, RegNext(s1_tag)),
+    (s2_validRefill, s2_req, s2_req.refillWay, RegNext(s1_tag)),
   )
 
   s1_bypassReplace := bypassReplaceList.map(r =>
-    r._1
-      && getSetIdx(r._2.paddr) === getSetIdx(s0_req.paddr)
-      && getTag(s0_req.paddr) === r._4
+    r._1 && (getLineAddr(s0_req.paddr) === Cat(r._4, getSetIdx(r._2.paddr)))
   ).reduce(_ || _)
 
   // * Store -> Load Bypassing End
@@ -338,7 +336,8 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     replacer.access(touchSet, touchWay)
   }
 
-  victimWay := replacer.way(getSetIdx(mshrs.io.toReplace.bits.lineAddr << blockOffBits)) // FIXME
+  val replSet = getSetIdx(mshrs.io.toReplace.bits.lineAddr << blockOffBits)
+  victimWay := replacer.way(replSet) // FIXME
 
   // * Replacer End
 
@@ -378,10 +377,10 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // mshr send replace req to pipeline
   mshrs.io.toReplace.ready := true.B
-  mshrs.io.replaceFinish   := s2_refillFinish
+  mshrs.io.replaceFinish   := s2_validRefill
 
   // probe -> mshr
-  mshrs.io.fromProbe := DontCare
+  mshrs.io.fromProbe <> probeQueue.io.probeCheck
 
   mshrs.io.toPipeline.ready := true.B // FIXME
 
@@ -396,14 +395,16 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   refillInter.io.toRefill <> refillQueue.io.fromL2
 
+  // TODO: add tl-e GrantAck
+
   // * Refill End
 
   // * Writeback Begin
 
   // wb in pipeline stage 1
 
-  // source 0: probe
-  // source 1: main pipeline
+  // source 0: main pipeline
+  // source 1: probe
   val wbArbiter = Module(new Arbiter(new WritebackReq(edge.bundle), 2))
 
   val wbPipeReq = WireInit(0.U.asTypeOf(Decoupled(new WritebackReq(edge.bundle))))
@@ -437,7 +438,8 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   probeQueue.io.lrscAddr.valid := lrscValid
   probeQueue.io.lrscAddr.bits  := lrscAddr
-  probeQueue.io.probeCheck <> mshrs.io.fromProbe
+
+  // in MSHR: probeQueue.io.probeCheck <> mshrs.io.fromProbe
 
   probeQueue.io.probeResp := Mux(
     !s1_probeWb,
@@ -463,6 +465,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     ),
   )
 
+  // mshr resp
   mshrsResp.valid        := mshrs.io.toPipeline.valid
   mshrsResp.bits.status  := CacheRespStatus.refill
   mshrsResp.bits.source  := mshrs.io.toPipeline.bits.sID
@@ -483,7 +486,6 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // FIXME
   // test tilelink
-  tl_out.b.ready := false.B
   tl_out.e.valid := false.B
 
   tl_out.d.ready := false.B
