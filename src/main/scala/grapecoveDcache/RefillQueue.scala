@@ -29,11 +29,11 @@ class TLDInterface extends Module {
     data(counter) := io.fromL2.bits.data
   }
 
-  writeFlag := Mux(writeFlag, false.B, Mux(counter === refillCycles.asUInt - 1.U, true.B, writeFlag))
+  writeFlag := Mux(writeFlag, false.B, Mux(counter === refillCycles.asUInt - 1.U && inValid, true.B, writeFlag))
 
   io.fromL2.ready             := io.toRefill.ready && !writeFlag
   io.toRefill.bits.probeMatch := DontCare
-  io.toRefill.valid           := writeFlag | io.fromL2.bits.opcode === TLMessages.Grant
+  io.toRefill.valid           := writeFlag | (io.fromL2.bits.opcode === TLMessages.Grant && io.fromL2.valid)
   io.toRefill.bits.hasData    := Mux(io.fromL2.bits.opcode === TLMessages.Grant, false.B, true.B)
   io.toRefill.bits.data       := data.asUInt
   io.toRefill.bits.entryId := Mux(

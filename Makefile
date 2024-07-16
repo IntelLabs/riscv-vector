@@ -15,14 +15,6 @@ dcache:
 	mkdir -p $(BUILD_DIR)
 	mill -i $(PRJ)[$(CHISEL_VERSION)].runMain grapecoveDCache.Main --target-dir $(BUILD_DIR)
 
-mshr:
-	mkdir -p $(BUILD_DIR)
-	mill -i $(PRJ)[$(CHISEL_VERSION)].runMain grapecoveDCache.MSHRFile --target-dir $(BUILD_DIR)
-
-refill:
-	mkdir -p $(BUILD_DIR)
-	mill -i $(PRJ)[$(CHISEL_VERSION)].runMain grapecoveDCache.RefillTest --target-dir $(BUILD_DIR)
-
 help:
 	mill -i $(PRJ).runMain grapecoveDCache.DCache --help
 
@@ -35,6 +27,7 @@ checkformat:
 clean:
 	-rm -rf $(BUILD_DIR)
 	rm -rf ./out
+	rm -rf ./test_run_dir
 
 include Makefile.test
 

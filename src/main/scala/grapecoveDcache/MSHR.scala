@@ -24,7 +24,7 @@ class MSHR(id: Int) extends Module() {
   val metaCounter = RegInit(0.U(log2Up(mshrEntryMetaNum).W))
 
   // match & output
-  val lineAddrMatch = lineAddrReg === io.reqLineAddr && state =/= mode_idle && io.req.orR
+  val lineAddrMatch = lineAddrReg === io.reqLineAddr && state =/= mode_idle // && io.req.orR
   io.lineAddrMatch := lineAddrMatch
 
   /////////////// allocate state flag
@@ -119,11 +119,7 @@ class MSHR(id: Int) extends Module() {
   }
 
   // enqueue the sender
-  io.senderPermission := Mux(
-    sentPermission === TLPermissions.NtoB && lineAddrMatch && !stallReq && !io.maskConflict,
-    TLPermissions.NtoT,
-    sentPermission,
-  )
+  io.senderPermission := sentPermission
 
   io.senderLineAddr := lineAddrReg
 
@@ -312,7 +308,6 @@ class MSHRFile extends Module() {
 
   val allocateArb = Module(new Arbiter(Bool(), mshrEntryNum))
   allocateArb.io.in.foreach(_.bits := DontCare)
-  allocateArb.io.out.ready := !lineAddrMatch
 
   val metaWriteIdx = metaCounterList(lineAddrMatchIdx)
 
@@ -342,7 +337,11 @@ class MSHRFile extends Module() {
     i =>
       val mshr = Module(new MSHR(i))
 
-      mshr.io.req         := Cat(io.fromProbe.valid, io.fromRefill.valid, allocateArb.io.in(i).fire)
+      mshr.io.req := Cat(
+        io.fromProbe.valid,
+        io.fromRefill.valid,
+        allocateArb.io.in(i).fire || (allocateReq && mshr.io.lineAddrMatch),
+      )
       mshr.io.reqLineAddr := reqLineAddr
       mshr.io.reqType     := io.pipelineReq.bits.meta.rwType
       mshr.io.isUpgrade   := io.pipelineReq.bits.isUpgrade
@@ -385,18 +384,22 @@ class MSHRFile extends Module() {
   when(!probeReq && !replayReq && allocateReq && !stallReq && !maskConflict) {
     metaArray(lineAddrMatchIdx)(metaWriteIdx) := io.pipelineReq.bits.meta.asUInt
     maskArray(lineAddrMatchIdx)               := io.pipelineReq.bits.mask | maskArray(lineAddrMatchIdx)
-    dataArray(lineAddrMatchIdx) := dataMergeGen(maskArray(lineAddrMatchIdx), dataArray(lineAddrMatchIdx)) |
+    dataArray(lineAddrMatchIdx) := dataMergeGen(
+      ~io.pipelineReq.bits.mask,
+      dataArray(lineAddrMatchIdx),
+    ) |
       dataMergeGen(
-        io.pipelineReq.bits.mask,
+        Mux(io.pipelineReq.bits.isUpgrade, Fill(mshrMaskWidth, 1.U(1.W)), io.pipelineReq.bits.mask),
         io.pipelineReq.bits.data,
       )
   }.elsewhen(io.replaceFinish) {
     maskArray(replayReg.io.replayIdx) := 0.U
+    dataArray(replayReg.io.replayIdx) := 0.U
   }
 
   // Resp To Cache Pipeline
   io.pipelineReq.ready     := !probeReq && !replayReq && !stallReq && !maskConflict
-  allocateArb.io.out.ready := allocateReq
+  allocateArb.io.out.ready := allocateReq && !lineAddrMatch
 
   // sender queue
   senderQueue.io.enq.valid := io.pipelineReq.valid && senderReqList.asUInt.orR
