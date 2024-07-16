@@ -154,7 +154,7 @@ trait DCacheTestTrait {
         }
         dut.io.resp.valid.expect(true.B)
         dut.io.resp.bits.status.expect(CacheRespStatus.refill)
-        dut.io.resp.bits.data.expect(DCacheInit.initData.U)
+        dut.io.resp.bits.data.expect("h23232323".U)
         dut.clock.step(10)
         dut.clock.step(10)
 

@@ -2,7 +2,6 @@ package grapecoveDCache
 
 import chisel3._
 import chisel3.util._
-import util._
 import freechips.rocketchip.tilelink._
 import _root_.circt.stage.ChiselStage
 
@@ -73,7 +72,7 @@ class MSHR(id: Int) extends Module() {
   io.metaCounter := metaCounter
 
   // if already has write req, metaCounter won't change
-  when(allocateReq && !(io.isUpgrade || (io.reqType.asBool && sentPermission === TLPermissions.BtoT))) {
+  when(allocateReq && !(io.reqType.asBool && sentPermission === TLPermissions.BtoT)) {
     when(
       lineAddrMatch && !stallReq && !io.maskConflict &&
         (!io.reqType.asBool || (io.reqType.asBool && !sentPermission =/= TLPermissions.NtoT))
@@ -137,7 +136,8 @@ class MSHR(id: Int) extends Module() {
 }
 
 class ReplayModule extends Module() {
-  val io                = IO(new ReplayModuleIO())
+  val io = IO(new ReplayModuleIO())
+  dontTouch(io.innerIO.bits.meta)
   private val replayReg = RegInit(0.U(mshrDataWidth.W))
 
   val mode_idle :: mode_replay :: mode_wait_replace :: mode_clear :: Nil = Enum(4)
@@ -168,7 +168,7 @@ class ReplayModule extends Module() {
       replayReg,
       false.B,
       mshrDataWidth / 8,
-    )
+    ).genData(2)
 
   def maskedStoreGen(mask: UInt, originData: UInt, newData: UInt): UInt = {
     val originDataByte = originData.asTypeOf(Vec(mshrDataWidth / 8, UInt(8.W)))
@@ -235,7 +235,7 @@ class ReplayModule extends Module() {
   io.toPipe.valid := (state === mode_replay) && !io.innerIO.bits.meta.rwType
   // replayStall            := io.toPipe.valid && !io.toPipe.ready
   io.toPipe.bits.regIdx  := io.innerIO.bits.meta.regIdx
-  io.toPipe.bits.regData := loadgen.genData(sizeMax)
+  io.toPipe.bits.regData := loadgen
   io.toPipe.bits.sID     := io.innerIO.bits.meta.sourceId
 
   io.toPipe.bits.nextCycleWb := (io.innerIO.valid && state === mode_idle) || (metaCounter < totalCounter - 1.U && state === mode_replay)
