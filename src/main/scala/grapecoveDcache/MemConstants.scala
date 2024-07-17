@@ -41,7 +41,7 @@ trait MemoryOpConstants {
 
   def isAMO(cmd:         UInt) = isAMOLogical(cmd) || isAMOArithmetic(cmd)
   def isPrefetch(cmd:    UInt) = cmd === M_PFR || cmd === M_PFW
-  def isRead(cmd:        UInt) = cmd.isOneOf(M_XRD, M_HLVX, M_XLR, M_XSC) || isAMO(cmd)
+  def isRead(cmd:        UInt) = cmd.isOneOf(M_XRD, M_HLVX, M_XLR, M_XSC, M_PFR) || isAMO(cmd)
   def isWrite(cmd:       UInt) = cmd === M_XWR || cmd === M_PWR || cmd === M_XSC || isAMO(cmd)
   def isWriteIntent(cmd: UInt) = isWrite(cmd) || cmd === M_PFW || cmd === M_XLR
 }

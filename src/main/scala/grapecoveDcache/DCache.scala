@@ -7,6 +7,7 @@ import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
 import utility._
 import AddrDecoder._
+import MemoryOpConstants._
 
 class GPCDCache()(
     implicit p: Parameters
@@ -147,10 +148,10 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // hit/miss for load/store
   val s1_hasPerm         = s1_cohMeta.onAccess(s1_req.cmd)._1
   val s1_newHitCohMeta   = s1_cohMeta.onAccess(s1_req.cmd)._3
-  val s1_hit             = s1_valid && s1_tagMatch && s1_hasPerm
-  val s1_upgradePermHit  = s1_hit && s1_newHitCohMeta =/= s1_cohMeta // e.g. T->Dirty hit
-  val s1_noDataMiss      = s1_valid && !s1_tagMatch                  // e.g. N->B or N->T miss
-  val s1_upgradePermMiss = s1_valid && s1_tagMatch && !s1_hasPerm    // e.g. B->T miss
+  val s1_hit             = s1_validFromCore && s1_tagMatch && s1_hasPerm
+  val s1_upgradePermHit  = s1_hit && s1_newHitCohMeta =/= s1_cohMeta      // e.g. T->Dirty hit
+  val s1_noDataMiss      = s1_validFromCore && !s1_tagMatch               // e.g. N->B or N->T miss
+  val s1_upgradePermMiss = s1_validFromCore && s1_tagMatch && !s1_hasPerm // e.g. B->T miss
 
   // organize read data
   val s1_dataPreBypass =
@@ -163,7 +164,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_maskInBytes = Mux(
     s1_req.isRefill,
     Fill(dataBytes, 1.U),
-    Mux(s1_req.cmd === MemoryOpConstants.M_PWR, s1_req.wmask, s1_storeGenMask), // FIXME wmask
+    Mux(s1_req.cmd === M_PWR, s1_req.wmask, s1_storeGenMask), // FIXME wmask
   )
   val s1_mask           = FillInterleaved(8, s1_maskInBytes)
   val s1_mergeStoreData = s1_req.wdata & s1_mask | s1_data & ~s1_mask // FIXME wdata incorrect
@@ -184,8 +185,8 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val lrscCount = RegInit(0.U)
   val lrscValid = lrscCount > lrscBackoff.U
 
-  val s1_lr = s1_valid && (s1_req.cmd === MemoryOpConstants.M_XLR)
-  val s1_sc = s1_valid && (s1_req.cmd === MemoryOpConstants.M_XSC)
+  val s1_lr = s1_validFromCore && (s1_req.cmd === M_XLR)
+  val s1_sc = s1_validFromCore && (s1_req.cmd === M_XSC)
 
   val lrscAddr         = RegEnable(s1_req.paddr >> blockOffBits, s1_lr)
   val s1_lrscAddrMatch = lrscValid && (s1_req.paddr >> blockOffBits === lrscAddr)
@@ -195,7 +196,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     lrscCount,
     Seq(
       // (lr | sc | other cmd) after lr hit
-      (s1_valid & lrscCount > 0.U) -> 0.U,
+      (s1_validFromCore & lrscCount > 0.U) -> 0.U,
       // lr hit
       (s1_hit && s1_lr) -> (lrscCycles - 1).U,
       // no cmd after lr hit
@@ -204,7 +205,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   )
 
   val s1_storeUpdateMeta = (s1_upgradePermHit || s1_upgradePermMiss) && !s1_scFail
-  val s1_storeUpdateData = (s1_hit && MemoryOpConstants.isWrite(s1_req.cmd)) && !s1_scFail
+  val s1_storeUpdateData = (s1_hit && isWrite(s1_req.cmd)) && !s1_scFail
 
   // probe
   val s1_probeDirty       = s1_cohMeta.onProbe(s1_req.probePerm)._1
@@ -217,14 +218,14 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // replace
   val s1_repLineAddr    = Cat(s1_tag, getSetIdx(s1_req.paddr)) // FIXME
   val s1_repMeta        = s1_cohMeta
-  val s1_repDirty       = s1_repMeta.onCacheControl(MemoryOpConstants.M_FLUSH)._1
-  val s1_repShrinkParam = s1_repMeta.onCacheControl(MemoryOpConstants.M_FLUSH)._2
+  val s1_repDirty       = s1_repMeta.onCacheControl(M_FLUSH)._1
+  val s1_repShrinkParam = s1_repMeta.onCacheControl(M_FLUSH)._2
 
   val s1_refillUpdateMeta = s1_validRefill
   val s1_refillUpdateData = s1_validRefill
   val s1_refillData       = s1_req.wdata
-  val s1_replaceWb        = s1_validRefill && s1_repDirty
-  val s1_replaceWbData    = s1_replaceWb
+  val s1_replaceWb        = s1_validRefill && (s1_repMeta.state > ClientStates.Branch)
+  val s1_replaceWbData    = s1_repDirty
 
   // prepare for s2
   val s1_updateMeta = s1_storeUpdateMeta || s1_probeUpdateMeta || s1_refillUpdateMeta
@@ -232,15 +233,15 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // FIXME mask
   val s1_storeData =
-    Mux(s1_req.isRefill, s1_req.wdata, Mux(MemoryOpConstants.isAMO(s1_req.cmd), s1_amoStoreData, s1_mergeStoreData))
+    Mux(s1_req.isRefill, s1_req.wdata, Mux(isAMO(s1_req.cmd), s1_amoStoreData, s1_mergeStoreData))
 
   val s1_newCoh = MuxCase(
     s1_req.cmd,
     Seq(
-      s1_validProbe                            -> s1_newProbeCoh.state,
-      s1_validRefill                           -> s1_req.refillCoh,
-      (s1_validFromCore && s1_hit)             -> s1_newHitCohMeta.state,
-      (s1_validFromCore && s1_upgradePermMiss) -> 0.U,// invalid
+      s1_validProbe      -> s1_newProbeCoh.state,
+      s1_validRefill     -> s1_req.refillCoh,
+      s1_hit             -> s1_newHitCohMeta.state,
+      s1_upgradePermMiss -> 0.U,// invalid
     ),
   )
 
@@ -303,7 +304,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     (s2_valid, s2_req, s2_bypassStoreCandidate),
   ).map(r =>
     (
-      r._1 && MemoryOpConstants.isWrite(r._2.cmd) && getLineAddr(s0_req.paddr) === getLineAddr(r._2.paddr),
+      r._1 && isWrite(r._2.cmd) && getLineAddr(s0_req.paddr) === getLineAddr(r._2.paddr),
       r._3,
     )
   )
@@ -356,7 +357,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   mshrs.io.pipelineReq.bits.lineAddr      := getLineAddr(s1_req.paddr)
   mshrs.io.pipelineReq.bits.meta.sourceId := s1_req.source
   mshrs.io.pipelineReq.bits.meta.offset   := getBlockOffset(s1_req.paddr)
-  mshrs.io.pipelineReq.bits.meta.rwType   := MemoryOpConstants.isWrite(s1_req.cmd)
+  mshrs.io.pipelineReq.bits.meta.rwType   := isWrite(s1_req.cmd)
   mshrs.io.pipelineReq.bits.meta.regIdx   := s1_req.dest
   mshrs.io.pipelineReq.bits.meta.size     := s1_req.size
   mshrs.io.pipelineReq.bits.meta.signed   := s1_req.signed
@@ -420,7 +421,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   wbQueue.io.req <> wbArbiter.io.out
 
-  wbQueue.io.missCheck.valid    := s1_valid && ~s1_hit
+  wbQueue.io.missCheck.valid    := s1_validFromCore && ~s1_hit
   wbQueue.io.missCheck.lineAddr := getLineAddr(s1_req.paddr)
   s1_wbqBlockMiss               := wbQueue.io.missCheck.blockMiss
 
@@ -451,11 +452,11 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // * Resp Begin
 
   //  s1 resp
-  s1_cacheResp.valid        := s1_valid && s1_req.isFromCore
+  s1_cacheResp.valid        := s1_validFromCore && !isPrefetch(s1_req.cmd)
   s1_cacheResp.bits.source  := s1_req.source
   s1_cacheResp.bits.dest    := s1_req.dest
   s1_cacheResp.bits.data    := Mux(s1_sc, s1_scFail, loadGen.data)
-  s1_cacheResp.bits.hasData := MemoryOpConstants.isRead(s1_req.cmd)
+  s1_cacheResp.bits.hasData := isRead(s1_req.cmd)
   s1_cacheResp.bits.status := MuxCase(
     CacheRespStatus.miss,
     Seq(
