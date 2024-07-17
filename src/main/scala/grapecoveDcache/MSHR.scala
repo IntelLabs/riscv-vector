@@ -296,7 +296,7 @@ class MSHRFile extends Module() {
   io.fromProbe.hit := probeReq && lineAddrMatch
 
   // interface for replay
-  val replayReq = io.fromRefill.valid
+  val replayReq = io.fromRefill.fire
   io.fromRefill.ready := replayReg.io.innerIO.ready && !probeReq
 
   val metaCounterList = Wire(Vec(mshrEntryNum, UInt(log2Up(mshrEntryMetaNum).W)))
