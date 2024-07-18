@@ -150,6 +150,7 @@ class ReplayModule extends Module() {
   val totalCounter   = RegEnable(io.innerIO.bits.counter, 0.U(log2Up(mshrEntryMetaNum).W), initEnable)
   val replayLineAddr = RegEnable(io.innerIO.bits.lineAddr, 0.U(lineAddrWidth.W), initEnable)
   val replayPerm     = RegEnable(io.innerIO.bits.perm, TLPermissions.NtoB, initEnable)
+  val replayMeta     = RegEnable(io.innerIO.bits.meta, 0.U.asTypeOf(new ReqMetaBundle), initEnable)
 
   val writeRecord = RegInit(false.B)
 
@@ -234,9 +235,9 @@ class ReplayModule extends Module() {
   // replay output
   io.toPipe.valid := (state === mode_replay) && !io.innerIO.bits.meta.rwType
   // replayStall            := io.toPipe.valid && !io.toPipe.ready
-  io.toPipe.bits.regIdx  := io.innerIO.bits.meta.regIdx
-  io.toPipe.bits.regData := loadgen
-  io.toPipe.bits.sID     := io.innerIO.bits.meta.sourceId
+  io.toPipe.bits.regIdx   := replayMeta.regIdx
+  io.toPipe.bits.sourceId := replayMeta.sourceId
+  io.toPipe.bits.regData  := loadgen
 
   io.toPipe.bits.nextCycleWb := (io.innerIO.valid && state === mode_idle) || (metaCounter < totalCounter - 1.U && state === mode_replay)
 }

@@ -266,6 +266,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s2_updateMeta  = RegNext(s1_updateMeta)
   val s2_updateData  = RegNext(s1_updateData)
   val s2_validRefill = RegNext(s1_validRefill)
+  val s2_tag         = RegEnable(s1_tag, s1_valid)
 
   when(s1_updateMeta || s1_updateData) {
     s2_req       := s1_req
@@ -316,7 +317,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // list (valid, req, refillWay, replace tag)
   val bypassReplaceList = List(
     (s1_validRefill, s1_req, s1_req.refillWay, s1_tag),
-    (s2_validRefill, s2_req, s2_req.refillWay, RegNext(s1_tag)),
+    (s2_validRefill, s2_req, s2_req.refillWay, s2_tag),
   )
 
   s1_bypassReplace := bypassReplaceList.map(r =>
@@ -469,7 +470,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // mshr resp
   mshrsResp.valid        := mshrs.io.toPipeline.valid
   mshrsResp.bits.status  := CacheRespStatus.refill
-  mshrsResp.bits.source  := mshrs.io.toPipeline.bits.sID
+  mshrsResp.bits.source  := mshrs.io.toPipeline.bits.sourceId
   mshrsResp.bits.dest    := mshrs.io.toPipeline.bits.regIdx
   mshrsResp.bits.data    := mshrs.io.toPipeline.bits.regData
   mshrsResp.bits.hasData := true.B
