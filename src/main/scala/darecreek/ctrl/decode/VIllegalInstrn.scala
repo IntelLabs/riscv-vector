@@ -121,8 +121,8 @@ class VIllegalInstrn extends Module {
     vemul === 2.U && startReg(1, 0) =/= 0.U ||
     vemul === 3.U && startReg(2, 0) =/= 0.U
   }
-  val ill_reg = regGroup_start_illegal(vemulVd, ldest) && (ctrl.ldestVal || ctrl.lsrcVal(2)) ||
-                regGroup_start_illegal(vemulVs1, lsrc(0)) && ctrl.lsrcVal(0) ||
+  val ill_reg = regGroup_start_illegal(vemulVd, ldest) && (ctrl.ldestVal || ctrl.lsrcVal(2)) && ~ctrl.redu ||
+                regGroup_start_illegal(vemulVs1, lsrc(0)) && ctrl.lsrcVal(0) && ~ctrl.redu ||
                 regGroup_start_illegal(vemulVs2, lsrc(1)) && ctrl.lsrcVal(1)
  
   /** Register Group Overlap
