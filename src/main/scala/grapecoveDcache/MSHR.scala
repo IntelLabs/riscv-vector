@@ -304,7 +304,8 @@ class MSHRFile extends Module() {
   val replayFinishRespList = Wire(Vec(mshrEntryNum, Bool()))
 
   // interface for allocate
-  val allocateReq = io.pipelineReq.valid
+  val allocateReq  = io.pipelineReq.valid
+  val allocateList = Wire(Vec(mshrEntryNum, Bool()))
 
   val allocateArb = Module(new Arbiter(Bool(), mshrEntryNum))
   allocateArb.io.in.foreach(_.bits := DontCare)
@@ -339,7 +340,7 @@ class MSHRFile extends Module() {
 
       mshr.io.req := Cat(
         io.fromProbe.valid,
-        io.fromRefill.valid,
+        io.fromRefill.fire,
         allocateArb.io.in(i).fire || (allocateReq && mshr.io.lineAddrMatch),
       )
       mshr.io.reqLineAddr := reqLineAddr
@@ -360,6 +361,7 @@ class MSHRFile extends Module() {
 
       // allocate signal
       allocateArb.io.in(i).valid := mshr.io.isEmpty
+      allocateList(i)            := allocateArb.io.in(i).fire
 
       stallReqList(i)      := mshr.io.stallReq
       mshr.io.maskConflict := maskConflict
@@ -381,12 +383,13 @@ class MSHRFile extends Module() {
     res.asUInt
   }
 
+  val wrIdx = Mux(lineAddrMatch, lineAddrMatchIdx, OHToUInt(allocateList.asUInt))
   when(!probeReq && !replayReq && allocateReq && !stallReq && !maskConflict) {
-    metaArray(lineAddrMatchIdx)(metaWriteIdx) := io.pipelineReq.bits.meta.asUInt
-    maskArray(lineAddrMatchIdx)               := io.pipelineReq.bits.mask | maskArray(lineAddrMatchIdx)
-    dataArray(lineAddrMatchIdx) := dataMergeGen(
+    metaArray(wrIdx)(metaWriteIdx) := io.pipelineReq.bits.meta.asUInt
+    maskArray(wrIdx)               := io.pipelineReq.bits.mask | maskArray(wrIdx)
+    dataArray(wrIdx) := dataMergeGen(
       ~io.pipelineReq.bits.mask,
-      dataArray(lineAddrMatchIdx),
+      dataArray(wrIdx),
     ) |
       dataMergeGen(
         Mux(io.pipelineReq.bits.isUpgrade, Fill(mshrMaskWidth, 1.U(1.W)), io.pipelineReq.bits.mask),
