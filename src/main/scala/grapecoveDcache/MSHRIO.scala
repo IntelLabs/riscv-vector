@@ -35,9 +35,9 @@ class MSHREntryIO extends Bundle() {
 
 /////// replay reg IOs
 class MSHRPipeResp extends Bundle() {
-  val sID     = UInt(MasterSource.width.W)
-  val regIdx  = UInt(regAddrWidth.W)
-  val regData = UInt(mshrDataWidth.W)
+  val sourceId = UInt(MasterSource.width.W)
+  val regIdx   = UInt(regAddrWidth.W)
+  val regData  = UInt(mshrDataWidth.W)
 
   val nextCycleWb = Bool()
 }

@@ -150,6 +150,7 @@ class ReplayModule extends Module() {
   val totalCounter   = RegEnable(io.innerIO.bits.counter, 0.U(log2Up(mshrEntryMetaNum).W), initEnable)
   val replayLineAddr = RegEnable(io.innerIO.bits.lineAddr, 0.U(lineAddrWidth.W), initEnable)
   val replayPerm     = RegEnable(io.innerIO.bits.perm, TLPermissions.NtoB, initEnable)
+  val replayMeta     = RegEnable(io.innerIO.bits.meta, 0.U.asTypeOf(new ReqMetaBundle), initEnable)
 
   val writeRecord = RegInit(false.B)
 
@@ -234,9 +235,9 @@ class ReplayModule extends Module() {
   // replay output
   io.toPipe.valid := (state === mode_replay) && !io.innerIO.bits.meta.rwType
   // replayStall            := io.toPipe.valid && !io.toPipe.ready
-  io.toPipe.bits.regIdx  := io.innerIO.bits.meta.regIdx
-  io.toPipe.bits.regData := loadgen
-  io.toPipe.bits.sID     := io.innerIO.bits.meta.sourceId
+  io.toPipe.bits.regIdx   := replayMeta.regIdx
+  io.toPipe.bits.sourceId := replayMeta.sourceId
+  io.toPipe.bits.regData  := loadgen
 
   io.toPipe.bits.nextCycleWb := (io.innerIO.valid && state === mode_idle) || (metaCounter < totalCounter - 1.U && state === mode_replay)
 }
@@ -248,7 +249,7 @@ class MSHRFile extends Module() {
       val pipelineReq = Flipped(DecoupledIO(new CachepipeMSHRFile))
       val toL2Req     = DecoupledIO(new MSHRFileL2)              // TL A
       val fromRefill  = Flipped(DecoupledIO(new RefillMSHRFile)) // TL D/E
-      val fromProbe   = new ProbeMSHRFile
+      val probeCheck  = new ProbeMSHRFile
       val probeRefill = ValidIO(new ProbeRefill)
 
       val toPipeline    = DecoupledIO(new MSHRPipeResp()) // read resp
@@ -284,16 +285,16 @@ class MSHRFile extends Module() {
   val lineAddrMatchIdx     = lineAddrMatchIdxList.reduce(_ | _)
 
   // interface for probe
-  val probeReq       = io.fromProbe.valid
+  val probeReq       = io.probeCheck.valid
   val probeStateList = Wire(Vec(mshrEntryNum, UInt(ProbeMSHRState.width.W)))
   val probeState     = probeStateList.reduce(_ | _)
-  io.fromProbe.replaceFinish := io.replaceFinish
+  io.probeCheck.replaceFinish := io.replaceFinish
 
-  io.probeRefill.valid        := io.fromProbe.valid
+  io.probeRefill.valid        := io.probeCheck.valid
   io.probeRefill.bits.entryId := lineAddrMatchIdx
 
-  io.fromProbe.hitGo := probeReq && (probeState === ProbeMSHRState.hitGo | (probeState === ProbeMSHRState.hitBlockN && !io.fromRefill.bits.probeMatch))
-  io.fromProbe.hit := probeReq && lineAddrMatch
+  io.probeCheck.hitGo := probeReq && (probeState === ProbeMSHRState.hitGo | (probeState === ProbeMSHRState.hitBlockN && !io.fromRefill.bits.probeMatch))
+  io.probeCheck.hit := probeReq && lineAddrMatch
 
   // interface for replay
   val replayReq = io.fromRefill.fire
@@ -304,7 +305,7 @@ class MSHRFile extends Module() {
   val replayFinishRespList = Wire(Vec(mshrEntryNum, Bool()))
 
   // interface for allocate
-  val allocateReq  = io.pipelineReq.valid
+  val allocateReq  = io.pipelineReq.fire
   val allocateList = Wire(Vec(mshrEntryNum, Bool()))
 
   val allocateArb = Module(new Arbiter(Bool(), mshrEntryNum))
@@ -315,12 +316,13 @@ class MSHRFile extends Module() {
   val stallReqList = Wire(Vec(mshrEntryNum, Bool()))
   val stallReq     = stallReqList.asUInt.orR
 
-  val maskConflict = allocateReq && lineAddrMatch && (io.pipelineReq.bits.mask & maskArray(lineAddrMatchIdx)).orR
+  val maskConflict =
+    io.pipelineReq.valid && lineAddrMatch && (io.pipelineReq.bits.mask & maskArray(lineAddrMatchIdx)).orR
 
   val reqLineAddr = MuxCase(
     io.pipelineReq.bits.lineAddr,
     Seq(
-      probeReq -> io.fromProbe.lineAddr
+      probeReq -> io.probeCheck.lineAddr
     ),
   )
 
@@ -339,7 +341,7 @@ class MSHRFile extends Module() {
       val mshr = Module(new MSHR(i))
 
       mshr.io.req := Cat(
-        io.fromProbe.valid,
+        io.probeCheck.valid,
         io.fromRefill.fire,
         allocateArb.io.in(i).fire || (allocateReq && mshr.io.lineAddrMatch),
       )
@@ -352,7 +354,7 @@ class MSHRFile extends Module() {
 
       // probe signal
       probeStateList(i)       := mshr.io.probeState
-      mshr.io.probePermission := io.fromProbe.probePermission
+      mshr.io.probePermission := io.probeCheck.probePermission
 
       // replay & refill signal
       metaCounterList(i) := mshr.io.metaCounter
@@ -389,7 +391,7 @@ class MSHRFile extends Module() {
     maskArray(wrIdx)               := io.pipelineReq.bits.mask | maskArray(wrIdx)
     dataArray(wrIdx) := dataMergeGen(
       ~io.pipelineReq.bits.mask,
-      dataArray(wrIdx),
+      dataArray(lineAddrMatchIdx),
     ) |
       dataMergeGen(
         Mux(io.pipelineReq.bits.isUpgrade, Fill(mshrMaskWidth, 1.U(1.W)), io.pipelineReq.bits.mask),
@@ -405,7 +407,7 @@ class MSHRFile extends Module() {
   allocateArb.io.out.ready := allocateReq && !lineAddrMatch
 
   // sender queue
-  senderQueue.io.enq.valid := io.pipelineReq.valid && senderReqList.asUInt.orR
+  senderQueue.io.enq.valid := io.pipelineReq.fire && senderReqList.asUInt.orR
   senderQueue.io.enq.bits  := senderIdxList.reduce(_ | _)
 
   io.toL2Req.valid         := senderQueue.io.deq.valid

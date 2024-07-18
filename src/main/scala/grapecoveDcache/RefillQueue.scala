@@ -6,118 +6,116 @@ import freechips.rocketchip.tilelink._
 import _root_.circt.stage.ChiselStage
 import org.chipsalliance.cde.config.Parameters
 
-class L2TLD extends Bundle() {
-  val opcode = UInt(3.W)
-  val source = UInt(log2Up(mshrEntryNum).W)
-  val data   = UInt(beatBits.W)
-}
-
-class TLDInterface extends Module {
+class RefillQueueWrapper(
+    implicit edge: TLEdgeOut,
+    p:             Parameters,
+) extends Module {
   val io = IO(new Bundle {
-    val fromL2   = Flipped(DecoupledIO(new L2TLD))
-    val toRefill = DecoupledIO(new L2Refill())
+    val memGrant   = Flipped(Decoupled(new TLBundleD(edge.bundle)))
+    val memFinish  = Decoupled(new TLBundleE(edge.bundle))
+    val probeCheck = Flipped(ValidIO(new ProbeRefill))
+    val refillResp = DecoupledIO(new RefillMSHRFile)
   })
 
-  val data = RegInit(VecInit(Seq.fill(refillCycles)(0.U(beatBits.W))))
+  val s_receive_grant :: s_send_refill :: Nil = Enum(2)
 
-  val counter   = RegInit(0.U(log2Up(refillCycles).W))
-  val writeFlag = RegInit(false.B)
+  val state = RegInit(s_receive_grant)
 
-  val inValid = io.fromL2.valid && io.toRefill.ready && !writeFlag && io.fromL2.bits.opcode === TLMessages.GrantData
-  when(inValid) {
-    counter       := Mux(counter + 1.U >= refillCycles.asUInt, 0.U, counter + 1.U)
-    data(counter) := io.fromL2.bits.data
+  val refillQueue = Module(new RefillQueue)
+
+  val dataReg    = RegInit(VecInit(Seq.fill(refillCycles)(0.U(beatBits.W))))
+  val hasDataReg = RegEnable(io.memGrant.bits.opcode =/= TLMessages.Grant, io.memGrant.fire)
+  val sourceReg  = RegEnable(io.memGrant.bits.source, io.memGrant.fire)
+
+  val allBeatDone = edge.last(io.memGrant) && io.memGrant.fire
+  val counter     = RegInit(0.U(log2Up(refillCycles).W))
+
+  switch(state) {
+    is(s_receive_grant) {
+      when(allBeatDone) {
+        state := s_send_refill
+      }
+    }
+    is(s_send_refill) {
+      when(refillQueue.io.refillResp.fire) {
+        state := s_receive_grant
+      }
+
+    }
   }
 
-  writeFlag := Mux(writeFlag, false.B, Mux(counter === refillCycles.asUInt - 1.U && inValid, true.B, writeFlag))
+  when(io.memGrant.fire && io.memGrant.bits.opcode === TLMessages.GrantData) {
+    counter          := Mux(counter + 1.U >= refillCycles.asUInt, 0.U, counter + 1.U)
+    dataReg(counter) := io.memGrant.bits.data
+  }
 
-  io.fromL2.ready             := io.toRefill.ready && !writeFlag
-  io.toRefill.bits.probeMatch := DontCare
-  io.toRefill.valid           := writeFlag | (io.fromL2.bits.opcode === TLMessages.Grant && io.fromL2.valid)
-  io.toRefill.bits.hasData    := Mux(io.fromL2.bits.opcode === TLMessages.Grant, false.B, true.B)
-  io.toRefill.bits.data       := data.asUInt
-  io.toRefill.bits.entryId := Mux(
-    io.fromL2.bits.opcode === TLMessages.Grant,
-    io.fromL2.bits.source,
-    RegEnable(io.fromL2.bits.source, counter === refillCycles.asUInt - 1.U),
+  refillQueue.io.memRefill.valid           := (state === s_send_refill)
+  refillQueue.io.memRefill.bits.hasData    := hasDataReg
+  refillQueue.io.memRefill.bits.data       := dataReg.asUInt
+  refillQueue.io.memRefill.bits.entryId    := sourceReg
+  refillQueue.io.memRefill.bits.probeMatch := DontCare
+
+  refillQueue.io.probeCheck <> io.probeCheck
+  io.refillResp <> refillQueue.io.refillResp
+
+  val grantAckQueue = Module(new Queue(new TLBundleE(edge.bundle), 1))
+
+  grantAckQueue.io.enq.valid := (s_receive_grant & allBeatDone)
+  grantAckQueue.io.enq.bits  := edge.GrantAck(io.memGrant.bits)
+
+  io.memFinish <> grantAckQueue.io.deq
+  grantAckQueue.io.deq.ready := io.memFinish.ready
+
+  io.memGrant.ready := (state === s_receive_grant) && grantAckQueue.io.enq.ready
+
+  assert(
+    !(io.memGrant.fire && io.memGrant.bits.opcode =/= TLMessages.GrantData && io.memGrant.bits.opcode =/= TLMessages.Grant)
   )
 }
 
 class RefillQueue extends Module {
   val io = IO(new Bundle {
-    val fromL2    = Flipped(DecoupledIO(new L2Refill))
-    val fromProbe = Flipped(ValidIO(new ProbeRefill))
-    val toCore    = DecoupledIO(new RefillMSHRFile)
+    val memRefill  = Flipped(DecoupledIO(new L2Refill))
+    val probeCheck = Flipped(ValidIO(new ProbeRefill))
+    val refillResp = DecoupledIO(new RefillMSHRFile)
   })
 
   val dataIdxQueue = Module(new SearchableQueue(UInt(log2Up(mshrEntryNum).W), refillDataQueueNum))
   val dataQueue    = Module(new Queue(UInt(mshrDataWidth.W), refillDataQueueNum))
 
-  val noDataQueue = Module(new SearchableQueue(UInt(log2Up(mshrEntryNum).W), refillNoDataQueueNum))
+  val permQueue = Module(new SearchableQueue(UInt(log2Up(mshrEntryNum).W), refillNoDataQueueNum))
 
-//  dataQueue.equals()
+  // enq
+  dataIdxQueue.io.enq.valid := io.memRefill.valid && io.memRefill.bits.hasData
+  dataIdxQueue.io.enq.bits  := io.memRefill.bits.entryId
 
-  dataIdxQueue.io.enq.valid := io.fromL2.valid && io.fromL2.bits.hasData
-  dataIdxQueue.io.enq.bits  := io.fromL2.bits.entryId
-  dataQueue.io.enq.valid    := io.fromL2.valid && io.fromL2.bits.hasData
-  dataQueue.io.enq.bits     := io.fromL2.bits.data
+  dataQueue.io.enq.valid := io.memRefill.valid && io.memRefill.bits.hasData
+  dataQueue.io.enq.bits  := io.memRefill.bits.data
 
-  noDataQueue.io.enq.valid := io.fromL2.valid && !io.fromL2.bits.hasData
-  noDataQueue.io.enq.bits  := io.fromL2.bits.entryId
+  permQueue.io.enq.valid := io.memRefill.valid && !io.memRefill.bits.hasData
+  permQueue.io.enq.bits  := io.memRefill.bits.entryId
 
-  io.fromL2.ready := dataQueue.io.enq.ready && noDataQueue.io.enq.ready
+  io.memRefill.ready := dataQueue.io.enq.ready && permQueue.io.enq.ready
 
-  val priv = RegInit(false.B) // false for data, true for no data
+  // deq arb
+  val queueArb = Module(new Arbiter(UInt(log2Up(mshrEntryNum).W), 2))
+  queueArb.io.in(0) <> permQueue.io.deq
+  queueArb.io.in(1) <> dataIdxQueue.io.deq
+  queueArb.io.out.ready := io.refillResp.ready
 
-  io.toCore.valid := noDataQueue.io.deq.valid | dataQueue.io.deq.valid
-  io.toCore.bits.entryId := Mux(
-    priv && noDataQueue.io.deq.valid,
-    noDataQueue.io.deq.bits,
-    dataIdxQueue.io.deq.bits,
-  )
-  io.toCore.bits.data := dataQueue.io.deq.bits
+  permQueue.io.deq.ready    := queueArb.io.in(0).ready
+  dataIdxQueue.io.deq.ready := queueArb.io.in(1).ready
+  dataQueue.io.deq.ready    := queueArb.io.out.ready
 
-  dataIdxQueue.io.searchIdx := io.fromProbe.bits.entryId
-  noDataQueue.io.searchIdx  := io.fromProbe.bits.entryId
-  io.toCore.bits.probeMatch := io.fromProbe.valid && (dataIdxQueue.io.idxMatch || noDataQueue.io.idxMatch)
+  io.refillResp.valid        := queueArb.io.out.valid
+  io.refillResp.bits.entryId := queueArb.io.out.bits
+  io.refillResp.bits.data    := dataQueue.io.deq.bits
 
-  noDataQueue.io.deq.ready  := io.toCore.ready && (!priv || (priv && !noDataQueue.io.deq.valid))
-  dataQueue.io.deq.ready    := io.toCore.ready && (priv || (!priv && dataQueue.io.deq.valid))
-  dataIdxQueue.io.deq.ready := io.toCore.ready && (!priv || (priv && !noDataQueue.io.deq.valid))
+  // probe search
+  dataIdxQueue.io.searchIdx     := io.probeCheck.bits.entryId
+  permQueue.io.searchIdx        := io.probeCheck.bits.entryId
+  io.refillResp.bits.probeMatch := io.probeCheck.valid && (dataIdxQueue.io.idxMatch || permQueue.io.idxMatch)
 }
-
-//class RefillTest
-////    implicit edge: TLEdgeIn
-//    extends Module {
-//  val io = IO(new Bundle {
-//    val fromL2 = Flipped(DecoupledIO(new L2TLD))
-//    val toCore = DecoupledIO(new RefillMSHRFile)
-//  })
-//
-//  val interface = Module(new TLDInterface())
-//  val refill    = Module(new RefillQueue)
-//
-//  interface.io.fromL2 <> io.fromL2
-//  io.toCore <> refill.io.toCore
-//  refill.io.fromL2 <> interface.io.toRefill
-//}
-//
-//object RefillTest extends App {
-//
-//  val firtoolOptions = Array(
-//    "--lowering-options=" + List(
-//      "disallowLocalVariables",
-//      "disallowPackedArrays",
-//      "locationInfoStyle=wrapInAtSquareBracket",
-//    ).reduce(_ + "," + _)
-//  )
-//
-//  ChiselStage.emitSystemVerilogFile(
-//    new RefillTest,
-//    args,
-//    firtoolOptions ++ Array("--disable-all-randomization"),
-//  )
-//}
 
 class SearchableQueue[T <: Data](val gen: T, val entries: Int) extends Module {
   val io = IO(new Bundle {

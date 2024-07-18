@@ -31,6 +31,30 @@ class StoreGen(sizeType: UInt, addr: UInt, dat: UInt, maxSizeInBytes: Int) {
 class LoadGen(sizeType: UInt, signed: Bool, addr: UInt, dat: UInt, zero: Bool, maxSizeInBytes: Int) {
   private val size = new StoreGen(sizeType, addr, dat, maxSizeInBytes).size
 
+  /*
+  +-------------++------------+
+  |    high1    ||   low1     |
+  +--+---+------++------------+
+    |   |
+    |   +-------------+
+    v                 v
+  +-------------+------++-----+
+  | ignore high1| high2||low2 |
+  +---+---------+--+--+++-----+
+      |            |  |              +
+      |            |  +---+
+      v            v      v
+  +--------------------++-----+
+  | ignore high1 high2 ||high2|
+  +--------------------+++--+-+
+                        |  |
+            +-----------+  |
+            v              v
+  +--------------------++-----+
+  |    sign-ext?       || data|
+  +--------------------++-----+
+   */
+
   def genData(logMinSize: Int): UInt = {
     var res = dat
     for (i <- log2Up(maxSizeInBytes) - 1 to logMinSize by -1) {
