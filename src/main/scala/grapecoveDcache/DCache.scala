@@ -25,8 +25,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val mshrs       = Module(new MSHRFile)
   val wbQueue     = Module(new WritebackQueue)
   val probeQueue  = Module(new ProbeQueue)
-  val refillQueue = Module(new RefillQueue)
-  val refillInter = Module(new TLDInterface)
+  val refillQueue = Module(new RefillQueueWrapper)
 
   // * Signal Define Begin
   // Store -> Load Bypassing
@@ -374,15 +373,15 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   )._2
 
   // refillQueue -> mshr
-  mshrs.io.fromRefill <> refillQueue.io.toCore
-  mshrs.io.probeRefill <> refillQueue.io.fromProbe
+  mshrs.io.fromRefill <> refillQueue.io.refillResp
+  mshrs.io.probeRefill <> refillQueue.io.probeCheck
 
   // mshr send replace req to pipeline
   mshrs.io.toReplace.ready := true.B
   mshrs.io.replaceFinish   := s2_validRefill
 
   // probe -> mshr
-  mshrs.io.fromProbe <> probeQueue.io.probeCheck
+  mshrs.io.probeCheck <> probeQueue.io.probeCheck
 
   mshrs.io.toPipeline.ready := true.B // FIXME
 
@@ -390,12 +389,12 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // * Refill Begin
 
-  refillInter.io.fromL2.valid       := tl_out.d.valid
-  refillInter.io.fromL2.bits.data   := tl_out.d.bits.data
-  refillInter.io.fromL2.bits.source := tl_out.d.bits.source
-  refillInter.io.fromL2.bits.opcode := tl_out.d.bits.opcode
+  refillQueue.io.memFinish <> tl_out.e
 
-  refillInter.io.toRefill <> refillQueue.io.fromL2
+  // set to default
+  // actual connect see tl-d
+  refillQueue.io.memGrant.valid := false.B
+  refillQueue.io.memGrant.bits  := DontCare
 
   // TODO: add tl-e GrantAck
 
@@ -441,7 +440,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   probeQueue.io.lrscAddr.valid := lrscValid
   probeQueue.io.lrscAddr.bits  := lrscAddr
 
-  // in MSHR: probeQueue.io.probeCheck <> mshrs.io.fromProbe
+  // in MSHR: probeQueue.io.probeCheck <> mshrs.io.probeCheck
 
   probeQueue.io.probeResp := Mux(
     !s1_probeWb,
@@ -494,7 +493,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   when(tl_out.d.bits.opcode === TLMessages.ReleaseAck) {
     tl_out.d <> wbQueue.io.grant
   }.elsewhen(tl_out.d.bits.opcode === TLMessages.Grant || tl_out.d.bits.opcode === TLMessages.GrantData) {
-    tl_out.d.ready := true.B
+    tl_out.d <> refillQueue.io.memGrant
   }.otherwise {
     assert(!tl_out.d.fire)
   }
