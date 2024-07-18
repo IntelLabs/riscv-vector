@@ -37,7 +37,7 @@ class RefillQueueWrapper(
       }
     }
     is(s_send_refill) {
-      when(refillQueue.io.refillResp.fire) {
+      when(refillQueue.io.memRefill.fire) {
         state := s_receive_grant
       }
 
