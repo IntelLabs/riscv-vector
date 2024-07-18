@@ -50,7 +50,7 @@ class MSHR(id: Int) extends Module() {
     ),
     ProbeMSHRState.miss,
   )
-//    === TLPermissions.toB && sentPermission =/= TLPermissions.NtoB
+  //    === TLPermissions.toB && sentPermission =/= TLPermissions.NtoB
   io.probeState := Mux(probeReq, probeState, ProbeMSHRState.miss)
 
   readAfterWriteFlag := MuxCase(
@@ -127,7 +127,7 @@ class MSHR(id: Int) extends Module() {
     Seq(
       mode_idle        -> Mux(allocateReq, mode_req_enqueue, state),
       mode_req_enqueue -> Mux(io.senderResp, mode_resp_wait, state),
-      mode_resp_wait   -> Mux(lineAddrMatch && replayReq, mode_replay, state),
+      mode_resp_wait   -> Mux(replayReq, mode_replay, state),
       mode_replay      -> Mux(io.replayFinish, mode_clear, state),
       mode_clear       -> mode_idle,
     )
@@ -278,7 +278,7 @@ class MSHRFile extends Module() {
     )
   )
 
-// general signal
+  // general signal
   val lineAddrMatchList    = Wire(Vec(mshrEntryNum, Bool()))
   val lineAddrMatch        = lineAddrMatchList.asUInt.orR
   val lineAddrMatchIdxList = Wire(Vec(mshrEntryNum, UInt(log2Up(mshrEntryNum).W)))
@@ -310,8 +310,6 @@ class MSHRFile extends Module() {
 
   val allocateArb = Module(new Arbiter(Bool(), mshrEntryNum))
   allocateArb.io.in.foreach(_.bits := DontCare)
-
-  val metaWriteIdx = metaCounterList(lineAddrMatchIdx)
 
   val stallReqList = Wire(Vec(mshrEntryNum, Bool()))
   val stallReq     = stallReqList.asUInt.orR
@@ -385,7 +383,8 @@ class MSHRFile extends Module() {
     res.asUInt
   }
 
-  val wrIdx = Mux(lineAddrMatch, lineAddrMatchIdx, OHToUInt(allocateList.asUInt))
+  val wrIdx        = Mux(lineAddrMatch, lineAddrMatchIdx, OHToUInt(allocateList.asUInt))
+  val metaWriteIdx = metaCounterList(wrIdx)
   when(!probeReq && !replayReq && allocateReq && !stallReq && !maskConflict) {
     metaArray(wrIdx)(metaWriteIdx) := io.pipelineReq.bits.meta.asUInt
     maskArray(wrIdx)               := io.pipelineReq.bits.mask | maskArray(wrIdx)

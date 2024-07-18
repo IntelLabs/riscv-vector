@@ -105,7 +105,7 @@ class RefillQueue extends Module {
 
   permQueue.io.deq.ready    := queueArb.io.in(0).ready
   dataIdxQueue.io.deq.ready := queueArb.io.in(1).ready
-  dataQueue.io.deq.ready    := queueArb.io.out.ready
+  dataQueue.io.deq.ready    := queueArb.io.in(1).ready
 
   io.refillResp.valid        := queueArb.io.out.valid
   io.refillResp.bits.entryId := queueArb.io.out.bits
