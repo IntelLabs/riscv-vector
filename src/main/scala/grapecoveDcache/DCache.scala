@@ -148,10 +148,10 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // hit/miss for load/store
   val s1_hasPerm         = s1_cohMeta.onAccess(s1_req.cmd)._1
   val s1_newHitCohMeta   = s1_cohMeta.onAccess(s1_req.cmd)._3
-  val s1_hit             = s1_validFromCore && s1_tagMatch && s1_hasPerm
-  val s1_upgradePermHit  = s1_hit && s1_newHitCohMeta =/= s1_cohMeta      // e.g. T->Dirty hit
-  val s1_noDataMiss      = s1_validFromCore && !s1_tagMatch               // e.g. N->B or N->T miss
-  val s1_upgradePermMiss = s1_validFromCore && s1_tagMatch && !s1_hasPerm // e.g. B->T miss
+  val s1_hit             = s1_tagMatch && s1_hasPerm
+  val s1_upgradePermHit  = s1_hit && s1_newHitCohMeta =/= s1_cohMeta // e.g. T->Dirty hit
+  val s1_noDataMiss      = !s1_tagMatch                              // e.g. N->B or N->T miss
+  val s1_upgradePermMiss = s1_tagMatch && !s1_hasPerm                // e.g. B->T miss
 
   // organize read data
   val s1_dataPreBypass =
@@ -204,18 +204,18 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     ),
   )
 
-  val s1_storeUpdateMeta = (s1_upgradePermHit || s1_upgradePermMiss) && !s1_scFail
-  val s1_storeUpdateData = (s1_hit && isWrite(s1_req.cmd)) && !s1_scFail
+  val s1_storeUpdateMeta = s1_validFromCore && (s1_upgradePermHit || s1_upgradePermMiss) && !s1_scFail
+  val s1_storeUpdateData = (s1_validFromCore && s1_hit && isWrite(s1_req.cmd)) && !s1_scFail
 
   // probe
   val s1_probeDirty       = s1_cohMeta.onProbe(s1_req.probePerm)._1
   val s1_probeReportParam = s1_cohMeta.onProbe(s1_req.probePerm)._2
   val s1_newProbeCoh      = s1_cohMeta.onProbe(s1_req.probePerm)._3
-  val s1_probeUpdateMeta  = s1_validProbe && s1_tagMatch                  // probe should update meta
-  val s1_probeWb          = s1_validProbe                                 // probe should send probeAck
-  val s1_probeWbData      = s1_validProbe && s1_tagMatch && s1_probeDirty // probe has data
+  val s1_probeUpdateMeta  = s1_validProbe && s1_tagMatch // probe should update meta
+  val s1_probeWb          = s1_validProbe                // probe should send probeAck
+  val s1_probeWbData      = s1_tagMatch && s1_probeDirty // probe has data
 
-  val s1_canDoProbe = s1_validProbe && wbPipeReq.fire
+  val s1_canDoProbe = wbPipeReq.fire
 
   // replace
   val s1_repLineAddr    = Cat(s1_tag, getSetIdx(s1_req.paddr)) // FIXME
@@ -229,7 +229,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_replaceWb        = s1_validRefill && (s1_repMeta.state > ClientStates.Branch)
   val s1_replaceWbData    = s1_repDirty
 
-  val s1_canDoRefill = s1_validRefill && ((!s1_replaceWb) || wbPipeReq.fire)
+  val s1_canDoRefill = (!s1_replaceWb) || wbPipeReq.fire
 
   // prepare for s2
   val s1_updateMeta =
@@ -259,7 +259,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     ),
   ).asUInt
 
-  val s1_updateReplacer = s1_hit || s1_canDoRefill
+  val s1_updateReplacer = (s1_validFromCore && s1_hit) || (s1_validRefill && s1_canDoRefill)
 
   // * pipeline stage 1 End
 
@@ -438,7 +438,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   wbQueue.io.grant.valid := false.B
   wbQueue.io.grant.bits  := DontCare
 
-  assert(!(s1_probeWbData && s1_replaceWbData))
+  assert(!(s1_probeWb && s1_replaceWb))
 
   // * Writeback End
 

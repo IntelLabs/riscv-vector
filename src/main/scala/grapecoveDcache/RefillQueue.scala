@@ -64,7 +64,6 @@ class RefillQueueWrapper(
   grantAckQueue.io.enq.bits  := edge.GrantAck(io.memGrant.bits)
 
   io.memFinish <> grantAckQueue.io.deq
-  grantAckQueue.io.deq.ready := io.memFinish.ready
 
   io.memGrant.ready := (state === s_receive_grant) && grantAckQueue.io.enq.ready
 
