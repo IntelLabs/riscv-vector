@@ -441,9 +441,7 @@ class MSHRFile extends Module() {
     ),
     dataArray(replayReg.io.replayIdx),
   )
-
-  replayReg.io.innerIO.bits.entryIdx := senderIdxList.reduce(_ | _)
-  replayReg.io.innerIO.bits.counter  := metaCounterList(lineAddrMatchIdx)
+  replayReg.io.innerIO.bits.counter := metaCounterList(lineAddrMatchIdx)
 
   io.toPipeline <> replayReg.io.toPipe
   io.toReplace <> replayReg.io.toReplace
