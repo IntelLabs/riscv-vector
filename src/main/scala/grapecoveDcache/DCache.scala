@@ -456,7 +456,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   s1_cacheResp.bits.source  := s1_req.source
   s1_cacheResp.bits.dest    := s1_req.dest
   s1_cacheResp.bits.data    := Mux(s1_sc, s1_scFail, loadGen.data)
-  s1_cacheResp.bits.hasData := isRead(s1_req.cmd)
+  s1_cacheResp.bits.hasData := s1_hit && isRead(s1_req.cmd)
   s1_cacheResp.bits.status := MuxCase(
     CacheRespStatus.miss,
     Seq(
@@ -472,7 +472,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   mshrsResp.bits.source  := mshrs.io.toPipeline.bits.sourceId
   mshrsResp.bits.dest    := mshrs.io.toPipeline.bits.regIdx
   mshrsResp.bits.data    := mshrs.io.toPipeline.bits.regData
-  mshrsResp.bits.hasData := true.B
+  mshrsResp.bits.hasData := mshrs.io.toPipeline.valid
 
   // return resp
   io.nextCycleWb := mshrs.io.toPipeline.bits.nextCycleWb // FIXME
