@@ -55,6 +55,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val victimWay = WireInit(0.U(log2Up(nWays).W))
 
   val s1_wbqBlockMiss = WireInit(false.B)
+  val wbPipeReq       = WireInit(0.U.asTypeOf(Decoupled(new WritebackReq(edge.bundle))))
 
   val blockReq = io.nextCycleWb || (io.resp.valid && io.resp.bits.status === CacheRespStatus.replay)
   // * Signal Define End
@@ -214,6 +215,8 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_probeWb          = s1_validProbe                                 // probe should send probeAck
   val s1_probeWbData      = s1_validProbe && s1_tagMatch && s1_probeDirty // probe has data
 
+  val s1_canDoProbe = s1_validProbe && wbPipeReq.fire
+
   // replace
   val s1_repLineAddr    = Cat(s1_tag, getSetIdx(s1_req.paddr)) // FIXME
   val s1_repMeta        = s1_cohMeta
@@ -226,9 +229,12 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_replaceWb        = s1_validRefill && (s1_repMeta.state > ClientStates.Branch)
   val s1_replaceWbData    = s1_repDirty
 
+  val s1_canDoRefill = s1_validRefill && ((!s1_replaceWb) || wbPipeReq.fire)
+
   // prepare for s2
-  val s1_updateMeta = s1_storeUpdateMeta || s1_probeUpdateMeta || s1_refillUpdateMeta
-  val s1_updateData = s1_storeUpdateData || s1_refillUpdateData
+  val s1_updateMeta =
+    s1_storeUpdateMeta || (s1_probeUpdateMeta && s1_canDoProbe) || (s1_refillUpdateMeta && s1_canDoRefill)
+  val s1_updateData = s1_storeUpdateData || (s1_refillUpdateData && s1_canDoRefill)
 
   // FIXME mask
   val s1_storeData =
@@ -253,7 +259,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     ),
   ).asUInt
 
-  val s1_updateReplacer = s1_hit || s1_validRefill
+  val s1_updateReplacer = s1_hit || s1_canDoRefill
 
   // * pipeline stage 1 End
 
@@ -377,8 +383,13 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   mshrs.io.probeRefill <> refillQueue.io.probeCheck
 
   // mshr send replace req to pipeline
-  mshrs.io.toReplace.ready := true.B
-  mshrs.io.replaceFinish   := s2_validRefill
+  mshrs.io.replaceFinish := s2_validRefill
+
+  mshrs.io.replaceStatus := Mux(
+    !s1_validRefill,
+    ReplaceStatus.replace_invalid,
+    Mux(s1_canDoRefill, ReplaceStatus.replace_finish, ReplaceStatus.replace_replay),
+  )
 
   // probe -> mshr
   mshrs.io.probeCheck <> probeQueue.io.probeCheck
@@ -408,7 +419,6 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // source 1: probe
   val wbArbiter = Module(new Arbiter(new WritebackReq(edge.bundle), 2))
 
-  val wbPipeReq = WireInit(0.U.asTypeOf(Decoupled(new WritebackReq(edge.bundle))))
   wbPipeReq.valid          := s1_probeWb || s1_replaceWb
   wbPipeReq.bits.voluntary := s1_req.isRefill
   wbPipeReq.bits.data      := s1_data
@@ -445,7 +455,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   probeQueue.io.probeResp := Mux(
     !s1_probeWb,
     ProbeRespStatus.probe_invalid,
-    Mux(wbPipeReq.fire, ProbeRespStatus.probe_finish, ProbeRespStatus.probe_replay),
+    Mux(s1_canDoProbe, ProbeRespStatus.probe_finish, ProbeRespStatus.probe_replay),
   )
   // * Probe End
 

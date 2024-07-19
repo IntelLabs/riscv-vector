@@ -5,6 +5,10 @@ import chisel3.util._
 import util._
 import freechips.rocketchip.tilelink._
 
+object ReplaceStatus extends ChiselEnum {
+  val replace_invalid, replace_finish, replace_replay = Value
+}
+
 /////// MSHR Entry IO
 class MSHREntryIO extends Bundle() {
   val req         = Input(UInt(mshrReqType.W))

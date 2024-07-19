@@ -255,6 +255,7 @@ class MSHRFile extends Module() {
       val toPipeline    = DecoupledIO(new MSHRPipeResp()) // read resp
       val toReplace     = DecoupledIO(new MSHRReplace())
       val replaceFinish = Input(Bool())
+      val replaceStatus = Input(ReplaceStatus())
     }
   )
 
