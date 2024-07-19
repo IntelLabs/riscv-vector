@@ -200,7 +200,7 @@ class ReplayModule extends Module() {
     Seq(
       mode_idle         -> Mux(io.innerIO.valid, mode_replay, state),
       mode_replay       -> Mux((metaCounter + 1.U) >= totalCounter, mode_wait_replace, state),
-      mode_wait_replace -> Mux(io.replaceFinish, mode_clear, state),
+      mode_wait_replace -> Mux(io.replaceStatus === ReplaceStatus.replace_finish, mode_clear, state),
       mode_clear        -> mode_idle,
     )
   )
@@ -214,7 +214,7 @@ class ReplayModule extends Module() {
   val replaceSendFlag = RegInit(false.B)
 
   replaceSendFlag := Mux(
-    state =/= mode_wait_replace,
+    state =/= mode_wait_replace || (state === mode_wait_replace && io.replaceStatus === ReplaceStatus.replace_replay),
     false.B,
     Mux(io.toReplace.ready, true.B, replaceSendFlag),
   )
@@ -254,7 +254,6 @@ class MSHRFile extends Module() {
 
       val toPipeline    = DecoupledIO(new MSHRPipeResp()) // read resp
       val toReplace     = DecoupledIO(new MSHRReplace())
-      val replaceFinish = Input(Bool())
       val replaceStatus = Input(ReplaceStatus())
     }
   )
@@ -289,7 +288,7 @@ class MSHRFile extends Module() {
   val probeReq       = io.probeCheck.valid
   val probeStateList = Wire(Vec(mshrEntryNum, UInt(ProbeMSHRState.width.W)))
   val probeState     = probeStateList.reduce(_ | _)
-  io.probeCheck.replaceFinish := io.replaceFinish
+  io.probeCheck.replaceFinish := io.replaceStatus === ReplaceStatus.replace_finish
 
   io.probeRefill.valid        := io.probeCheck.valid
   io.probeRefill.bits.entryId := lineAddrMatchIdx
@@ -397,7 +396,7 @@ class MSHRFile extends Module() {
         Mux(io.pipelineReq.bits.isUpgrade, Fill(mshrMaskWidth, 1.U(1.W)), io.pipelineReq.bits.mask),
         io.pipelineReq.bits.data,
       )
-  }.elsewhen(io.replaceFinish) {
+  }.elsewhen(io.replaceStatus === ReplaceStatus.replace_finish) {
     maskArray(replayReg.io.replayIdx) := 0.U
     dataArray(replayReg.io.replayIdx) := 0.U
   }
@@ -446,10 +445,10 @@ class MSHRFile extends Module() {
 
   io.toPipeline <> replayReg.io.toPipe
   io.toReplace <> replayReg.io.toReplace
-  replayReg.io.replaceFinish := io.replaceFinish
+  replayReg.io.replaceStatus := io.replaceStatus
 
   replayFinishRespList := Mux(
-    io.replaceFinish,
+    io.replaceStatus === ReplaceStatus.replace_finish,
     UIntToOH(replayReg.io.replayIdx),
     0.U,
   ).asBools

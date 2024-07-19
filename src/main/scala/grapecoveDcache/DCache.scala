@@ -383,8 +383,6 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   mshrs.io.probeRefill <> refillQueue.io.probeCheck
 
   // mshr send replace req to pipeline
-  mshrs.io.replaceFinish := s2_validRefill
-
   mshrs.io.replaceStatus := Mux(
     !s1_validRefill,
     ReplaceStatus.replace_invalid,

@@ -68,7 +68,7 @@ class ReplayModuleIO extends Bundle() {
   val toPipe = DecoupledIO(new MSHRPipeResp())
 
   val toReplace     = DecoupledIO(new MSHRReplace())
-  val replaceFinish = Input(Bool())
+  val replaceStatus = Input(ReplaceStatus())
 
   val innerIO = Flipped(DecoupledIO(new MSHRInner()))
 
