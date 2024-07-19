@@ -7,7 +7,7 @@ import freechips.rocketchip.tilelink._
 import MemoryOpConstants._
 
 class DataExchangeReq extends Bundle {
-  val source = UInt(srcWidth.W)
+  val source = UInt(MasterSource.width.W)
   val paddr  = UInt(paddrWidth.W)
   val cmd    = UInt(M_SZ.W)
   // 64 -> 2, 512 -> 3
@@ -30,7 +30,7 @@ object CacheRespStatus extends ChiselEnum {
 }
 
 class DataExchangeResp extends Bundle {
-  val source  = UInt(srcWidth.W)
+  val source  = UInt(MasterSource.width.W)
   val dest    = UInt(destWidth.W)
   val status  = CacheRespStatus()
   val hasData = Bool()
@@ -46,7 +46,7 @@ class DataExchangeIO extends Bundle {
 }
 
 class MainPipeReq extends Bundle {
-  val source  = UInt(srcWidth.W)
+  val source  = UInt(MasterSource.width.W)
   val paddr   = UInt(paddrWidth.W)
   val cmd     = UInt(M_SZ.W)
   val size    = UInt(log2Up(log2Up(dataBytes)).W)

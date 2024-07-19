@@ -34,7 +34,6 @@ trait DCacheParams {
   val paddrWidth    = 39
   val regAddrWidth  = 5
   val vLsqSizeWidth = 5
-  val srcWidth      = 2
 
   val destWidth = max(regAddrWidth, vLsqSizeWidth)
   val dataWidth = max(XLEN, VLEN)
@@ -95,8 +94,9 @@ trait DCacheParams {
 object MasterSource {
   val width = 2
 
-  def Core   = 0.U(width.W)
-  def Vector = 2.U(width.W)
+  def CoreInt = 0.U(width.W)
+  def CoreFp  = 1.U(width.W)
+  def Vector  = 2.U(width.W)
 }
 
 object ProbeMSHRState {
