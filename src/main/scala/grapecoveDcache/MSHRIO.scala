@@ -52,11 +52,11 @@ class MSHRInner extends Bundle() {
   val perm     = UInt(TLPermissions.aWidth.W)
   val lineAddr = UInt(lineAddrWidth.W)
 
-  val meta = new ReqMetaBundle()
+  val meta = new ReqMetaBundle() // current tick read meta array
   val mask = UInt(mshrMaskWidth.W)
   val data = UInt(mshrDataWidth.W)
 
-  val entryIdx = UInt(log2Up(mshrEntryNum).W)
+  val entryIdx = UInt(log2Up(mshrEntryNum).W) // init replay reg, set read meta array base addr
   val counter  = UInt(log2Up(mshrEntryMetaNum).W)
 }
 

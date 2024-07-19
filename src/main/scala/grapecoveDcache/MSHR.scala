@@ -150,7 +150,7 @@ class ReplayModule extends Module() {
   val totalCounter   = RegEnable(io.innerIO.bits.counter, 0.U(log2Up(mshrEntryMetaNum).W), initEnable)
   val replayLineAddr = RegEnable(io.innerIO.bits.lineAddr, 0.U(lineAddrWidth.W), initEnable)
   val replayPerm     = RegEnable(io.innerIO.bits.perm, TLPermissions.NtoB, initEnable)
-  val replayMeta     = RegEnable(io.innerIO.bits.meta, 0.U.asTypeOf(new ReqMetaBundle), initEnable)
+  val replayMeta     = io.innerIO.bits.meta
 
   val writeRecord = RegInit(false.B)
 
