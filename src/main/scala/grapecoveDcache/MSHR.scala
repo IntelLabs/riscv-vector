@@ -62,7 +62,7 @@ class MSHR(id: Int) extends Module() {
   )
 
   // don't have enough space to store current inst
-  val isFull = (metaCounter + 1.U) > nMSHRs.asUInt
+  val isFull = (metaCounter + 1.U) > nMSHRMetas.asUInt
 
   val stallReq = lineAddrMatch && (!(state <= mode_resp_wait) || isFull || privErr || wrwErr)
   io.stallReq := stallReq
@@ -284,6 +284,15 @@ class MSHRFile extends Module() {
   val lineAddrMatchIdxList = Wire(Vec(nMSHRs, UInt(log2Up(nMSHRs).W)))
   val lineAddrMatchIdx     = lineAddrMatchIdxList.reduce(_ | _)
 
+//  val reqArb = Module(new Arbiter(MSHRReqType(), 3))
+//
+//  reqArb.io.in(0).valid := io.probeCheck.valid
+//  reqArb.io.in(0).bits  := MSHRReqType.probe
+//  reqArb.io.in(1).valid := io.fromRefill.fire
+//  reqArb.io.in(1).bits  := MSHRReqType.replay
+//  reqArb.io.in(2).valid := io.pipelineReq.valid
+//  reqArb.io.in(2).bits  := MSHRReqType.alloc
+
   // interface for probe
   val probeReq       = io.probeCheck.valid
   val probeStateList = Wire(Vec(nMSHRs, UInt(ProbeMSHRState.width.W)))
@@ -402,8 +411,8 @@ class MSHRFile extends Module() {
   }
 
   // Resp To Cache Pipeline
-  io.pipelineReq.ready     := !probeReq && !replayReq && !stallReq && !maskConflict
-  allocateArb.io.out.ready := allocateReq && !lineAddrMatch
+  io.pipelineReq.ready := !probeReq && !replayReq && !stallReq && !maskConflict && (lineAddrMatch || allocateArb.io.out.valid)
+  allocateArb.io.out.ready := io.pipelineReq.ready && !lineAddrMatch
 
   // sender queue
   senderQueue.io.enq.valid := io.pipelineReq.fire && senderReqList.asUInt.orR

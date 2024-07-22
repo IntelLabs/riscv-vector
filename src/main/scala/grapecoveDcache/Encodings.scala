@@ -35,3 +35,8 @@ object ProbeMSHRState {
   def hitBlockN = 2.U(width.W)
   def hitBlockB = 3.U(width.W)
 }
+
+// mshr req type
+object MSHRReqType extends ChiselEnum {
+  val invalid, alloc, replay, probe = Value
+}
