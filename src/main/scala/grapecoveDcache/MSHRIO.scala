@@ -5,10 +5,6 @@ import chisel3.util._
 import util._
 import freechips.rocketchip.tilelink._
 
-object ReplaceStatus extends ChiselEnum {
-  val replace_invalid, replace_finish, replace_replay = Value
-}
-
 /////// MSHR Entry IO
 class MSHREntryIO extends Bundle() {
   val req         = Input(UInt(mshrReqType.W))
@@ -20,7 +16,7 @@ class MSHREntryIO extends Bundle() {
 
   // replay & refill signals
   val replayFinish = Input(Bool())
-  val metaCounter  = Output(UInt(log2Up(mshrEntryMetaNum).W))
+  val metaCounter  = Output(UInt(log2Up(nMSHRMetas).W))
 
   // state flag for allocate
   val isEmpty      = Output(Bool())
@@ -41,7 +37,7 @@ class MSHREntryIO extends Bundle() {
 class MSHRPipeResp extends Bundle() {
   val sourceId = UInt(MasterSource.width.W)
   val regIdx   = UInt(regAddrWidth.W)
-  val regData  = UInt(mshrDataWidth.W)
+  val regData  = UInt(blockBits.W)
 
   val nextCycleWb = Bool()
 }
@@ -49,7 +45,7 @@ class MSHRPipeResp extends Bundle() {
 class MSHRReplace extends Bundle() {
   val state    = UInt(cohBits.W)       // for s0
   val lineAddr = UInt(lineAddrWidth.W) // for s0
-  val data     = UInt(mshrDataWidth.W) // for s2
+  val data     = UInt(blockBits.W)     // for s2
 }
 
 class MSHRInner extends Bundle() {
@@ -57,11 +53,11 @@ class MSHRInner extends Bundle() {
   val lineAddr = UInt(lineAddrWidth.W)
 
   val meta = new ReqMetaBundle() // current tick read meta array
-  val mask = UInt(mshrMaskWidth.W)
-  val data = UInt(mshrDataWidth.W)
+  val mask = UInt(blockBytes.W)
+  val data = UInt(blockBits.W)
 
-  val entryIdx = UInt(log2Up(mshrEntryNum).W) // init replay reg, set read meta array base addr
-  val counter  = UInt(log2Up(mshrEntryMetaNum).W)
+  val entryIdx = UInt(log2Up(nMSHRs).W) // init replay reg, set read meta array base addr
+  val counter  = UInt(log2Up(nMSHRMetas).W)
 }
 
 class ReplayModuleIO extends Bundle() {
@@ -72,8 +68,8 @@ class ReplayModuleIO extends Bundle() {
 
   val innerIO = Flipped(DecoupledIO(new MSHRInner()))
 
-  val idxMeta   = Output(UInt(log2Up(mshrEntryMetaNum).W))
-  val replayIdx = Output(UInt(log2Up(mshrEntryNum).W))
+  val idxMeta   = Output(UInt(log2Up(nMSHRMetas).W))
+  val replayIdx = Output(UInt(log2Up(nMSHRs).W))
 }
 
 /////// MSHR file IO
@@ -82,7 +78,7 @@ class MetaBundle extends Bundle() {
   val regIdx   = UInt(regAddrWidth.W)
   val size     = UInt(log2Up(log2Up(dataBytes)).W)
   val signed   = Bool()
-  val offset   = UInt(dataOffsetWidth.W)
+  val offset   = UInt(log2Up(blockBytes).W)
 }
 
 class ReqMetaBundle extends MetaBundle() {
@@ -93,19 +89,19 @@ class CachepipeMSHRFile extends Bundle() {
   val isUpgrade = Bool()
   val lineAddr  = UInt(lineAddrWidth.W)
   val meta      = new ReqMetaBundle
-  val mask      = UInt(mshrMaskWidth.W)
-  val data      = UInt(mshrDataWidth.W)
+  val mask      = UInt(blockBytes.W)
+  val data      = UInt(blockBits.W)
 }
 
 class MSHRFileL2 extends Bundle() {
   val perm     = UInt(TLPermissions.aWidth.W)
-  val entryId  = UInt(log2Up(mshrEntryNum).W)
+  val entryId  = UInt(log2Up(nMSHRs).W)
   val lineAddr = UInt(lineAddrWidth.W)
 }
 
 class RefillMSHRFile extends Bundle() {
-  val entryId = UInt(log2Up(mshrEntryNum).W)
-  val data    = UInt(mshrDataWidth.W)
+  val entryId = UInt(log2Up(nMSHRs).W)
+  val data    = UInt(blockBits.W)
 
   val probeMatch = Bool()
 }
@@ -126,5 +122,5 @@ class ProbeMSHRFile extends Bundle() {
 }
 
 class ProbeRefill extends Bundle() {
-  val entryId = UInt(log2Up(mshrEntryNum).W)
+  val entryId = UInt(log2Up(nMSHRs).W)
 }

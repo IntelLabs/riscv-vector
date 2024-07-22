@@ -41,7 +41,7 @@ class LoadGen(sizeType: UInt, signed: Bool, addr: UInt, dat: UInt, zero: Bool, m
   +-------------+------++-----+
   | ignore high1| high2||low2 |
   +---+---------+--+--+++-----+
-      |            |  |              +
+      |            |  |
       |            |  +---+
       v            v      v
   +--------------------++-----+

@@ -9,10 +9,6 @@ import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
 import AddrDecoder._
 
-object ProbeRespStatus extends ChiselEnum {
-  val probe_invalid, probe_finish, probe_replay = Value
-}
-
 class ProbeQueue(
     implicit edge: TLEdgeOut,
     p:             Parameters,

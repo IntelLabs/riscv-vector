@@ -3,6 +3,17 @@ package grapecoveDCache
 import chisel3._
 import chisel3.util._
 
+object toInt {
+  def apply(in: UInt, range: Int = 256): Int = {
+    var out: Int = 0
+    for (i <- 0 to range)
+      when(i.asUInt === in) {
+        out = i
+      }
+    out
+  }
+}
+
 object AddrDecoder {
   def getLineAddr(addr: UInt): UInt =
     addr(addr.getWidth - blockOffBits - 1, blockOffBits)

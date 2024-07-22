@@ -20,7 +20,7 @@ class MSHR(id: Int) extends Module() {
   val sentPermission = RegInit(0.U(TLPermissions.aWidth.W))
   val lineAddrReg    = RegEnable(io.reqLineAddr, 0.U, allocateReq && state === mode_idle)
 
-  val metaCounter = RegInit(0.U(log2Up(mshrEntryMetaNum).W))
+  val metaCounter = RegInit(0.U(log2Up(nMSHRMetas).W))
 
   // match & output
   val lineAddrMatch = lineAddrReg === io.reqLineAddr && state =/= mode_idle // && io.req.orR
@@ -62,7 +62,7 @@ class MSHR(id: Int) extends Module() {
   )
 
   // don't have enough space to store current inst
-  val isFull = (metaCounter + 1.U) > mshrEntryMetaNum.asUInt
+  val isFull = (metaCounter + 1.U) > nMSHRs.asUInt
 
   val stallReq = lineAddrMatch && (!(state <= mode_resp_wait) || isFull || privErr || wrwErr)
   io.stallReq := stallReq
@@ -138,16 +138,16 @@ class MSHR(id: Int) extends Module() {
 class ReplayModule extends Module() {
   val io = IO(new ReplayModuleIO())
   dontTouch(io.innerIO.bits.meta)
-  private val replayReg = RegInit(0.U(mshrDataWidth.W))
+  private val replayReg = RegInit(0.U(blockBits.W))
 
   val mode_idle :: mode_replay :: mode_wait_replace :: mode_clear :: Nil = Enum(4)
   private val state                                                      = RegInit(mode_idle)
 
-  val metaCounter = RegInit(0.U(log2Up(mshrEntryMetaNum).W))
+  val metaCounter = RegInit(0.U(log2Up(nMSHRMetas).W))
 
   val initEnable     = state === mode_idle && io.innerIO.valid
-  val mshrEntryIdx   = RegEnable(io.innerIO.bits.entryIdx, 0.U(log2Up(mshrEntryNum).W), initEnable)
-  val totalCounter   = RegEnable(io.innerIO.bits.counter, 0.U(log2Up(mshrEntryMetaNum).W), initEnable)
+  val mshrEntryIdx   = RegEnable(io.innerIO.bits.entryIdx, 0.U(log2Up(nMSHRs).W), initEnable)
+  val totalCounter   = RegEnable(io.innerIO.bits.counter, 0.U(log2Up(nMSHRMetas).W), initEnable)
   val replayLineAddr = RegEnable(io.innerIO.bits.lineAddr, 0.U(lineAddrWidth.W), initEnable)
   val replayPerm     = RegEnable(io.innerIO.bits.perm, TLPermissions.NtoB, initEnable)
   val replayMeta     = io.innerIO.bits.meta
@@ -168,14 +168,14 @@ class ReplayModule extends Module() {
       io.innerIO.bits.meta.offset,
       replayReg,
       false.B,
-      mshrDataWidth / 8,
+      blockBytes,
     ).genData(2)
 
   def maskedStoreGen(mask: UInt, originData: UInt, newData: UInt): UInt = {
-    val originDataByte = originData.asTypeOf(Vec(mshrDataWidth / 8, UInt(8.W)))
-    val newDataByte    = newData.asTypeOf(Vec(mshrDataWidth / 8, UInt(8.W)))
-    val res            = Wire(Vec(mshrDataWidth / 8, UInt(8.W)))
-    for (i <- 0 until mshrDataWidth / 8)
+    val originDataByte = originData.asTypeOf(Vec(blockBytes, UInt(8.W)))
+    val newDataByte    = newData.asTypeOf(Vec(blockBytes, UInt(8.W)))
+    val res            = Wire(Vec(blockBytes, UInt(8.W)))
+    for (i <- 0 until blockBytes)
       res(i) := Mux(mask(i), newDataByte(i), originDataByte(i))
     res.asUInt
   }
@@ -262,31 +262,31 @@ class MSHRFile extends Module() {
 
   val metaArray = RegInit(
     VecInit(
-      Seq.fill(mshrEntryNum)(VecInit(Seq.fill(mshrEntryMetaNum)(0.U((new ReqMetaBundle).getWidth.W))))
+      Seq.fill(nMSHRs)(VecInit(Seq.fill(nMSHRMetas)(0.U((new ReqMetaBundle).getWidth.W))))
     )
   )
 
   val maskArray = RegInit(
     VecInit(
-      Seq.fill(mshrEntryNum)(0.U(mshrMaskWidth.W))
+      Seq.fill(nMSHRs)(0.U(blockBytes.W))
     )
   )
 
   val dataArray = RegInit(
     VecInit(
-      Seq.fill(mshrEntryNum)(0.U(mshrDataWidth.W))
+      Seq.fill(nMSHRs)(0.U(blockBits.W))
     )
   )
 
   // general signal
-  val lineAddrMatchList    = Wire(Vec(mshrEntryNum, Bool()))
+  val lineAddrMatchList    = Wire(Vec(nMSHRs, Bool()))
   val lineAddrMatch        = lineAddrMatchList.asUInt.orR
-  val lineAddrMatchIdxList = Wire(Vec(mshrEntryNum, UInt(log2Up(mshrEntryNum).W)))
+  val lineAddrMatchIdxList = Wire(Vec(nMSHRs, UInt(log2Up(nMSHRs).W)))
   val lineAddrMatchIdx     = lineAddrMatchIdxList.reduce(_ | _)
 
   // interface for probe
   val probeReq       = io.probeCheck.valid
-  val probeStateList = Wire(Vec(mshrEntryNum, UInt(ProbeMSHRState.width.W)))
+  val probeStateList = Wire(Vec(nMSHRs, UInt(ProbeMSHRState.width.W)))
   val probeState     = probeStateList.reduce(_ | _)
   io.probeCheck.replaceFinish := io.replaceStatus === ReplaceStatus.replace_finish
 
@@ -300,18 +300,18 @@ class MSHRFile extends Module() {
   val replayReq = io.fromRefill.fire
   io.fromRefill.ready := replayReg.io.innerIO.ready && !probeReq
 
-  val metaCounterList = Wire(Vec(mshrEntryNum, UInt(log2Up(mshrEntryMetaNum).W)))
+  val metaCounterList = Wire(Vec(nMSHRs, UInt(log2Up(nMSHRMetas).W)))
 
-  val replayFinishRespList = Wire(Vec(mshrEntryNum, Bool()))
+  val replayFinishRespList = Wire(Vec(nMSHRs, Bool()))
 
   // interface for allocate
   val allocateReq  = io.pipelineReq.fire
-  val allocateList = Wire(Vec(mshrEntryNum, Bool()))
+  val allocateList = Wire(Vec(nMSHRs, Bool()))
 
-  val allocateArb = Module(new Arbiter(Bool(), mshrEntryNum))
+  val allocateArb = Module(new Arbiter(Bool(), nMSHRs))
   allocateArb.io.in.foreach(_.bits := DontCare)
 
-  val stallReqList = Wire(Vec(mshrEntryNum, Bool()))
+  val stallReqList = Wire(Vec(nMSHRs, Bool()))
   val stallReq     = stallReqList.asUInt.orR
 
   val maskConflict =
@@ -325,16 +325,16 @@ class MSHRFile extends Module() {
   )
 
   // interface for new entry sender
-  val senderQueue    = Module(new Queue(UInt(log2Up(mshrEntryNum).W), mshrEntryNum))
-  val senderReqList  = Wire(Vec(mshrEntryNum, Bool()))
-  val senderRespList = Wire(Vec(mshrEntryNum, Bool()))
-  val senderIdxList  = Wire(Vec(mshrEntryNum, UInt(mshrEntryNum.W)))
+  val senderQueue    = Module(new Queue(UInt(log2Up(nMSHRs).W), nMSHRs))
+  val senderReqList  = Wire(Vec(nMSHRs, Bool()))
+  val senderRespList = Wire(Vec(nMSHRs, Bool()))
+  val senderIdxList  = Wire(Vec(nMSHRs, UInt(nMSHRs.W)))
 
-  val lineAddrList         = Wire(Vec(mshrEntryNum, UInt(lineAddrWidth.W)))
-  val senderPermissionList = Wire(Vec(mshrEntryNum, UInt(TLPermissions.aWidth.W)))
+  val lineAddrList         = Wire(Vec(nMSHRs, UInt(lineAddrWidth.W)))
+  val senderPermissionList = Wire(Vec(nMSHRs, UInt(TLPermissions.aWidth.W)))
 
   // connect mshr
-  val mshrs = (0 until mshrEntryNum) map {
+  val mshrs = (0 until nMSHRs) map {
     i =>
       val mshr = Module(new MSHR(i))
 
@@ -376,9 +376,9 @@ class MSHRFile extends Module() {
 
   // Write Mask & Data Array
   def dataMergeGen(mask: UInt, data: UInt): UInt = {
-    val byteData = data.asTypeOf(Vec(mshrDataWidth / 8, UInt(8.W)))
-    var res      = Wire(Vec(mshrDataWidth / 8, UInt(8.W)))
-    for (i <- 0 until (mshrDataWidth / 8))
+    val byteData = data.asTypeOf(Vec(blockBytes, UInt(8.W)))
+    var res      = Wire(Vec(blockBytes, UInt(8.W)))
+    for (i <- 0 until blockBytes)
       res(i) := Mux(mask(i), byteData(i), 0.U)
     res.asUInt
   }
@@ -393,7 +393,7 @@ class MSHRFile extends Module() {
       dataArray(lineAddrMatchIdx),
     ) |
       dataMergeGen(
-        Mux(io.pipelineReq.bits.isUpgrade, Fill(mshrMaskWidth, 1.U(1.W)), io.pipelineReq.bits.mask),
+        Mux(io.pipelineReq.bits.isUpgrade, Fill(blockBytes, 1.U(1.W)), io.pipelineReq.bits.mask),
         io.pipelineReq.bits.data,
       )
   }.elsewhen(io.replaceStatus === ReplaceStatus.replace_finish) {
@@ -417,7 +417,7 @@ class MSHRFile extends Module() {
 
   senderRespList := Mux(
     io.toL2Req.ready,
-    UIntToOH(senderQueue.io.deq.bits, mshrEntryNum),
+    UIntToOH(senderQueue.io.deq.bits, nMSHRs),
     0.U,
   ).asBools
 

@@ -68,7 +68,9 @@ class RefillQueueWrapper(
   io.memGrant.ready := (state === s_receive_grant) && grantAckQueue.io.enq.ready
 
   assert(
-    !(io.memGrant.fire && io.memGrant.bits.opcode =/= TLMessages.GrantData && io.memGrant.bits.opcode =/= TLMessages.Grant)
+    !(io.memGrant.fire &&
+      io.memGrant.bits.opcode =/= TLMessages.GrantData &&
+      io.memGrant.bits.opcode =/= TLMessages.Grant)
   )
 }
 
@@ -79,10 +81,10 @@ class RefillQueue extends Module {
     val refillResp = DecoupledIO(new RefillMSHRFile)
   })
 
-  val dataIdxQueue = Module(new SearchableQueue(UInt(log2Up(mshrEntryNum).W), refillDataQueueNum))
-  val dataQueue    = Module(new Queue(UInt(mshrDataWidth.W), refillDataQueueNum))
+  val dataIdxQueue = Module(new SearchableQueue(UInt(log2Up(nMSHRs).W), nRefillQDataEntries))
+  val dataQueue    = Module(new Queue(UInt(blockBits.W), nRefillQDataEntries))
 
-  val permQueue = Module(new SearchableQueue(UInt(log2Up(mshrEntryNum).W), refillNoDataQueueNum))
+  val permQueue = Module(new SearchableQueue(UInt(log2Up(nMSHRs).W), nRefillQPermEntries))
 
   // enq
   dataIdxQueue.io.enq.valid := io.memRefill.valid && io.memRefill.bits.hasData
@@ -97,7 +99,7 @@ class RefillQueue extends Module {
   io.memRefill.ready := dataQueue.io.enq.ready && permQueue.io.enq.ready
 
   // deq arb
-  val queueArb = Module(new Arbiter(UInt(log2Up(mshrEntryNum).W), 2))
+  val queueArb = Module(new Arbiter(UInt(log2Up(nMSHRs).W), 2))
   queueArb.io.in(0) <> permQueue.io.deq
   queueArb.io.in(1) <> dataIdxQueue.io.deq
   queueArb.io.out.ready := io.refillResp.ready

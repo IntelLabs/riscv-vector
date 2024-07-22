@@ -25,10 +25,6 @@ class DataExchangeReq extends Bundle {
 
 }
 
-object CacheRespStatus extends ChiselEnum {
-  val hit, miss, replay, refill = Value
-}
-
 class DataExchangeResp extends Bundle {
   val source  = UInt(MasterSource.width.W)
   val dest    = UInt(destWidth.W)

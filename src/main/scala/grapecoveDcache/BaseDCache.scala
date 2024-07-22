@@ -37,7 +37,7 @@ class BaseDCacheImp(outer: BaseDCache) extends LazyModuleImp(outer) {
   fifoManagers.foreach { m =>
     require(
       m.fifoId == fifoManagers.head.fifoId,
-      s"IOMSHRs must be FIFO for all regions with effects, but HellaCache sees\n" +
+      s"IOMSHRs must be FIFO for all regions with effects, but Cache sees\n" +
         s"${m.nodePath.map(_.name)}\nversus\n${fifoManagers.head.nodePath.map(_.name)}",
     )
   }
