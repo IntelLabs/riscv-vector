@@ -74,7 +74,7 @@ class MSHR(id: Int) extends Module() {
   // if already has write req, metaCounter won't change
   when(allocateReq && !(io.reqType.asBool && sentPermission === TLPermissions.BtoT)) {
     when(
-      lineAddrMatch && !stallReq && !io.maskConflict &&
+      lineAddrMatch && !stallReq &&
         (!io.reqType.asBool || (io.reqType.asBool && !sentPermission =/= TLPermissions.NtoT))
     ) {
       metaCounter := metaCounter + 1.U
@@ -108,7 +108,7 @@ class MSHR(id: Int) extends Module() {
             Mux(sentPermission === TLPermissions.BtoT, TLPermissions.NtoT, sentPermission),
         )
       )
-    }.elsewhen(allocateReq && !stallReq && !io.maskConflict) {
+    }.elsewhen(allocateReq && !stallReq) {
       sentPermission := Mux(
         sentPermission === TLPermissions.BtoT,
         sentPermission,
@@ -322,9 +322,9 @@ class MSHRFile extends Module() {
 
   val stallReqList = Wire(Vec(nMSHRs, Bool()))
   val stallReq     = stallReqList.asUInt.orR
-
-  val maskConflict =
-    io.pipelineReq.valid && lineAddrMatch && (io.pipelineReq.bits.mask & maskArray(lineAddrMatchIdx)).orR
+//
+//  val maskConflict =
+//    io.pipelineReq.valid && lineAddrMatch && (io.pipelineReq.bits.mask & maskArray(lineAddrMatchIdx)).orR
 
   val reqLineAddr = MuxCase(
     io.pipelineReq.bits.lineAddr,
@@ -372,8 +372,8 @@ class MSHRFile extends Module() {
       allocateArb.io.in(i).valid := mshr.io.isEmpty
       allocateList(i)            := allocateArb.io.in(i).fire
 
-      stallReqList(i)      := mshr.io.stallReq
-      mshr.io.maskConflict := maskConflict
+      stallReqList(i) := mshr.io.stallReq
+//      mshr.io.maskConflict := maskConflict
 
       // sender signal
       lineAddrList(i)         := mshr.io.senderLineAddr
@@ -394,7 +394,7 @@ class MSHRFile extends Module() {
 
   val wrIdx        = Mux(lineAddrMatch, lineAddrMatchIdx, OHToUInt(allocateList.asUInt))
   val metaWriteIdx = metaCounterList(wrIdx)
-  when(!probeReq && !replayReq && allocateReq && !stallReq && !maskConflict) {
+  when(!probeReq && !replayReq && allocateReq && !stallReq) {
     metaArray(wrIdx)(metaWriteIdx) := io.pipelineReq.bits.meta.asUInt
     maskArray(wrIdx)               := io.pipelineReq.bits.mask | maskArray(wrIdx)
     dataArray(wrIdx) := dataMergeGen(
@@ -411,8 +411,8 @@ class MSHRFile extends Module() {
   }
 
   // Resp To Cache Pipeline
-  io.pipelineReq.ready := !probeReq && !replayReq && !stallReq && !maskConflict && (lineAddrMatch || allocateArb.io.out.valid)
-  allocateArb.io.out.ready := io.pipelineReq.ready && !lineAddrMatch
+  io.pipelineReq.ready     := !probeReq && !replayReq && !stallReq && (lineAddrMatch || allocateArb.io.out.valid)
+  allocateArb.io.out.ready := io.pipelineReq.fire && !lineAddrMatch
 
   // sender queue
   senderQueue.io.enq.valid := io.pipelineReq.fire && senderReqList.asUInt.orR

@@ -21,7 +21,6 @@ class MSHREntryIO extends Bundle() {
   // state flag for allocate
   val isEmpty      = Output(Bool())
   val stallReq     = Output(Bool())
-  val maskConflict = Input(Bool())
 
   // mshr sender port
   val senderResp       = Input(Bool()) // permitted to send this entry now
