@@ -30,7 +30,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
 
     // * signal define
     // * END
-    io.lsuReady      := !ldstQueueFull
+    io.lsuReady := !ldstQueueFull
 
     // decode nfield / indexed / unit-stride / strided
     val (vstart, vl)     = (io.mUop.bits.uop.info.vstart, io.mUop.bits.uop.info.vl)
@@ -173,9 +173,9 @@ class SVVLsu(implicit p: Parameters) extends Module {
     val issueOffset  = AddrUtil.getAlignedOffset(issueLdstUop.addr)
 
     val issueWData = issueData << (issueOffset << 3.U)
-    val issueWMask = VecInit(Seq.fill(8)(0.U(1.W)))
+    val issueWMask = VecInit(Seq.fill(dataBytes)(0.U(1.W)))
 
-    for (i <- 0 until 8) {
+    for (i <- 0 until dataBytes) {
         // 1 to write, 0 to skip
         issueWMask(i) := Mux(i.U >= issueOffset && i.U < issueOffset + issueDataSz, 1.U, 0.U)
     }
@@ -201,7 +201,7 @@ class SVVLsu(implicit p: Parameters) extends Module {
     val loadComplete  = isLoadResp && isLoadRespDataValid && !memXcpt
 
     val respDataSz = (1.U << ldstUopQueue(respLdstPtr).size)
-    val respLdData = WireInit(0.U(64.W))
+    val respLdData = WireInit(0.U(dataWidth.W))
     val respOffset = AddrUtil.getAlignedOffset(ldstUopQueue(respLdstPtr).addr)
     // ldData := io.dataExchange.resp.bits.data((offset + dataSz) << 3.U - 1.U, offset << 3.U)
     respLdData := (respData >> (respOffset << 3.U)) & ((1.U << (respDataSz << 3.U)) - 1.U)
@@ -227,7 +227,11 @@ class SVVLsu(implicit p: Parameters) extends Module {
     val commitDataSz      = (1.U << ldstUopQueue(commitPtr).size)
     val commitLog2DataSz  = ldstUopQueue(commitPtr).size
 
-    val commitWData       = commitData << ((commitDestElem << commitLog2DataSz) << 3.U)
+
+    val dataLeftShiftCnt = WireInit(0.U((log2Up(VLEN + 1)).W))
+    dataLeftShiftCnt := (commitDestElem << commitLog2DataSz) << 3.U
+
+    val commitWData       = commitData << dataLeftShiftCnt
     val commitWMask       = VecInit(Seq.fill(vlenb)(0.U(1.W)))
 
     for (i <- 0 until vlenb) {

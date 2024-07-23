@@ -33,7 +33,8 @@ trait smartParas {
 
   // LSU
   val addrWidth = 64
-  val dataWidth = 64
+  val dataWidth = 128
+  val dataBytes = dataWidth / 8
   val ldstUopQueueSize = 17
   val ldstUopQueueWidth = log2Up(ldstUopQueueSize)
 
