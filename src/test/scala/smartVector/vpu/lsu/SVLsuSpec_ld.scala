@@ -30,7 +30,7 @@ trait VLsuBehavior_ld {
     val vlse32  = CtrlBundle(VLSE32_V)
     val vlse64  = CtrlBundle(VLSE64_V)
     val vse8    = CtrlBundle(VSE8_V)
-  
+
     def vLsuTest0(): Unit = {
         it should "pass: unit-stride load (uops=1, eew=8, vl=8, vstart=0)" in {
         test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>

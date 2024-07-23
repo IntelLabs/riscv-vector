@@ -31,7 +31,7 @@ class SVHLsu(implicit p: Parameters) extends Module {
 
     val vregInfoStatusVec = RegInit(VecInit(Seq.fill(vlenb)(VRegSegmentStatus.invalid)))
     val vregInfoIdxVec    = RegInit(VecInit(Seq.fill(vlenb)(ldstUopQueueSize.U)))
-    val vregInfoOffsetVec = RegInit(VecInit(Seq.fill(vlenb)(0.U(log2Ceil(8).W))))
+    val vregInfoOffsetVec = RegInit(VecInit(Seq.fill(vlenb)(0.U(log2Ceil(dataBytes).W))))
     val vregInfoDataVec   = RegInit(VecInit(Seq.fill(vlenb)(0.U(8.W))))
 
     // Split info
@@ -154,7 +154,7 @@ class SVHLsu(implicit p: Parameters) extends Module {
 
     // pipeline stage 0 --> calc addr
     val addr        = WireInit(0.U(addrWidth.W))
-    val offset      = WireInit(0.U(log2Ceil(addrWidth / 8).W))
+    val offset      = WireInit(0.U(log2Ceil(dataBytes).W))
     val baseAddr    = mUopInfoReg.rs1Val
 
     val curVl       = (mUopInfoReg.uopIdx << ldstCtrlReg.log2MinLen) + curSplitIdx
@@ -181,9 +181,9 @@ class SVHLsu(implicit p: Parameters) extends Module {
         stride := 11111.S
     }
 
-    val accelerateStride = Cat(strideAbs === 4.U, strideAbs === 2.U, strideAbs === 1.U)
+    val accelerateStride = Cat(strideAbs === 8.U, strideAbs === 4.U, strideAbs === 2.U, strideAbs === 1.U)
     val canAccelerate = (accelerateStride =/= 0.U || strideAbs === 0.U) && ~AddrUtil.isAddrMisalign(strideAbs, ldstCtrlReg.log2Memwb)
-    val log2Stride = Mux(canAccelerate, Mux1H(accelerateStride, Seq(0.U, 1.U, 2.U)), 0.U)
+    val log2Stride = Mux(canAccelerate, Mux1H(accelerateStride, Seq(0.U, 1.U, 2.U, 3.U)), 0.U)
 
     val curStridedAddr = Mux(
         curSplitIdx === 0.U && mUopInfoReg.uopIdx === 0.U, 
@@ -210,9 +210,12 @@ class SVHLsu(implicit p: Parameters) extends Module {
 
     val startElemPos    = (curVl - ((curVl >> ldstCtrlReg.log2Mlen) << ldstCtrlReg.log2Mlen)) 
     val startVRegIdx    = startElemPos << ldstCtrlReg.log2Memwb
-    val canLoadElemCnt  = WireInit(0.U((log2Ceil(8) + 1).W))
+    val canLoadElemCnt  = WireInit(0.U((log2Ceil(dataBytes) + 1).W))
     canLoadElemCnt      := Mux(canAccelerate,
-                            (splitCount - curSplitIdx) min Mux(negStride, (offset >> log2Stride) + 1.U(4.W), ((8.U >> log2Stride) - (offset >> log2Stride))), 
+                            (splitCount - curSplitIdx) min 
+                                Mux(negStride, 
+                                    (offset >> log2Stride) + 1.U((log2Ceil(dataBytes) + 1).W), 
+                                    ((dataBytes.U >> log2Stride) - (offset >> log2Stride))), 
                             1.U
                         )
     val endElemPos      = startElemPos + canLoadElemCnt
@@ -307,8 +310,8 @@ class SVHLsu(implicit p: Parameters) extends Module {
         issueLdstPtr := issueLdstPtr + 1.U
     }
 
-    val storeDataVec = VecInit(Seq.fill(8)(0.U(8.W)))
-    val storeMaskVec = VecInit(Seq.fill(8)(0.U(1.W)))
+    val storeDataVec = VecInit(Seq.fill(dataBytes)(0.U(8.W)))
+    val storeMaskVec = VecInit(Seq.fill(dataBytes)(0.U(1.W)))
 
     (0 until vlenb).foreach { i =>
         when (ldstCtrlReg.isStore && vregInfoStatusVec(i) === VRegSegmentStatus.notReady && vregInfoIdxVec(i) === issueLdstPtr) {
@@ -332,6 +335,11 @@ class SVHLsu(implicit p: Parameters) extends Module {
     // * BEGIN
     // * Recv Resp
     val (respLdstPtr, respData) = (io.dataExchange.resp.bits.idx, io.dataExchange.resp.bits.data)
+    
+    val respDataVec = VecInit(Seq.fill(dataBytes)(0.U(8.W)))
+    (0 until dataBytes).foreach { i =>
+        respDataVec(i) := respData(8 * i + 7, 8 * i)
+    }
 
     when (io.dataExchange.resp.valid || memXcpt) {
         ldstUopQueue(respLdstPtr).status := LdstUopStatus.ready
@@ -343,12 +351,8 @@ class SVHLsu(implicit p: Parameters) extends Module {
         when (ldstUopQueue(respLdstPtr).memOp === VMemCmd.read) {
             (0 until vlenb).foreach { i =>
                 when (vregInfoStatusVec(i) === VRegSegmentStatus.notReady && vregInfoIdxVec(i) === respLdstPtr) {
-                    val offsetOH = UIntToOH(vregInfoOffsetVec(i), 8)
-                    vregInfoDataVec(i) := Mux1H(
-                        offsetOH, 
-                        Seq(respData( 7,  0), respData(15,  8), respData(23, 16), respData(31, 24),
-                            respData(39, 32), respData(47, 40), respData(55, 48), respData(63, 56))
-                    )
+                        val offsetOH = UIntToOH(vregInfoOffsetVec(i), dataBytes)
+                    vregInfoDataVec(i) := Mux1H(offsetOH, respDataVec)
                 }
             }
         }
