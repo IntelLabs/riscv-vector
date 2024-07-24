@@ -411,7 +411,7 @@ class MSHRFile extends Module() {
   }
 
   // Resp To Cache Pipeline
-  io.pipelineReq.ready     := !probeReq && !replayReq && !stallReq && (lineAddrMatch || allocateArb.io.out.valid)
+  io.pipelineReq.ready := !probeReq && !replayReq && !stallReq && !maskConflict && (lineAddrMatch || allocateArb.io.out.valid)
   allocateArb.io.out.ready := io.pipelineReq.fire && !lineAddrMatch
 
   // sender queue
