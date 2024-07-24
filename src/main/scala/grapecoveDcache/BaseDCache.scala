@@ -32,7 +32,7 @@ class BaseDCache()(
 
 class BaseDCacheImp(outer: BaseDCache) extends LazyModuleImp(outer) {
   implicit val edge        = outer.node.edges.out(0)
-  val (tl_out, _)          = outer.node.out(0)
+  val (tlBus, _)           = outer.node.out(0)
   private val fifoManagers = edge.manager.managers.filter(TLFIFOFixer.allVolatile)
   fifoManagers.foreach { m =>
     require(

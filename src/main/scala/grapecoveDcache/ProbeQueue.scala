@@ -69,8 +69,7 @@ class ProbeQueue(
   io.wbReq.bits.data      := DontCare // FIXME
   io.wbReq.bits.hasData   := false.B  // FIXME
 
-  io.memProbe.ready := true.B
+  io.memProbe.ready := (state === s_invalid)
 
-  dontTouch(io.memProbe)
   assert(io.memProbe.bits.opcode === TLMessages.Probe || ~io.memProbe.valid)
 }

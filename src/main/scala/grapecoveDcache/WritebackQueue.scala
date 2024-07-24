@@ -49,7 +49,7 @@ class WritebackEntry(id: Int)(
   val req         = RegEnable(io.req.bits, io.req.fire)
   val remainBeats = RegInit(0.U(log2Up(refillCycles + 1).W))
   val curBeatData = getBeatData(refillCycles.U - remainBeats, req.data)
-  val allBeatDone = edge.last(io.release)
+  val allBeatDone = edge.done(io.release)
 
   // * FSM transition Begin
   switch(state) {
@@ -187,8 +187,7 @@ class WritebackQueue(
   io.release.valid := releaseSources(releasePtr.value).valid
   io.release.bits  := releaseSources(releasePtr.value).bits
 
-  val releaseLast = edge.firstlast(io.release)._2
-  when(io.release.fire && releaseLast) {
+  when(edge.done(io.release)) {
     releasePtr := releasePtr + 1.U
   }
 

@@ -159,7 +159,6 @@ trait DCacheTestTrait {
         dut.io.resp.bits.data.expect("h23232323".U)
         dut.io.resp.bits.dest.expect(16.U)
         dut.clock.step(10)
-        dut.clock.step(10)
 
       }
     }
