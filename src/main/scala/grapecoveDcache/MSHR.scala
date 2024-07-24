@@ -15,8 +15,13 @@ class MSHR(id: Int) extends Module() {
   val probeReq    = io.req === MSHRReqType.probe && io.lineAddrMatch
   val replayReq   = io.req === MSHRReqType.replay
   val allocateReq = io.req === MSHRReqType.alloc
+  // req
+  val probeReq    = io.req === MSHRReqType.probe && io.lineAddrMatch
+  val replayReq   = io.req === MSHRReqType.replay
+  val allocateReq = io.req === MSHRReqType.alloc
 
   // info regs & wires
+  val sentPermission = RegInit(TLPermissions.NtoB)
   val sentPermission = RegInit(TLPermissions.NtoB)
   val lineAddrReg    = RegEnable(io.reqLineAddr, 0.U, allocateReq && state === mode_idle)
 
@@ -24,14 +29,17 @@ class MSHR(id: Int) extends Module() {
 
   // match & output
   val lineAddrMatch = lineAddrReg === io.reqLineAddr && state =/= mode_idle
+  val lineAddrMatch = lineAddrReg === io.reqLineAddr && state =/= mode_idle
   io.lineAddrMatch := lineAddrMatch
 
   /////////////// allocate state flag
   // current entry is sent as read, but here is a write req
   val privErr = (state >= mode_resp_wait) && (sentPermission === TLPermissions.NtoB) && io.reqType.asBool
+  val privErr = (state >= mode_resp_wait) && (sentPermission === TLPermissions.NtoB) && io.reqType.asBool
   // it is not allowed for write -> read -> write
   val readAfterWriteFlag = RegInit(false.B)
   val wrwErr             = readAfterWriteFlag && io.reqType.asBool
+
 
   val probeState = Mux(
     state >= mode_resp_wait,
@@ -46,7 +54,20 @@ class MSHR(id: Int) extends Module() {
         ),
       )
     ),
+    state >= mode_resp_wait,
+    ProbeMSHRState.hitBlockB,
+    MuxLookup(io.probePermission, ProbeMSHRState.hitBlockB)(
+      Seq(
+        TLPermissions.toN -> ProbeMSHRState.hitBlockN,
+        TLPermissions.toB -> Mux(
+          sentPermission === TLPermissions.NtoB,
+          ProbeMSHRState.hitGo,
+          ProbeMSHRState.hitBlockB,
+        ),
+      )
+    ),
   )
+
 
   io.probeState := Mux(probeReq, probeState, ProbeMSHRState.miss)
 
@@ -60,12 +81,14 @@ class MSHR(id: Int) extends Module() {
 
   // don't have enough space to store current inst
   val isFull = (metaCounter + 1.U) >= nMSHRMetas.asUInt
+  val isFull = (metaCounter + 1.U) >= nMSHRMetas.asUInt
 
   val stallReq = lineAddrMatch && (!(state <= mode_resp_wait) || isFull || privErr || wrwErr)
   io.stallReq := stallReq
   io.isEmpty  := state === mode_idle
 
   /////////////// refill state flag & io
+  io.metaCounter := Mux(sentPermission =/= TLPermissions.NtoB && allocateReq, metaCounter - 1.U, metaCounter)
   io.metaCounter := Mux(sentPermission =/= TLPermissions.NtoB && allocateReq, metaCounter - 1.U, metaCounter)
 
   // if already has write req, metaCounter won't change
@@ -79,7 +102,18 @@ class MSHR(id: Int) extends Module() {
         metaCounter := metaCounter + 1.U
       }.elsewhen(!io.reqType.asBool) {
         metaCounter := metaCounter + 1.U
+  when(state === mode_clear) {
+    metaCounter := 0.U
+  }.elsewhen(allocateReq && !stallReq) {
+    when(state === mode_idle) {
+      metaCounter := 1.U
+    }.elsewhen(lineAddrMatch){
+      when(sentPermission === TLPermissions.NtoB && io.reqType.asBool) {
+        metaCounter := metaCounter + 1.U
+      }.elsewhen(!io.reqType.asBool) {
+        metaCounter := metaCounter + 1.U
     }
+  }
   }
   }
 
@@ -94,10 +128,28 @@ class MSHR(id: Int) extends Module() {
         Mux(io.reqType.asBool, TLPermissions.NtoT, TLPermissions.NtoB),
       )
     }.elsewhen(lineAddrMatch) {
+  }.elsewhen(allocateReq && !stallReq) {
+    when(state === mode_idle) {
+      sentPermission := Mux(
+        io.isUpgrade,
+        TLPermissions.BtoT,
+        Mux(io.reqType.asBool, TLPermissions.NtoT, TLPermissions.NtoB),
+      )
+    }.elsewhen(lineAddrMatch) {
       sentPermission := Mux(
         sentPermission === TLPermissions.NtoB,
         TLPermissions.NtoT,
+        sentPermission === TLPermissions.NtoB,
+        TLPermissions.NtoT,
         sentPermission,
+      )
+    }
+  }.elsewhen(probeReq) {
+    sentPermission := Mux(
+      io.probePermission === TLPermissions.toN && sentPermission === TLPermissions.BtoT,
+      TLPermissions.NtoT,
+      sentPermission,
+    )
       )
     }
   }.elsewhen(probeReq) {
@@ -133,14 +185,21 @@ class ReplayModule extends Module() {
 
   val mode_idle :: mode_replay :: mode_send_replace :: mode_wait_replace :: mode_clear :: Nil = Enum(5)
   private val state                                                                           = RegInit(mode_idle)
+  val mode_idle :: mode_replay :: mode_send_replace :: mode_wait_replace :: mode_clear :: Nil = Enum(5)
+  private val state                                                                           = RegInit(mode_idle)
 
   val metaCounter = RegInit(0.U(log2Up(nMSHRMetas).W))
 
+  val initEnable     = io.innerIO.fire
   val initEnable     = io.innerIO.fire
   val mshrEntryIdx   = RegEnable(io.innerIO.bits.entryIdx, 0.U(log2Up(nMSHRs).W), initEnable)
   val totalCounter   = RegEnable(io.innerIO.bits.counter, 0.U(log2Up(nMSHRMetas).W), initEnable)
   val replayLineAddr = RegEnable(io.innerIO.bits.lineAddr, 0.U(lineAddrWidth.W), initEnable)
   val replayPerm     = RegEnable(io.innerIO.bits.perm, TLPermissions.NtoB, initEnable)
+
+  val underReplay = initEnable || state === mode_replay
+//  val replayMetaValid = RegEnable(metaCounter < totalCounter, underReplay)
+  val replayMeta = RegEnable(io.innerIO.bits.meta, underReplay)
 
   val underReplay = initEnable || state === mode_replay
 //  val replayMetaValid = RegEnable(metaCounter < totalCounter, underReplay)
@@ -152,11 +211,15 @@ class ReplayModule extends Module() {
     Seq(
       mode_clear  -> false.B,
       mode_replay -> (writeRecord | replayMeta.rwType.asBool),
+      mode_replay -> (writeRecord | replayMeta.rwType.asBool),
     )
   )
 
   val loadgen =
     new LoadGen(
+      replayMeta.size,
+      replayMeta.signed,
+      replayMeta.offset,
       replayMeta.size,
       replayMeta.signed,
       replayMeta.offset,
@@ -176,7 +239,12 @@ class ReplayModule extends Module() {
 
   metaCounter := MuxCase(
     metaCounter,
+  metaCounter := MuxCase(
+    metaCounter,
     Seq(
+      (state === mode_clear) -> 0.U,
+      underReplay            -> (metaCounter + 1.U),
+    ),
       (state === mode_clear) -> 0.U,
       underReplay            -> (metaCounter + 1.U),
     ),
@@ -186,6 +254,7 @@ class ReplayModule extends Module() {
     replayReg,
     Seq(
       initEnable -> io.innerIO.bits.data,
+      ((state === mode_replay) && replayMeta.rwType.asBool) ->
       ((state === mode_replay) && replayMeta.rwType.asBool) ->
         maskedStoreGen(io.innerIO.bits.mask, replayReg, io.innerIO.bits.data),
     ),
@@ -211,6 +280,7 @@ class ReplayModule extends Module() {
   io.replayIdx     := mshrEntryIdx
 
   // replace signal connect
+  io.toReplace.valid := state === mode_send_replace
   io.toReplace.valid := state === mode_send_replace
 
   io.toReplace.bits.state := MuxLookup(replayPerm, ClientStates.Branch)(
@@ -280,6 +350,13 @@ class MSHRFile extends Module() {
 
   val allocateArb = Module(new Arbiter(Bool(), nMSHRs))
   allocateArb.io.in.foreach(_.bits := DontCare)
+  val lineAddrMatchIdx     = OHToUInt(lineAddrMatchList)
+
+  val stallReqList = Wire(Vec(nMSHRs, Bool()))
+  val stallReq     = stallReqList.asUInt.orR
+
+  val allocateArb = Module(new Arbiter(Bool(), nMSHRs))
+  allocateArb.io.in.foreach(_.bits := DontCare)
 
   val reqArb = Module(new Arbiter(MSHRReqType(), 3))
   val probeReq  = reqArb.io.in(0).fire
@@ -318,6 +395,8 @@ class MSHRFile extends Module() {
 
   io.probeCheck.pass := probeReq && (probeState === ProbeMSHRState.hitGo | (probeState === ProbeMSHRState.hitBlockN && !io.fromRefill.bits.probeMatch))
   io.probeCheck.hit  := probeReq && lineAddrMatch
+  io.probeCheck.pass := probeReq && (probeState === ProbeMSHRState.hitGo | (probeState === ProbeMSHRState.hitBlockN && !io.fromRefill.bits.probeMatch))
+  io.probeCheck.hit  := probeReq && lineAddrMatch
 
   // interface for replay
   val metaCounterList = Wire(Vec(nMSHRs, UInt(log2Up(nMSHRMetas).W)))
@@ -333,7 +412,9 @@ class MSHRFile extends Module() {
   // interface for new entry sender
   val senderQueue    = Module(new Queue(UInt(log2Up(nMSHRs).W), nMSHRs))
   // val senderReqList  = Wire(Vec(nMSHRs, Bool()))
+  // val senderReqList  = Wire(Vec(nMSHRs, Bool()))
   val senderRespList = Wire(Vec(nMSHRs, Bool()))
+  // val senderIdx      = OHToUInt(senderReqList)
   // val senderIdx      = OHToUInt(senderReqList)
 
   val lineAddrList         = Wire(Vec(nMSHRs, UInt(lineAddrWidth.W)))
@@ -369,6 +450,7 @@ class MSHRFile extends Module() {
       // sender signal
       lineAddrList(i)         := mshr.io.senderLineAddr
       // senderReqList(i)        := mshr.io.isEmpty & allocateArb.io.in(i).fire
+      // senderReqList(i)        := mshr.io.isEmpty & allocateArb.io.in(i).fire
       senderPermissionList(i) := mshr.io.senderPermission
       mshr.io.senderResp      := senderRespList(i)
   }
@@ -383,7 +465,9 @@ class MSHRFile extends Module() {
   }
 
   val wrIdx        = Mux(lineAddrMatch, lineAddrMatchIdx, allocateIdx)
+  val wrIdx        = Mux(lineAddrMatch, lineAddrMatchIdx, allocateIdx)
   val metaWriteIdx = metaCounterList(wrIdx)
+  when(io.pipelineReq.ready) {
   when(io.pipelineReq.ready) {
     metaArray(wrIdx)(metaWriteIdx) := io.pipelineReq.bits.meta.asUInt
     maskArray(wrIdx)               := io.pipelineReq.bits.mask | maskArray(wrIdx)
@@ -404,6 +488,8 @@ class MSHRFile extends Module() {
   // sender queue
   senderQueue.io.enq.valid := allocateList.asUInt.orR
   senderQueue.io.enq.bits  := allocateIdx
+  senderQueue.io.enq.valid := allocateList.asUInt.orR
+  senderQueue.io.enq.bits  := allocateIdx
 
   io.toL2Req.valid         := senderQueue.io.deq.valid
   senderQueue.io.deq.ready := io.toL2Req.ready
@@ -418,6 +504,8 @@ class MSHRFile extends Module() {
   ).asBools
 
   // refill queue wakeup MSHR FSM & replay reg
+  // replayReg.io.innerIO.valid         := io.fromRefill.valid
+  // io.fromRefill.ready                := replayReg.io.innerIO.ready
   // replayReg.io.innerIO.valid         := io.fromRefill.valid
   // io.fromRefill.ready                := replayReg.io.innerIO.ready
   replayReg.io.innerIO.bits.perm     := senderPermissionList(io.fromRefill.bits.entryId)
@@ -453,6 +541,18 @@ class MSHRFile extends Module() {
 
 /** For Test * */
 
+//object MSHRFile extends App {
+//
+//  val firtoolOptions = Array(
+//    "--lowering-options=" + List(
+//      "disallowLocalVariables",
+//      "disallowPackedArrays",
+//      "locationInfoStyle=wrapInAtSquareBracket",
+//    ).reduce(_ + "," + _)
+//  )
+//
+//  ChiselStage.emitSystemVerilogFile(new MSHRFile, args, firtoolOptions ++ Array("--disable-all-randomization"))
+//}
 //object MSHRFile extends App {
 //
 //  val firtoolOptions = Array(
