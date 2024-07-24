@@ -17,11 +17,11 @@ class RefillQueueWrapper(
     val refillResp = DecoupledIO(new RefillMSHRFile)
   })
 
+  val refillQueue = Module(new RefillQueue)
+
   val s_receive_grant :: s_send_refill :: Nil = Enum(2)
 
   val state = RegInit(s_receive_grant)
-
-  val refillQueue = Module(new RefillQueue)
 
   val dataReg    = RegInit(VecInit(Seq.fill(refillCycles)(0.U(beatBits.W))))
   val hasDataReg = RegEnable(io.memGrant.bits.opcode =/= TLMessages.Grant, io.memGrant.fire)
@@ -60,7 +60,7 @@ class RefillQueueWrapper(
 
   val grantAckQueue = Module(new Queue(new TLBundleE(edge.bundle), 1))
 
-  grantAckQueue.io.enq.valid := (s_receive_grant & allBeatDone)
+  grantAckQueue.io.enq.valid := ((state === s_receive_grant) & allBeatDone)
   grantAckQueue.io.enq.bits  := edge.GrantAck(io.memGrant.bits)
 
   io.memFinish <> grantAckQueue.io.deq

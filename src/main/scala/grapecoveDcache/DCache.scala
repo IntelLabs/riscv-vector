@@ -19,6 +19,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   dontTouch(io)
 
+  // * Modules Begin
   def onReset     = Metadata(0.U, ClientMetadata.onReset.state)
   val metaArray   = Module(new MetaArray[Metadata](() => onReset))
   val dataArray   = Module(new DataArray)
@@ -27,11 +28,10 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val wbQueue     = Module(new WritebackQueue)
   val probeQueue  = Module(new ProbeQueue)
   val refillQueue = Module(new RefillQueueWrapper)
+  // * Modules End
 
   // * Signal Define Begin
-
   // Store -> Load Bypassing
-
   class BypassStore extends Bundle {
     val data  = UInt(dataWidth.W)
     val tag   = UInt(tagBits.W)
@@ -96,9 +96,6 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // * pipeline stage 0 End
 
   // * pipeline stage 1 Begin
-  // 1. Obtain meta & data
-  // 2. Organize Data
-  // 3. Return Resp
 
   val s1_req           = RegEnable(s0_req, s0_valid)
   val s1_valid         = RegNext(s0_valid) & ~(io.s1_kill && s1_req.isFromCore)
@@ -110,7 +107,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_dataArrayResp = dataArray.io.resp // nways nbanks data
   val s1_metaArrayResp = metaArray.io.resp // nways meta
 
-  // obtain tag for load/store/probe
+  // obtain tag & coh
   val s1_tagMatchWayPreBypassVec = VecInit(
     (0 until nWays).map(w =>
       s1_metaArrayResp(w).tag === getTag(s1_req.paddr) && s1_metaArrayResp(w).coh > 0.U
@@ -185,6 +182,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // TODO: Merge Store & AMO Store
 
   // * cpu amo store data
+  // NOTE: operate in 8Bytes
   val s1_blockOffset  = getBlockOffset(s1_req.paddr)
   val s1_amoStoreData = (amoalu.io.out << (s1_blockOffset << 3) & s1_mask) | s1_data & ~s1_mask
 
@@ -194,6 +192,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   amoalu.io.rhs  := s1_req.wdata
 
   // * cpu lrsc
+  // NOTE: when lrscValid -> block probe & replace to lrscAddr
   val lrscCount = RegInit(0.U)
   val lrscValid = lrscCount > lrscBackoff.U
 
@@ -217,7 +216,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   )
 
   val s1_storeUpdateMeta = s1_validFromCore && (s1_upgradePermHit || s1_upgradePermMiss) && !s1_scFail
-  val s1_storeUpdateData = (s1_validFromCore && s1_hit && isWrite(s1_req.cmd)) && !s1_scFail
+  val s1_storeUpdateData = s1_validFromCore && s1_hit && isWrite(s1_req.cmd) && !s1_scFail
 
   // TODO: flush & flush all
 
@@ -231,7 +230,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_probeWbData      = s1_isTagMatch && s1_probeDirty                              // probe has data
 
   // * replace
-  val s1_repLineAddr    = Cat(s1_tag, getSetIdx(s1_req.paddr)) // FIXME
+  val s1_repLineAddr    = Cat(s1_tag, getSetIdx(s1_req.paddr))
   val s1_repMeta        = s1_coh
   val s1_repDirty       = s1_repMeta.onCacheControl(M_FLUSH)._1
   val s1_repShrinkParam = s1_repMeta.onCacheControl(M_FLUSH)._2
@@ -313,30 +312,28 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // * pipeline stage 2 End
 
-  // *  Store -> Load Bypassing Begin
-  // store/probe/refill -> access bypassing
+  // * Store -> Load Bypassing Begin
+
   val s1_bypassStoreCandidate = createBypassStore(s1_storeData, getTag(s1_req.paddr), s1_newCoh, s1_wayEn)
   val s2_bypassStoreCandidate = createBypassStore(s2_req.wdata, getTag(s2_req.paddr), s2_newCoh, s2_wayEn)
-  val bypassStoreList = List(
-    (s1_updateMeta || s1_updateData, s1_req, s1_bypassStoreCandidate),
-    (s2_valid, s2_req, s2_bypassStoreCandidate),
-  ).map(r => (r._1 && isWrite(r._2.cmd) && getLineAddr(s0_req.paddr) === getLineAddr(r._2.paddr), r._3))
 
-  // replace -> access bypassing
-  val bypassReplaceList = List(
-    (s1_validRefill, s1_req, s1_tag),
-    (s2_validRefill, s2_req, RegNext(s1_tag)),
+  val bypassList = List(
+    (s1_updateMeta || s1_updateData, s1_req, s1_bypassStoreCandidate, s1_tag),
+    (s2_valid, s2_req, s2_bypassStoreCandidate, RegNext(s1_tag)),
+  ).map(r =>
+    (
+      // bypass store cond: valid & isWrite & same line addr
+      r._1 && isWrite(r._2.cmd) && getLineAddr(s0_req.paddr) === getLineAddr(r._2.paddr),
+      // bypass replace cond: valid & prev isRefill & req line addr = replace line addr
+      r._1 && r._2.isRefill && (getLineAddr(s0_req.paddr) === Cat(r._4, getSetIdx(r._2.paddr))), // TODO: redundant
+      r._3,
+    )
   )
-  val bypassReplaceValidList = bypassReplaceList.map(r =>
-    r._1 && (getLineAddr(s0_req.paddr) === Cat(r._3, getSetIdx(r._2.paddr)))
-  )
 
-  // s2: hit s1: replace -> use s1 status
-  // s2: replace s1: hit -> impossible
-  s1_bypassStore.valid := ~bypassReplaceValidList(0) && bypassStoreList.map(_._1).reduce(_ || _)
-  s1_bypassStore.bits  := PriorityMux(bypassStoreList.map(d => (d._1, d._2)))
-
-  s1_bypassReplaceValid := bypassReplaceList.map(_._1).reduce(_ || _)
+  val bypassEntry = PriorityMux(bypassList.map(d => (d._1 || d._2, Cat(d._3.asUInt, d._2, d._1))))
+  s1_bypassReplaceValid := bypassEntry(1)
+  s1_bypassStore.valid  := bypassEntry(0)
+  s1_bypassStore.bits   := (bypassEntry >> 2.U).asTypeOf(new BypassStore)
 
   // * Store -> Load Bypassing End
 
@@ -382,9 +379,9 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   mshrs.io.pipelineReq.bits.meta.signed   := s1_req.signed
 
   // mshr acquire block or perm from L2
-  mshrs.io.toL2Req.ready := tl_out.a.ready
-  tl_out.a.valid         := mshrs.io.toL2Req.valid
-  tl_out.a.bits := edge.AcquireBlock(
+  mshrs.io.toL2Req.ready := tlBus.a.ready
+  tlBus.a.valid          := mshrs.io.toL2Req.valid
+  tlBus.a.bits := edge.AcquireBlock(
     fromSource = mshrs.io.toL2Req.bits.entryId,
     toAddress = mshrs.io.toL2Req.bits.lineAddr << blockOffBits,
     lgSize = log2Ceil(blockBytes).U,
@@ -415,10 +412,9 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // * Refill Begin
 
-  refillQueue.io.memFinish <> tl_out.e
+  refillQueue.io.memFinish <> tlBus.e
 
-  // NOTE: set to default
-  // actual connect see tl-d
+  // NOTE: set to default; actual connect see tl-d
   refillQueue.io.memGrant.valid := false.B
   refillQueue.io.memGrant.bits  := DontCare
 
@@ -447,7 +443,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   wbQueue.io.missCheck.lineAddr := getLineAddr(s1_req.paddr)
   val s1_wbqBlockMiss = wbQueue.io.missCheck.blockMiss
 
-  wbQueue.io.release <> tl_out.c
+  wbQueue.io.release <> tlBus.c
   // default value
   wbQueue.io.grant.valid := false.B
   wbQueue.io.grant.bits  := DontCare
@@ -457,7 +453,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // * Writeback End
 
   // * Probe Begin
-  probeQueue.io.memProbe <> tl_out.b
+  probeQueue.io.memProbe <> tlBus.b
 
   probeQueue.io.lrscAddr.valid := lrscValid
   probeQueue.io.lrscAddr.bits  := lrscAddr
@@ -509,17 +505,14 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // * Resp End
 
-  // FIXME
-  // test tilelink
-  tl_out.e.valid := false.B
-
-  tl_out.d.ready := false.B
-  when(tl_out.d.bits.opcode === TLMessages.ReleaseAck) {
-    tl_out.d <> wbQueue.io.grant
-  }.elsewhen(tl_out.d.bits.opcode === TLMessages.Grant || tl_out.d.bits.opcode === TLMessages.GrantData) {
-    tl_out.d <> refillQueue.io.memGrant
+  // tilelink d
+  tlBus.d.ready := false.B
+  when(tlBus.d.bits.opcode === TLMessages.ReleaseAck) {
+    tlBus.d <> wbQueue.io.grant
+  }.elsewhen(tlBus.d.bits.opcode === TLMessages.Grant || tlBus.d.bits.opcode === TLMessages.GrantData) {
+    tlBus.d <> refillQueue.io.memGrant
   }.otherwise {
-    assert(!tl_out.d.fire)
+    assert(!tlBus.d.fire)
   }
-  dontTouch(tl_out)
+  dontTouch(tlBus)
 }
