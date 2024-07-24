@@ -58,11 +58,11 @@ class ProbeQueue(
   val issueValid = (state === s_pipe_req) && ~io.lrscAddr.valid
 
   // orgranize probe req sent to pipeline
-  io.mainPipeReq.valid := issueValid && (!io.probeCheck.hit && !io.probeCheck.hitGo)
+  io.mainPipeReq.valid := issueValid && (!io.probeCheck.hit && !io.probeCheck.pass)
   io.mainPipeReq.bits  := MainPipeReqConverter(probeReq)
 
   // organize probe req sent to wb
-  io.wbReq.valid          := issueValid && io.probeCheck.hitGo
+  io.wbReq.valid          := issueValid && io.probeCheck.pass
   io.wbReq.bits.voluntary := false.B
   io.wbReq.bits.lineAddr  := getLineAddr(probeReq.address)
   io.wbReq.bits.perm      := probeReq.param

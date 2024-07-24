@@ -7,7 +7,7 @@ import freechips.rocketchip.tilelink._
 
 /////// MSHR Entry IO
 class MSHREntryIO extends Bundle() {
-  val req         = Input(UInt(mshrReqType.W))
+  val req         = Input(MSHRReqType())
   val reqType     = Input(UInt(mshrType.W))
   val reqLineAddr = Input(UInt(lineAddrWidth.W))
   val isUpgrade   = Input(Bool()) // for BtoT
@@ -19,8 +19,8 @@ class MSHREntryIO extends Bundle() {
   val metaCounter  = Output(UInt(log2Up(nMSHRMetas).W))
 
   // state flag for allocate
-  val isEmpty      = Output(Bool())
-  val stallReq     = Output(Bool())
+  val isEmpty  = Output(Bool())
+  val stallReq = Output(Bool())
 
   // mshr sender port
   val senderResp       = Input(Bool()) // permitted to send this entry now
@@ -114,8 +114,8 @@ class ProbeMSHRFile extends Bundle() {
   val probePermission = Input(UInt(TLPermissions.bdWidth.W))
   val lineAddr        = Input(UInt(lineAddrWidth.W))
 
-  val hitGo = Output(Bool())
-  val hit   = Output(Bool())
+  val pass = Output(Bool())
+  val hit  = Output(Bool())
 
   val replaceFinish = Output(Bool())
 }

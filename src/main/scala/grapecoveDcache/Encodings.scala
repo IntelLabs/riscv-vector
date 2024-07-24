@@ -32,8 +32,8 @@ object ProbeMSHRState {
 
   def miss      = 0.U(width.W)
   def hitGo     = 1.U(width.W)
-  def hitBlockN = 2.U(width.W)
-  def hitBlockB = 3.U(width.W)
+  def hitBlockN = 2.U(width.W) // maybe be blocked
+  def hitBlockB = 3.U(width.W) // must be blocked
 }
 
 // mshr req type
