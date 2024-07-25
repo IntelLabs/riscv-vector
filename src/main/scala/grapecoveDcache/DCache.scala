@@ -62,6 +62,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // req arbiter
   val mainReqArb = Module(new Arbiter(new MainPipeReq, 3))
 
+  // TODO: priority
   // source 0: probe
   mainReqArb.io.in(0) <> probeQueue.io.mainPipeReq
   // source 1: replace
@@ -73,6 +74,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   mainReqArb.io.in(2).bits  := MainPipeReqConverter(io.req.bits)
   io.req.ready              := mainReqArb.io.in(2).ready
 
+  // FIXME: store ready ?
   mainReqArb.io.out.ready := Mux(
     mainReqArb.io.out.bits.isFromCore,
     !(io.nextCycleWb || (io.resp.valid && io.resp.bits.status === CacheRespStatus.replay)),
@@ -81,7 +83,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // get s0 req
   val s0_req   = mainReqArb.io.out.bits
-  val s0_valid = mainReqArb.io.out.valid & ~(io.s0_kill && s0_req.isFromCore)
+  val s0_valid = mainReqArb.io.out.fire & ~(io.s0_kill && s0_req.isFromCore)
 
   // read tag array
   metaArray.io.read.valid       := s0_valid
@@ -207,7 +209,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     lrscCount,
     Seq(
       // (lr | sc | other cmd) after lr hit
-      (s1_validFromCore & lrscCount > 0.U) -> 0.U,
+      (s1_validFromCore & (lrscCount > 0.U)) -> 0.U,
       // lr hit
       (s1_hit && s1_lr) -> (lrscCycles - 1).U,
       // no cmd after lr hit
