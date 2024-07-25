@@ -296,12 +296,15 @@ class MSHRFile extends Module() {
 
   reqArb.io.in(0).valid := io.probeCheck.valid
   reqArb.io.in(0).bits  := MSHRReqType.probe
+  
   reqArb.io.in(1).valid := io.fromRefill.valid && replayReg.io.innerIO.ready
   reqArb.io.in(1).bits  := MSHRReqType.replay
+  io.fromRefill.ready   := reqArb.io.in(1).ready && replayReg.io.innerIO.ready
+
   reqArb.io.in(2).valid := io.pipelineReq.valid
   reqArb.io.in(2).bits  := Mux(io.pipelineReq.valid, MSHRReqType.alloc, MSHRReqType.invalid)
+  io.pipelineReq.ready  := reqArb.io.in(2).ready
 
-  io.pipelineReq.ready := reqArb.io.in(2).ready
   reqArb.io.out.ready := MuxLookup(reqArb.io.out.bits, false.B)(
     Seq(
       MSHRReqType.probe  -> true.B,
@@ -309,8 +312,6 @@ class MSHRFile extends Module() {
       MSHRReqType.alloc  -> ((!lineAddrMatch && allocateArb.io.out.valid) || (lineAddrMatch && !stallReq)),
     )
   )
-
-  io.fromRefill.ready        := reqArb.io.in(1).ready
   replayReg.io.innerIO.valid := replayReq
 
   allocateArb.io.out.ready := allocReq && !lineAddrMatch
