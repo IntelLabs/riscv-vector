@@ -109,6 +109,9 @@ class VIllegalInstrn extends Module {
   val vrgather = ctrl.perm && (ctrl.funct6 === "b001100".U || ctrl.funct6 === "b001110".U && ctrl.funct3 === "b000".U)
   val viota    = ctrl.mask && ctrl.funct6 === "b010100".U && ctrl.lsrc(0) === "b10000".U
 
+  val mask_onlyOneReg = ctrl.mask && !(ctrl.funct6(3, 2) === "b01".U && ctrl.lsrc(0)(4))
+  val alu_mask = ctrl.alu && (ctrl.funct6(5,4) === "b11".U || ctrl.funct6 === "b010001".U || ctrl.funct6 === "b010011".U)
+  
   val convertToInt = vfncvt_xu_f || vfncvt_x_f || vfncvt_rtz_xu_f || vfncvt_rtz_x_f // || vfncvt_f_xu || vfncvt_f_x
 
   val ill_frm = csr.frm(2) && csr.frm(1, 0) =/= 0.U && isFp
@@ -158,8 +161,7 @@ class VIllegalInstrn extends Module {
                         (!overlap_isLegal(vs1, vs1End, veewVs1, vemulVs1, vd, vdEnd, veewVd) || vrgather || viota)
   val ill_regOverlap_2 = overlap(vs2, vs2End, ctrl.lsrcVal(1), vd, vdEnd, ctrl.ldestVal) &&
                         (!overlap_isLegal(vs2, vs2End, veewVs2, vemulVs2, vd, vdEnd, veewVd) || vrgather || viota)
-  val ill_regOverlap_m = overlap(0.U, 0.U, !ctrl.vm, vd, vdEnd, ctrl.ldestVal) &&
-                        (!overlap_isLegal(0.U, 0.U, 7.U, 0.U, vd, vdEnd, veewVd) || viota)
+  val ill_regOverlap_m = vd === 0.U && !ctrl.vm && ~mask_onlyOneReg && ~alu_mask && ~ctrl.narrow_to_1
   val ill_regOverlap = (ill_regOverlap_1 || ill_regOverlap_2 || ill_regOverlap_m) && ~ctrl.redu
 
   // Segment: for indexed segment, vd reg-group cannot overlap vs2 reg-group
