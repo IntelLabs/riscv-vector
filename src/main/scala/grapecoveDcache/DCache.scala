@@ -196,14 +196,15 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // * cpu lrsc
   // NOTE: when lrscValid -> block probe & replace to lrscAddr
   val lrscCount = RegInit(0.U)
-  val lrscValid = lrscCount > lrscBackoff.U
+  val lrscValid = lrscCount > lrscBackoff.U // FIXME lrscBackOff  probe interval
 
   val s1_lr = s1_validFromCore && (s1_req.cmd === M_XLR)
   val s1_sc = s1_validFromCore && (s1_req.cmd === M_XSC)
 
   val lrscAddr         = RegEnable(s1_req.paddr >> blockOffBits, s1_lr)
   val s1_lrscAddrMatch = lrscValid && (s1_req.paddr >> blockOffBits === lrscAddr)
-  val s1_scFail        = s1_sc && !s1_lrscAddrMatch // FIXME: s1 sc miss?
+  val s1_lrFail        = s1_lr && !s1_hit
+  val s1_scFail        = s1_sc && (!s1_hit || !s1_lrscAddrMatch)
 
   lrscCount := MuxCase(
     lrscCount,
@@ -217,31 +218,36 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     ),
   )
 
-  val s1_storeUpdateMeta = s1_validFromCore && (s1_upgradePermHit || s1_upgradePermMiss) && !s1_scFail
+  val s1_storeUpdateMeta = s1_validFromCore && !s1_scFail &&
+    (s1_upgradePermHit || (s1_upgradePermMiss && mshrs.io.pipelineReq.ready))
   val s1_storeUpdateData = s1_validFromCore && s1_hit && isWrite(s1_req.cmd) && !s1_scFail
 
   // TODO: flush & flush all
 
   // * probe
-  val s1_canProbe         = wbPipeReq.ready                                             // writeback queue ready
-  val s1_probeDirty       = s1_coh.onProbe(s1_req.probePerm)._1
-  val s1_probeReportParam = s1_coh.onProbe(s1_req.probePerm)._2
-  val s1_newProbeCoh      = s1_coh.onProbe(s1_req.probePerm)._3
-  val s1_probeUpdateMeta  = s1_validProbe && s1_isTagMatch && s1_coh =/= s1_newProbeCoh // downgrade coh
-  val s1_probeWb          = s1_validProbe                                               // probe should send probeAck
-  val s1_probeWbData      = s1_isTagMatch && s1_probeDirty                              // probe has data
+  // FIXME
+  val s1_canProbe = wbPipeReq.ready // writeback queue ready
+  val s1_probeCoh = Mux(s1_isTagMatch, s1_coh, ClientMetadata(0.U))
+
+  val s1_probeDirty       = s1_probeCoh.onProbe(s1_req.probePerm)._1
+  val s1_probeReportParam = s1_probeCoh.onProbe(s1_req.probePerm)._2
+  val s1_newProbeCoh      = s1_probeCoh.onProbe(s1_req.probePerm)._3
+
+  val s1_probeUpdateMeta = s1_validProbe && s1_isTagMatch && (s1_probeCoh =/= s1_newProbeCoh)
+  val s1_probeWb         = s1_validProbe                  // probe should send probeAck
+  val s1_probeWbData     = s1_isTagMatch && s1_probeDirty // probe has data
 
   // * replace
   val s1_repLineAddr    = Cat(s1_tag, getSetIdx(s1_req.paddr))
-  val s1_repMeta        = s1_coh
-  val s1_repDirty       = s1_repMeta.onCacheControl(M_FLUSH)._1
-  val s1_repShrinkParam = s1_repMeta.onCacheControl(M_FLUSH)._2
+  val s1_repCoh         = s1_coh
+  val s1_repDirty       = s1_repCoh.onCacheControl(M_FLUSH)._1
+  val s1_repShrinkParam = s1_repCoh.onCacheControl(M_FLUSH)._2
+  val s1_replaceWb      = s1_validRefill && (s1_repCoh.state > ClientStates.Branch) // Trunk or Dirty
+  val s1_replaceWbData  = s1_repDirty
 
   val s1_refillUpdateMeta = s1_validRefill
   val s1_refillUpdateData = s1_validRefill
   val s1_refillData       = s1_req.wdata
-  val s1_replaceWb        = s1_validRefill && (s1_repMeta.state > ClientStates.Branch)
-  val s1_replaceWbData    = s1_repDirty
 
   val s1_canDoRefill = (!s1_replaceWb) || wbPipeReq.ready
 
@@ -257,7 +263,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     Mux(s1_req.isRefill, s1_req.wdata, Mux(isAMO(s1_req.cmd), s1_amoStoreData, s1_mergeStoreData))
 
   val s1_newCoh = MuxCase(
-    s1_req.cmd,
+    0.U,
     Seq(
       s1_validProbe      -> s1_newProbeCoh.state,
       s1_validRefill     -> s1_req.refillCoh,
@@ -324,8 +330,8 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     (s2_valid, s2_req, s2_bypassStoreCandidate, RegNext(s1_tag)),
   ).map(r =>
     (
-      // bypass store cond: valid & isWrite & same line addr
-      r._1 && isWrite(r._2.cmd) && getLineAddr(s0_req.paddr) === getLineAddr(r._2.paddr),
+      // bypass store cond: valid & same line addr
+      r._1 && getLineAddr(s0_req.paddr) === getLineAddr(r._2.paddr), // FIXME
       // bypass replace cond: valid & prev isRefill & req line addr = replace line addr
       r._1 && r._2.isRefill && (getLineAddr(s0_req.paddr) === Cat(r._4, getSetIdx(r._2.paddr))), // TODO: redundant
       r._3,
