@@ -7,6 +7,7 @@ import freechips.rocketchip.tilelink._
 
 /////// MSHR Entry IO
 class MSHREntryIO extends Bundle() {
+  val reqValid    = Input(Bool())
   val req         = Input(MSHRReqType())
   val reqType     = Input(UInt(mshrType.W))
   val reqLineAddr = Input(UInt(lineAddrWidth.W))

@@ -49,6 +49,7 @@ class MainPipeReq extends Bundle {
   val signed  = Bool()
   val wdata   = UInt(dataWidth.W)
   val wmask   = UInt(dataBytes.W)
+  val isMMIO  = Bool()
   val noAlloc = Bool()
   val dest    = UInt(destWidth.W) // reg addr or lsq idx
 

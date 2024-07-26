@@ -40,3 +40,8 @@ object ProbeMSHRState {
 object MSHRReqType extends ChiselEnum {
   val invalid, alloc, replay, probe = Value
 }
+
+// IOMSHR req type
+object IOMSHRReqType extends ChiselEnum {
+  val invalid, mmio, amo = Value
+}
