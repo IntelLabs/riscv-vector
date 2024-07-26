@@ -197,7 +197,7 @@ class ReplayModule extends Module() {
 
   state := MuxLookup(state, state)(
     Seq(
-      mode_idle         -> Mux(io.innerIO.valid, mode_replay, state),
+      mode_idle         -> Mux(io.innerIO.fire, mode_replay, state),
       mode_replay       -> Mux(metaCounter >= totalCounter, mode_send_replace, state),
       mode_send_replace -> Mux(io.toReplace.ready, mode_wait_replace, state),
       mode_wait_replace -> Mux(
@@ -249,6 +249,7 @@ class MSHRFile extends Module() {
       val pipelineReq = Flipped(DecoupledIO(new CachepipeMSHRFile))
       val toL2Req     = DecoupledIO(new MSHRFileL2)              // TL A
       val fromRefill  = Flipped(DecoupledIO(new RefillMSHRFile)) // TL D/E
+
       val probeCheck  = new ProbeMSHRFile
       val probeRefill = ValidIO(new ProbeRefill)
 
@@ -296,7 +297,7 @@ class MSHRFile extends Module() {
 
   reqArb.io.in(0).valid := io.probeCheck.valid
   reqArb.io.in(0).bits  := MSHRReqType.probe
-  
+
   reqArb.io.in(1).valid := io.fromRefill.valid && replayReg.io.innerIO.ready
   reqArb.io.in(1).bits  := MSHRReqType.replay
   io.fromRefill.ready   := reqArb.io.in(1).ready && replayReg.io.innerIO.ready
@@ -403,7 +404,7 @@ class MSHRFile extends Module() {
     maskArray(wrIdx)               := io.pipelineReq.bits.mask | maskArray(wrIdx)
     dataArray(wrIdx) := dataMergeGen(
       ~io.pipelineReq.bits.mask,
-      dataArray(lineAddrMatchIdx),
+      dataArray(wrIdx),
     ) |
       dataMergeGen(
         Mux(io.pipelineReq.bits.isUpgrade, Fill(blockBytes, 1.U(1.W)), io.pipelineReq.bits.mask),
@@ -450,7 +451,7 @@ class MSHRFile extends Module() {
     ),
     dataArray(replayReg.io.replayIdx),
   )
-  replayReg.io.innerIO.bits.counter := metaCounterList(lineAddrMatchIdx)
+  replayReg.io.innerIO.bits.counter := metaCounterList(replayReg.io.replayIdx)
 
   io.toPipeline <> replayReg.io.toPipe
   io.toReplace <> replayReg.io.toReplace
