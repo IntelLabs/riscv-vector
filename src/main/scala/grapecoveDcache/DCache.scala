@@ -84,6 +84,11 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // get s0 req
   val s0_req   = mainReqArb.io.out.bits
   val s0_valid = mainReqArb.io.out.fire & ~(io.s0_kill && s0_req.isFromCore)
+  val s0_cacheable = edge.manager.supportsAcquireBFast( // determine if the request is cacheable or not
+    s0_req.paddr,
+    log2Up(blockBytes).U,
+  )
+  dontTouch(s0_cacheable)
 
   // read tag array
   metaArray.io.read.valid       := s0_valid

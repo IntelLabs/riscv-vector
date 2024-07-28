@@ -13,14 +13,19 @@ class DCacheWrapper()(
 
   val dcacheClient = LazyModule(new GPCDCache()(p))
 
-  val ram = LazyModule(new TLRAM(AddressSet(0x80000000L, 0xffffL), beatBytes = beatBytes))
+  val ram  = LazyModule(new TLRAM(AddressSet(0x80000000L, 0x0ffffL), beatBytes = beatBytes))
+  val mmio = LazyModule(new TLRAM(AddressSet(0x60000000L, 0x1ffffL), beatBytes = beatBytes))
 
-  ram.node :=
-    TLXbar() :=*
-      TLFragmenter(beatBytes, blockBytes) :=*
-      TLCacheCork() :=*
-      TLDelayer(0) :=*
-      dcacheClient.node
+  val xbar = TLXbar()
+  mmio.node := xbar
+  ram.node :=*
+    TLFragmenter(beatBytes, blockBytes) :=*
+    TLCacheCork() :=*
+    TLDelayer(0) :=*
+    xbar
+
+  xbar :=*
+    dcacheClient.node
 
   lazy val module = new DCacheWrapperImp(this)
 }

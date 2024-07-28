@@ -155,7 +155,7 @@ class WritebackQueue(
   val blockMissVec = Wire(Vec(nWBQEntries, Bool()))
 
   val wbqEntries = (0 until nWBQEntries).map { i =>
-    val entryId = nMSHRs + nMMIOs + i
+    val entryId = nMSHRs + i
     val entry   = Module(new WritebackEntry(entryId)(edge, p))
 
     entry.io.missCheck.valid    := io.missCheck.valid

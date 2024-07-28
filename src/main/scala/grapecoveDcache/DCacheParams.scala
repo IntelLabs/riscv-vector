@@ -14,7 +14,7 @@ trait DCacheParams {
   val blockBytes          = 64
   val nMSHRs              = 8
   val nMSHRMetas          = 8 // number of metas each MSHR entry can hold
-  val nMMIOs              = 0
+  val nMMIOs              = 1
   val nWBQEntries         = 2 // writeback queue entries
   val nRefillQDataEntries = 8 // refill queue data entries
   val nRefillQPermEntries = 8 // refill queue permission entries
