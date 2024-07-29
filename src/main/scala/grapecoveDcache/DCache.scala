@@ -88,15 +88,14 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     s0_req.paddr,
     log2Up(blockBytes).U,
   )
-  dontTouch(s0_cacheable)
 
   // read tag array
-  metaArray.io.read.valid       := s0_valid
+  metaArray.io.read.valid       := s0_valid && s0_cacheable
   metaArray.io.read.bits.setIdx := getSetIdx(s0_req.paddr)
   metaArray.io.read.bits.wayEn  := Mux(s0_req.isRefill, UIntToOH(s0_req.refillWay), Fill(nWays, true.B))
 
   // read data array
-  dataArray.io.read.valid       := s0_valid
+  dataArray.io.read.valid       := s0_valid && s0_cacheable
   dataArray.io.read.bits.setIdx := getSetIdx(s0_req.paddr)
   dataArray.io.read.bits.bankEn := UIntToOH(getBankIdx(s0_req.paddr)) // useless now
   dataArray.io.read.bits.wayEn  := Mux(s0_req.isRefill, UIntToOH(s0_req.refillWay), Fill(nWays, true.B))
@@ -106,9 +105,13 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   val s1_req           = RegEnable(s0_req, s0_valid)
   val s1_valid         = RegNext(s0_valid) & ~(io.s1_kill && s1_req.isFromCore)
+  val s1_cacheable     = RegEnable(s0_cacheable, s0_valid)
   val s1_validFromCore = s1_valid && s1_req.isFromCore
   val s1_validProbe    = s1_valid && s1_req.isProbe
   val s1_validRefill   = s1_valid && s1_req.isRefill
+
+  assert(!s1_validProbe || (s1_validProbe && s1_cacheable))
+  assert(!s1_validRefill || (s1_validRefill && s1_cacheable))
 
   // meta & data resp
   val s1_dataArrayResp = dataArray.io.resp // nways nbanks data
@@ -185,6 +188,11 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   )
   val s1_mask           = FillInterleaved(8, s1_maskInBytes)
   val s1_mergeStoreData = s1_req.wdata & s1_mask | s1_data & ~s1_mask
+
+  assert(
+    !(s1_validFromCore && s1_req.cmd === M_PWR && s1_req.size =/= 6.U),
+    "Only support partial write 64 bytes",
+  )
   // TODO: PWR assertion
   // TODO: Merge Store & AMO Store
 
@@ -223,9 +231,10 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     ),
   )
 
-  val s1_storeUpdateMeta = s1_validFromCore && !s1_scFail &&
+  val s1_storeUpdateMeta = s1_validFromCore && s1_cacheable && !s1_scFail &&
     (s1_upgradePermHit || (s1_upgradePermMiss && mshrs.io.pipelineReq.ready))
-  val s1_storeUpdateData = s1_validFromCore && s1_hit && isWrite(s1_req.cmd) && !s1_scFail
+  val s1_storeUpdateData = s1_validFromCore && s1_cacheable && s1_hit &&
+    isWrite(s1_req.cmd) && !s1_scFail
 
   // TODO: flush & flush all
 
@@ -264,6 +273,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     (s1_refillUpdateData && s1_canDoRefill)
 
   // FIXME mask
+  // data array store data
   val s1_storeData =
     Mux(s1_req.isRefill, s1_req.wdata, Mux(isAMO(s1_req.cmd), s1_amoStoreData, s1_mergeStoreData))
 
@@ -376,13 +386,17 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   dontTouch(mshrs.io)
 
   // pipeline miss -> mshr
-  val s1_mshrAlloc     = s1_validFromCore && ~s1_hit && ~s1_scFail
+  val s1_mshrAlloc     = s1_validFromCore && s1_cacheable && ~s1_hit && ~s1_scFail
   val s1_mshrAllocFail = s1_mshrAlloc && !mshrs.io.pipelineReq.ready
+
+  // mshr store data
+  val s1_mshrStoreData        = Mux(s1_upgradePermMiss, s1_mergeStoreData, s1_req.wdata)
+  val s1_mshrStoreMaskInBytes = Mux(s1_upgradePermMiss, 0.U, s1_maskInBytes)
 
   mshrs.io.pipelineReq.valid              := s1_mshrAlloc
   mshrs.io.pipelineReq.bits.isUpgrade     := s1_upgradePermMiss
-  mshrs.io.pipelineReq.bits.data          := s1_storeData
-  mshrs.io.pipelineReq.bits.mask          := s1_req.wmask
+  mshrs.io.pipelineReq.bits.data          := s1_mshrStoreData
+  mshrs.io.pipelineReq.bits.mask          := s1_mshrStoreMaskInBytes
   mshrs.io.pipelineReq.bits.lineAddr      := getLineAddr(s1_req.paddr)
   mshrs.io.pipelineReq.bits.meta.sourceId := s1_req.source
   mshrs.io.pipelineReq.bits.meta.offset   := getBlockOffset(s1_req.paddr)

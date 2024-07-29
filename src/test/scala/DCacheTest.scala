@@ -164,6 +164,89 @@ trait DCacheTestTrait {
     }
 
   def cacheTest3(): Unit =
+    it should "pass: cache store miss" in {
+      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+        Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
+      ) { dut =>
+        DCacheInit.initDut(dut)
+
+        // req miss
+        dut.io.req.valid.poke(true.B)
+        dut.io.req.bits.poke(genReq(CacheReqBundle(
+          paddr = "h8000c000",
+          cmd = M_XWR,
+          wdata = "h12345678",
+        )))
+
+        dut.clock.step(1)
+        dut.io.req.valid.poke(false.B)
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
+        dut.clock.step(1)
+
+        // wait store
+        dut.clock.step(200)
+
+        // read hit after refill
+        dut.io.req.valid.poke(true.B)
+        dut.io.req.bits.poke(genReq(CacheReqBundle(
+          paddr = "h8000c000",
+          cmd = M_XRD,
+        )))
+
+        dut.clock.step(1)
+        dut.io.req.valid.poke(false.B)
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.data.expect("h12345678".U)
+        dut.io.resp.bits.status.expect(CacheRespStatus.hit)
+        dut.clock.step(1)
+      }
+    }
+
+  def cacheTest4(): Unit =
+    it should "pass: cache partial store miss" in {
+      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+        Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
+      ) { dut =>
+        DCacheInit.initDut(dut)
+
+        // req miss
+        dut.io.req.valid.poke(true.B)
+        dut.io.req.bits.poke(genReq(CacheReqBundle(
+          paddr = "h8000a000",
+          cmd = M_PWR,
+          size = 6,
+          wdata = "h0101010112345678",
+          wmask = "hf0",
+        )))
+
+        dut.clock.step(1)
+        dut.io.req.valid.poke(false.B)
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
+        dut.clock.step(1)
+
+        // wait store
+        dut.clock.step(200)
+
+        // read hit after refill
+        dut.io.req.valid.poke(true.B)
+        dut.io.req.bits.poke(genReq(CacheReqBundle(
+          paddr = "h8000a000",
+          cmd = M_XRD,
+          size = 3,
+        )))
+
+        dut.clock.step(1)
+        dut.io.req.valid.poke(false.B)
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.data.expect("h0101010123232323".U)
+        dut.io.resp.bits.status.expect(CacheRespStatus.hit)
+        dut.clock.step(1)
+      }
+    }
+
+  def cacheTest5(): Unit =
     it should "pass: block miss that occurs in WBQ" in {
       test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
@@ -208,4 +291,6 @@ class DCacheTest extends AnyFlatSpec with ChiselScalatestTester with BundleGenHe
   it should behave like cacheTest1() //
   it should behave like cacheTest2() //
   it should behave like cacheTest3() //
+  it should behave like cacheTest4() //
+  it should behave like cacheTest5() //
 }
