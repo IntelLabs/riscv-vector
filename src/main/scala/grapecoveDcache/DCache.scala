@@ -90,12 +90,12 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   )
 
   // read tag array
-  metaArray.io.read.valid       := s0_valid && s0_cacheable
+  metaArray.io.read.valid       := s0_valid
   metaArray.io.read.bits.setIdx := getSetIdx(s0_req.paddr)
   metaArray.io.read.bits.wayEn  := Mux(s0_req.isRefill, UIntToOH(s0_req.refillWay), Fill(nWays, true.B))
 
   // read data array
-  dataArray.io.read.valid       := s0_valid && s0_cacheable
+  dataArray.io.read.valid       := s0_valid
   dataArray.io.read.bits.setIdx := getSetIdx(s0_req.paddr)
   dataArray.io.read.bits.bankEn := UIntToOH(getBankIdx(s0_req.paddr)) // useless now
   dataArray.io.read.bits.wayEn  := Mux(s0_req.isRefill, UIntToOH(s0_req.refillWay), Fill(nWays, true.B))
