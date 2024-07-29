@@ -391,7 +391,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // mshr store data
   val s1_mshrStoreData        = Mux(s1_upgradePermMiss, s1_mergeStoreData, s1_req.wdata)
-  val s1_mshrStoreMaskInBytes = Mux(s1_upgradePermMiss, 0.U, s1_maskInBytes)
+  val s1_mshrStoreMaskInBytes = Mux(s1_upgradePermMiss, Fill(dataBytes, 1.U), s1_maskInBytes)
 
   mshrs.io.pipelineReq.valid              := s1_mshrAlloc
   mshrs.io.pipelineReq.bits.isUpgrade     := s1_upgradePermMiss

@@ -400,17 +400,21 @@ class MSHRFile extends Module() {
 
   val wrIdx        = Mux(lineAddrMatch, lineAddrMatchIdx, allocateIdx)
   val metaWriteIdx = metaCounterList(wrIdx)
-  when(io.pipelineReq.ready) {
+
+  when(io.pipelineReq.fire) {
+    // read/write => update meta info
     metaArray(wrIdx)(metaWriteIdx) := io.pipelineReq.bits.meta.asUInt
-    maskArray(wrIdx)               := io.pipelineReq.bits.mask | maskArray(wrIdx)
-    dataArray(wrIdx) := dataMergeGen(
-      ~io.pipelineReq.bits.mask,
-      dataArray(wrIdx),
-    ) |
-      dataMergeGen(
-        Mux(io.pipelineReq.bits.isUpgrade, Fill(blockBytes, 1.U(1.W)), io.pipelineReq.bits.mask),
+
+    // write => update data array & mask array
+    when(io.pipelineReq.bits.meta.rwType.asBool) {
+      maskArray(wrIdx) := io.pipelineReq.bits.mask | maskArray(wrIdx)
+      dataArray(wrIdx) := Mux(
+        io.pipelineReq.bits.isUpgrade,
         io.pipelineReq.bits.data,
+        dataMergeGen(~io.pipelineReq.bits.mask, dataArray(wrIdx)) |
+          dataMergeGen(io.pipelineReq.bits.mask, io.pipelineReq.bits.data),
       )
+    }
   }.elsewhen(io.replaceStatus === ReplaceStatus.replace_finish) {
     maskArray(replayReg.io.replayIdx) := 0.U
     dataArray(replayReg.io.replayIdx) := 0.U
