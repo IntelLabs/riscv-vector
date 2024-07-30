@@ -448,7 +448,7 @@ class MSHRFile extends Module() {
   replayReg.io.innerIO.bits.mask := maskArray(replayReg.io.replayIdx)
 
   replayReg.io.innerIO.bits.data := Mux(
-    io.fromRefill.valid,
+    io.fromRefill.fire,
     Mux(
       senderPermissionList(io.fromRefill.bits.entryId) === TLPermissions.BtoT,
       dataArray(replayReg.io.replayIdx),
