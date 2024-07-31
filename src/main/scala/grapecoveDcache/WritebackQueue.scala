@@ -165,9 +165,8 @@ class WritebackQueue(
     val grant     = Flipped(Decoupled(new TLBundleD(edge.bundle)))
   })
 
-  val enqPtr     = RegInit(0.U.asTypeOf(new WritebackQueuePtr))
-  val releasePtr = RegInit(0.U.asTypeOf(new WritebackQueuePtr))
-  val deqPtr     = RegInit(0.U.asTypeOf(new WritebackQueuePtr))
+  val enqPtr = RegInit(0.U.asTypeOf(new WritebackQueuePtr))
+  val deqPtr = RegInit(0.U.asTypeOf(new WritebackQueuePtr))
 
   val wbqEntries = (0 until nWBQEntries).map { i =>
     val entryId = nMSHRs + i
@@ -194,26 +193,22 @@ class WritebackQueue(
   }
 
   // release
-  val releaseSources = VecInit(wbqEntries.map(_.io.release))
-  releaseSources.zipWithIndex.foreach { case (source, i) =>
-    source.ready := (releasePtr.value === i.U) && io.release.ready
+  val releaseVec = VecInit(wbqEntries.map(_.io.release))
+  releaseVec.zipWithIndex.foreach { case (source, i) =>
+    source.ready := (deqPtr.value === i.U) && io.release.ready
   }
 
-  io.release.valid := releaseSources(releasePtr.value).valid
-  io.release.bits  := releaseSources(releasePtr.value).bits
-
-  when(edge.done(io.release)) {
-    releasePtr := releasePtr + 1.U
-  }
+  io.release.valid := releaseVec(deqPtr.value).valid
+  io.release.bits  := releaseVec(deqPtr.value).bits
 
   // tl-d grant
-  val grantReadySources = VecInit(wbqEntries.map(_.io.grant.ready))
-  io.grant.ready := grantReadySources(deqPtr.value)
+  val grantReadyVec = VecInit(wbqEntries.map(_.io.grant.ready))
+  io.grant.ready := grantReadyVec(deqPtr.value)
 
   // wb finish
-  val wbFinishSources = VecInit(wbqEntries.map(_.io.wbFinish))
+  val wbFinishVec = VecInit(wbqEntries.map(_.io.wbFinish))
 
-  when(wbFinishSources(deqPtr.value)) {
+  when(wbFinishVec(deqPtr.value)) {
     deqPtr := deqPtr + 1.U
   }
 

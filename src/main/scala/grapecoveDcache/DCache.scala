@@ -514,7 +514,10 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // when mshr wants to wb,
   // it will send nextCycleWb to kill other cache request
-  assert(~(s1_cacheResp.valid && mshrsResp.valid))
+  assert(
+    ~(s1_cacheResp.valid && mshrsResp.valid),
+    "MSHR & Cache Resp cannot exists simultaneously",
+  )
 
   // * Resp End
 
