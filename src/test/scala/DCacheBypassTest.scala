@@ -2,14 +2,13 @@ package grapecoveDCache
 
 import chisel3._
 import chiseltest._
-import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.flatspec.AnyFlatSpec
 import chisel3.experimental.BundleLiterals._
-import org.scalatest.matchers.must.Matchers
 import chiseltest.{VerilatorBackendAnnotation, WriteVcdAnnotation}
 import org.chipsalliance.cde.config.{Parameters, Field}
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
+import MemoryOpConstants._
 
 trait DCacheBypassTestTrait {
   this: AnyFlatSpec with ChiselScalatestTester with BundleGenHelper =>
@@ -19,221 +18,162 @@ trait DCacheBypassTestTrait {
   implicit val valName = ValName("DCacheBypassTest")
 
   def cacheTest0(): Unit =
-    it should "pass: N->Dirty store->load bypassing" in {
+    it should "pass: cache bypass load" in {
       test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
-        val cacheReq = CacheReqBundle(
-          paddr = "h80004000",
-          cmd = MemoryOpConstants.M_XRD,
-        )
-
         DCacheInit.initDut(dut)
 
+        val cacheReadReq = CacheReqBundle(
+          size = 6,
+          paddr = "h8000f000",
+          noAlloc = true,
+          cmd = M_XRD,
+        )
+
         dut.io.req.valid.poke(true.B)
-        dut.io.req.bits.poke(genReq(cacheReq.copy(
-          cmd = MemoryOpConstants.M_XWR,
-          wdata = "h12345678",
-        )))
+        dut.io.req.bits.poke(genReq(cacheReadReq))
 
         dut.clock.step(1)
-        // s2->s1 store load bypass
-        dut.io.req.bits.poke(genReq(cacheReq))
-
-        dut.clock.step(1)
+        dut.io.req.valid.poke(false.B)
         dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.data.expect("h12345678".U)
-        dut.io.resp.bits.status.expect(CacheRespStatus.hit)
+        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
+        dut.clock.step(1)
 
-        // s3->s1 store load bypass
-        dut.io.req.bits.poke(genReq(cacheReq))
+        // refill resp
+        while (!dut.io.resp.valid.peekBoolean()) {
+          dut.clock.step(1)
+        }
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.status.expect(CacheRespStatus.refill)
+        dut.io.resp.bits.data.expect(0.U)
+        dut.clock.step(10)
+
+        // read miss again because of no alloc
+        dut.io.req.valid.poke(true.B)
+        dut.io.req.bits.poke(genReq(cacheReadReq))
 
         dut.clock.step(1)
+        dut.io.req.valid.poke(false.B)
         dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.data.expect("h12345678".U)
-        dut.io.resp.bits.status.expect(CacheRespStatus.hit)
-
-        // directly read meta array
-        dut.io.req.bits.poke(genReq(cacheReq))
-
+        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
         dut.clock.step(1)
+
+        // refill resp
+        while (!dut.io.resp.valid.peekBoolean()) {
+          dut.clock.step(1)
+        }
         dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.data.expect("h12345678".U)
-        dut.io.resp.bits.status.expect(CacheRespStatus.hit)
+        dut.io.resp.bits.status.expect(CacheRespStatus.refill)
+        dut.io.resp.bits.data.expect(0.U)
+        dut.clock.step(10)
       }
     }
 
   def cacheTest1(): Unit =
-    it should "pass: T->Dirty store->load bypassing" in {
+    it should "pass: cache bypass store" in {
       test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
-        val cacheReq = CacheReqBundle(
-          paddr = "h80008000",
-          cmd = MemoryOpConstants.M_XRD,
-        )
-
         DCacheInit.initDut(dut)
 
-        dut.io.req.valid.poke(true.B)
-        dut.io.req.bits.poke(genReq(cacheReq.copy(
-          cmd = MemoryOpConstants.M_XWR,
-          wdata = "h12345678",
-        )))
-
-        dut.clock.step(1)
-        // s2->s1 store load bypass
-        dut.io.req.bits.poke(genReq(cacheReq))
-
-        dut.clock.step(1)
-        dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.data.expect("h12345678".U)
-        dut.io.resp.bits.status.expect(CacheRespStatus.hit)
-
-        // s3->s1 store load bypass
-        dut.io.req.bits.poke(genReq(cacheReq))
-
-        dut.clock.step(1)
-        dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.data.expect("h12345678".U)
-        dut.io.resp.bits.status.expect(CacheRespStatus.hit)
-
-        // directly read meta array
-        dut.io.req.bits.poke(genReq(cacheReq))
-
-        dut.clock.step(1)
-        dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.data.expect("h12345678".U)
-        dut.io.resp.bits.status.expect(CacheRespStatus.hit)
-      }
-    }
-
-  def cacheTest2(): Unit =
-    it should "pass: B->Dirty store->load bypassing" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
-        Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
-      ) { dut =>
-        val cacheReq = CacheReqBundle(
-          paddr = "h8000a000",
-          cmd = MemoryOpConstants.M_XRD,
+        val cacheReqDefault = CacheReqBundle(
+          size = 6,
+          paddr = "h8000f000",
+          noAlloc = true,
+          cmd = M_XRD,
         )
 
-        DCacheInit.initDut(dut)
-
+        // write no alloc
         dut.io.req.valid.poke(true.B)
-        dut.io.req.bits.poke(genReq(cacheReq.copy(
-          cmd = MemoryOpConstants.M_XWR,
+        dut.io.req.bits.poke(genReq(cacheReqDefault.copy(
+          cmd = M_XWR,
           wdata = "h12345678",
         )))
-
-        dut.clock.step(1)
-        // s2->s1 store load bypass
-        dut.io.req.bits.poke(genReq(cacheReq))
-
-        dut.clock.step(1)
-        dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
-
-        // s3->s1 store load bypass
-        dut.io.req.bits.poke(genReq(cacheReq))
 
         dut.clock.step(1)
         dut.io.req.valid.poke(false.B)
         dut.io.resp.valid.expect(true.B)
         dut.io.resp.bits.status.expect(CacheRespStatus.miss)
 
-        dut.clock.step(1)
-        // directly read meta array
+        dut.clock.step(200)
 
+        // read miss  because of no alloc
+        dut.io.req.valid.poke(true.B)
+        dut.io.req.bits.poke(genReq(cacheReqDefault))
+
+        dut.clock.step(1)
+        dut.io.req.valid.poke(false.B)
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
+        dut.clock.step(1)
+
+        // refill resp
         while (!dut.io.resp.valid.peekBoolean()) {
           dut.clock.step(1)
         }
         dut.io.resp.valid.expect(true.B)
         dut.io.resp.bits.status.expect(CacheRespStatus.refill)
         dut.io.resp.bits.data.expect("h12345678".U)
+        dut.clock.step(10)
+      }
+    }
 
-        dut.clock.step(1)
-        dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.status.expect(CacheRespStatus.refill)
-        dut.io.resp.bits.data.expect("h12345678".U)
+  def cacheTest2(): Unit =
+    it should "pass: cache bypass partial masked store" in {
+      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+        Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
+      ) { dut =>
+        DCacheInit.initDut(dut)
 
-        dut.clock.step(20)
+        val cacheReqDefault = CacheReqBundle(
+          size = 6,
+          paddr = "h8000f000",
+          noAlloc = true,
+          cmd = M_XRD,
+        )
 
+        // write no alloc
         dut.io.req.valid.poke(true.B)
-        dut.io.req.bits.poke(genReq(cacheReq))
+        dut.io.req.bits.poke(genReq(cacheReqDefault.copy(
+          cmd = M_PWR,
+          wdata = "h0101010112345678",
+          wmask = "hf0",
+        )))
 
         dut.clock.step(1)
         dut.io.req.valid.poke(false.B)
         dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.data.expect("h12345678".U)
-        dut.io.resp.bits.status.expect(CacheRespStatus.hit)
-      }
-    }
+        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
 
-  def cacheTest3(): Unit =
-    it should "pass: replace->load bypassing" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
-        Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
-      ) { dut =>
-        val cacheReq = CacheReqBundle(
-          paddr = "h8000a000",
-          cmd = MemoryOpConstants.M_XRD,
-        )
+        dut.clock.step(200)
 
-        DCacheInit.initDut(dut)
-
+        // read miss  because of no alloc
         dut.io.req.valid.poke(true.B)
-        dut.io.req.bits.poke(genReq(cacheReq.copy(
-          paddr = "h8000e000",
-          isRefill = true,
-          refillWay = 3,
-          refillCoh = ClientStates.Dirty,
-          wdata = "h12345678",
-        )))
+        dut.io.req.bits.poke(genReq(cacheReqDefault))
 
         dut.clock.step(1)
-        // s2->s1 replace load bypass
-        dut.io.req.bits.poke(genReq(cacheReq))
-
-        dut.clock.step(1)
+        dut.io.req.valid.poke(false.B)
         dut.io.resp.valid.expect(true.B)
         dut.io.resp.bits.status.expect(CacheRespStatus.miss)
-
-        // s3->s1 replace load bypass
-        dut.io.req.bits.poke(genReq(cacheReq))
-
         dut.clock.step(1)
+
+        // refill resp
+        while (!dut.io.resp.valid.peekBoolean()) {
+          dut.clock.step(1)
+        }
         dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
-
-        // directly read meta array
-        dut.io.req.bits.poke(genReq(cacheReq))
-
-        dut.clock.step(1)
-        dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
-      }
-
-    }
-
-  def cacheTest4(): Unit =
-    it should "pass: probe->load bypassing" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
-        Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
-      ) { dut =>
-        DCacheInit.initDut(dut)
-
-        // TODO
+        dut.io.resp.bits.status.expect(CacheRespStatus.refill)
+        dut.io.resp.bits.data.expect("h0101010100000000".U)
+        dut.clock.step(10)
       }
     }
 }
-
-class DCacheBypassTest extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with DCacheBypassTestTrait {
-  behavior of "DCache Bypass Test"
+class DCacheBypassTest extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper
+    with DCacheBypassTestTrait {
+  behavior of "DCache Bypass DCache Test"
 
   it should behave like cacheTest0() //
   it should behave like cacheTest1() //
   it should behave like cacheTest2() //
-  it should behave like cacheTest3() //
-  it should behave like cacheTest4() //
 }
