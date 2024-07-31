@@ -253,7 +253,7 @@ class MSHRFile extends Module() {
       val probeCheck  = new ProbeMSHRFile
       val probeRefill = ValidIO(new ProbeRefill)
 
-      val toPipeline    = DecoupledIO(new MSHRPipeResp()) // read resp
+      val toPipeline    = ValidIO(new MSHRPipeResp()) // read resp
       val toReplace     = DecoupledIO(new MSHRReplace())
       val replaceStatus = Input(ReplaceStatus())
     }
@@ -469,18 +469,3 @@ class MSHRFile extends Module() {
   ).asBools
 
 }
-
-/** For Test * */
-
-//object MSHRFile extends App {
-//
-//  val firtoolOptions = Array(
-//    "--lowering-options=" + List(
-//      "disallowLocalVariables",
-//      "disallowPackedArrays",
-//      "locationInfoStyle=wrapInAtSquareBracket",
-//    ).reduce(_ + "," + _)
-//  )
-//
-//  ChiselStage.emitSystemVerilogFile(new MSHRFile, args, firtoolOptions ++ Array("--disable-all-randomization"))
-//}

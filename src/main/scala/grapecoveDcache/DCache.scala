@@ -7,6 +7,7 @@ import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
 import utility._
 import AddrDecoder._
+//import grapecoveDCache.MS
 import MemoryOpConstants._
 
 class GPCDCache()(
@@ -24,7 +25,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val metaArray   = Module(new MetaArray[Metadata](() => onReset))
   val dataArray   = Module(new DataArray)
   val amoalu      = Module(new AMOALU(XLEN))
-  val mshrs       = Module(new MSHRFile)
+  val mshrs       = Module(new MSHRWrapper)
   val wbQueue     = Module(new WritebackQueue)
   val probeQueue  = Module(new ProbeQueue)
   val refillQueue = Module(new RefillQueueWrapper)
@@ -232,7 +233,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   )
 
   val s1_storeUpdateMeta = s1_validFromCore && s1_cacheable && !s1_scFail &&
-    (s1_upgradePermHit || (s1_upgradePermMiss && mshrs.io.pipelineReq.ready))
+    (s1_upgradePermHit || (s1_upgradePermMiss && mshrs.io.req.ready))
   val s1_storeUpdateData = s1_validFromCore && s1_cacheable && s1_hit &&
     isWrite(s1_req.cmd) && !s1_scFail
 
@@ -387,33 +388,23 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // pipeline miss -> mshr
   val s1_mshrAlloc     = s1_validFromCore && s1_cacheable && ~s1_hit && ~s1_scFail
-  val s1_mshrAllocFail = s1_mshrAlloc && !mshrs.io.pipelineReq.ready
+  val s1_mshrAllocFail = s1_mshrAlloc && !mshrs.io.req.ready
 
   // mshr store data
   val s1_mshrStoreData        = Mux(s1_upgradePermMiss, s1_mergeStoreData, s1_req.wdata)
   val s1_mshrStoreMaskInBytes = Mux(s1_upgradePermMiss, Fill(dataBytes, 1.U), s1_maskInBytes)
 
-  mshrs.io.pipelineReq.valid              := s1_mshrAlloc
-  mshrs.io.pipelineReq.bits.isUpgrade     := s1_upgradePermMiss
-  mshrs.io.pipelineReq.bits.data          := s1_mshrStoreData
-  mshrs.io.pipelineReq.bits.mask          := s1_mshrStoreMaskInBytes
-  mshrs.io.pipelineReq.bits.lineAddr      := getLineAddr(s1_req.paddr)
-  mshrs.io.pipelineReq.bits.meta.sourceId := s1_req.source
-  mshrs.io.pipelineReq.bits.meta.offset   := getBlockOffset(s1_req.paddr)
-  mshrs.io.pipelineReq.bits.meta.rwType   := isWrite(s1_req.cmd)
-  mshrs.io.pipelineReq.bits.meta.regIdx   := s1_req.dest
-  mshrs.io.pipelineReq.bits.meta.size     := s1_req.size
-  mshrs.io.pipelineReq.bits.meta.signed   := s1_req.signed
+  val mshrReq = s1_req
+  mshrReq.wdata := s1_mshrStoreData
+  mshrReq.wmask := s1_mshrStoreMaskInBytes
+
+  mshrs.io.req.valid := s1_mshrAlloc
+  mshrs.io.req.bits  := mshrReq
+  mshrs.io.isUpgrade := s1_upgradePermMiss
+  mshrs.io.cacheable := s1_cacheable
 
   // mshr acquire block or perm from L2
-  mshrs.io.toL2Req.ready := tlBus.a.ready
-  tlBus.a.valid          := mshrs.io.toL2Req.valid
-  tlBus.a.bits := edge.AcquireBlock(
-    fromSource = mshrs.io.toL2Req.bits.entryId,
-    toAddress = mshrs.io.toL2Req.bits.lineAddr << blockOffBits,
-    lgSize = log2Ceil(blockBytes).U,
-    growPermissions = mshrs.io.toL2Req.bits.perm,
-  )._2
+  tlBus.a <> mshrs.io.l2Req
 
   // refillQueue -> mshr
   mshrs.io.fromRefill <> refillQueue.io.refillResp
@@ -433,7 +424,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // probe -> mshr
   mshrs.io.probeCheck <> probeQueue.io.probeCheck
 
-  mshrs.io.toPipeline.ready := true.B // FIXME
+//  mshrs.io.toPipeline.ready := true.B // FIXME
 
   // * MSHR End
 
@@ -514,15 +505,10 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   )
 
   // mshr resp
-  mshrsResp.valid        := mshrs.io.toPipeline.valid
-  mshrsResp.bits.status  := CacheRespStatus.refill
-  mshrsResp.bits.source  := mshrs.io.toPipeline.bits.sourceId
-  mshrsResp.bits.dest    := mshrs.io.toPipeline.bits.regIdx
-  mshrsResp.bits.data    := mshrs.io.toPipeline.bits.regData
-  mshrsResp.bits.hasData := mshrs.io.toPipeline.valid
+  mshrsResp <> mshrs.io.resp
 
   // return resp
-  io.nextCycleWb := mshrs.io.toPipeline.bits.nextCycleWb
+  io.nextCycleWb := mshrs.io.nextCycleWb
   io.resp.valid  := s1_cacheResp.valid || mshrsResp.valid
   io.resp.bits   := Mux(s1_cacheResp.valid, s1_cacheResp.bits, mshrsResp.bits)
 

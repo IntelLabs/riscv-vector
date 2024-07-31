@@ -76,7 +76,7 @@ class RefillQueueWrapper(
 
 class RefillQueue extends Module {
   val io = IO(new Bundle {
-    val memRefill  = Flipped(DecoupledIO(new L2Refill))
+    val memRefill  = Flipped(DecoupledIO(new RefillMSHRFile))
     val probeCheck = Flipped(ValidIO(new ProbeRefill))
     val refillResp = DecoupledIO(new RefillMSHRFile)
   })

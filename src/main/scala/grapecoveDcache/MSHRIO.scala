@@ -61,7 +61,7 @@ class MSHRInner extends Bundle() {
 }
 
 class ReplayModuleIO extends Bundle() {
-  val toPipe = DecoupledIO(new MSHRPipeResp())
+  val toPipe = ValidIO(new MSHRPipeResp())
 
   val toReplace     = DecoupledIO(new MSHRReplace())
   val replaceStatus = Input(ReplaceStatus())
@@ -95,19 +95,16 @@ class CachepipeMSHRFile extends Bundle() {
 
 class MSHRFileL2 extends Bundle() {
   val perm     = UInt(TLPermissions.aWidth.W)
-  val entryId  = UInt(log2Up(nMSHRs).W)
+  val entryId  = UInt(log2Up(nMSHRs + nWBQEntries + nMMIOs).W)
   val lineAddr = UInt(lineAddrWidth.W)
 }
 
 class RefillMSHRFile extends Bundle() {
-  val entryId = UInt(log2Up(nMSHRs).W)
+  val entryId = UInt(log2Up(nMSHRs + nWBQEntries + nMMIOs).W)
   val data    = UInt(blockBits.W)
+  val hasData = Bool()
 
   val probeMatch = Bool()
-}
-
-class L2Refill extends RefillMSHRFile() {
-  val hasData = Bool()
 }
 
 class ProbeMSHRFile extends Bundle() {

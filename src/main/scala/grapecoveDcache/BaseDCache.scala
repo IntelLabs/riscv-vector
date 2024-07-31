@@ -20,10 +20,12 @@ class BaseDCache()(
     name = "Dcache MMIO",
     sourceId = IdRange(nMSHRs + nWBQEntries, nMSHRs + nWBQEntries + nMMIOs),
     requestFifo = true,
+    supportsArithmetic = TransferSizes(blockBytes, blockBytes),
+    supportsLogical = TransferSizes(blockBytes, blockBytes),
   ))
 
   val node = TLClientNode(Seq(TLMasterPortParameters.v1(
-    clients = cacheClientParameters,
+    clients = cacheClientParameters ++ mmioClientParameters,
     minLatency = 1,
   )))
 
