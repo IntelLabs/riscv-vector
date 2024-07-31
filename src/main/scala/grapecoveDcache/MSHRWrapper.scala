@@ -67,7 +67,7 @@ class MSHRWrapper(
   val refillIOMSHR = io.fromRefill.bits.entryId >= (nMSHRs + nWBQEntries).asUInt &&
     io.fromRefill.bits.entryId < (nMSHRs + nWBQEntries + nMMIOs).asUInt
 
-  assert(!refillMSHR && !refillIOMSHR && io.fromRefill.valid)
+//  assert(!refillMSHR && !refillIOMSHR && io.fromRefill.valid)
 
   mshrs.io.fromRefill.valid := io.fromRefill.valid && refillMSHR
   mshrs.io.fromRefill.bits  := io.fromRefill.bits
@@ -92,9 +92,10 @@ class MSHRWrapper(
   val iomshrWbSucc = RegInit(false.B)
   iomshrWbSucc := Mux(iomshrWbSucc || mshrs.io.toPipeline.bits.nextCycleWb, false.B, iomshrs.io.resp.valid)
 
-  io.nextCycleWb := mshrs.io.toPipeline.bits.nextCycleWb || (iomshrs.io.resp.valid && !iomshrWbSucc)
-  io.resp.valid  := mshrs.io.toPipeline.valid || iomshrWbSucc
-  io.resp.bits   := Mux(iomshrWbSucc, iomshrs.io.resp.bits, mshrsResp)
+  io.nextCycleWb        := mshrs.io.toPipeline.bits.nextCycleWb || (iomshrs.io.resp.valid && !iomshrWbSucc)
+  io.resp.valid         := mshrs.io.toPipeline.valid || iomshrWbSucc
+  io.resp.bits          := Mux(iomshrWbSucc, iomshrs.io.resp.bits, mshrsResp)
+  iomshrs.io.resp.ready := iomshrWbSucc
 
   // others for MSHR
   io.toReplace <> mshrs.io.toReplace

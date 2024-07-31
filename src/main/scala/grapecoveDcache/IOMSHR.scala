@@ -40,7 +40,7 @@ class IOMSHRFile(
 ) extends Module {
   val io = IO(new Bundle {
     val req  = Flipped(DecoupledIO(new MainPipeReq))
-    val resp = ValidIO(new DataExchangeResp())
+    val resp = DecoupledIO(new DataExchangeResp())
 
     val l2Req      = DecoupledIO(new TLBundleA(edge.bundle))
     val fromRefill = Flipped(DecoupledIO(new RefillMSHRFile))
@@ -117,11 +117,16 @@ class IOMSHRFile(
 
   // refill req
   val respIOMSHRIdx = io.fromRefill.bits.entryId - (nMSHRs + nWBQEntries).asUInt
+  val refillData    = RegEnable(io.resp.bits.data, 0.U, state === mode_idle && io.fromRefill.valid)
+
+  io.resp.valid        := state === mode_replay
   io.resp.bits.hasData := true.B
   io.resp.bits.source  := reqList(respIOMSHRIdx).source
   io.resp.bits.dest    := reqList(respIOMSHRIdx).dest
   io.resp.bits.status  := CacheRespStatus.refill
-  io.resp.bits.data    := io.fromRefill.bits.data // TODO add pipeline
+  io.resp.bits.data    := refillData
+
+  io.fromRefill.ready := state === mode_idle
 
   replayFinishList := VecInit(UIntToOH(Mux(io.resp.fire, respIOMSHRIdx, 0.U)))
 

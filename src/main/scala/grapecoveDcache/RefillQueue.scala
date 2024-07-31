@@ -111,6 +111,7 @@ class RefillQueue extends Module {
   io.refillResp.valid        := queueArb.io.out.valid
   io.refillResp.bits.entryId := queueArb.io.out.bits
   io.refillResp.bits.data    := dataQueue.io.deq.bits
+  io.refillResp.bits.hasData := DontCare
 
   // probe search
   dataIdxQueue.io.searchIdx     := io.probeCheck.bits.entryId

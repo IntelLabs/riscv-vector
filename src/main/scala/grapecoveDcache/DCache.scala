@@ -394,13 +394,15 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_mshrStoreMaskInBytes = Mux(s1_upgradePermMiss, Fill(dataBytes, 1.U), s1_maskInBytes)
 
   val mshrReq = s1_req
-  mshrReq.wdata := s1_mshrStoreData
-  mshrReq.wmask := s1_mshrStoreMaskInBytes
+//  mshrReq.wdata := s1_mshrStoreData
+//  mshrReq.wmask := s1_mshrStoreMaskInBytes
 
-  mshrs.io.req.valid := s1_mshrAlloc
-  mshrs.io.req.bits  := mshrReq
-  mshrs.io.isUpgrade := s1_upgradePermMiss
-  mshrs.io.cacheable := s1_cacheable
+  mshrs.io.req.valid      := s1_mshrAlloc
+  mshrs.io.req.bits       := mshrReq
+  mshrs.io.req.bits.wdata := s1_mshrStoreData
+  mshrs.io.req.bits.wmask := s1_mshrStoreMaskInBytes
+  mshrs.io.isUpgrade      := s1_upgradePermMiss
+  mshrs.io.cacheable      := s1_cacheable
 
   // mshr acquire block or perm from L2
   tlBus.a <> mshrs.io.l2Req
