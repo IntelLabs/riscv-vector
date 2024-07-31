@@ -127,12 +127,12 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
 
   val bitsReg = RegInit(0.U.asTypeOf(new VDecodeOutput))
 
-  when(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl || io.out.bits.vCtrl.illegal){
-    validReg := false.B
-  }
-
   when(!validReg || io.out.ready){
       validReg := decodeInValid
+  }
+
+  when(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl || io.out.bits.vCtrl.illegal){
+    validReg := false.B
   }
  
   val fire = decodeInValid & (!validReg || io.out.ready)
