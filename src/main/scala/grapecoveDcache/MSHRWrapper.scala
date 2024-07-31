@@ -82,7 +82,7 @@ class MSHRWrapper(
   )
 
   // load resp to cpu
-  val mshrsResp = new DataExchangeResp
+  val mshrsResp = Wire(new DataExchangeResp)
   mshrsResp.status  := CacheRespStatus.refill
   mshrsResp.source  := mshrs.io.toPipeline.bits.sourceId
   mshrsResp.dest    := mshrs.io.toPipeline.bits.regIdx

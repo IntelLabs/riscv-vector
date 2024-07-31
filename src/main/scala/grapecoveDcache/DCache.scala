@@ -7,7 +7,6 @@ import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
 import utility._
 import AddrDecoder._
-//import grapecoveDCache.MS
 import MemoryOpConstants._
 
 class GPCDCache()(

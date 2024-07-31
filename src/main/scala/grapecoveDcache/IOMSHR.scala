@@ -123,7 +123,7 @@ class IOMSHRFile(
   io.resp.bits.status  := CacheRespStatus.refill
   io.resp.bits.data    := io.fromRefill.bits.data // TODO add pipeline
 
-  replayFinishList := UIntToOH(Mux(io.resp.fire, respIOMSHRIdx, 0.U))
+  replayFinishList := VecInit(UIntToOH(Mux(io.resp.fire, respIOMSHRIdx, 0.U)))
 
   state := MuxLookup(state, state)(
     Seq(
