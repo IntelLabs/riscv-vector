@@ -425,8 +425,6 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // probe -> mshr
   mshrs.io.probeCheck <> probeQueue.io.probeCheck
 
-//  mshrs.io.toPipeline.ready := true.B // FIXME
-
   // * MSHR End
 
   // * Refill Begin
@@ -456,14 +454,15 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // source 1: probe
   wbArbiter.io.in(1) <> probeQueue.io.wbReq
 
+  // wbq req
   wbQueue.io.req <> wbArbiter.io.out
-
-  wbQueue.io.missCheck.valid    := s1_validFromCore && ~s1_hit
+  // miss check
+  wbQueue.io.missCheck.valid    := s1_validFromCore && s1_cacheable && ~s1_hit
   wbQueue.io.missCheck.lineAddr := getLineAddr(s1_req.paddr)
   val s1_wbqBlockMiss = wbQueue.io.missCheck.blockMiss
-
+  // wbq release
   wbQueue.io.release <> tlBus.c
-  // default value
+  // wbq grant: set default value; see TL-D connection
   wbQueue.io.grant.valid := false.B
   wbQueue.io.grant.bits  := DontCare
 

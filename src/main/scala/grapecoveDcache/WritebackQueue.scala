@@ -36,44 +36,57 @@ class WritebackEntry(id: Int)(
     val wbFinish  = Output(Bool())
   })
 
+  // helper function to get current beat data
   def getBeatData(count: UInt, data: UInt): UInt = {
     val beatData = Wire(UInt(beatBits.W))
     beatData := data >> (count << log2Up(beatBits))
     beatData
   }
 
+  val reqReg = RegEnable(io.req.bits, io.req.fire)
+
+  // * FSM Begin
   val s_invalid :: s_release_req :: s_release_resp :: Nil = Enum(3)
 
-  val state = RegInit(s_invalid)
+  val state     = RegInit(s_invalid)
+  val nextState = WireDefault(s_invalid)
 
-  val req         = RegEnable(io.req.bits, io.req.fire)
-  val remainBeats = RegInit(0.U(log2Up(refillCycles + 1).W))
-  val curBeatData = getBeatData(refillCycles.U - remainBeats, req.data)
   val allBeatDone = edge.done(io.release)
 
-  // * FSM transition Begin
   switch(state) {
     is(s_invalid) {
       when(io.req.fire) {
-        state := s_release_req
+        nextState := s_release_req
+      }.otherwise {
+        nextState := s_invalid
       }
     }
     is(s_release_req) {
       when(allBeatDone) {
-        when(req.hasData) {
-          state := s_release_resp
+        when(reqReg.voluntary) {
+          nextState := s_release_resp
         }.otherwise {
-          state := s_invalid
+          nextState := s_invalid
         }
+      }.otherwise {
+        nextState := s_release_req
       }
     }
     is(s_release_resp) {
       when(io.grant.fire) {
-        state := s_invalid
+        nextState := s_invalid
+      }.otherwise {
+        nextState := s_release_resp
       }
     }
   }
-  // * FSM transition End
+
+  state := nextState
+  // * FSM End
+
+  // calculate remain beats & get beat data
+  val remainBeats = RegInit(0.U(log2Up(refillCycles + 1).W))
+  val curBeatData = getBeatData(refillCycles.U - remainBeats, reqReg.data)
 
   when(state === s_invalid && io.req.fire) {
     remainBeats := Mux(io.req.bits.hasData, refillCycles.U, 1.U)
@@ -81,14 +94,15 @@ class WritebackEntry(id: Int)(
     remainBeats := remainBeats - 1.U
   }
 
-  val releaseAddr = req.lineAddr << blockOffBits
+  // * Organize C Channel Messages Begin
+  val releaseAddr = reqReg.lineAddr << blockOffBits
 
   // probe ack response
   val probeAck = edge.ProbeAck(
     fromSource = id.U,
     toAddress = releaseAddr,
     lgSize = log2Ceil(blockBytes).U,
-    reportPermissions = req.perm,
+    reportPermissions = reqReg.perm,
   )
 
   // probe ack with data
@@ -96,7 +110,7 @@ class WritebackEntry(id: Int)(
     fromSource = id.U,
     toAddress = releaseAddr,
     lgSize = log2Ceil(blockBytes).U,
-    reportPermissions = req.perm,
+    reportPermissions = reqReg.perm,
     data = curBeatData,
   )
 
@@ -105,7 +119,7 @@ class WritebackEntry(id: Int)(
     fromSource = id.U,
     toAddress = releaseAddr,
     lgSize = log2Ceil(blockBytes).U,
-    shrinkPermissions = req.perm,
+    shrinkPermissions = reqReg.perm,
   )._2
 
   // voluntary release with data
@@ -113,23 +127,26 @@ class WritebackEntry(id: Int)(
     fromSource = id.U,
     toAddress = releaseAddr,
     lgSize = log2Ceil(blockBytes).U,
-    shrinkPermissions = req.perm,
+    shrinkPermissions = reqReg.perm,
     data = curBeatData,
   )._2
+  // * Organize TL-Channel C Messages End
 
-  io.release.valid := (state === s_release_req) // TODO
+  // release
+  io.release.valid := (state === s_release_req)
   io.release.bits := Mux(
-    req.voluntary,
-    Mux(req.hasData, releaseData, release),
-    Mux(req.hasData, probeAckData, probeAck),
+    reqReg.voluntary,
+    Mux(reqReg.hasData, releaseData, release),
+    Mux(reqReg.hasData, probeAckData, probeAck),
   )
 
-  io.wbFinish := ((state === s_release_resp) && io.grant.fire) ||
-    (state === s_release_req && allBeatDone && !req.hasData)
+  // writeback finish
+  io.wbFinish := (state =/= s_invalid) && (nextState === s_invalid)
 
   // cache miss & addr is in wbq -> block the miss req
-  io.missCheck.blockMiss := io.missCheck.valid && (state =/= s_invalid) &&
-    (io.missCheck.lineAddr === req.lineAddr)
+  io.missCheck.blockMiss := io.missCheck.valid &&
+    (state =/= s_invalid) &&
+    (io.missCheck.lineAddr === reqReg.lineAddr)
 
   io.req.ready   := (state === s_invalid)
   io.grant.ready := (state === s_release_resp)
@@ -152,33 +169,31 @@ class WritebackQueue(
   val releasePtr = RegInit(0.U.asTypeOf(new WritebackQueuePtr))
   val deqPtr     = RegInit(0.U.asTypeOf(new WritebackQueuePtr))
 
-  val blockMissVec = Wire(Vec(nWBQEntries, Bool()))
-
   val wbqEntries = (0 until nWBQEntries).map { i =>
     val entryId = nMSHRs + i
     val entry   = Module(new WritebackEntry(entryId)(edge, p))
 
+    // req
+    entry.io.req.valid := io.req.valid && (enqPtr.value === i.U)
+    entry.io.req.bits  := io.req.bits
+
+    // miss check
     entry.io.missCheck.valid    := io.missCheck.valid
     entry.io.missCheck.lineAddr := io.missCheck.lineAddr
-    entry.io.grant.valid        := (io.grant.valid && io.grant.bits.source === entryId.U)
-    entry.io.grant.bits         := io.grant.bits
 
-    blockMissVec(i) := entry.io.missCheck.blockMiss
+    // tl-d grant
+    entry.io.grant.valid := (io.grant.valid && io.grant.bits.source === entryId.U)
+    entry.io.grant.bits  := io.grant.bits
 
     entry
   }
 
-  // update enqPtr
-  wbqEntries.zipWithIndex.foreach { case (entry, i) =>
-    entry.io.req.valid := io.req.valid && (enqPtr.value === i.U)
-    entry.io.req.bits  := io.req.bits
-  }
-
+  // enq
   when(io.req.fire) {
     enqPtr := enqPtr + 1.U
   }
 
-  // update releasePtr
+  // release
   val releaseSources = VecInit(wbqEntries.map(_.io.release))
   releaseSources.zipWithIndex.foreach { case (source, i) =>
     source.ready := (releasePtr.value === i.U) && io.release.ready
@@ -191,15 +206,20 @@ class WritebackQueue(
     releasePtr := releasePtr + 1.U
   }
 
-  // update deqPtr
+  // tl-d grant
+  val grantReadySources = VecInit(wbqEntries.map(_.io.grant.ready))
+  io.grant.ready := grantReadySources(deqPtr.value)
+
+  // wb finish
   val wbFinishSources = VecInit(wbqEntries.map(_.io.wbFinish))
 
   when(wbFinishSources(deqPtr.value)) {
     deqPtr := deqPtr + 1.U
   }
 
+  // miss check
+  val blockMissVec = VecInit(wbqEntries.map(_.io.missCheck.blockMiss))
   io.missCheck.blockMiss := blockMissVec.reduce(_ || _)
 
-  io.grant.ready := true.B
-  io.req.ready   := !isFull(enqPtr, deqPtr)
+  io.req.ready := !isFull(enqPtr, deqPtr)
 }
