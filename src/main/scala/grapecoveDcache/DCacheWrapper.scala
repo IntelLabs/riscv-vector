@@ -13,7 +13,7 @@ class DCacheWrapper()(
 
   val dcacheClient = LazyModule(new GPCDCache()(p))
 
-  val ram  = LazyModule(new TLRAM(AddressSet(0x80000000L, 0x7fffffffL), beatBytes = beatBytes))
+  val ram  = LazyModule(new TLRAM(AddressSet(0x80000000L, 0x7fffffffL), beatBytes = beatBytes, atomics = true))
   val mmio = LazyModule(new TLRAM(AddressSet(0x60000000L, 0x1fffffffL), beatBytes = beatBytes, atomics = true))
 
   val xbar = TLXbar()
