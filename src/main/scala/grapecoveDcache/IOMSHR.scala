@@ -82,7 +82,7 @@ class IOMSHRFile(
   senderQueue.io.enq.valid := senderQueue.io.enq.ready && io.req.valid
   senderQueue.io.enq.bits  := OHToUInt(allocList.asUInt)
 
-  val a_source = senderQueue.io.deq.bits + (nMSHRs + nWBQEntries).asUInt
+  val a_source = senderQueue.io.deq.bits + firstMMIO.U
   val a_addr   = reqList(senderQueue.io.deq.bits).paddr
   val a_size   = reqList(senderQueue.io.deq.bits).size
   val a_data   = reqList(senderQueue.io.deq.bits).wdata
@@ -116,7 +116,7 @@ class IOMSHRFile(
   )
 
   // refill req
-  val respIOMSHRIdx = io.fromRefill.bits.entryId - (nMSHRs + nWBQEntries).asUInt
+  val respIOMSHRIdx = io.fromRefill.bits.entryId - firstMMIO.U
   val refillData    = RegEnable(io.fromRefill.bits.data, 0.U, state === mode_idle && io.fromRefill.valid)
 
   io.resp.valid        := state === mode_replay
