@@ -108,7 +108,6 @@ class VIllegalInstrn extends Module {
 
   val convertToInt = vfncvt_xu_f || vfncvt_x_f || vfncvt_rtz_xu_f || vfncvt_rtz_x_f // || vfncvt_f_xu || vfncvt_f_x
 
-
   val ill_frm = csr.frm(2) && csr.frm(1, 0) =/= 0.U && isFp
   // invalid SEW of FP
   val ill_sewFP = (vsew === 0.U && (isFp)) || (vsew === 1.U && (isFp && ~convertToInt && ~vfwcvt_f_x))
@@ -119,8 +118,8 @@ class VIllegalInstrn extends Module {
     vemul === 2.U && startReg(1, 0) =/= 0.U ||
     vemul === 3.U && startReg(2, 0) =/= 0.U
   }
-  val ill_reg = regGroup_start_illegal(vemulVd, ldest) && (ctrl.ldestVal || ctrl.lsrcVal(2)) ||
-                regGroup_start_illegal(vemulVs1, lsrc(0)) && ctrl.lsrcVal(0) ||
+  val ill_reg = regGroup_start_illegal(vemulVd, ldest) && (ctrl.ldestVal || ctrl.lsrcVal(2)) && ~ctrl.redu ||
+                regGroup_start_illegal(vemulVs1, lsrc(0)) && ctrl.lsrcVal(0) && ~ctrl.redu ||
                 regGroup_start_illegal(vemulVs2, lsrc(1)) && ctrl.lsrcVal(1)
  
   /** Register Group Overlap
@@ -153,12 +152,11 @@ class VIllegalInstrn extends Module {
   }
   // illegal overlap = vd/vs1_overlap || vd/vs2_overlap || vd/vmask_overlap
   val ill_regOverlap_1 = overlap(vs1, vs1End, ctrl.lsrcVal(0), vd, vdEnd, ctrl.ldestVal) &&
-                        !overlap_isLegal(vs1, vs1End, veewVs1, vemulVs1, vd, vdEnd, veewVd)
+                        (!overlap_isLegal(vs1, vs1End, veewVs1, vemulVs1, vd, vdEnd, veewVd) || vrgather || viota)
   val ill_regOverlap_2 = overlap(vs2, vs2End, ctrl.lsrcVal(1), vd, vdEnd, ctrl.ldestVal) &&
-                        !overlap_isLegal(vs2, vs2End, veewVs2, vemulVs2, vd, vdEnd, veewVd)
-  val ill_regOverlap_m = overlap(0.U, 0.U, !ctrl.vm, vd, vdEnd, ctrl.ldestVal) &&
-                        !overlap_isLegal(0.U, 0.U, 7.U, 0.U, vd, vdEnd, veewVd)
-  val ill_regOverlap = ill_regOverlap_1 || ill_regOverlap_2 || ill_regOverlap_m
+                        (!overlap_isLegal(vs2, vs2End, veewVs2, vemulVs2, vd, vdEnd, veewVd) || vrgather || viota)
+  val ill_regOverlap_m = vd === 0.U && !ctrl.vm && ~mask_onlyOneReg && ~alu_mask && ~ctrl.narrow_to_1
+  val ill_regOverlap = (ill_regOverlap_1 || ill_regOverlap_2 || ill_regOverlap_m) && ~ctrl.redu
 
   // Segment: for indexed segment, vd reg-group cannot overlap vs2 reg-group
   val ill_segOverlap = ctrl.load && ldstCtrl.segment && ldstCtrl.indexed && overlap(vs2, vs2End, ctrl.lsrcVal(1), vd, vdEnd_seg(5, 0), ctrl.ldestVal)

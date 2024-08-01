@@ -390,7 +390,7 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.scoreBoardReadIO.readNum1     := emulVs1
     io.scoreBoardReadIO.readNum2     := emulVs2 
 
-    when(!vs1ReadEn){
+    when(!vs1ReadEn || vs1Idx === ctrl.ldest + ldest_inc){
         hasRegConf(0) := false.B
     }.elsewhen(ctrl.perm){
         hasRegConf(0) := io.scoreBoardReadIO.readBypassed1N
