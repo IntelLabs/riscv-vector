@@ -28,6 +28,7 @@ class RefillQueueWrapper(
     io.memGrant.bits.opcode === TLMessages.GrantData || io.memGrant.bits.opcode === TLMessages.AccessAckData,
     io.memGrant.fire,
   )
+  val permReg   = RegEnable(io.memGrant.bits.param, io.memGrant.fire)
   val sourceReg = RegEnable(io.memGrant.bits.source, io.memGrant.fire)
 
   val allBeatDone = edge.last(io.memGrant) && io.memGrant.fire
@@ -56,6 +57,7 @@ class RefillQueueWrapper(
 
   refillQueue.io.memRefill.valid           := (state === s_send_refill)
   refillQueue.io.memRefill.bits.hasData    := hasDataReg
+  refillQueue.io.memRefill.bits.perm       := permReg
   refillQueue.io.memRefill.bits.data       := dataReg.asUInt
   refillQueue.io.memRefill.bits.entryId    := sourceReg
   refillQueue.io.memRefill.bits.probeMatch := DontCare
@@ -89,14 +91,18 @@ class RefillQueue extends Module {
     val refillResp = DecoupledIO(new RefillMSHRFile)
   })
 
-  val dataIdxQueue = Module(new SearchableQueue(UInt(log2Up(nMSHRs + nWBQEntries + nMMIOs).W), nRefillQDataEntries))
-  val dataQueue    = Module(new Queue(UInt(blockBits.W), nRefillQDataEntries))
+  val dataIdxQueue  = Module(new SearchableQueue(UInt(log2Up(nMSHRs + nWBQEntries + nMMIOs).W), nRefillQDataEntries))
+  val dataPermQueue = Module(new Queue(UInt(TLPermissions.bdWidth.W), nRefillQDataEntries))
+  val dataQueue     = Module(new Queue(UInt(blockBits.W), nRefillQDataEntries))
 
   val permQueue = Module(new SearchableQueue(UInt(log2Up(nMSHRs + nWBQEntries + nMMIOs).W), nRefillQPermEntries))
 
   // enq
   dataIdxQueue.io.enq.valid := io.memRefill.valid && io.memRefill.bits.hasData
   dataIdxQueue.io.enq.bits  := io.memRefill.bits.entryId
+
+  dataPermQueue.io.enq.valid := io.memRefill.valid && io.memRefill.bits.hasData
+  dataPermQueue.io.enq.bits  := io.memRefill.bits.perm
 
   dataQueue.io.enq.valid := io.memRefill.valid && io.memRefill.bits.hasData
   dataQueue.io.enq.bits  := io.memRefill.bits.data
@@ -112,14 +118,16 @@ class RefillQueue extends Module {
   queueArb.io.in(1) <> dataIdxQueue.io.deq
   queueArb.io.out.ready := io.refillResp.ready
 
-  permQueue.io.deq.ready    := queueArb.io.in(0).ready
-  dataIdxQueue.io.deq.ready := queueArb.io.in(1).ready
-  dataQueue.io.deq.ready    := queueArb.io.in(1).ready
+  permQueue.io.deq.ready     := queueArb.io.in(0).ready
+  dataIdxQueue.io.deq.ready  := queueArb.io.in(1).ready
+  dataQueue.io.deq.ready     := queueArb.io.in(1).ready
+  dataPermQueue.io.deq.ready := queueArb.io.in(1).ready
 
   io.refillResp.valid        := queueArb.io.out.valid
   io.refillResp.bits.entryId := queueArb.io.out.bits
   io.refillResp.bits.data    := dataQueue.io.deq.bits
-  io.refillResp.bits.hasData := DontCare
+  io.refillResp.bits.hasData := queueArb.io.in(1).ready
+  io.refillResp.bits.perm    := Mux(queueArb.io.in(1).ready, dataPermQueue.io.deq.bits, TLPermissions.toT)
 
   // probe search
   dataIdxQueue.io.searchIdx     := io.probeCheck.bits.entryId

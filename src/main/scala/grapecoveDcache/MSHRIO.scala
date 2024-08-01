@@ -9,7 +9,7 @@ import freechips.rocketchip.tilelink._
 class MSHREntryIO extends Bundle() {
   val reqValid    = Input(Bool())
   val req         = Input(MSHRReqType())
-  val reqType     = Input(UInt(mshrType.W))
+  val reqCmd      = Input(UInt(M_SZ.W))
   val reqLineAddr = Input(UInt(lineAddrWidth.W))
   val isUpgrade   = Input(Bool()) // for BtoT
 
@@ -49,7 +49,7 @@ class MSHRReplace extends Bundle() {
 }
 
 class MSHRInner extends Bundle() {
-  val perm     = UInt(TLPermissions.aWidth.W)
+  val perm     = UInt(TLPermissions.bdWidth.W)
   val lineAddr = UInt(lineAddrWidth.W)
 
   val meta = new ReqMetaBundle() // current tick read meta array
@@ -82,7 +82,7 @@ class MetaBundle extends Bundle() {
 }
 
 class ReqMetaBundle extends MetaBundle() {
-  val rwType = UInt(1.W)
+  val cmd = UInt(M_SZ.W)
 }
 
 class CachepipeMSHRFile extends Bundle() {
@@ -101,6 +101,7 @@ class MSHRFileL2 extends Bundle() {
 
 class RefillMSHRFile extends Bundle() {
   val entryId = UInt(log2Up(nMSHRs + nWBQEntries + nMMIOs).W)
+  val perm    = UInt(TLPermissions.bdWidth.W)
   val data    = UInt(blockBits.W)
   val hasData = Bool()
 

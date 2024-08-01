@@ -39,7 +39,7 @@ class MSHRWrapper(
   mshrs.io.pipelineReq.bits.lineAddr      := AddrDecoder.getLineAddr(io.req.bits.paddr)
   mshrs.io.pipelineReq.bits.meta.sourceId := io.req.bits.source
   mshrs.io.pipelineReq.bits.meta.offset   := AddrDecoder.getBlockOffset(io.req.bits.paddr)
-  mshrs.io.pipelineReq.bits.meta.rwType   := isWrite(io.req.bits.cmd)
+  mshrs.io.pipelineReq.bits.meta.cmd      := io.req.bits.cmd
   mshrs.io.pipelineReq.bits.meta.regIdx   := io.req.bits.dest
   mshrs.io.pipelineReq.bits.meta.size     := io.req.bits.size
   mshrs.io.pipelineReq.bits.meta.signed   := io.req.bits.signed
