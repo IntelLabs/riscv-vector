@@ -53,7 +53,7 @@ class IOMSHRFile(
 
   val allocArb = Module(new Arbiter(Bool(), nMMIOs))
   allocArb.io.in.foreach(_.bits := DontCare)
-  allocArb.io.out.ready := !senderQueue.io.enq.ready && io.req.valid
+  allocArb.io.out.ready := senderQueue.io.enq.ready && io.req.valid
 
   val replayFinishList = Wire(Vec(nMMIOs, Bool()))
   val reqList          = Wire(Vec(nMMIOs, new MainPipeReq))
@@ -79,7 +79,7 @@ class IOMSHRFile(
   io.req.ready := allocArb.io.out.valid
 
   // set sender enq/deq info
-  senderQueue.io.enq.valid := !senderQueue.io.enq.ready && io.req.valid
+  senderQueue.io.enq.valid := senderQueue.io.enq.ready && io.req.valid
   senderQueue.io.enq.bits  := OHToUInt(allocList.asUInt)
 
   val a_source = senderQueue.io.deq.bits + (nMSHRs + nWBQEntries).asUInt
@@ -104,7 +104,7 @@ class IOMSHRFile(
       M_XA_MAXU -> edge.Arithmetic(a_source, a_addr, a_size, a_data, TLAtomics.MAXU)._2,
     )
   )
-  val bypassLoad  = edge.AcquireBlock(a_source, a_addr, a_size, TLPermissions.NtoB)._2
+  val bypassLoad  = edge.Get(a_source, a_addr, a_size)._2
   val bypassStore = edge.Put(a_source, a_addr, a_size, a_data, a_mask)._2
 
   io.l2Req.valid           := senderQueue.io.deq.valid
@@ -117,7 +117,7 @@ class IOMSHRFile(
 
   // refill req
   val respIOMSHRIdx = io.fromRefill.bits.entryId - (nMSHRs + nWBQEntries).asUInt
-  val refillData    = RegEnable(io.resp.bits.data, 0.U, state === mode_idle && io.fromRefill.valid)
+  val refillData    = RegEnable(io.fromRefill.bits.data, 0.U, state === mode_idle && io.fromRefill.valid)
 
   io.resp.valid        := state === mode_replay
   io.resp.bits.hasData := true.B

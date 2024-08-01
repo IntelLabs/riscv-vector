@@ -23,9 +23,12 @@ class RefillQueueWrapper(
 
   val state = RegInit(s_receive_grant)
 
-  val dataReg    = RegInit(VecInit(Seq.fill(refillCycles)(0.U(beatBits.W))))
-  val hasDataReg = RegEnable(io.memGrant.bits.opcode =/= TLMessages.Grant, io.memGrant.fire)
-  val sourceReg  = RegEnable(io.memGrant.bits.source, io.memGrant.fire)
+  val dataReg = RegInit(VecInit(Seq.fill(refillCycles)(0.U(beatBits.W))))
+  val hasDataReg = RegEnable(
+    io.memGrant.bits.opcode === TLMessages.GrantData || io.memGrant.bits.opcode === TLMessages.AccessAckData,
+    io.memGrant.fire,
+  )
+  val sourceReg = RegEnable(io.memGrant.bits.source, io.memGrant.fire)
 
   val allBeatDone = edge.last(io.memGrant) && io.memGrant.fire
   val counter     = RegInit(0.U(log2Up(refillCycles).W))
@@ -44,7 +47,9 @@ class RefillQueueWrapper(
     }
   }
 
-  when(io.memGrant.fire && io.memGrant.bits.opcode === TLMessages.GrantData) {
+  when(
+    io.memGrant.fire && (io.memGrant.bits.opcode === TLMessages.GrantData || io.memGrant.bits.opcode === TLMessages.AccessAckData)
+  ) {
     counter          := Mux(counter + 1.U >= refillCycles.asUInt, 0.U, counter + 1.U)
     dataReg(counter) := io.memGrant.bits.data
   }
@@ -60,8 +65,9 @@ class RefillQueueWrapper(
 
   val grantAckQueue = Module(new Queue(new TLBundleE(edge.bundle), 1))
 
-  grantAckQueue.io.enq.valid := ((state === s_receive_grant) & allBeatDone)
-  grantAckQueue.io.enq.bits  := edge.GrantAck(io.memGrant.bits)
+  grantAckQueue.io.enq.valid := ((state === s_receive_grant) & allBeatDone) &&
+    (io.memGrant.bits.opcode === TLMessages.GrantData || io.memGrant.bits.opcode === TLMessages.Grant)
+  grantAckQueue.io.enq.bits := edge.GrantAck(io.memGrant.bits)
 
   io.memFinish <> grantAckQueue.io.deq
 
@@ -70,7 +76,9 @@ class RefillQueueWrapper(
   assert(
     !(io.memGrant.fire &&
       io.memGrant.bits.opcode =/= TLMessages.GrantData &&
-      io.memGrant.bits.opcode =/= TLMessages.Grant)
+      io.memGrant.bits.opcode =/= TLMessages.Grant &&
+      io.memGrant.bits.opcode =/= TLMessages.AccessAckData &&
+      io.memGrant.bits.opcode =/= TLMessages.AccessAck)
   )
 }
 
@@ -81,10 +89,10 @@ class RefillQueue extends Module {
     val refillResp = DecoupledIO(new RefillMSHRFile)
   })
 
-  val dataIdxQueue = Module(new SearchableQueue(UInt(log2Up(nMSHRs).W), nRefillQDataEntries))
+  val dataIdxQueue = Module(new SearchableQueue(UInt(log2Up(nMSHRs + nWBQEntries + nMMIOs).W), nRefillQDataEntries))
   val dataQueue    = Module(new Queue(UInt(blockBits.W), nRefillQDataEntries))
 
-  val permQueue = Module(new SearchableQueue(UInt(log2Up(nMSHRs).W), nRefillQPermEntries))
+  val permQueue = Module(new SearchableQueue(UInt(log2Up(nMSHRs + nWBQEntries + nMMIOs).W), nRefillQPermEntries))
 
   // enq
   dataIdxQueue.io.enq.valid := io.memRefill.valid && io.memRefill.bits.hasData
@@ -99,7 +107,7 @@ class RefillQueue extends Module {
   io.memRefill.ready := dataQueue.io.enq.ready && permQueue.io.enq.ready
 
   // deq arb
-  val queueArb = Module(new Arbiter(UInt(log2Up(nMSHRs).W), 2))
+  val queueArb = Module(new Arbiter(UInt(log2Up(nMSHRs + nWBQEntries + nMMIOs).W), 2))
   queueArb.io.in(0) <> permQueue.io.deq
   queueArb.io.in(1) <> dataIdxQueue.io.deq
   queueArb.io.out.ready := io.refillResp.ready

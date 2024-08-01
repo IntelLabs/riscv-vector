@@ -393,16 +393,14 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_mshrStoreData        = Mux(s1_upgradePermMiss, s1_mergeStoreData, s1_req.wdata)
   val s1_mshrStoreMaskInBytes = Mux(s1_upgradePermMiss, Fill(dataBytes, 1.U), s1_maskInBytes)
 
-  val mshrReq = s1_req
-//  mshrReq.wdata := s1_mshrStoreData
-//  mshrReq.wmask := s1_mshrStoreMaskInBytes
+  val mshrReq = WireDefault(s1_req)
+  mshrReq.wdata := s1_mshrStoreData
+  mshrReq.wmask := s1_mshrStoreMaskInBytes
 
-  mshrs.io.req.valid      := s1_mshrAlloc
-  mshrs.io.req.bits       := mshrReq
-  mshrs.io.req.bits.wdata := s1_mshrStoreData
-  mshrs.io.req.bits.wmask := s1_mshrStoreMaskInBytes
-  mshrs.io.isUpgrade      := s1_upgradePermMiss
-  mshrs.io.cacheable      := s1_cacheable
+  mshrs.io.req.valid := s1_mshrAlloc
+  mshrs.io.req.bits  := mshrReq
+  mshrs.io.isUpgrade := s1_upgradePermMiss
+  mshrs.io.cacheable := s1_cacheable
 
   // mshr acquire block or perm from L2
   tlBus.a <> mshrs.io.l2Req
@@ -525,7 +523,8 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   tlBus.d.ready := false.B
   when(tlBus.d.bits.opcode === TLMessages.ReleaseAck) {
     tlBus.d <> wbQueue.io.grant
-  }.elsewhen(tlBus.d.bits.opcode === TLMessages.Grant || tlBus.d.bits.opcode === TLMessages.GrantData) {
+  }.elsewhen(tlBus.d.bits.opcode === TLMessages.Grant || tlBus.d.bits.opcode === TLMessages.GrantData ||
+    tlBus.d.bits.opcode === TLMessages.AccessAckData || tlBus.d.bits.opcode === TLMessages.AccessAck) {
     tlBus.d <> refillQueue.io.memGrant
   }.otherwise {
     assert(!tlBus.d.fire)
