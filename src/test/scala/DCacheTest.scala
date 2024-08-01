@@ -142,7 +142,10 @@ trait DCacheTestTrait {
 
         // read miss after replace
         dut.io.req.valid.poke(true.B)
-        dut.io.req.bits.poke(genReq(cacheReadReq.copy(paddr = "h80004000")))
+        dut.io.req.bits.poke(genReq(cacheReadReq.copy(
+          paddr = "h80004000",
+          size = 0,
+        )))
 
         dut.clock.step(1)
         dut.io.req.valid.poke(false.B)
@@ -156,7 +159,7 @@ trait DCacheTestTrait {
         }
         dut.io.resp.valid.expect(true.B)
         dut.io.resp.bits.status.expect(CacheRespStatus.refill)
-        dut.io.resp.bits.data.expect("h23232323".U)
+        dut.io.resp.bits.data.expect("h23".U)
         dut.io.resp.bits.dest.expect(16.U)
         dut.clock.step(10)
 
