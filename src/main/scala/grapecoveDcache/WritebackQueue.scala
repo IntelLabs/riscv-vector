@@ -169,7 +169,7 @@ class WritebackQueue(
   val deqPtr = RegInit(0.U.asTypeOf(new WritebackQueuePtr))
 
   val wbqEntries = (0 until nWBQEntries).map { i =>
-    val entryId = nMSHRs + i
+    val entryId = firstWBQ + i
     val entry   = Module(new WritebackEntry(entryId)(edge, p))
 
     // req

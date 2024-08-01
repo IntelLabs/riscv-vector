@@ -514,7 +514,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // it will send nextCycleWb to kill other cache request
   assert(
     ~(s1_cacheResp.valid && mshrsResp.valid),
-    "MSHR & Cache Resp cannot exists simultaneously",
+    "MSHR & Cache Resp cannot exist simultaneously",
   )
 
   // * Resp End
@@ -523,11 +523,9 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   tlBus.d.ready := false.B
   when(tlBus.d.bits.opcode === TLMessages.ReleaseAck) {
     tlBus.d <> wbQueue.io.grant
-  }.elsewhen(tlBus.d.bits.opcode === TLMessages.Grant || tlBus.d.bits.opcode === TLMessages.GrantData ||
-    tlBus.d.bits.opcode === TLMessages.AccessAckData || tlBus.d.bits.opcode === TLMessages.AccessAck) {
-    tlBus.d <> refillQueue.io.memGrant
   }.otherwise {
-    assert(!tlBus.d.fire)
+    tlBus.d <> refillQueue.io.memGrant
   }
+
   dontTouch(tlBus)
 }

@@ -48,9 +48,7 @@ class RefillQueueWrapper(
     }
   }
 
-  when(
-    io.memGrant.fire && (io.memGrant.bits.opcode === TLMessages.GrantData || io.memGrant.bits.opcode === TLMessages.AccessAckData)
-  ) {
+  when(io.memGrant.fire && edge.hasData(io.memGrant.bits)) {
     counter          := Mux(counter + 1.U >= refillCycles.asUInt, 0.U, counter + 1.U)
     dataReg(counter) := io.memGrant.bits.data
   }
@@ -68,7 +66,8 @@ class RefillQueueWrapper(
   val grantAckQueue = Module(new Queue(new TLBundleE(edge.bundle), 1))
 
   grantAckQueue.io.enq.valid := ((state === s_receive_grant) & allBeatDone) &&
-    (io.memGrant.bits.opcode === TLMessages.GrantData || io.memGrant.bits.opcode === TLMessages.Grant)
+    (io.memGrant.bits.opcode === TLMessages.GrantData ||
+      io.memGrant.bits.opcode === TLMessages.Grant)
   grantAckQueue.io.enq.bits := edge.GrantAck(io.memGrant.bits)
 
   io.memFinish <> grantAckQueue.io.deq
@@ -77,10 +76,8 @@ class RefillQueueWrapper(
 
   assert(
     !(io.memGrant.fire &&
-      io.memGrant.bits.opcode =/= TLMessages.GrantData &&
-      io.memGrant.bits.opcode =/= TLMessages.Grant &&
-      io.memGrant.bits.opcode =/= TLMessages.AccessAckData &&
-      io.memGrant.bits.opcode =/= TLMessages.AccessAck)
+      io.memGrant.bits.opcode === TLMessages.ReleaseAck),
+    "ReleaseAck should not be sent to refill queue",
   )
 }
 

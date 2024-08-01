@@ -22,6 +22,10 @@ trait DCacheParams {
   val beatBytes           = 64
 
   // calculate
+  val firstMSHR = 0
+  val firstWBQ  = firstMSHR + nMSHRs
+  val firstMMIO = firstWBQ + nWBQEntries
+
   val rowBits      = rowBytes * 8
   val blockBits    = blockBytes * 8
   val beatBits     = beatBytes * 8

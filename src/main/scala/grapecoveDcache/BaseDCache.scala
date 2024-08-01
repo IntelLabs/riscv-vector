@@ -18,7 +18,7 @@ class BaseDCache()(
 
   protected def mmioClientParameters = Seq(TLMasterParameters.v1(
     name = "Dcache MMIO",
-    sourceId = IdRange(nMSHRs + nWBQEntries, nMSHRs + nWBQEntries + nMMIOs),
+    sourceId = IdRange(firstMMIO, firstMMIO + nMMIOs),
     requestFifo = true,
   ))
 
