@@ -90,7 +90,7 @@ class IOMSHRFile(
   val a_cmd    = reqList(senderQueue.io.deq.bits).cmd
 
   val get = edge.Get(a_source, a_addr, a_size)._2
-  val put = edge.Put(a_source, a_addr, a_size, a_data)._2
+  val put = edge.Put(a_source, a_addr, a_size, a_data, a_mask)._2
   val atomic = MuxLookup(a_cmd, 0.U.asTypeOf(new TLBundleA(edge.bundle)))(
     Seq(
       M_XA_SWAP -> edge.Logical(a_source, a_addr, a_size, a_data, TLAtomics.SWAP)._2,
@@ -116,8 +116,9 @@ class IOMSHRFile(
   )
 
   // refill req
-  val respIOMSHRIdx = io.fromRefill.bits.entryId - firstMMIO.U
-  val refillData    = RegEnable(io.fromRefill.bits.data, 0.U, state === mode_idle && io.fromRefill.valid)
+  val respIOMSHRIdx =
+    RegEnable(io.fromRefill.bits.entryId - firstMMIO.U, 0.U, state === mode_idle && io.fromRefill.valid)
+  val refillData = RegEnable(io.fromRefill.bits.data, 0.U, state === mode_idle && io.fromRefill.valid)
 
   io.resp.valid        := state === mode_replay
   io.resp.bits.hasData := true.B
@@ -128,7 +129,11 @@ class IOMSHRFile(
 
   io.fromRefill.ready := state === mode_idle
 
-  replayFinishList := VecInit(UIntToOH(Mux(io.resp.fire, respIOMSHRIdx, 0.U)))
+  replayFinishList := Mux(
+    io.resp.fire,
+    UIntToOH(respIOMSHRIdx),
+    Mux(io.l2Req.fire && isWrite(a_cmd) && !isAMO(a_cmd), UIntToOH(senderQueue.io.deq.bits), 0.U),
+  ).asTypeOf(replayFinishList)
 
   state := MuxLookup(state, state)(
     Seq(
