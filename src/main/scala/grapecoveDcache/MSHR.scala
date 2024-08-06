@@ -66,11 +66,13 @@ class MSHR(id: Int) extends Module() {
   io.isEmpty  := state === mode_idle
 
   /////////////// refill state flag & io
-  io.metaCounter := Mux(
+  io.writeCounter := Mux(
     sentPermission =/= TLPermissions.NtoB && allocateReq && isWrite(io.reqCmd),
     metaCounter - 1.U,
     metaCounter,
   )
+
+  io.replayCounter := metaCounter
 
   // if already has write req, metaCounter won't change
   when(state === mode_clear) {
@@ -141,8 +143,12 @@ class ReplayModule extends Module() {
 
   val metaCounter = RegInit(0.U(log2Up(nMSHRMetas).W))
 
-  val initEnable     = io.innerIO.fire
-  val mshrEntryIdx   = RegEnable(io.innerIO.bits.entryIdx, 0.U(log2Up(nMSHRs).W), initEnable)
+  val initEnable = io.innerIO.fire
+  val mshrEntryIdx = RegEnable(
+    Mux(state === mode_clear, 0.U, io.innerIO.bits.entryIdx),
+    0.U(log2Up(nMSHRs).W),
+    initEnable | state === mode_clear,
+  )
   val totalCounter   = RegEnable(io.innerIO.bits.counter, 0.U(log2Up(nMSHRMetas).W), initEnable)
   val replayLineAddr = RegEnable(io.innerIO.bits.lineAddr, 0.U(lineAddrWidth.W), initEnable)
   val replayPerm     = RegEnable(io.innerIO.bits.perm, TLPermissions.toB, initEnable)
@@ -213,7 +219,7 @@ class ReplayModule extends Module() {
   // inner connect
   io.innerIO.ready := state === mode_idle
   io.idxMeta       := metaCounter
-  io.replayIdx     := Mux(state === mode_idle, io.innerIO.bits.entryIdx, mshrEntryIdx)
+  io.replayIdx     := mshrEntryIdx
 
   // replace signal connect
   io.toReplace.valid := state === mode_send_replace
@@ -320,7 +326,8 @@ class MSHRFile extends Module() {
   // interface for probe
   val probeStateList = Wire(Vec(nMSHRs, UInt(ProbeMSHRState.width.W)))
   val probeState     = probeStateList.reduce(_ | _)
-  io.probeCheck.replaceFinish := io.replaceStatus === ReplaceStatus.replace_finish
+  io.probeCheck.replaceFinish := io.replaceStatus === ReplaceStatus.replace_finish &&
+    io.probeCheck.lineAddr === replayReg.io.toReplace.bits.lineAddr
 
   io.probeRefill.valid        := io.probeCheck.valid
   io.probeRefill.bits.entryId := lineAddrMatchIdx
@@ -329,7 +336,8 @@ class MSHRFile extends Module() {
   io.probeCheck.hit := probeReq && lineAddrMatch
 
   // interface for replay
-  val metaCounterList = Wire(Vec(nMSHRs, UInt(log2Up(nMSHRMetas).W)))
+  val writeCounterList  = Wire(Vec(nMSHRs, UInt(log2Up(nMSHRMetas).W)))
+  val replayCounterList = Wire(Vec(nMSHRs, UInt(log2Up(nMSHRMetas).W)))
 
   val replayFinishRespList = Wire(Vec(nMSHRs, Bool()))
 
@@ -372,7 +380,8 @@ class MSHRFile extends Module() {
       mshr.io.probePermission := io.probeCheck.probePermission
 
       // replay & refill signal
-      metaCounterList(i) := mshr.io.metaCounter
+      writeCounterList(i)  := mshr.io.writeCounter
+      replayCounterList(i) := mshr.io.replayCounter
 
       mshr.io.replayFinish := replayFinishRespList(i)
 
@@ -399,7 +408,7 @@ class MSHRFile extends Module() {
   }
 
   val wrIdx        = Mux(lineAddrMatch, lineAddrMatchIdx, allocateIdx)
-  val metaWriteIdx = metaCounterList(wrIdx)
+  val metaWriteIdx = writeCounterList(wrIdx)
 
   when(io.pipelineReq.fire) {
     // read/write => update meta info
@@ -456,7 +465,7 @@ class MSHRFile extends Module() {
     ),
     dataArray(replayReg.io.replayIdx),
   )
-  replayReg.io.innerIO.bits.counter := metaCounterList(replayReg.io.replayIdx)
+  replayReg.io.innerIO.bits.counter := replayCounterList(replayReg.io.replayIdx)
 
   io.toPipeline <> replayReg.io.toPipe
   io.toReplace <> replayReg.io.toReplace

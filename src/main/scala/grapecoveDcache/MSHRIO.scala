@@ -17,7 +17,9 @@ class MSHREntryIO extends Bundle() {
 
   // replay & refill signals
   val replayFinish = Input(Bool())
-  val metaCounter  = Output(UInt(log2Up(nMSHRMetas).W))
+
+  val writeCounter  = Output(UInt(log2Up(nMSHRMetas).W))
+  val replayCounter = Output(UInt(log2Up(nMSHRMetas).W))
 
   // state flag for allocate
   val isEmpty  = Output(Bool())
