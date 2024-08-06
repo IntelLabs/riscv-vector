@@ -4,6 +4,9 @@ test_dcache:
 test_amo:
 	mill -i $(PRJ)[$(CHISEL_VERSION)].test.testOnly $(PRJ).DCacheAMOTest
 
+test_mmio:
+	mill -i $(PRJ)[$(CHISEL_VERSION)].test.testOnly $(PRJ).DCacheMMIOTest
+
 test_forward:
 	mill -i $(PRJ)[$(CHISEL_VERSION)].test.testOnly $(PRJ).DCacheForwardTest
 

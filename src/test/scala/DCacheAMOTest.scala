@@ -245,7 +245,7 @@ trait DCacheAMOTestTrait {
 }
 
 class DCacheAMOTest extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with DCacheAMOTestTrait {
-  behavior of "DCache Test"
+  behavior of "DCache AMO Test"
 
   it should behave like cacheTest0() //
   it should behave like cacheTest1() //
