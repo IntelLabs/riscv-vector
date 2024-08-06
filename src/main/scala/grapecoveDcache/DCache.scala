@@ -274,8 +274,11 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // FIXME mask
   // data array store data
-  val s1_storeData =
-    Mux(s1_req.isRefill, s1_req.wdata, Mux(isAMO(s1_req.cmd), s1_amoStoreData, s1_mergeStoreData))
+  val s1_storeData = Mux(
+    s1_req.isRefill,
+    s1_req.wdata,
+    Mux(isAMO(s1_req.cmd), s1_amoStoreData, s1_mergeStoreData),
+  )
 
   val s1_newCoh = MuxCase(
     0.U,
@@ -386,7 +389,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   dontTouch(mshrs.io)
 
   // pipeline miss -> mshr
-  val s1_mshrAlloc     = s1_validFromCore && s1_cacheable && ~s1_hit && ~s1_scFail
+  val s1_mshrAlloc     = s1_validFromCore && ~s1_hit && ~s1_scFail
   val s1_mshrAllocFail = s1_mshrAlloc && !mshrs.io.req.ready
 
   // mshr store data
