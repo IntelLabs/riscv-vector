@@ -22,20 +22,38 @@ class ProbeQueue(
     val probeResp   = Input(ProbeRespStatus())                 // probe status in main pipeline
   })
 
-  val s_invalid :: s_pipe_req :: s_wait_resp :: Nil = Enum(3)
+  // * FSM Begin
+  val s_invalid :: s_check_mshr :: s_wait_mshr :: s_pipe_req :: s_wb_req :: s_wait_resp :: Nil = Enum(6)
 
   val state = RegInit(s_invalid)
 
   switch(state) {
     is(s_invalid) {
       when(io.memProbe.fire) {
+        state := s_check_mshr
+      }
+    }
+    is(s_check_mshr) {
+      when(io.probeCheck.hit && io.probeCheck.pass) { // can directly writeback
+        state := s_wb_req
+      }.elsewhen(io.probeCheck.hit && !io.probeCheck.pass) { // blocked by mask
+        state := s_wait_mshr
+      }.otherwise { // can directly send to main pipeline
+        state := s_pipe_req
+      }
+    }
+    is(s_wait_mshr) {
+      when(io.probeCheck.replaceFinish) {
         state := s_pipe_req
       }
     }
     is(s_pipe_req) {
       when(io.mainPipeReq.fire) {
         state := s_wait_resp
-      }.elsewhen(io.wbReq.fire) {
+      }
+    }
+    is(s_wb_req) {
+      when(io.wbReq.fire) {
         state := s_invalid
       }
     }
@@ -48,21 +66,23 @@ class ProbeQueue(
     }
   }
 
+  // * FSM End
+
   val probeReq = RegEnable(io.memProbe.bits, io.memProbe.fire)
 
   // check mshr addr
-  io.probeCheck.valid           := (state === s_pipe_req)
+  io.probeCheck.valid           := (state === s_check_mshr)
   io.probeCheck.lineAddr        := getLineAddr(probeReq.address)
   io.probeCheck.probePermission := probeReq.param
 
-  val issueValid = (state === s_pipe_req) && ~io.lrscAddr.valid
-
   // orgranize probe req sent to pipeline
-  io.mainPipeReq.valid := issueValid && (!io.probeCheck.hit && !io.probeCheck.pass)
-  io.mainPipeReq.bits  := MainPipeReqConverter(probeReq)
+  io.mainPipeReq.bits := MainPipeReqConverter(probeReq)
+  io.mainPipeReq.valid :=
+    (state === s_pipe_req) &&
+      (!io.lrscAddr.valid || io.lrscAddr.bits =/= getLineAddr(probeReq.address))
 
   // organize probe req sent to wb
-  io.wbReq.valid          := issueValid && io.probeCheck.pass
+  io.wbReq.valid          := (state === s_wb_req)
   io.wbReq.bits.voluntary := false.B
   io.wbReq.bits.lineAddr  := getLineAddr(probeReq.address)
   io.wbReq.bits.perm      := probeReq.param
