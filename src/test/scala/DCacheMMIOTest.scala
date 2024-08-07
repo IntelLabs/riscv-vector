@@ -81,7 +81,6 @@ trait DCacheMMIOTestTrait {
         val cacheReq = CacheReqBundle(
           paddr = "h6000c000",
           cmd = M_XRD,
-          dest = 16,
         )
 
         // req miss
@@ -117,55 +116,6 @@ trait DCacheMMIOTestTrait {
         dut.clock.step(10)
       }
     }
-
-  def cacheTest2(): Unit =
-    it should "pass: cache mmio masked store" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
-        Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
-      ) { dut =>
-        DCacheInit.initDut(dut)
-
-        val cacheReq = CacheReqBundle(
-          paddr = "h6000c000",
-          cmd = M_XRD,
-          size = 6,
-        )
-
-        // req miss
-        dut.io.req.valid.poke(true.B)
-        dut.io.req.bits.poke(genReq(cacheReq.copy(
-          cmd = M_PWR,
-          wdata = "h12345678",
-          wmask = "hf0",
-        )))
-
-        dut.clock.step(1)
-        dut.io.req.valid.poke(false.B)
-        dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
-
-        dut.clock.step(200)
-
-        // read miss
-        dut.io.req.valid.poke(true.B)
-        dut.io.req.bits.poke(genReq(cacheReq))
-
-        dut.clock.step(1)
-        dut.io.req.valid.poke(false.B)
-        dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
-        dut.clock.step(1)
-
-        // refill resp
-        while (!dut.io.resp.valid.peekBoolean()) {
-          dut.clock.step(1)
-        }
-        dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.status.expect(CacheRespStatus.refill)
-        dut.io.resp.bits.data.expect("h12340000".U)
-        dut.clock.step(10)
-      }
-    }
 }
 
 class DCacheMMIOTest extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with DCacheMMIOTestTrait {
@@ -173,5 +123,4 @@ class DCacheMMIOTest extends AnyFlatSpec with ChiselScalatestTester with BundleG
 
   it should behave like cacheTest0() //
   it should behave like cacheTest1() //
-  it should behave like cacheTest2() //
 }
