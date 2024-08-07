@@ -156,10 +156,11 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_coh = ClientMetadata(s1_meta.coh) // obtain coh for load/store/probe/replace
 
   // obtain data
+  val s1_dataHitWay = Mux1H(s1_tagMatchWayPreBypassVec, s1_dataArrayResp)
   val s1_dataPreBypass = Mux(
     s1_req.isRefill,
-    s1_dataArrayResp(s1_req.refillWay),                 // get replace data
-    Mux1H(s1_tagMatchWayPreBypassVec, s1_dataArrayResp),// select hit way data
+    s1_dataArrayResp(s1_req.refillWay), // get replace data
+    s1_dataHitWay,                      // select hit way data
   ).asUInt
 
   val s1_data = Mux(s1_bypassStore.valid, s1_bypassStore.bits.data, s1_dataPreBypass)
@@ -198,12 +199,18 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // * cpu amo store data
   // NOTE: operate in 8Bytes
-  val s1_blockOffset  = getBlockOffset(s1_req.paddr)
+  val s1_bankOffset  = getBankIdx(s1_req.paddr)
+  val s1_blockOffset = getBlockOffset(s1_req.paddr)
+  val s1_dataVec = VecInit( // FIXME
+    (0 until nBanks).map(i =>
+      s1_data((i + 1) * rowBits - 1, i * rowBits)
+    ))
+
   val s1_amoStoreData = (amoalu.io.out << (s1_blockOffset << 3) & s1_mask) | s1_data & ~s1_mask
 
   amoalu.io.mask := new StoreGen(s1_req.size, s1_req.paddr, 0.U, XLEN).mask
   amoalu.io.cmd  := s1_req.cmd
-  amoalu.io.lhs  := (s1_data >> (s1_blockOffset << 3))(XLEN - 1, 0)
+  amoalu.io.lhs  := s1_dataVec(s1_bankOffset)
   amoalu.io.rhs  := s1_req.wdata
 
   // * cpu lrsc
@@ -499,9 +506,10 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   s1_cacheResp.bits.status := MuxCase(
     CacheRespStatus.miss,
     Seq(
-      s1_hit           -> CacheRespStatus.hit,
-      s1_wbqBlockMiss  -> CacheRespStatus.replay,
-      s1_mshrAllocFail -> CacheRespStatus.replay,
+      s1_hit
+        -> CacheRespStatus.hit,
+      (s1_wbqBlockMiss | s1_mshrAllocFail | s1_lrFail)
+        -> CacheRespStatus.replay,
     ),
   )
 

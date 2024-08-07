@@ -189,7 +189,7 @@ trait DCacheAMOTestTrait {
     }
 
   def cacheTest4(): Unit =
-    it should "pass: lrsc fail" in {
+    it should "pass: lr success sc fail" in {
       test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
@@ -242,6 +242,60 @@ trait DCacheAMOTestTrait {
         dut.clock.step(10)
       }
     }
+
+  def cacheTest5(): Unit =
+    it should "pass: lr fail->success sc success" in {
+      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+        Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
+      ) { dut =>
+        DCacheInit.initDut(dut)
+
+        val cacheReq = CacheReqBundle(
+          paddr = "h80003000",
+          size = 3,
+        )
+
+        // XLR
+        dut.io.req.valid.poke(true.B)
+        dut.io.req.bits.poke(genReq(cacheReq.copy(cmd = M_XLR)))
+
+        dut.clock.step(1)
+        dut.io.req.valid.poke(false.B)
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.status.expect(CacheRespStatus.replay)
+
+        dut.clock.step(20)
+        dut.io.req.valid.poke(true.B)
+        dut.io.req.bits.poke(genReq(cacheReq.copy(cmd = M_XLR)))
+
+        dut.clock.step(1)
+        dut.io.req.valid.poke(false.B)
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.status.expect(CacheRespStatus.hit)
+
+        // XSC
+        dut.io.req.valid.poke(true.B)
+        dut.io.req.bits.poke(genReq(cacheReq.copy(
+          wdata = "h0101010101010101",
+          cmd = M_XSC,
+        )))
+        dut.clock.step(1)
+        dut.io.req.valid.poke(false.B)
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.data.expect("h0".U)
+
+        // read hit 64
+        dut.io.req.valid.poke(true.B)
+        dut.io.req.bits.poke(genReq(cacheReq.copy(cmd = M_XRD)))
+
+        dut.clock.step(1)
+        dut.io.req.valid.poke(false.B)
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.data.expect("h0101010101010101".U)
+        dut.io.resp.bits.status.expect(CacheRespStatus.hit)
+        dut.clock.step(10)
+      }
+    }
 }
 
 class DCacheAMOTest extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with DCacheAMOTestTrait {
@@ -252,4 +306,5 @@ class DCacheAMOTest extends AnyFlatSpec with ChiselScalatestTester with BundleGe
   it should behave like cacheTest2() //
   it should behave like cacheTest3() //
   it should behave like cacheTest4() //
+  it should behave like cacheTest5() //
 }
