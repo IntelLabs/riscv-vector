@@ -90,7 +90,7 @@ class IOMSHRFile(
   val a_cmd    = reqList(senderQueue.io.deq.bits).cmd
 
   val get = edge.Get(a_source, a_addr, a_size)._2
-  val put = edge.Put(a_source, a_addr, a_size, a_data, a_mask)._2
+  val put = edge.Put(a_source, a_addr, a_size, a_data)._2
   val atomic = MuxLookup(a_cmd, 0.U.asTypeOf(new TLBundleA(edge.bundle)))(
     Seq(
       M_XA_SWAP -> edge.Logical(a_source, a_addr, a_size, a_data, TLAtomics.SWAP)._2,
@@ -104,14 +104,13 @@ class IOMSHRFile(
       M_XA_MAXU -> edge.Arithmetic(a_source, a_addr, a_size, a_data, TLAtomics.MAXU)._2,
     )
   )
-  val bypassLoad  = edge.Get(a_source, a_addr, a_size)._2
-  val bypassStore = edge.Put(a_source, a_addr, a_size, a_data, a_mask)._2
+  val bypassStorePartial = edge.Put(a_source, a_addr, a_size, a_data, a_mask)._2
 
   io.l2Req.valid           := senderQueue.io.deq.valid
   senderQueue.io.deq.ready := io.l2Req.ready
   io.l2Req.bits := Mux(
-    reqList(senderQueue.io.deq.bits).noAlloc,
-    Mux(isRead(a_cmd), bypassLoad, bypassStore),
+    reqList(senderQueue.io.deq.bits).noAlloc && a_cmd === M_PWR,
+    bypassStorePartial,
     Mux(isAMO(a_cmd), atomic, Mux(isRead(a_cmd), get, put)),
   )
 
