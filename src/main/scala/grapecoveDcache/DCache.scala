@@ -199,14 +199,17 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // * cpu amo store data
   // NOTE: operate in 8Bytes
-  val s1_bankOffset  = getBankIdx(s1_req.paddr)
-  val s1_blockOffset = getBlockOffset(s1_req.paddr)
-  val s1_dataVec = VecInit( // FIXME
-    (0 until nBanks).map(i =>
-      s1_data((i + 1) * rowBits - 1, i * rowBits)
-    ))
+  val s1_bankOffset = getBankIdx(s1_req.paddr)
+  val s1_dataVec = VecInit(
+    (0 until nBanks).map(i => s1_data((i + 1) * rowBits - 1, i * rowBits))
+  )
 
-  val s1_amoStoreData = (amoalu.io.out << (s1_blockOffset << 3) & s1_mask) | s1_data & ~s1_mask
+  val s1_amoStoreDataVec = VecInit(
+    (0 until nBanks).map(i => s1_data((i + 1) * rowBits - 1, i * rowBits))
+  )
+  s1_amoStoreDataVec(s1_bankOffset) := amoalu.io.out
+
+  val s1_amoStoreData = (s1_amoStoreDataVec.asUInt & s1_mask) | s1_data & ~s1_mask
 
   amoalu.io.mask := new StoreGen(s1_req.size, s1_req.paddr, 0.U, XLEN).mask
   amoalu.io.cmd  := s1_req.cmd
@@ -502,7 +505,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   s1_cacheResp.bits.source  := s1_req.source
   s1_cacheResp.bits.dest    := s1_req.dest
   s1_cacheResp.bits.data    := Mux(s1_sc, s1_scFail, loadGen.data)
-  s1_cacheResp.bits.hasData := s1_hit && isRead(s1_req.cmd)
+  s1_cacheResp.bits.hasData := s1_hit && isRead(s1_req.cmd) // FIXME SC
   s1_cacheResp.bits.status := MuxCase(
     CacheRespStatus.miss,
     Seq(

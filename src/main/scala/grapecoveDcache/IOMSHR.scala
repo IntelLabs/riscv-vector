@@ -124,12 +124,21 @@ class IOMSHRFile(
   val refillData =
     RegEnable(io.fromRefill.bits.data, 0.U, state === mode_idle && io.fromRefill.valid && io.fromRefill.bits.hasData)
 
+  val loadgen = new LoadGen(
+    reqList(respIOMSHRIdx).size,
+    reqList(respIOMSHRIdx).signed,
+    reqList(respIOMSHRIdx).paddr,
+    refillData,
+    false.B,
+    blockBytes,
+  )
+
   io.resp.valid        := state === mode_replay
   io.resp.bits.hasData := true.B
   io.resp.bits.source  := reqList(respIOMSHRIdx).source
   io.resp.bits.dest    := reqList(respIOMSHRIdx).dest
   io.resp.bits.status  := CacheRespStatus.refill
-  io.resp.bits.data    := refillData
+  io.resp.bits.data    := loadgen.data
 
   io.fromRefill.ready := state === mode_idle
 

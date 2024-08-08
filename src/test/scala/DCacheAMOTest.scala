@@ -57,11 +57,31 @@ trait DCacheAMOTestTrait {
       ) { dut =>
         DCacheInit.initDut(dut)
 
-        val cacheReq = CacheReqBundle(
-          paddr = "h80005000",
-          size = 3,
+        // evict 80004000
+
+        val cacheReadReq = CacheReqBundle(
+          paddr = "h8000c000",
+          cmd = M_XRD,
+          dest = 16,
         )
 
+        // req miss
+        dut.io.req.valid.poke(true.B)
+        dut.io.req.bits.poke(genReq(cacheReadReq))
+
+        dut.clock.step(1)
+        dut.io.req.valid.poke(false.B)
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
+        dut.clock.step(1)
+
+        dut.clock.step(200) // writeback
+
+        val cacheReq = CacheReqBundle(
+          paddr = "h80004008",
+          size = 2,
+          signed = true,
+        )
         // swap
         dut.io.req.valid.poke(true.B)
         dut.io.req.bits.poke(genReq(cacheReq.copy(wdata = "h7890", cmd = M_XA_SWAP)))
@@ -76,7 +96,7 @@ trait DCacheAMOTestTrait {
           dut.clock.step(1)
         }
         dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.data.expect(0.U)
+        dut.io.resp.bits.data.expect("h10101010".U)
         dut.io.resp.bits.status.expect(CacheRespStatus.refill)
 
         dut.io.req.valid.poke(true.B)
