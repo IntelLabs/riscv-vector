@@ -72,7 +72,7 @@ class MSHRWrapper(
   mshrs.io.fromRefill.valid := io.fromRefill.valid && refillMSHR
   mshrs.io.fromRefill.bits  := io.fromRefill.bits
 
-  iomshrs.io.fromRefill.valid := io.fromRefill.valid && refillIOMSHR && io.fromRefill.bits.hasData
+  iomshrs.io.fromRefill.valid := io.fromRefill.valid && refillIOMSHR // && io.fromRefill.bits.hasData
   iomshrs.io.fromRefill.bits  := io.fromRefill.bits
 
   io.fromRefill.ready := Mux(

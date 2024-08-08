@@ -12,19 +12,20 @@ class MSHR(id: Int) extends Module() {
   private val state                                                                       = RegInit(mode_idle)
 
   // req
-  val probeReq    = io.req === MSHRReqType.probe && io.lineAddrMatch && io.reqValid
+//  val probeReq    = io.req === MSHRReqType.probe && io.lineAddrMatch && io.reqValid
+  val probeReq    = io.probeValid
   val replayReq   = io.req === MSHRReqType.replay && io.reqValid
   val allocateReq = io.req === MSHRReqType.alloc && io.reqValid
 
   // info regs & wires
   val sentPermission = RegInit(TLPermissions.NtoB)
-  val lineAddrReg    = RegEnable(io.reqLineAddr, 0.U, allocateReq && state === mode_idle)
+  val lineAddrReg    = RegEnable(io.allocLineAddr, 0.U, allocateReq && state === mode_idle)
 
   val metaCounter = RegInit(0.U(log2Up(nMSHRMetas).W))
 
   // match & output
-  val lineAddrMatch = lineAddrReg === io.reqLineAddr && state =/= mode_idle
-  io.lineAddrMatch := lineAddrMatch
+  val allocLineAddrMatch = lineAddrReg === io.allocLineAddr && state =/= mode_idle
+  io.allocLineAddrMatch := allocLineAddrMatch
 
   /////////////// allocate state flag
   // current entry is sent as read, but here is a write req
@@ -34,7 +35,7 @@ class MSHR(id: Int) extends Module() {
   val wrwErr             = readAfterWriteFlag && isWrite(io.reqCmd)
 
   val probeState = Mux(
-    state >= mode_resp_wait,
+    state > mode_resp_wait,
     ProbeMSHRState.hitBlockB,
     MuxLookup(io.probePermission, ProbeMSHRState.hitBlockB)(
       Seq(
@@ -48,20 +49,21 @@ class MSHR(id: Int) extends Module() {
     ),
   )
 
-  io.probeState := Mux(probeReq, probeState, ProbeMSHRState.miss)
+  io.probeState         := Mux(probeReq, probeState, ProbeMSHRState.miss)
+  io.probeLineAddrMatch := lineAddrReg === io.probeLineAddr && probeReq
 
   readAfterWriteFlag := MuxCase(
     readAfterWriteFlag,
     Seq(
-      (state === mode_clear)                                                        -> false.B,
-      (lineAddrMatch && sentPermission =/= TLPermissions.NtoB && isRead(io.reqCmd)) -> true.B,
+      (state === mode_clear)                                                             -> false.B,
+      (allocLineAddrMatch && sentPermission =/= TLPermissions.NtoB && isRead(io.reqCmd)) -> true.B,
     ),
   )
 
   // don't have enough space to store current inst
   val isFull = (metaCounter + 1.U) >= nMSHRMetas.asUInt
 
-  val stallReq = lineAddrMatch && (!(state <= mode_resp_wait) || isFull || privErr || wrwErr)
+  val stallReq = allocLineAddrMatch && (!(state <= mode_resp_wait) || isFull || privErr || wrwErr)
   io.stallReq := stallReq
   io.isEmpty  := state === mode_idle
 
@@ -80,7 +82,7 @@ class MSHR(id: Int) extends Module() {
   }.elsewhen(allocateReq && !stallReq) {
     when(state === mode_idle) {
       metaCounter := 1.U
-    }.elsewhen(lineAddrMatch) {
+    }.elsewhen(allocLineAddrMatch) {
       when(sentPermission === TLPermissions.NtoB && isWrite(io.reqCmd)) {
         metaCounter := metaCounter + 1.U
       }.elsewhen(isRead(io.reqCmd)) {
@@ -99,7 +101,7 @@ class MSHR(id: Int) extends Module() {
         TLPermissions.BtoT,
         Mux(isWriteIntent(io.reqCmd), TLPermissions.NtoT, TLPermissions.NtoB),
       )
-    }.elsewhen(lineAddrMatch) {
+    }.elsewhen(allocLineAddrMatch) {
       sentPermission := Mux(
         sentPermission === TLPermissions.NtoB && isWriteIntent(io.reqCmd),
         TLPermissions.NtoT,
@@ -296,25 +298,25 @@ class MSHRFile extends Module() {
   val allocateArb = Module(new Arbiter(Bool(), nMSHRs))
   allocateArb.io.in.foreach(_.bits := DontCare)
 
-  val reqArb    = Module(new Arbiter(MSHRReqType(), 3))
-  val probeReq  = reqArb.io.in(0).fire
-  val replayReq = reqArb.io.in(1).fire
-  val allocReq  = reqArb.io.in(2).fire
+  val reqArb = Module(new Arbiter(MSHRReqType(), 2))
+//  val probeReq  = reqArb.io.in(0).fire
+  val replayReq = reqArb.io.in(0).fire
+  val allocReq  = reqArb.io.in(1).fire
 
-  reqArb.io.in(0).valid := io.probeCheck.valid
-  reqArb.io.in(0).bits  := MSHRReqType.probe
+//  reqArb.io.in(0).valid := io.probeCheck.valid
+//  reqArb.io.in(0).bits  := MSHRReqType.probe
 
-  reqArb.io.in(1).valid := io.fromRefill.valid && replayReg.io.innerIO.ready
-  reqArb.io.in(1).bits  := MSHRReqType.replay
-  io.fromRefill.ready   := reqArb.io.in(1).ready && replayReg.io.innerIO.ready
+  reqArb.io.in(0).valid := io.fromRefill.valid && replayReg.io.innerIO.ready
+  reqArb.io.in(0).bits  := MSHRReqType.replay
+  io.fromRefill.ready   := reqArb.io.in(0).ready && replayReg.io.innerIO.ready
 
-  reqArb.io.in(2).valid := io.pipelineReq.valid
-  reqArb.io.in(2).bits  := Mux(io.pipelineReq.valid, MSHRReqType.alloc, MSHRReqType.invalid)
-  io.pipelineReq.ready  := reqArb.io.in(2).ready
+  reqArb.io.in(1).valid := io.pipelineReq.valid
+  reqArb.io.in(1).bits  := Mux(io.pipelineReq.valid, MSHRReqType.alloc, MSHRReqType.invalid)
+  io.pipelineReq.ready  := reqArb.io.in(1).ready
 
   reqArb.io.out.ready := MuxLookup(reqArb.io.out.bits, false.B)(
     Seq(
-      MSHRReqType.probe  -> true.B,
+//      MSHRReqType.probe  -> true.B,
       MSHRReqType.replay -> true.B,
       MSHRReqType.alloc  -> ((!lineAddrMatch && allocateArb.io.out.valid) || (lineAddrMatch && !stallReq)),
     )
@@ -324,16 +326,21 @@ class MSHRFile extends Module() {
   allocateArb.io.out.ready := allocReq && !lineAddrMatch
 
   // interface for probe
+  val probeReq               = io.probeCheck.valid
+  val probeLineAddrMatchList = Wire(Vec(nMSHRs, Bool()))
+  val probeLineAddrMatch     = probeLineAddrMatchList.asUInt.orR
+  val probeLineAddrMatchIdx  = OHToUInt(probeLineAddrMatchList)
+
   val probeStateList = Wire(Vec(nMSHRs, UInt(ProbeMSHRState.width.W)))
   val probeState     = probeStateList.reduce(_ | _)
   io.probeCheck.replaceFinish := io.replaceStatus === ReplaceStatus.replace_finish &&
     io.probeCheck.lineAddr === replayReg.io.toReplace.bits.lineAddr
 
   io.probeRefill.valid        := io.probeCheck.valid
-  io.probeRefill.bits.entryId := lineAddrMatchIdx
+  io.probeRefill.bits.entryId := probeLineAddrMatchIdx
 
   io.probeCheck.pass := probeReq && (probeState === ProbeMSHRState.hitGo | (probeState === ProbeMSHRState.hitBlockN && !io.fromRefill.bits.probeMatch))
-  io.probeCheck.hit := probeReq && lineAddrMatch
+  io.probeCheck.hit := probeReq && probeLineAddrMatch
 
   // interface for replay
   val writeCounterList  = Wire(Vec(nMSHRs, UInt(log2Up(nMSHRMetas).W)))
@@ -344,8 +351,6 @@ class MSHRFile extends Module() {
   // interface for allocate
   val allocateList = Wire(Vec(nMSHRs, Bool()))
   val allocateIdx  = OHToUInt(allocateList.asUInt)
-
-  val reqLineAddr = Mux(io.probeCheck.valid, io.probeCheck.lineAddr, io.pipelineReq.bits.lineAddr)
 
   // interface for new entry sender
   val senderQueue = Module(new Queue(UInt(log2Up(nMSHRs).W), nMSHRs))
@@ -363,17 +368,20 @@ class MSHRFile extends Module() {
 
       mshr.io.reqValid := MuxLookup(reqArb.io.out.bits, false.B)(
         Seq(
-          MSHRReqType.probe  -> true.B,
+//          MSHRReqType.probe  -> true.B,
           MSHRReqType.replay -> (io.fromRefill.bits.entryId === i.asUInt),
-          MSHRReqType.alloc  -> (allocateArb.io.in(i).fire || mshr.io.lineAddrMatch),
+          MSHRReqType.alloc  -> (allocateArb.io.in(i).fire || mshr.io.allocLineAddrMatch),
         )
       )
-      mshr.io.req         := reqArb.io.out.bits
-      mshr.io.reqLineAddr := reqLineAddr
-      mshr.io.reqCmd      := io.pipelineReq.bits.meta.cmd
-      mshr.io.isUpgrade   := io.pipelineReq.bits.isUpgrade
+      mshr.io.req           := reqArb.io.out.bits
+      mshr.io.allocLineAddr := io.pipelineReq.bits.lineAddr
+      mshr.io.probeValid    := probeReq
+      mshr.io.probeLineAddr := io.probeCheck.lineAddr
+      mshr.io.reqCmd        := io.pipelineReq.bits.meta.cmd
+      mshr.io.isUpgrade     := io.pipelineReq.bits.isUpgrade
 
-      lineAddrMatchList(i) := mshr.io.lineAddrMatch
+      lineAddrMatchList(i)      := mshr.io.allocLineAddrMatch
+      probeLineAddrMatchList(i) := mshr.io.probeLineAddrMatch
 
       // probe signal
       probeStateList(i)       := mshr.io.probeState

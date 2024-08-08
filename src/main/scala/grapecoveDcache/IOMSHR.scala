@@ -116,8 +116,13 @@ class IOMSHRFile(
 
   // refill req
   val respIOMSHRIdx =
-    RegEnable(io.fromRefill.bits.entryId - firstMMIO.U, 0.U, state === mode_idle && io.fromRefill.valid)
-  val refillData = RegEnable(io.fromRefill.bits.data, 0.U, state === mode_idle && io.fromRefill.valid)
+    RegEnable(
+      io.fromRefill.bits.entryId - firstMMIO.U,
+      0.U,
+      state === mode_idle && io.fromRefill.valid && io.fromRefill.bits.hasData,
+    )
+  val refillData =
+    RegEnable(io.fromRefill.bits.data, 0.U, state === mode_idle && io.fromRefill.valid && io.fromRefill.bits.hasData)
 
   io.resp.valid        := state === mode_replay
   io.resp.bits.hasData := true.B
@@ -131,12 +136,12 @@ class IOMSHRFile(
   replayFinishList := Mux(
     io.resp.fire,
     UIntToOH(respIOMSHRIdx),
-    Mux(io.l2Req.fire && isWrite(a_cmd) && !isAMO(a_cmd), UIntToOH(senderQueue.io.deq.bits), 0.U),
+    Mux(io.fromRefill.fire && !io.fromRefill.bits.hasData, UIntToOH(io.fromRefill.bits.entryId - firstMMIO.U), 0.U),
   ).asTypeOf(replayFinishList)
 
   state := MuxLookup(state, state)(
     Seq(
-      mode_idle   -> Mux(io.fromRefill.valid, mode_replay, state),
+      mode_idle   -> Mux(io.fromRefill.valid && io.fromRefill.bits.hasData, mode_replay, state),
       mode_replay -> Mux(io.resp.fire, mode_idle, state),
     )
   )

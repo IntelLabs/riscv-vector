@@ -7,13 +7,14 @@ import freechips.rocketchip.tilelink._
 
 /////// MSHR Entry IO
 class MSHREntryIO extends Bundle() {
-  val reqValid    = Input(Bool())
-  val req         = Input(MSHRReqType())
-  val reqCmd      = Input(UInt(M_SZ.W))
-  val reqLineAddr = Input(UInt(lineAddrWidth.W))
-  val isUpgrade   = Input(Bool()) // for BtoT
+  val reqValid      = Input(Bool())
+  val req           = Input(MSHRReqType())
+  val reqCmd        = Input(UInt(M_SZ.W))
+  val allocLineAddr = Input(UInt(lineAddrWidth.W))
+  val probeLineAddr = Input(UInt(lineAddrWidth.W))
+  val isUpgrade     = Input(Bool()) // for BtoT
 
-  val lineAddrMatch = Output(Bool()) // mshr inner tag match
+  val allocLineAddrMatch = Output(Bool()) // mshr inner tag match
 
   // replay & refill signals
   val replayFinish = Input(Bool())
@@ -31,8 +32,10 @@ class MSHREntryIO extends Bundle() {
   val senderLineAddr   = Output(UInt(lineAddrWidth.W))
 
   // probe permission
-  val probePermission = Input(UInt(TLPermissions.bdWidth.W))
-  val probeState      = Output(UInt(ProbeMSHRState.width.W))
+  val probeValid         = Input(Bool())
+  val probeLineAddrMatch = Output(Bool())
+  val probePermission    = Input(UInt(TLPermissions.bdWidth.W))
+  val probeState         = Output(UInt(ProbeMSHRState.width.W))
 }
 
 /////// replay reg IOs
