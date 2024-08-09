@@ -89,8 +89,8 @@ class RefillQueue extends Module {
   })
 
   val dataIdxQueue  = Module(new SearchableQueue(UInt(log2Up(nMSHRs + nWBQEntries + nMMIOs).W), nRefillQDataEntries))
-  val dataPermQueue = Module(new Queue(UInt(TLPermissions.bdWidth.W), nRefillQDataEntries))
-  val dataQueue     = Module(new Queue(UInt(blockBits.W), nRefillQDataEntries))
+  val dataPermQueue = Module(new MyQueue(UInt(TLPermissions.bdWidth.W), nRefillQDataEntries))
+  val dataQueue     = Module(new MyQueue(UInt(blockBits.W), nRefillQDataEntries))
 
   val permQueue = Module(new SearchableQueue(UInt(log2Up(nMSHRs + nWBQEntries + nMMIOs).W), nRefillQPermEntries))
 
@@ -170,4 +170,37 @@ class SearchableQueue[T <: Data](val gen: T, val entries: Int) extends Module {
   def search(gen: T): Bool =
     queue.foldLeft(false.B)((m, n) => m | n === gen)
   io.idxMatch := search(io.searchIdx)
+}
+
+class MyQueue[T <: Data](val gen: T, val entries: Int) extends Module {
+  val io = IO(new Bundle {
+    val enq = Flipped(DecoupledIO(gen))
+    val deq = DecoupledIO(gen)
+  })
+
+  val queue      = RegInit(VecInit(Seq.fill(entries)(0.U.asTypeOf(gen))))
+  val enq_ptr    = Counter(entries)
+  val deq_ptr    = Counter(entries)
+  val maybe_full = RegInit(false.B)
+  val ptr_match  = enq_ptr.value === deq_ptr.value
+  val empty      = ptr_match && !maybe_full
+  val full       = ptr_match && maybe_full
+  val do_enq     = WireDefault(io.enq.fire)
+  val do_deq     = WireDefault(io.deq.fire)
+
+  when(do_enq) {
+    queue(enq_ptr.value) := io.enq.bits
+    enq_ptr.inc()
+  }
+  when(do_deq) {
+    deq_ptr.inc()
+  }
+  when(do_enq =/= do_deq) {
+    maybe_full := do_enq
+  }
+
+  io.deq.valid := !empty
+  io.enq.ready := !full
+
+  io.deq.bits := queue(deq_ptr.value)
 }

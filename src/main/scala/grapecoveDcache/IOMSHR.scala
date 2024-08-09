@@ -49,7 +49,7 @@ class IOMSHRFile(
   val mode_idle :: mode_replay :: Nil = Enum(2)
   val state                           = RegInit(mode_idle)
 
-  val senderQueue = Module(new Queue(UInt(log2Up(nMMIOs).W), nMMIOs))
+  val senderQueue = Module(new MyQueue(UInt(log2Up(nMMIOs).W), nMMIOs))
 
   val allocArb = Module(new Arbiter(Bool(), nMMIOs))
   allocArb.io.in.foreach(_.bits := DontCare)
