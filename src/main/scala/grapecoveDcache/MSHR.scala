@@ -255,6 +255,7 @@ class MSHRFile extends Module() {
   val io = IO(
     new Bundle {
       val pipelineReq = Flipped(DecoupledIO(new CachepipeMSHRFile))
+      val addrMatch   = Output(Bool())
       val toL2Req     = DecoupledIO(new MSHRFileL2)              // TL A
       val fromRefill  = Flipped(DecoupledIO(new RefillMSHRFile)) // TL D/E
 
@@ -313,6 +314,7 @@ class MSHRFile extends Module() {
   reqArb.io.in(1).valid := io.pipelineReq.valid
   reqArb.io.in(1).bits  := Mux(io.pipelineReq.valid, MSHRReqType.alloc, MSHRReqType.invalid)
   io.pipelineReq.ready  := reqArb.io.in(1).ready
+  io.addrMatch          := lineAddrMatch
 
   reqArb.io.out.ready := MuxLookup(reqArb.io.out.bits, false.B)(
     Seq(

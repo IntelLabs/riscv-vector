@@ -29,12 +29,12 @@ class MSHRWrapper(
   val mshrs   = Module(new MSHRFile())
   val iomshrs = Module(new IOMSHRFile())
 
-  val toIOMSHR = !io.cacheable || isAMO(io.req.bits.cmd) || io.req.bits.noAlloc
+  val IOMSHRType = !io.cacheable || isAMO(io.req.bits.cmd) || io.req.bits.noAlloc
 
   // req signal connect
-  mshrs.io.pipelineReq.valid              := io.req.valid && !toIOMSHR
+  mshrs.io.pipelineReq.valid              := io.req.valid && !IOMSHRType && !iomshrs.io.addrMatch
   mshrs.io.pipelineReq.bits.isUpgrade     := io.isUpgrade
-  mshrs.io.pipelineReq.bits.data          := io.req.bits.wdata // FIXME
+  mshrs.io.pipelineReq.bits.data          := io.req.bits.wdata
   mshrs.io.pipelineReq.bits.mask          := io.req.bits.wmask
   mshrs.io.pipelineReq.bits.lineAddr      := AddrDecoder.getLineAddr(io.req.bits.paddr)
   mshrs.io.pipelineReq.bits.meta.sourceId := io.req.bits.source
@@ -44,10 +44,14 @@ class MSHRWrapper(
   mshrs.io.pipelineReq.bits.meta.size     := io.req.bits.size
   mshrs.io.pipelineReq.bits.meta.signed   := io.req.bits.signed
 
-  iomshrs.io.req.valid := io.req.valid && toIOMSHR
+  iomshrs.io.req.valid := io.req.valid && IOMSHRType && !mshrs.io.addrMatch
   iomshrs.io.req.bits  := io.req.bits
 
-  io.req.ready := Mux(toIOMSHR, iomshrs.io.req.ready, mshrs.io.pipelineReq.ready)
+  io.req.ready := Mux(
+    IOMSHRType,
+    Mux(mshrs.io.addrMatch, false.B, iomshrs.io.req.ready),
+    Mux(iomshrs.io.addrMatch, false.B, mshrs.io.pipelineReq.ready),
+  )
 
   // request L2 using TL A
   val acquire = edge.AcquireBlock(

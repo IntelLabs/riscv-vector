@@ -12,8 +12,11 @@ class IOMSHR(id: Int)(
   val io = IO(new Bundle {
     val req = Input(new MainPipeReq)
 
-    val isEmpty      = Output(Bool())
-    val reqValid     = Input(Bool())
+    val isEmpty  = Output(Bool())
+    val reqValid = Input(Bool())
+
+    val addrMatch = Output(Bool())
+
     val replayFinish = Input(Bool())
 
     val reqReg = Output(new MainPipeReq)
@@ -32,15 +35,17 @@ class IOMSHR(id: Int)(
       mode_busy -> Mux(io.replayFinish, mode_idle, state),
     )
   )
-  io.isEmpty := state === mode_idle
+  io.isEmpty   := state === mode_idle
+  io.addrMatch := state === mode_busy && io.req.paddr === reqReg.paddr
 }
 
 class IOMSHRFile(
     implicit edge: TLEdgeOut
 ) extends Module {
   val io = IO(new Bundle {
-    val req  = Flipped(DecoupledIO(new MainPipeReq))
-    val resp = DecoupledIO(new DataExchangeResp())
+    val req       = Flipped(DecoupledIO(new MainPipeReq))
+    val addrMatch = Output(Bool())
+    val resp      = DecoupledIO(new DataExchangeResp())
 
     val l2Req      = DecoupledIO(new TLBundleA(edge.bundle))
     val fromRefill = Flipped(DecoupledIO(new RefillMSHRFile))
@@ -55,6 +60,7 @@ class IOMSHRFile(
   allocArb.io.in.foreach(_.bits := DontCare)
   allocArb.io.out.ready := senderQueue.io.enq.ready && io.req.valid
 
+  val addrMatchList    = Wire(Vec(nMMIOs, Bool()))
   val replayFinishList = Wire(Vec(nMMIOs, Bool()))
   val reqList          = Wire(Vec(nMMIOs, new MainPipeReq))
   val allocList        = Wire(Vec(nMMIOs, Bool()))
@@ -71,12 +77,14 @@ class IOMSHRFile(
 
       reqList(i) := iomshr.io.reqReg
 
+      addrMatchList(i)       := iomshr.io.addrMatch
       iomshr.io.replayFinish := replayFinishList(i)
 
   }
 
   // to pipe req
   io.req.ready := allocArb.io.out.valid
+  io.addrMatch := addrMatchList.asUInt.orR
 
   // set sender enq/deq info
   senderQueue.io.enq.valid := senderQueue.io.enq.ready && io.req.valid
