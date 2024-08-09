@@ -78,6 +78,32 @@ class LoadGen(sizeType: UInt, signed: Bool, addr: UInt, dat: UInt, zero: Bool, m
   def data     = genData(0)
 }
 
+class LoadGenAcc(sizeType: UInt, signed: Bool, addr: UInt, dat: UInt, zero: Bool, maxSizeInBytes: Int, splitSize: Int) {
+  val vecLen     = maxSizeInBytes / (1 << splitSize)
+  val vecBlockSz = (1 << splitSize) << 3
+
+  val dataVec = VecInit((0 until vecLen).map { i =>
+    dat(i * vecBlockSz + vecBlockSz - 1, i * vecBlockSz)
+  })
+
+  val offset = addr(splitSize + log2Up(vecLen) - 1, splitSize)
+
+  val loadGenSmall = new LoadGen(sizeType, signed, addr, dataVec(offset), zero, 1 << splitSize)
+  val loadGenLarge = new LoadGen(sizeType, signed, addr, dat, zero, maxSizeInBytes)
+
+  def genData(): UInt = {
+    val loadGenSmallData = loadGenSmall.genData(0)
+    val smallData        = WireInit(0.U((maxSizeInBytes * 8).W))
+    smallData := Cat(
+      Fill(maxSizeInBytes * 8 - vecBlockSz, Mux(signed, loadGenSmallData(vecBlockSz - 1), 0.U)),
+      loadGenSmallData,
+    )
+
+    val data = Mux(sizeType <= splitSize.U, smallData, loadGenLarge.genData(splitSize + 1))
+    data
+  }
+}
+
 class AMOALU(operandBits: Int) extends Module
     with MemoryOpConstants {
   val minXLen = 32

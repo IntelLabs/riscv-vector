@@ -164,6 +164,9 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   ).asUInt
 
   val s1_data = Mux(s1_bypassStore.valid, s1_bypassStore.bits.data, s1_dataPreBypass)
+  val s1_dataVec = VecInit(
+    (0 until nBanks).map(i => s1_data((i + 1) * rowBits - 1, i * rowBits))
+  )
 
   // * load/store
   val s1_hasPerm         = s1_coh.onAccess(s1_req.cmd)._1
@@ -172,9 +175,6 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_upgradePermHit  = s1_hit && s1_newHitCoh =/= s1_coh // e.g. T->Dirty hit
   val s1_noDataMiss      = !s1_isTagMatch                    // e.g. N->B or N->T miss
   val s1_upgradePermMiss = s1_isTagMatch && !s1_hasPerm      // e.g. B->T miss
-
-  // organize load data
-  val loadGen = new LoadGen(s1_req.size, s1_req.signed, s1_req.paddr, s1_data, false.B, dataBytes)
 
   // organize store data
   val s1_storeGenMask = new StoreGen(s1_req.size, s1_req.paddr, 0.U, dataBytes).mask
@@ -200,10 +200,6 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // * cpu amo store data
   // NOTE: operate in 8Bytes
   val s1_bankOffset = getBankIdx(s1_req.paddr)
-  val s1_dataVec = VecInit(
-    (0 until nBanks).map(i => s1_data((i + 1) * rowBits - 1, i * rowBits))
-  )
-
   val s1_amoStoreDataVec = VecInit(
     (0 until nBanks).map(i => s1_data((i + 1) * rowBits - 1, i * rowBits))
   )
@@ -501,11 +497,42 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val mshrsResp    = Wire(Valid(new DataExchangeResp))
 
   //  s1 resp
+
+  // val loadGenAcc =
+  //   new LoadGenAcc(s1_req.size, s1_req.signed, s1_req.paddr, s1_data, s1_scFail, dataBytes, log2Up(rowBytes))
+
+  val loadDataStart = LookupTree(
+    s1_req.paddr(5, 0),
+    (0 until 63).flatMap(i =>
+      Seq(i.U -> s1_data(511, i * 8))
+    ),
+  )
+
+  val loadDataSel = LookupTree(
+    Cat(s1_req.signed, s1_req.size),
+    List(
+      "b0_000".U -> ZeroExt(loadDataStart(7, 0), blockBits),
+      "b0_001".U -> ZeroExt(loadDataStart(15, 0), blockBits),
+      "b0_010".U -> ZeroExt(loadDataStart(31, 0), blockBits),
+      "b0_011".U -> ZeroExt(loadDataStart(63, 0), blockBits),
+      "b0_100".U -> ZeroExt(loadDataStart(127, 0), blockBits),
+      "b0_101".U -> ZeroExt(loadDataStart(255, 0), blockBits),
+      "b0_110".U -> ZeroExt(loadDataStart(511, 0), blockBits),
+      "b1_000".U -> SignExt(loadDataStart(7, 0), blockBits),
+      "b1_001".U -> SignExt(loadDataStart(15, 0), blockBits),
+      "b1_010".U -> SignExt(loadDataStart(31, 0), blockBits),
+      "b1_011".U -> SignExt(loadDataStart(63, 0), blockBits),
+      "b1_100".U -> SignExt(loadDataStart(127, 0), blockBits),
+      "b1_101".U -> SignExt(loadDataStart(255, 0), blockBits),
+      "b1_110".U -> SignExt(loadDataStart(511, 0), blockBits),
+    ),
+  )
+
   s1_cacheResp.valid        := s1_validFromCore && !isPrefetch(s1_req.cmd)
   s1_cacheResp.bits.source  := s1_req.source
   s1_cacheResp.bits.dest    := s1_req.dest
-  s1_cacheResp.bits.data    := Mux(s1_sc, s1_scFail, loadGen.data)
-  s1_cacheResp.bits.hasData := s1_hit && isRead(s1_req.cmd) // FIXME SC
+  s1_cacheResp.bits.hasData := (s1_hit && isRead(s1_req.cmd)) | s1_sc // FIXME SC
+  s1_cacheResp.bits.data    := loadDataSel
   s1_cacheResp.bits.status := MuxCase(
     CacheRespStatus.miss,
     Seq(
