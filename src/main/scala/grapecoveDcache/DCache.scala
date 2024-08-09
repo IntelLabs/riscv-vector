@@ -220,8 +220,8 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_lr = s1_validFromCore && (s1_req.cmd === M_XLR)
   val s1_sc = s1_validFromCore && (s1_req.cmd === M_XSC)
 
-  val lrscAddr         = RegEnable(s1_req.paddr >> blockOffBits, s1_lr)
-  val s1_lrscAddrMatch = lrscValid && (s1_req.paddr >> blockOffBits === lrscAddr)
+  val lrscAddr         = RegEnable(getLineAddr(s1_req.paddr), s1_lr)
+  val s1_lrscAddrMatch = lrscValid && (getLineAddr(s1_req.paddr) === lrscAddr)
   val s1_lrFail        = s1_lr && !s1_hit
   val s1_scFail        = s1_sc && (!s1_hit || !s1_lrscAddrMatch)
 
@@ -498,41 +498,49 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   //  s1 resp
 
-  // val loadGenAcc =
-  //   new LoadGenAcc(s1_req.size, s1_req.signed, s1_req.paddr, s1_data, s1_scFail, dataBytes, log2Up(rowBytes))
+  // val loadDataStart = LookupTree(
+  //   s1_req.paddr(5, 0),
+  //   (0 until 63).flatMap(i =>
+  //     Seq(i.U -> s1_data(511, i * 8))
+  //   ),
+  // )
 
-  val loadDataStart = LookupTree(
-    s1_req.paddr(5, 0),
-    (0 until 63).flatMap(i =>
-      Seq(i.U -> s1_data(511, i * 8))
-    ),
-  )
+  // val loadDataSel = LookupTree(
+  //   Cat(s1_req.signed, s1_req.size),
+  //   List(
+  //     "b0_000".U -> ZeroExt(loadDataStart(7, 0), blockBits),
+  //     "b0_001".U -> ZeroExt(loadDataStart(15, 0), blockBits),
+  //     "b0_010".U -> ZeroExt(loadDataStart(31, 0), blockBits),
+  //     "b0_011".U -> ZeroExt(loadDataStart(63, 0), blockBits),
+  //     "b0_100".U -> ZeroExt(loadDataStart(127, 0), blockBits),
+  //     "b0_101".U -> ZeroExt(loadDataStart(255, 0), blockBits),
+  //     "b0_110".U -> ZeroExt(loadDataStart(511, 0), blockBits),
+  //     "b1_000".U -> SignExt(loadDataStart(7, 0), blockBits),
+  //     "b1_001".U -> SignExt(loadDataStart(15, 0), blockBits),
+  //     "b1_010".U -> SignExt(loadDataStart(31, 0), blockBits),
+  //     "b1_011".U -> SignExt(loadDataStart(63, 0), blockBits),
+  //     "b1_100".U -> SignExt(loadDataStart(127, 0), blockBits),
+  //     "b1_101".U -> SignExt(loadDataStart(255, 0), blockBits),
+  //     "b1_110".U -> SignExt(loadDataStart(511, 0), blockBits),
+  //   ),
+  // )
+  // s1_cacheResp.bits.data    := Mux(s1_sc, s1_scFail, loadDataSel)
 
-  val loadDataSel = LookupTree(
-    Cat(s1_req.signed, s1_req.size),
-    List(
-      "b0_000".U -> ZeroExt(loadDataStart(7, 0), blockBits),
-      "b0_001".U -> ZeroExt(loadDataStart(15, 0), blockBits),
-      "b0_010".U -> ZeroExt(loadDataStart(31, 0), blockBits),
-      "b0_011".U -> ZeroExt(loadDataStart(63, 0), blockBits),
-      "b0_100".U -> ZeroExt(loadDataStart(127, 0), blockBits),
-      "b0_101".U -> ZeroExt(loadDataStart(255, 0), blockBits),
-      "b0_110".U -> ZeroExt(loadDataStart(511, 0), blockBits),
-      "b1_000".U -> SignExt(loadDataStart(7, 0), blockBits),
-      "b1_001".U -> SignExt(loadDataStart(15, 0), blockBits),
-      "b1_010".U -> SignExt(loadDataStart(31, 0), blockBits),
-      "b1_011".U -> SignExt(loadDataStart(63, 0), blockBits),
-      "b1_100".U -> SignExt(loadDataStart(127, 0), blockBits),
-      "b1_101".U -> SignExt(loadDataStart(255, 0), blockBits),
-      "b1_110".U -> SignExt(loadDataStart(511, 0), blockBits),
-    ),
+  val loadGenAcc = new LoadGenAcc(
+    s1_req.size,
+    s1_req.signed,
+    s1_req.paddr,
+    s1_data,
+    s1_sc,
+    dataBytes,
+    log2Up(rowBytes),
   )
 
   s1_cacheResp.valid        := s1_validFromCore && !isPrefetch(s1_req.cmd)
   s1_cacheResp.bits.source  := s1_req.source
   s1_cacheResp.bits.dest    := s1_req.dest
   s1_cacheResp.bits.hasData := (s1_hit && isRead(s1_req.cmd)) | s1_sc // FIXME SC
-  s1_cacheResp.bits.data    := loadDataSel
+  s1_cacheResp.bits.data    := Mux(s1_sc, s1_scFail, loadGenAcc.genData())
   s1_cacheResp.bits.status := MuxCase(
     CacheRespStatus.miss,
     Seq(
