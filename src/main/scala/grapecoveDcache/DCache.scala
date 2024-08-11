@@ -228,10 +228,10 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   lrscCount := MuxCase(
     lrscCount,
     Seq(
-      // (lr | sc | other cmd) after lr hit
-      (s1_validFromCore & (lrscCount > 0.U)) -> 0.U,
       // lr hit
       (s1_hit && s1_lr) -> (lrscCycles - 1).U,
+      // (sc | other cmd) after lr hit
+      (s1_validFromCore & (lrscCount > 0.U)) -> 0.U,
       // no cmd after lr hit
       (lrscCount > 0.U) -> (lrscCount - 1.U),
     ),
