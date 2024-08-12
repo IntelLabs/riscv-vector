@@ -26,7 +26,10 @@ class IOMSHR(id: Int)(
   val mode_idle :: mode_busy :: Nil = Enum(2)
   val state                         = RegInit(mode_idle)
 
-  val reqReg = RegEnable(io.req, 0.U.asTypeOf(new MainPipeReq), io.reqValid)
+  val inReq = WireDefault(io.req)
+  inReq.wdata := new StoreGen(io.req.size, io.req.paddr, io.req.wdata, blockBytes).data
+
+  val reqReg = RegEnable(inReq, 0.U.asTypeOf(new MainPipeReq), io.reqValid)
   io.reqReg := reqReg
 
   state := MuxLookup(state, state)(
@@ -90,10 +93,13 @@ class IOMSHRFile(
   senderQueue.io.enq.valid := senderQueue.io.enq.ready && io.req.valid
   senderQueue.io.enq.bits  := OHToUInt(allocList.asUInt)
 
+  val counter     = RegInit(0.U(log2Up(refillCycles).W))
+  val allBeatDone = edge.last(io.l2Req) && io.l2Req.fire
+
   val a_source = senderQueue.io.deq.bits + firstMMIO.U
   val a_addr   = reqList(senderQueue.io.deq.bits).paddr
   val a_size   = reqList(senderQueue.io.deq.bits).size
-  val a_data   = reqList(senderQueue.io.deq.bits).wdata
+  val a_data   = reqList(senderQueue.io.deq.bits).wdata.asTypeOf(Vec(refillCycles, UInt(beatBits.W)))(counter)
   val a_mask   = reqList(senderQueue.io.deq.bits).wmask
   val a_cmd    = reqList(senderQueue.io.deq.bits).cmd
 
@@ -114,8 +120,10 @@ class IOMSHRFile(
   )
   val bypassStorePartial = edge.Put(a_source, a_addr, a_size, a_data, a_mask)._2
 
+  counter := Mux(allBeatDone, 0.U, Mux(io.l2Req.fire, counter + 1.U, counter))
+
   io.l2Req.valid           := senderQueue.io.deq.valid
-  senderQueue.io.deq.ready := io.l2Req.ready
+  senderQueue.io.deq.ready := allBeatDone
   io.l2Req.bits := Mux(
     reqList(senderQueue.io.deq.bits).noAlloc && a_cmd === M_PWR,
     bypassStorePartial,

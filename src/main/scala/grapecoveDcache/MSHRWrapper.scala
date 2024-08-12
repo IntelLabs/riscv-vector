@@ -62,9 +62,9 @@ class MSHRWrapper(
   )._2
 
   io.l2Req.valid         := mshrs.io.toL2Req.valid || iomshrs.io.l2Req.valid
-  mshrs.io.toL2Req.ready := io.l2Req.ready
-  iomshrs.io.l2Req.ready := io.l2Req.ready && !mshrs.io.toL2Req.valid
-  io.l2Req.bits          := Mux(mshrs.io.toL2Req.valid, acquire, iomshrs.io.l2Req.bits)
+  mshrs.io.toL2Req.ready := io.l2Req.ready && !iomshrs.io.l2Req.valid
+  iomshrs.io.l2Req.ready := io.l2Req.ready
+  io.l2Req.bits          := Mux(iomshrs.io.l2Req.valid, iomshrs.io.l2Req.bits, acquire)
 
   // refill data
   val refillMSHR = io.fromRefill.bits.entryId < nMSHRs.asUInt
