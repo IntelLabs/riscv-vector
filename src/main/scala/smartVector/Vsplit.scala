@@ -608,8 +608,8 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     // * BEGIN
     // * Output ExcpInfo
-    io.excpInfo.exception_vld := io.vLSUXcpt.exception_vld || (ctrl.illegal & instDecodeIn)
-    io.excpInfo.illegalInst   := ctrl.illegal
+    io.excpInfo.exception_vld := io.vLSUXcpt.exception_vld || RegNext((ctrl.illegal & instDecodeIn))
+    io.excpInfo.illegalInst   := RegNext(ctrl.illegal)
     io.excpInfo.update_float  := ctrl.rdVal && isfloat
     io.excpInfo.reg_idx       := ctrl.ldest
     io.excpInfo.update_vl     := io.vLSUXcpt.update_vl
