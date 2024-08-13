@@ -221,7 +221,7 @@ class ReplayModule extends Module() {
   // inner connect
   io.innerIO.ready := state === mode_idle
   io.idxMeta       := metaCounter
-  io.replayIdx     := mshrEntryIdx
+  io.replayIdx     := Mux(state === mode_idle, io.innerIO.bits.entryIdx, mshrEntryIdx)
 
   // replace signal connect
   io.toReplace.valid := state === mode_send_replace
