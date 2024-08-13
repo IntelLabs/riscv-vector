@@ -104,8 +104,13 @@ class VIllegalInstrn extends Module {
   //val vfncvt_f_x  = ctrl.fp && ctrl.funct6 === "b010010".U && ctrl.lsrc(0) === "b10011".U
   //val vfncvt_f_f = ctrl.fp && ctrl.funct6 === "b010010".U && ctrl.lsrc(0) === "b10100".U
   //val vfncvt_rod_f_f = ctrl.fp && ctrl.funct6 === "b010010".U && ctrl.lsrc(0) === "b10101".U
-  val vfwcvt_f_x = ctrl.fp && ctrl.funct6 === "b010010".U && ctrl.widen && (ctrl.lsrc(0) === "b01010".U || ctrl.lsrc(0) === "b01011".U)
+  val vfwcvt_f_x = ctrl.fp && ctrl.funct6 === "b010010".U && ctrl.widen && 
+                   (ctrl.lsrc(0) === "b01010".U || ctrl.lsrc(0) === "b01011".U)
+  val vrgather = ctrl.perm && (ctrl.funct6 === "b001100".U || ctrl.funct6 === "b001110".U && ctrl.funct3 === "b000".U)
+  val viota    = ctrl.mask && ctrl.funct6 === "b010100".U && ctrl.lsrc(0) === "b10000".U
 
+  val mask_onlyOneReg = ctrl.mask && !(ctrl.funct6(3, 2) === "b01".U && ctrl.lsrc(0)(4))
+  val alu_mask = ctrl.alu && (ctrl.funct6(5,4) === "b11".U || ctrl.funct6 === "b010001".U || ctrl.funct6 === "b010011".U)
   val convertToInt = vfncvt_xu_f || vfncvt_x_f || vfncvt_rtz_xu_f || vfncvt_rtz_x_f // || vfncvt_f_xu || vfncvt_f_x
 
   val ill_frm = csr.frm(2) && csr.frm(1, 0) =/= 0.U && isFp
