@@ -184,13 +184,13 @@ class VFMiscDataModule(implicit val p: Parameters) extends VFPUPipelineModule {
 }
 
 class VFMisc (implicit val p: Parameters) extends VFPUSubModule {
-  val module = Module(new VFMiscDataModule)
-  module.io.in <> io.in
-  module.io.redirect := io.redirect
+  val misc = Module(new VFMiscDataModule)
+  misc.io.in <> io.in
+  misc.io.redirect := io.redirect
   // block if is not misc,
-  module.io.in.valid := io.in.valid && io.in.bits.uop.vfpCtrl.isMisc  // idle when inst is not misc
+  misc.io.in.valid := io.in.valid && io.in.bits.uop.vfpCtrl.isMisc  // idle when inst is not misc
 
-  io.out <> module.io.out
+  io.out <> misc.io.out
 //  // IMPORTANT: compose results of compare uop when LMUL > 1. This is required from VPU Control/Issue design
 //  val outUop = module.io.out.bits.uop
 //  val compareReg = RegInit(~0.U(64.W))  // init all 1
