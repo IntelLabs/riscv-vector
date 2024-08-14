@@ -7,14 +7,14 @@ import darecreek.exu.vfu.fp.fudian.utils.CLZ
 import freechips.rocketchip.config._
 
 class VFRec(implicit val p: Parameters) extends VFPUSubModule {
-  val module = Module(new VFRecDataModule)
+  val rec = Module(new VFRecDataModule)
 
-  module.io.in <> io.in
-  module.io.redirect := io.redirect
-  io.out <> module.io.out
+  rec.io.in <> io.in
+  rec.io.redirect := io.redirect
+  io.out <> rec.io.out
   // block if is not rec,
   val vfpCtrl = io.in.bits.uop.vfpCtrl
-  module.io.in.valid := io.in.valid && (vfpCtrl.isRec7 || vfpCtrl.isRecSqrt7)
+  rec.io.in.valid := io.in.valid && (vfpCtrl.isRec7 || vfpCtrl.isRecSqrt7)
 }
 
 class OutTypeClassify(val t: VFPU.FType) extends Module {
