@@ -15,6 +15,8 @@ package darecreek
 import chisel3._
 import chisel3.util._
 import utils._
+import matrix._
+import matrix.MatrixParameters._
 
 // OVI (Open Vector Interface)
 class OVIissue extends Bundle {
@@ -73,7 +75,8 @@ class VCtrl extends Bundle {
   val funct6 = UInt(6.W)
   val funct3 = UInt(3.W) // 14..12
 
-  //-- Decoded signals --
+//  //-- Decoded signals --
+  val matrix  = if (hasMatrix) Bool() else null
   val illegal = Bool()
   val lsrcVal = Vec(3, Bool()) //0: vs1   1: vs2   2: 3rd operand (and vs3?)
   val ldestVal = Bool()

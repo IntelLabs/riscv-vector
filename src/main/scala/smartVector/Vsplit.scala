@@ -13,6 +13,7 @@ import SmartParam._
 import darecreek.lsu.LdstDecoder
 import darecreek.Vlmul_to_lmul
 import darecreek.VInfoAll
+import matrix.MatrixParameters._
 
 class MuopMergeAttr extends Bundle {
     val scalarRegWriteEn = Bool()
@@ -53,7 +54,8 @@ class VUopCtrlW extends Bundle {
   val narrow_to_1 = Bool()
   val load        = Bool()
   val store       = Bool()
-  val alu         = Bool() 
+  val matrix  = if (hasMatrix) Bool() else null
+  val alu         = Bool()
   val mul         = Bool()
   val fp          = Bool()
   val div         = Bool()
@@ -85,6 +87,14 @@ class VUop(implicit p: Parameters) extends Bundle {
 }
 
 class UopRegInfo(implicit p : Parameters) extends Bundle {
+    val vs1           = UInt(128.W)
+    val vs2           = UInt(128.W)
+    val mask          = UInt(128.W)
+    val old_vd        = UInt(128.W)
+    val vxsat         = Bool()
+}
+
+class mma_in(implicit p : Parameters) extends Bundle {
     val vs1           = UInt(128.W)
     val vs2           = UInt(128.W)
     val mask          = UInt(128.W)
@@ -464,8 +474,9 @@ class Vsplit(implicit p : Parameters) extends Module {
     mUopIn.bits.uop.ctrl.narrow_to_1 := ctrl.narrow_to_1
     mUopIn.bits.uop.ctrl.load        := ctrl.load
     mUopIn.bits.uop.ctrl.store       := ctrl.store
-    mUopIn.bits.uop.ctrl.alu         := ctrl.alu  
-    mUopIn.bits.uop.ctrl.mul         := ctrl.mul 
+    mUopIn.bits.uop.ctrl.alu         := ctrl.alu
+    mUopIn.bits.uop.ctrl.matrix      := ctrl.matrix
+    mUopIn.bits.uop.ctrl.mul         := ctrl.mul
     mUopIn.bits.uop.ctrl.fp          := ctrl.fp  
     mUopIn.bits.uop.ctrl.div         := ctrl.div 
     mUopIn.bits.uop.ctrl.fixP        := ctrl.fixP

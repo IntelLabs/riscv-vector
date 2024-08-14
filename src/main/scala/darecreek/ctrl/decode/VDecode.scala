@@ -16,6 +16,8 @@ import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.decode._
 import darecreek.ctrl.decode._
+import matrix._
+import matrix.MatrixParameters._
 
 class VDecode extends Module {
   val io = IO(new Bundle {
@@ -43,6 +45,9 @@ class VDecode extends Module {
 
   val vClasses = decodersOut.map(x => x(x.getWidth - 1))
   vCtrl.illegal := !(vClasses.reduce(_ || _))
+  if (hasMatrix) {
+    vCtrl.matrix := io.in === "b00000010110001000000100000001011".U
+  }
   val vCtrlSigs = Mux1H(vClasses, decodersOut)
 
   val ctrls = Seq(vCtrl.lsrcVal(2), vCtrl.lsrcVal(1), vCtrl.lsrcVal(0),

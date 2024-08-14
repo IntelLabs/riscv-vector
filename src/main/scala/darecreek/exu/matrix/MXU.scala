@@ -55,6 +55,7 @@ object AccTileConstants {
   val tpregSz = 5
   val vstqAddrSz = 3
   val rLen = 128
+  val numReadPorts = 1
   val numVLdPorts = 1
   val mxuPERows = 8
   val mxuPECols = 8
