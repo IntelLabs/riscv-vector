@@ -67,15 +67,4 @@ trait DCacheParams {
   val lrscCycles  = 80
   val lrscBackoff = 3
   // }}}
-
-  // {{{ TODO: move
-  // 1 for write & 0 for read
-  val mshrType = 1
-
-  // One Hot codeing
-  // bit 0: allocate req
-  // bit 1: replay req
-  // bit 2: probe req
-  val mshrReqType = 3
-  // }}}
 }

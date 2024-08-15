@@ -6,12 +6,15 @@ import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.devices.tilelink._
 import _root_.circt.stage.ChiselStage
+import grapecoveDcache._
 
 class DCacheWrapper()(
     implicit p: Parameters
 ) extends LazyModule {
 
-  val dcacheClient = LazyModule(new GPCDCache()(p))
+  val param: CanInstantiatePrefetcher = new NextLinePrefetcherParams
+
+  val dcacheClient = LazyModule(new DCachePrefetchWrapper(param)(p))
 
   val ram  = LazyModule(new TLRAM(AddressSet(0x80000000L, 0x7fffffffL), beatBytes = beatBytes, atomics = true))
   val mmio = LazyModule(new TLRAM(AddressSet(0x60000000L, 0x1fffffffL), beatBytes = beatBytes, atomics = true))
