@@ -192,26 +192,24 @@ trait DCacheForwardTestTrait {
         )))
 
         dut.clock.step(1)
-        // s2->s1 replace load forward
         dut.io.req.bits.poke(genReq(cacheReq))
 
         dut.clock.step(1)
+        dut.io.req.valid.poke(false.B)
         dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
+        dut.io.resp.bits.status.expect(CacheRespStatus.replay)
 
-        // s3->s1 replace load forward
+        dut.clock.step(20)
+
+        dut.io.req.valid.poke(true.B)
         dut.io.req.bits.poke(genReq(cacheReq))
 
         dut.clock.step(1)
+        dut.io.req.valid.poke(false.B)
         dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
+        dut.io.resp.bits.status.expect(CacheRespStatus.hit)
 
-        // directly read meta array
-        dut.io.req.bits.poke(genReq(cacheReq))
-
-        dut.clock.step(1)
-        dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
+        dut.clock.step(10)
       }
 
     }

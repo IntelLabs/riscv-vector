@@ -212,6 +212,12 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   amoalu.io.lhs  := s1_dataVec(s1_bankOffset)
   amoalu.io.rhs  := s1_req.wdata
 
+  // * amo no perm miss
+  val s1_amoNoPermMiss   = s1_validFromCore && isAMO(s1_req.cmd) && s1_upgradePermMiss
+  val s1_amoNoPermWb     = s1_amoNoPermMiss
+  val s1_amoNoPermWbData = false.B
+  val s1_amoShrinkParam  = TLPermissions.BtoN
+
   // * cpu lrsc
   // NOTE: when lrscValid -> block probe & replace to lrscAddr
   val lrscCount = RegInit(0.U)
@@ -237,8 +243,12 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     ),
   )
 
-  val s1_storeUpdateMeta = s1_validFromCore && s1_cacheable && !s1_scFail &&
-    (s1_upgradePermHit || (s1_upgradePermMiss && mshrs.io.req.ready))
+  val s1_storeHitUpdateMeta = s1_validFromCore && s1_cacheable && s1_upgradePermHit && !s1_scFail
+  val s1_storeMissUpdateMeta = s1_validFromCore && s1_cacheable && (
+    (s1_amoNoPermMiss && wbPipeReq.ready) ||
+      (s1_upgradePermMiss && !isAMO(s1_req.cmd) && mshrs.io.req.ready)
+  )
+
   val s1_storeUpdateData = s1_validFromCore && s1_cacheable && s1_hit &&
     isWrite(s1_req.cmd) && !s1_scFail
 
@@ -262,9 +272,10 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_repCoh         = s1_coh
   val s1_repDirty       = s1_repCoh.onCacheControl(M_FLUSH)._1
   val s1_repShrinkParam = s1_repCoh.onCacheControl(M_FLUSH)._2
-  val s1_replaceWb      = s1_validRefill && (s1_repCoh.state > ClientStates.Branch) // Trunk or Dirty
+  val s1_replaceWb      = s1_validRefill && (s1_repCoh.state > ClientStates.Nothing)
   val s1_replaceWbData  = s1_repDirty
 
+  // * refill
   val s1_refillUpdateMeta = s1_validRefill
   val s1_refillUpdateData = s1_validRefill
   val s1_refillData       = s1_req.wdata
@@ -272,7 +283,8 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_canDoRefill = (!s1_replaceWb) || wbPipeReq.ready
 
   // prepare for s2
-  val s1_updateMeta = s1_storeUpdateMeta ||
+  val s1_updateMeta = s1_storeHitUpdateMeta ||
+    s1_storeMissUpdateMeta ||
     (s1_probeUpdateMeta && s1_canProbe) ||
     (s1_refillUpdateMeta && s1_canDoRefill)
   val s1_updateData = s1_storeUpdateData ||
@@ -395,7 +407,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   dontTouch(mshrs.io)
 
   // pipeline miss -> mshr
-  val s1_mshrAlloc     = s1_validFromCore && ~s1_hit && ~s1_scFail
+  val s1_mshrAlloc     = s1_validFromCore && ~s1_hit && ~s1_scFail && ~s1_amoNoPermMiss
   val s1_mshrAllocFail = s1_mshrAlloc && !mshrs.io.req.ready
 
   // mshr store data
@@ -449,12 +461,20 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // wb in pipeline stage 1
   val wbArbiter = Module(new Arbiter(new WritebackReq(edge.bundle), 2))
 
-  wbPipeReq.valid          := s1_probeWb || s1_replaceWb
-  wbPipeReq.bits.voluntary := s1_req.isRefill
+  wbPipeReq.valid          := s1_probeWb | s1_replaceWb | s1_amoNoPermWb
+  wbPipeReq.bits.voluntary := !s1_req.isProbe
   wbPipeReq.bits.data      := s1_data
-  wbPipeReq.bits.perm      := Mux(s1_probeWb, s1_probeReportParam, s1_repShrinkParam)
-  wbPipeReq.bits.lineAddr  := Mux(s1_probeWb, getLineAddr(s1_req.paddr), s1_repLineAddr)
-  wbPipeReq.bits.hasData   := Mux(s1_probeWb, s1_probeWbData, s1_replaceWbData)
+  wbPipeReq.bits.lineAddr  := Mux(s1_replaceWb, s1_repLineAddr, getLineAddr(s1_req.paddr))
+  wbPipeReq.bits.perm := Mux(
+    s1_probeWb,
+    s1_probeReportParam,
+    Mux(s1_amoNoPermWb, s1_amoShrinkParam, s1_repShrinkParam),
+  )
+  wbPipeReq.bits.hasData := Mux(
+    s1_probeWb,
+    s1_probeWbData,
+    Mux(s1_amoNoPermWb, s1_amoNoPermWbData, s1_replaceWbData),
+  )
 
   // source 0: main pipeline
   wbArbiter.io.in(0) <> wbPipeReq
@@ -479,16 +499,18 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // * Probe Begin
   probeQueue.io.memProbe <> tlBus.b
-
   probeQueue.io.lrscAddr.valid := lrscValid
   probeQueue.io.lrscAddr.bits  := lrscAddr
-
   // in MSHR: probeQueue.io.probeCheck <> mshrs.io.probeCheck
 
   probeQueue.io.probeResp := Mux(
     !s1_probeWb,
     ProbeRespStatus.probe_invalid,
-    Mux(s1_canProbe, ProbeRespStatus.probe_finish, ProbeRespStatus.probe_replay),
+    Mux(
+      s1_canProbe,
+      ProbeRespStatus.probe_finish,
+      ProbeRespStatus.probe_replay,
+    ),
   )
   // * Probe End
 
@@ -497,35 +519,6 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val mshrsResp    = Wire(Valid(new DataExchangeResp))
 
   //  s1 resp
-
-  // val loadDataStart = LookupTree(
-  //   s1_req.paddr(5, 0),
-  //   (0 until 63).flatMap(i =>
-  //     Seq(i.U -> s1_data(511, i * 8))
-  //   ),
-  // )
-
-  // val loadDataSel = LookupTree(
-  //   Cat(s1_req.signed, s1_req.size),
-  //   List(
-  //     "b0_000".U -> ZeroExt(loadDataStart(7, 0), blockBits),
-  //     "b0_001".U -> ZeroExt(loadDataStart(15, 0), blockBits),
-  //     "b0_010".U -> ZeroExt(loadDataStart(31, 0), blockBits),
-  //     "b0_011".U -> ZeroExt(loadDataStart(63, 0), blockBits),
-  //     "b0_100".U -> ZeroExt(loadDataStart(127, 0), blockBits),
-  //     "b0_101".U -> ZeroExt(loadDataStart(255, 0), blockBits),
-  //     "b0_110".U -> ZeroExt(loadDataStart(511, 0), blockBits),
-  //     "b1_000".U -> SignExt(loadDataStart(7, 0), blockBits),
-  //     "b1_001".U -> SignExt(loadDataStart(15, 0), blockBits),
-  //     "b1_010".U -> SignExt(loadDataStart(31, 0), blockBits),
-  //     "b1_011".U -> SignExt(loadDataStart(63, 0), blockBits),
-  //     "b1_100".U -> SignExt(loadDataStart(127, 0), blockBits),
-  //     "b1_101".U -> SignExt(loadDataStart(255, 0), blockBits),
-  //     "b1_110".U -> SignExt(loadDataStart(511, 0), blockBits),
-  //   ),
-  // )
-  // s1_cacheResp.bits.data    := Mux(s1_sc, s1_scFail, loadDataSel)
-
   val loadGenAcc = new LoadGenAcc(
     s1_req.size,
     s1_req.signed,
@@ -546,7 +539,10 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     Seq(
       s1_hit
         -> CacheRespStatus.hit,
-      (s1_wbqBlockMiss | s1_mshrAllocFail | s1_lrFail)
+      (s1_wbqBlockMiss |   // miss addr exist in wbq
+        s1_mshrAllocFail | // miss but mshr full
+        s1_amoNoPermMiss | // amo no perm miss release B first
+        s1_lrFail)         // lr failed
         -> CacheRespStatus.replay,
     ),
   )
@@ -556,7 +552,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // return resp
   io.nextCycleWb := mshrs.io.nextCycleWb
-  io.resp.valid  := s1_cacheResp.valid || mshrsResp.valid
+  io.resp.valid  := s1_cacheResp.valid | mshrsResp.valid
   io.resp.bits   := Mux(s1_cacheResp.valid, s1_cacheResp.bits, mshrsResp.bits)
 
   // when mshr wants to wb,
