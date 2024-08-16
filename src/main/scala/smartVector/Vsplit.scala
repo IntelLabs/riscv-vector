@@ -121,8 +121,8 @@ class Vsplit(implicit p : Parameters) extends Module {
             val toRegFileRead = Output(new regReadIn)
             val mUopMergeAttr = ValidIO(new MuopMergeAttr)
         }
-        val scoreBoardSetIO = Flipped(new ScoreboardSetIO)
-        val scoreBoardReadIO = Flipped(new ScoreboardReadIO)
+        val writeSBoardSetIO = Flipped(new ScoreboardSetIO)
+        val writeSBoardReadIO = Flipped(new ScoreboardReadIO)
         val lsuStallSplit = Input(Bool())
         val lsuEmpty      = Input(Bool()) 
         val iexNeedStall  = Input(Bool())
@@ -383,18 +383,18 @@ class Vsplit(implicit p : Parameters) extends Module {
     //val needStall  = Wire(Bool())
     val hasRegConf = Wire(Vec(4,Bool()))
     
-    io.scoreBoardReadIO.readAddr1    := vs1Idx
-    io.scoreBoardReadIO.readAddr2    := vs2Idx
-    io.scoreBoardReadIO.readAddr3    := vs3Idx
-    io.scoreBoardReadIO.readMaskAddr := 0.U
-    io.scoreBoardReadIO.readNum1     := emulVs1
-    io.scoreBoardReadIO.readNum2     := emulVs2 
+    io.writeSBoardReadIO.readAddr1    := vs1Idx
+    io.writeSBoardReadIO.readAddr2    := vs2Idx
+    io.writeSBoardReadIO.readAddr3    := vs3Idx
+    io.writeSBoardReadIO.readMaskAddr := 0.U
+    io.writeSBoardReadIO.readNum1     := emulVs1
+    io.writeSBoardReadIO.readNum2     := emulVs2 
 
     when(!vs1ReadEn || vs1Idx === ctrl.ldest + ldest_inc){
         hasRegConf(0) := false.B
     }.elsewhen(ctrl.perm){
-        hasRegConf(0) := io.scoreBoardReadIO.readBypassed1N
-    }.elsewhen (~io.scoreBoardReadIO.readBypassed1){
+        hasRegConf(0) := io.writeSBoardReadIO.readBypassed1N
+    }.elsewhen (~io.writeSBoardReadIO.readBypassed1){
         hasRegConf(0) := false.B
     }.otherwise{
         hasRegConf(0) := true.B
@@ -403,8 +403,8 @@ class Vsplit(implicit p : Parameters) extends Module {
     when(!vs2ReadEn){
         hasRegConf(1) := false.B
     }.elsewhen(ctrl.perm){
-        hasRegConf(1) := io.scoreBoardReadIO.readBypassed2N
-    }.elsewhen (~io.scoreBoardReadIO.readBypassed2){
+        hasRegConf(1) := io.writeSBoardReadIO.readBypassed2N
+    }.elsewhen (~io.writeSBoardReadIO.readBypassed2){
         hasRegConf(1) := false.B
     }.otherwise{
         hasRegConf(1) := true.B
@@ -413,8 +413,8 @@ class Vsplit(implicit p : Parameters) extends Module {
     when(!vs3ReadEn){
         hasRegConf(2) := false.B
     }.elsewhen(ctrl.perm){
-        hasRegConf(2) := io.scoreBoardReadIO.readBypassed3N
-    }.elsewhen (~io.scoreBoardReadIO.readBypassed3){
+        hasRegConf(2) := io.writeSBoardReadIO.readBypassed3N
+    }.elsewhen (~io.writeSBoardReadIO.readBypassed3){
         hasRegConf(2) := false.B
     }.otherwise{
         hasRegConf(2) := true.B
@@ -422,7 +422,7 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     when(!maskReadEn){
         hasRegConf(3) := false.B
-    }.elsewhen (~io.scoreBoardReadIO.readBypassed4){
+    }.elsewhen (~io.writeSBoardReadIO.readBypassed4){
         hasRegConf(3) := false.B
     }.otherwise{
         hasRegConf(3) := true.B
@@ -441,10 +441,11 @@ class Vsplit(implicit p : Parameters) extends Module {
     io.out.toRegFileRead.rfReadIdx(2)     := 0.U
     io.out.toRegFileRead.rfReadIdx(3)     := ctrl.ldest + ldest_inc
 
-    io.scoreBoardSetIO.setEn      := RegNext(fire2PipeReg && ctrl.ldestVal && (~ctrl.perm || ~(ldstCtrl.segment && segmentRegNotFirstElem)))
-    io.scoreBoardSetIO.setMultiEn := RegNext(fire2PipeReg && ctrl.ldestVal && ctrl.perm)
-    io.scoreBoardSetIO.setNum     := RegNext(emulVd)
-    io.scoreBoardSetIO.setAddr    := RegNext(mUopMergeAttrIn.bits.ldest)
+    val longInst = ctrl.isLdst || ctrl.fp
+    io.writeSBoardSetIO.setEn      := RegNext(fire2PipeReg && ctrl.ldestVal && (longInst && ~(ldstCtrl.segment && segmentRegNotFirstElem)))
+    io.writeSBoardSetIO.setMultiEn := RegNext(fire2PipeReg && ctrl.ldestVal && ctrl.perm)
+    io.writeSBoardSetIO.setNum     := RegNext(emulVd)
+    io.writeSBoardSetIO.setAddr    := RegNext(mUopMergeAttrIn.bits.ldest)
 
     // * read & write scoreboard
     // * END

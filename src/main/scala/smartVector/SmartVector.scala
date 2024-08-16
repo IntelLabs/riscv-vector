@@ -21,6 +21,9 @@ class ScoreboardSetIO extends Bundle {
     val setAddr       = Input(UInt(log2Ceil(NVPhyRegs).W))
     val setMultiEn    = Input(Bool())
     val setNum        = Input(UInt(log2Ceil(NVPhyRegs).W))
+    val setAddr2       = Input(UInt(log2Ceil(NVPhyRegs).W))
+    val setMultiEn2    = Input(Bool())
+    val setNum2        = Input(UInt(log2Ceil(NVPhyRegs).W))
 }
 
 class ScoreboardClearIO extends Bundle {
@@ -54,6 +57,7 @@ class CommitInfo extends Bundle{
     val fflags = UInt(5.W)
     val data = UInt(64.W)
     val vxsat = Bool()
+    val sdId  = UInt(5.W)
 }
 
 class SmartVector extends Module {
@@ -149,19 +153,23 @@ class SmartVector extends Module {
     svlsuWrapper.io.dataExchange.xcpt.ae.ld := io.rvuMemory.xcpt.ae.ld
     svlsuWrapper.io.dataExchange.xcpt.ae.st := io.rvuMemory.xcpt.ae.st
     
-    val sboard  = new Scoreboard(NVPhyRegs, false)
-    sboard.clear(merge.io.scoreBoardCleanIO.clearEn, merge.io.scoreBoardCleanIO.clearAddr)
-    sboard.clearN(merge.io.scoreBoardCleanIO.clearMultiEn, merge.io.scoreBoardCleanIO.clearAddr, merge.io.scoreBoardCleanIO.clearNum)
-    sboard.set(split.io.scoreBoardSetIO.setEn, split.io.scoreBoardSetIO.setAddr)
-    sboard.setN(split.io.scoreBoardSetIO.setMultiEn, split.io.scoreBoardSetIO.setAddr, split.io.scoreBoardSetIO.setNum)
-    sboard.clearAll(merge.io.scoreBoardCleanIO.clearAll)    
-    split.io.scoreBoardReadIO.readBypassed1 := sboard.readBypassed(split.io.scoreBoardReadIO.readAddr1)
-    split.io.scoreBoardReadIO.readBypassed2 := sboard.readBypassed(split.io.scoreBoardReadIO.readAddr2)
-    split.io.scoreBoardReadIO.readBypassed3 := sboard.readBypassed(split.io.scoreBoardReadIO.readAddr3)
-    split.io.scoreBoardReadIO.readBypassed4 := sboard.readBypassed(split.io.scoreBoardReadIO.readMaskAddr)
-    split.io.scoreBoardReadIO.readBypassed1N := sboard.readBypassedN(split.io.scoreBoardReadIO.readNum1, split.io.scoreBoardReadIO.readAddr1)
-    split.io.scoreBoardReadIO.readBypassed2N := sboard.readBypassedN(split.io.scoreBoardReadIO.readNum2, split.io.scoreBoardReadIO.readAddr2)
-    split.io.scoreBoardReadIO.readBypassed3N := sboard.readBypassedN(1.U, split.io.scoreBoardReadIO.readAddr3)
+    val writeSboard  = new Scoreboard(NVPhyRegs, false)
+    val readSboard  = new Scoreboard(NVPhyRegs, false)
+    writeSboard.clear(merge.io.scoreBoardCleanIO.clearEn, merge.io.scoreBoardCleanIO.clearAddr)
+    writeSboard.clearN(merge.io.scoreBoardCleanIO.clearMultiEn, merge.io.scoreBoardCleanIO.clearAddr, merge.io.scoreBoardCleanIO.clearNum)
+    writeSboard.set(split.io.writeSBoardSetIO.setEn, split.io.writeSBoardSetIO.setAddr)
+    writeSboard.setN1(split.io.writeSBoardSetIO.setMultiEn, split.io.writeSBoardSetIO.setAddr, split.io.writeSBoardSetIO.setNum)
+    writeSboard.clearAll(merge.io.scoreBoardCleanIO.clearAll)    
+    readSboard.setN1(iex.io.readSBoardSetIO.setMultiEn, iex.io.readSBoardSetIO.setAddr, iex.io.readSBoardSetIO.setNum)
+    readSboard.setN2(iex.io.readSBoardSetIO.setMultiEn2, iex.io.readSBoardSetIO.setAddr2, iex.io.readSBoardSetIO.setNum2)
+    split.io.writeSBoardReadIO.readBypassed1  := writeSboard.readBypassed(split.io.writeSBoardReadIO.readAddr1)
+    split.io.writeSBoardReadIO.readBypassed2  := writeSboard.readBypassed(split.io.writeSBoardReadIO.readAddr2)
+    split.io.writeSBoardReadIO.readBypassed3  := writeSboard.readBypassed(split.io.writeSBoardReadIO.readAddr3)
+    split.io.writeSBoardReadIO.readBypassed4  := writeSboard.readBypassed(split.io.writeSBoardReadIO.readMaskAddr)
+    split.io.writeSBoardReadIO.readBypassed1N := writeSboard.readBypassedN(split.io.writeSBoardReadIO.readNum1, split.io.writeSBoardReadIO.readAddr1)
+    split.io.writeSBoardReadIO.readBypassed2N := writeSboard.readBypassedN(split.io.writeSBoardReadIO.readNum2, split.io.writeSBoardReadIO.readAddr2)
+    split.io.writeSBoardReadIO.readBypassed3N := writeSboard.readBypassedN(1.U, split.io.writeSBoardReadIO.readAddr3)    
+
     io.in.ready := decoder.io.in.ready
 }
 

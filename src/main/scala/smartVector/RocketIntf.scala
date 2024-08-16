@@ -24,6 +24,7 @@ class RVUissue extends Bundle {
     val frs1   = UInt(64.W) //float register data
     val rs1    = UInt(64.W)
     val rs2    = UInt(64.W)
+    val sbId   = UInt(5.W)
     val vInfo  = new VInfo
 }
 

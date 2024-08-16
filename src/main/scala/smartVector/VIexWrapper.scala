@@ -42,6 +42,9 @@ class VIexWrapper(implicit p : Parameters) extends Module {
     val permOut = new PermReadRF
     val permRegIn = Input(new(VPermRegIn))
     val iexNeedStall = Output(Bool())
+    val readSBoardSetIO = Flipped(new ScoreboardSetIO)
+    val readSBoardReadIO = Flipped(new ScoreboardReadIO)
+    val readSBoardClearIO = Flipped(new ScoreboardClearIO)
   })
 
   // IEX modules
@@ -202,6 +205,16 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   SVPerm.io.in.vs2_preg_idx    := VecInit(Seq.tabulate(8)(i => muxData.mUop.uop.ctrl.lsrc(1) + i.U))
   SVPerm.io.in.old_vd_preg_idx := VecInit(Seq.tabulate(8)(i => muxData.mUop.uop.ctrl.ldest   + 
                                   Mux(io.in.bits.mUop.uop.ctrl.vGatherEi16EEW8, i.U >> 1, i.U)))
+
+  io.readSBoardSetIO.setMultiEn := SVPerm.io.in.rvalid
+  io.readSBoardSetIO.setNum := Mux(io.in.bits.mUop.uop.ctrl.vGatherEi16EEW64, 2.U, 
+                               Mux(io.in.bits.mUop.uop.ctrl.vGatherEi16EEW32, 4.U, 8.U))
+  io.readSBoardSetIO.setAddr := muxData.mUop.uop.ctrl.lsrc(0)   
+
+  io.readSBoardSetIO.setMultiEn2 := SVPerm.io.in.rvalid 
+  io.readSBoardSetIO.setNum2     := Mux(io.in.bits.mUop.uop.ctrl.vGatherEi16EEW8, 4.U, 8.U)
+  io.readSBoardSetIO.setAddr2    := muxData.mUop.uop.ctrl.lsrc(1)                         
+
   SVPerm.io.in.mask_preg_idx := 0.U
   SVPerm.io.in.uop_valid := muxValid & muxData.mUop.uop.ctrl.perm
   SVPerm.io.in.rdata := io.permRegIn.rdata
@@ -211,22 +224,50 @@ class VIexWrapper(implicit p : Parameters) extends Module {
 
   io.permOut.rd_en  := SVPerm.io.permReadRF.rd_en
   io.permOut.rd_preg_idx := SVPerm.io.permReadRF.rd_preg_idx
- 
 
+  io.readSBoardClearIO.clearEn := SVPerm.io.permReadRF.rd_en
+  io.readSBoardClearIO.clearAddr := SVPerm.io.permReadRF.rd_preg_idx
+ 
   val Result = Wire(new IexOut)
 
-  val CycleVld1H = Seq(SValu.io.out.valid, SVMac.io.out.valid, SVMask.io.out.valid, SVReduc.io.out.valid,
-                       SVDiv.io.out.valid, SVFpu.io.out.valid, SVPerm.io.out.valid)
+  val CycleVld1H = VecInit(Seq(SValu.io.out.valid, SVMac.io.out.valid, SVMask.io.out.valid, SVReduc.io.out.valid,
+                       SVDiv.io.out.valid, SVFpu.io.out.valid, SVPerm.io.out.valid))
 
   val CycleResult1H = Seq(SValu.io.out.bits, SVMac.io.out.bits, SVMask.io.out.bits, SVReduc.io.out.bits,
                        SVDiv.io.out.bits, SVFpu.io.out.bits, SVPerm.io.out.bits)
 
-  Result  := Mux1H(CycleVld1H, CycleResult1H)
+  // 默认值，假设没有 valid 信号时的默认结果
+  val defaultBits = CycleResult1H.head
 
-  val fixCycleValid = SValu.io.out.valid || SVMac.io.out.valid || SVMask.io.out.valid || SVReduc.io.out.valid
+  // 初始化 oldestBits 为 defaultBits
+  val oldestBits = WireDefault(defaultBits)
+  val oldestIdx = Wire(UInt(3.W))
+
+  def selectOlder(bits1: UInt, bits2: UInt): UInt = {
+    Mux(bits1(4) === bits2(4), 
+      Mux(bits1(3,0) > bits2(3,0), bits1, bits2),  // 当 bits1(4) == bits2(4) 时，选取
+      Mux(bits1(3,0) < bits2(3,0), bits1, bits2)   // 当 bits1(4) != bits2(4) 时，比较 bits1(4) 和 bits2(4)
+    )
+  }
+
+  for(i <- 0 until CycleVld1H.length){
+    when(CycleVld1H(i)){
+      oldestBits := selectOlder(CycleResult1H(i).commitInfo.bits.sdId, oldestBits.commitInfo.bits.sdId)
+      oldestIdx := i.U
+    }
+  }
+
+  Result := oldestBits
+  io.readSBoardReadIO.readAddr1 := Result.toRegFileWrite.rfWriteIdx
+  when(io.readSBoardReadIO.readBypassed1){
+    Result.commitInfo.valid := false.B
+    Result.toRegFileWrite.rfWriteEn := false.B
+  }
+
+  //val fixCycleValid = SValu.io.out.valid || SVMac.io.out.valid || SVMask.io.out.valid || SVReduc.io.out.valid
   
   io.out.bits := Result
-  io.out.valid := fixCycleValid || SVPerm.io.out.valid || SVFpu.io.out.valid || SVPerm.io.out.valid
+  io.out.valid := CycleVld1H.reduce(_ || _) && !io.readSBoardReadIO.readBypassed1
 
   io.iexNeedStall := bufferValidReg
 }

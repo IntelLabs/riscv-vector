@@ -9,7 +9,8 @@ class Scoreboard(n: Int, zero: Boolean = false)
 {
 
   def set(en: Bool, addr: UInt): Unit = update(en, _next | mask(en, addr))
-  def setN(en: Bool, addr: UInt, num: UInt): Unit = update(en, _next | maskN(en, addr, num))
+  def setN1(en: Bool, addr: UInt, num: UInt): Unit = update(en, _next | maskN(en, addr, num))
+  def setN2(en: Bool, addr: UInt, num: UInt): Unit = update(en, _next | maskN(en, addr, num))
   def clear(en: Bool, addr: UInt): Unit = update(en, _next & ~mask(en, addr))
   def clearN(en: Bool, addr: UInt, num: UInt): Unit = update(en, _next & ~maskN(en, addr, num))
   def clearAll(en: Bool): Unit = update(en, _next & Fill(n,~en))
