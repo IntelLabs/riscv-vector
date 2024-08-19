@@ -12,8 +12,9 @@ class IOMSHR(id: Int)(
   val io = IO(new Bundle {
     val req = Input(new MainPipeReq)
 
-    val isEmpty  = Output(Bool())
-    val reqValid = Input(Bool())
+    val isEmpty    = Output(Bool())
+    val reqValid   = Input(Bool())
+    val sendNReady = Output(Bool())
 
     val addrMatch = Output(Bool())
 
@@ -26,11 +27,22 @@ class IOMSHR(id: Int)(
   val mode_idle :: mode_busy :: Nil = Enum(2)
   val state                         = RegInit(mode_idle)
 
-  val inReq = WireDefault(io.req)
-  inReq.wdata := new StoreGen(io.req.size, io.req.paddr, io.req.wdata, blockBytes).data
+//  val inReq = WireDefault(io.req)
+//  inReq.wdata := new StoreGen(io.req.size, io.req.paddr, io.req.wdata, blockBytes).data
 
-  val reqReg = RegEnable(inReq, 0.U.asTypeOf(new MainPipeReq), io.reqValid)
-  io.reqReg := reqReg
+  val reqReg       = RegInit(0.U.asTypeOf(new MainPipeReq))
+  val delayedValid = RegInit(false.B)
+  when(io.reqValid && state === mode_idle) {
+    reqReg       := io.req
+    delayedValid := true.B
+  }.elsewhen(delayedValid) {
+    delayedValid := false.B
+    reqReg.wmask := io.req.wmask
+    reqReg.wdata := new StoreGen(reqReg.size, reqReg.paddr, io.req.wdata, blockBytes).data
+  }
+
+  io.reqReg     := reqReg
+  io.sendNReady := delayedValid
 
   state := MuxLookup(state, state)(
     Seq(
@@ -68,6 +80,8 @@ class IOMSHRFile(
   val reqList          = Wire(Vec(nMMIOs, new MainPipeReq))
   val allocList        = Wire(Vec(nMMIOs, Bool()))
 
+  val sendNReadyList = Wire(Vec(nMMIOs, Bool()))
+
   val iomshrs = (0 until nMMIOs) map {
     i =>
       val iomshr = Module(new IOMSHR(i)(edge))
@@ -77,8 +91,8 @@ class IOMSHRFile(
       allocList(i)       := allocArb.io.in(i).fire
       iomshr.io.reqValid := allocArb.io.in(i).fire
       iomshr.io.req      := io.req.bits
-
-      reqList(i) := iomshr.io.reqReg
+      sendNReadyList(i)  := iomshr.io.sendNReady
+      reqList(i)         := iomshr.io.reqReg
 
       addrMatchList(i)       := iomshr.io.addrMatch
       iomshr.io.replayFinish := replayFinishList(i)
@@ -122,7 +136,7 @@ class IOMSHRFile(
 
   counter := Mux(allBeatDone, 0.U, Mux(io.l2Req.fire, counter + 1.U, counter))
 
-  io.l2Req.valid           := senderQueue.io.deq.valid
+  io.l2Req.valid           := senderQueue.io.deq.valid && !sendNReadyList.asUInt.orR
   senderQueue.io.deq.ready := allBeatDone
   io.l2Req.bits := Mux(
     reqList(senderQueue.io.deq.bits).noAlloc && a_cmd === M_PWR,

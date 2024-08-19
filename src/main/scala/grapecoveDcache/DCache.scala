@@ -429,7 +429,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s2_mshrStoreMaskInBytes = Mux(s2_upgradePermMiss, Fill(dataBytes, 1.U), s2_maskInBytes)
 
   val mshrReq = WireDefault(s1_req)
-  mshrReq.wdata := s2_mshrStoreMaskInBytes
+  mshrReq.wdata := s2_mshrStoreData
   mshrReq.wmask := s2_mshrStoreMaskInBytes
 
   mshrs.io.req.valid := s1_mshrAlloc

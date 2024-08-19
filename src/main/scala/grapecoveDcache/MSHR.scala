@@ -420,31 +420,41 @@ class MSHRFile extends Module() {
   val wrIdx        = Mux(lineAddrMatch, lineAddrMatchIdx, allocateIdx)
   val metaWriteIdx = writeCounterList(wrIdx)
 
+  val dataArrayWriteEna = RegInit(false.B)
+  val dataArrayWriteIdx = RegInit(0.U(nMSHRs.W))
+
   when(io.pipelineReq.fire) {
     // read/write => update meta info
     metaArray(wrIdx)(metaWriteIdx) := io.pipelineReq.bits.meta.asUInt
 
     // write => update data array & mask array
     when(isWrite(io.pipelineReq.bits.meta.cmd)) {
-      maskArray(wrIdx) := io.pipelineReq.bits.mask | maskArray(wrIdx)
-      dataArray(wrIdx) := Mux(
-        io.pipelineReq.bits.isUpgrade,
-        io.pipelineReq.bits.data,
-        dataMergeGen(~io.pipelineReq.bits.mask, dataArray(wrIdx)) |
-          dataMergeGen(io.pipelineReq.bits.mask, io.pipelineReq.bits.data),
-      )
+      dataArrayWriteEna := true.B
+      dataArrayWriteIdx := wrIdx
     }
   }.elsewhen(io.replaceStatus === ReplaceStatus.replace_finish) {
     maskArray(replayReg.io.replayIdx) := 0.U
     dataArray(replayReg.io.replayIdx) := 0.U
   }
 
+  // receive miss addr data at s2
+  when(dataArrayWriteEna) {
+    dataArrayWriteEna := false.B
+    dataArray(dataArrayWriteIdx) := Mux(
+      RegNext(io.pipelineReq.bits.isUpgrade),
+      io.pipelineReq.bits.data,
+      dataMergeGen(~io.pipelineReq.bits.mask, dataArray(dataArrayWriteIdx)) |
+        dataMergeGen(io.pipelineReq.bits.mask, io.pipelineReq.bits.data),
+    )
+    maskArray(dataArrayWriteIdx) := io.pipelineReq.bits.mask | maskArray(dataArrayWriteIdx)
+  }
+
   // sender queue
   senderQueue.io.enq.valid := allocateList.asUInt.orR
   senderQueue.io.enq.bits  := allocateIdx
 
-  io.toL2Req.valid         := senderQueue.io.deq.valid
-  senderQueue.io.deq.ready := io.toL2Req.ready
+  io.toL2Req.valid         := senderQueue.io.deq.valid && !dataArrayWriteEna
+  senderQueue.io.deq.ready := io.toL2Req.ready && !dataArrayWriteEna
   io.toL2Req.bits.perm     := senderPermissionList(senderQueue.io.deq.bits)
   io.toL2Req.bits.entryId  := senderQueue.io.deq.bits
   io.toL2Req.bits.lineAddr := lineAddrList(senderQueue.io.deq.bits)
