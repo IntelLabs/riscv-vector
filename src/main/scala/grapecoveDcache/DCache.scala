@@ -31,6 +31,12 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // * Modules End
 
   // * Signal Define Begin
+  val s1_mshrAlloc = WireInit(false.B)
+  // replace victim way
+  val victimWay = WireInit(0.U(log2Up(nWays).W))
+
+  val wbPipeReq = WireInit(0.U.asTypeOf(Decoupled(new WritebackReq(edge.bundle))))
+
   // Store -> Load Bypassing
   class BypassStore extends Bundle {
     val data  = UInt(dataWidth.W)
@@ -50,11 +56,6 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   val s1_bypassStore        = Wire(Valid(new BypassStore))
   val s1_bypassReplaceValid = WireInit(false.B)
-
-  // replace victim way
-  val victimWay = WireInit(0.U(log2Up(nWays).W))
-
-  val wbPipeReq = WireInit(0.U.asTypeOf(Decoupled(new WritebackReq(edge.bundle))))
 
   // * Signal Define End
 
@@ -283,16 +284,16 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // * pipeline stage 2 Begin
   // organize store data
-  val s2_valid       = RegNext(s1_needUpdate)
-  val s2_req         = RegEnable(s1_req, s1_needUpdate)
-  val s2_wayEn       = RegEnable(s1_wayEn, s1_needUpdate)
-  val s2_newCoh      = RegEnable(s1_newCoh, s1_needUpdate)
-  val s2_updateMeta  = RegNext(s1_updateMeta)
-  val s2_updateData  = RegNext(s1_updateData)
-  val s2_validRefill = RegNext(s1_validRefill)
+  val s2_valid      = RegNext(s1_needUpdate)
+  val s2_wayEn      = RegEnable(s1_wayEn, s1_needUpdate)
+  val s2_newCoh     = RegEnable(s1_newCoh, s1_needUpdate)
+  val s2_updateMeta = RegNext(s1_updateMeta)
+  val s2_updateData = RegNext(s1_updateData)
+  val s2_tag        = RegEnable(s1_tag, s1_needUpdate)
+  val s2_data       = RegEnable(s1_data, s1_needUpdate)
 
-  val s2_tag  = RegEnable(s1_tag, s1_needUpdate)
-  val s2_data = RegEnable(s1_data, s1_needUpdate)
+  // need to calculate hit store data & miss store data
+  val s2_req = RegEnable(s1_req, s1_needUpdate | (s1_mshrAlloc && isWrite(s1_req.cmd)))
 
   // * cpu store data
   val s2_storeGenMask = new StoreGen(s2_req.size, s2_req.paddr, 0.U, dataBytes).mask
@@ -330,16 +331,15 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // * pipeline stage 2 End
 
   // * pipeline stage 3 Begin
-  val s3_valid  = RegNext(s2_valid)
-  val s3_req    = RegEnable(s2_req, s2_valid)
-  val s3_newCoh = RegEnable(s2_newCoh, s2_valid)
-  val s3_wayEn  = RegEnable(s2_wayEn, s2_valid)
-  val s3_tag    = RegEnable(s2_tag, s2_valid)
-
-  s3_req.wdata := s2_storeData
-
+  val s3_valid      = RegNext(s2_valid)
+  val s3_req        = RegEnable(s2_req, s2_valid)
+  val s3_newCoh     = RegEnable(s2_newCoh, s2_valid)
+  val s3_wayEn      = RegEnable(s2_wayEn, s2_valid)
+  val s3_tag        = RegEnable(s2_tag, s2_valid)
   val s3_updateMeta = RegNext(s2_updateMeta)
   val s3_updateData = RegNext(s2_updateData)
+
+  s3_req.wdata := s2_storeData
 
   // meta write
   metaArray.io.write.valid         := s3_updateMeta
@@ -403,9 +403,8 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // pipeline stage 1 -> hit update replacer
   val s1_updateReplacer = (s1_validFromCore && s1_hit) || (s1_validRefill && s1_canDoRefill)
-
-  val touchWay = OHToUInt(s1_wayEn)
-  val touchSet = getSetIdx(s1_req.paddr)
+  val touchWay          = OHToUInt(s1_wayEn)
+  val touchSet          = getSetIdx(s1_req.paddr)
 
   when(s1_updateReplacer)(replacer.access(touchSet, touchWay))
 
@@ -420,7 +419,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   dontTouch(mshrs.io)
 
   // pipeline miss -> mshr
-  val s1_mshrAlloc     = s1_validFromCore && ~s1_hit && ~s1_scFail && ~s1_amoNoPermMiss
+  s1_mshrAlloc := s1_validFromCore && ~s1_hit && ~s1_scFail && ~s1_amoNoPermMiss
   val s1_mshrAllocFail = s1_mshrAlloc && !mshrs.io.req.ready
 
   // mshr get store data in s2
