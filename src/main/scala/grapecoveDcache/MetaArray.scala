@@ -55,7 +55,7 @@ class MetaArray[T <: Metadata](onReset: () => T) extends Module with DCacheParam
       shouldReset = false,
       holdRead = false,
       singlePort = false,
-      bypassWrite = true,
+      bypassWrite = false,
     )
   )
 

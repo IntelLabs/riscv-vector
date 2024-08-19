@@ -32,7 +32,7 @@ class DataSRAMBank extends Module {
         shouldReset = false,
         holdRead = false,
         singlePort = false,
-        bypassWrite = true,
+        bypassWrite = false,
       )
     )
   }
