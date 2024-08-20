@@ -58,6 +58,12 @@ trait VLsuBehavior_ld {
                     dut.io.lsuOut.valid.expect(true.B)
                     dut.io.lsuOut.bits.data.expect(r)
                     dut.io.lsuOut.bits.rfWriteMask.expect(m)
+
+                    val data = dut.io.lsuOut.bits.data.peek().litValue
+                    val mask = dut.io.lsuOut.bits.rfWriteMask.peek().litValue
+
+                    assert((data.U & FillInterleaved(8, mask.U)).litValue() == (r & FillInterleaved(8, m)).litValue())
+
                     dut.clock.step(1)
                 }
             }.join()
