@@ -37,7 +37,7 @@ trait smartParas {
   // val ldstUopQueueSize  = 17
   // val ldstUopQueueWidth = log2Up(ldstUopQueueSize)
 
-  val nHLsuQueueEntries = 16
+  val nHLsuQueueEntries = 4
   val nHLsuQueueWidth   = log2Up(nHLsuQueueEntries)
 
   val vLdstUopQueueSize  = 4

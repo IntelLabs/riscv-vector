@@ -157,7 +157,7 @@ class SVVLsu(
 //   val (respLdstPtr, respData) = (io.dataExchange.resp.bits.idx(3, 0), io.dataExchange.resp.bits.data)
 //   val issueLdstUop            = ldstUopQueue(issueLdstPtr)
   val respLdstPtr = 0.U.asTypeOf(new VLSUPtr)
-  respLdstPtr.value := io.dataExchange.resp.bits.idx(3, 0)
+  respLdstPtr.value := io.dataExchange.resp.bits.idx(nHLsuQueueWidth - 1, 0)
   respLdstPtr.flag  := io.dataExchange.resp.bits.flag
   val respData = io.dataExchange.resp.bits.data
 
