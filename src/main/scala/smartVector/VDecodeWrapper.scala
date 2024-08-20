@@ -139,10 +139,15 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   when(fire) {
       bitsReg := bitsIn
   }
- 
+
+  when(RegNext(bitsReg.vCtrl.illegal && io.out.ready)){
+    bitsReg.vCtrl.illegal := false.B
+  }
+
   when(RegNext(fire)){
     bitsReg.vCtrl.illegal := vIllegalInstrn.io.ill.valid
   }
+
   
   io.out.valid := validReg
   io.out.bits  := bitsReg
