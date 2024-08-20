@@ -46,7 +46,7 @@ class SVlsuWrapper(
   io.dataExchange.req <> dataReqArb.io.out
 
   // resp & xcpt
-  when((io.dataExchange.resp.bits.idx >> 4.U) === 1.U) {
+  when(io.dataExchange.resp.bits.srcId === 1.U) {
     vLsu.io.dataExchange.resp <> io.dataExchange.resp
     vLsu.io.dataExchange.xcpt <> io.dataExchange.xcpt
     hLsu.io.dataExchange.resp.valid     := false.B
