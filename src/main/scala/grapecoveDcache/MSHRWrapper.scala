@@ -31,8 +31,12 @@ class MSHRWrapper(
 
   val IOMSHRType = !io.cacheable || isAMO(io.req.bits.cmd) || io.req.bits.noAlloc
 
+  val validIOMSHRReq = (!io.cacheable || isAMO(io.req.bits.cmd) || io.req.bits.noAlloc) && !mshrs.io.addrMatch
+  val validMSHRReq = (io.cacheable && !isAMO(io.req.bits.cmd) && !io.req.bits.noAlloc && !iomshrs.io.addrMatch) ||
+    (io.req.bits.noAlloc && mshrs.io.addrMatch)
+
   // req signal connect
-  mshrs.io.pipelineReq.valid              := io.req.valid && !IOMSHRType && !iomshrs.io.addrMatch
+  mshrs.io.pipelineReq.valid              := io.req.valid && validMSHRReq
   mshrs.io.pipelineReq.bits.isUpgrade     := io.isUpgrade
   mshrs.io.pipelineReq.bits.data          := io.req.bits.wdata
   mshrs.io.pipelineReq.bits.mask          := io.req.bits.wmask
@@ -44,13 +48,13 @@ class MSHRWrapper(
   mshrs.io.pipelineReq.bits.meta.size     := io.req.bits.size
   mshrs.io.pipelineReq.bits.meta.signed   := io.req.bits.signed
 
-  iomshrs.io.req.valid := io.req.valid && IOMSHRType && !mshrs.io.addrMatch
+  iomshrs.io.req.valid := io.req.valid && validMSHRReq
   iomshrs.io.req.bits  := io.req.bits
 
   io.req.ready := Mux(
-    IOMSHRType,
-    Mux(mshrs.io.addrMatch, false.B, iomshrs.io.req.ready),
-    Mux(iomshrs.io.addrMatch, false.B, mshrs.io.pipelineReq.ready),
+    validIOMSHRReq,
+    iomshrs.io.req.ready,
+    Mux(validMSHRReq, mshrs.io.pipelineReq.ready, false.B),
   )
 
   // request L2 using TL A
