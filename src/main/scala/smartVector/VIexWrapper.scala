@@ -61,9 +61,67 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   // val fpuNotReady  = ~SVFpu.io.in.ready
   // val permNotReady = SVPerm.io.out.perm_busy
   // val ready    = ~(divNotReady || fpuNotReady || permNotReady)
+  val outValid = Wire(Bool())
+  if (hasMatrix) {
+    val mma = Module(new Mesh()(p))
+    for (c <- 0 until mxuMeshCols) {
+      mma.io.macReq(c).valid := mUopValid && mUop.uop.ctrl.matrix
+      mma.io.macReq(c).bits.src1Ridx := 0.U
+      mma.io.macReq(c).bits.src2Ridx := 0.U
+      mma.io.macReq(c).bits.dstRidx := 0.U
+      mma.io.macReq(c).bits.srcType := 0.U
+      mma.io.macReq(c).bits.outType := 2.U
+      mma.io.macReq(c).bits.aluType := 0.U
+      mma.io.macReq(c).bits.macInit := false.B
+      mma.io.macReq(c).bits.macLast := false.B
+      mma.io.macReq(c).bits.autoClr := false.B
+      mma.io.macReq(c).bits.autoCvt := false.B
+      //    mma.io.macReq(c).bits.prodLen := 0.U
+      mma.io.macReq(c).bits.dirCal := 0.U
+      mma.io.macReq(c).bits.rm := 0.U
+      mma.io.macReqSrcB(c) := 0.U // todo
+      mma.io.macReqSrcC(c) := 0.U
+    }
 
-  val outValid = SValu.io.out.valid || SVMac.io.out.valid || SVMask.io.out.valid || 
-                 SVReduc.io.out.valid || SVDiv.io.out.valid || SVFpu.io.out.valid
+    for (c <- 0 until mxuMeshRows) {
+      mma.io.macReqSrcA(c) := 0.U // todo
+      mma.io.macReqSrcD(c) := 0.U
+    }
+
+    mma.io.clrReq.valid := false.B
+    mma.io.clrReq.bits.ridx := 0.U
+
+    for (c <- 0 until numReadPorts) {
+      mma.io.rowReadReq(c).valid := false.B
+      mma.io.colReadReq(c).valid := false.B
+      mma.io.rowReadReq(c).bits.ridx := 0.U
+      mma.io.rowReadReq(c).bits.sidx := 0.U
+      mma.io.rowReadReq(c).bits.sew  := 0.U
+      mma.io.colReadReq(c).bits.ridx := 0.U
+      mma.io.colReadReq(c).bits.sidx := 0.U
+      mma.io.colReadReq(c).bits.sew := 0.U
+    }
+
+    for (c <- 0 until numVLdPorts) {
+      mma.io.rowWriteReq(c).valid := false.B
+      mma.io.colWriteReq(c).valid := false.B
+      mma.io.rowWriteReq(c).bits.ridx := 0.U
+      mma.io.rowWriteReq(c).bits.sidx := 0.U
+      mma.io.rowWriteReq(c).bits.sew := 0.U
+      mma.io.colWriteReq(c).bits.ridx := 0.U
+      mma.io.colWriteReq(c).bits.sidx := 0.U
+      mma.io.colWriteReq(c).bits.sew := 0.U
+      mma.io.rowWriteData(c) := 0.U
+      mma.io.rowWriteMask(c) := 0.U
+      mma.io.colWriteData(c) := 0.U
+      mma.io.colWriteMask(c) := 0.U
+    }
+      outValid := SValu.io.out.valid || SVMac.io.out.valid || SVMask.io.out.valid ||
+      SVReduc.io.out.valid || SVDiv.io.out.valid || SVFpu.io.out.valid || mma.io.macResp.valid
+  } else {
+      outValid := SValu.io.out.valid || SVMac.io.out.valid || SVMask.io.out.valid ||
+      SVReduc.io.out.valid || SVDiv.io.out.valid || SVFpu.io.out.valid
+  }
 
   val permDone = Wire(Bool())
   val permWriteNum = RegInit(0.U(4.W))
@@ -204,62 +262,6 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   }
   io.out.valid := outValid
 
-  if (hasMatrix) {
-    val mma = Module(new Mesh()(p))
-    for (c <- 0 until mxuMeshCols) {
-      mma.io.macReq(c).valid := mUopValid && mUop.uop.ctrl.matrix
-      mma.io.macReq(c).bits.src1Ridx := 0.U
-      mma.io.macReq(c).bits.src2Ridx := 0.U
-      mma.io.macReq(c).bits.dstRidx := 0.U
-      mma.io.macReq(c).bits.srcType := 0.U
-      mma.io.macReq(c).bits.outType := 2.U
-      mma.io.macReq(c).bits.aluType := 0.U
-      mma.io.macReq(c).bits.macInit := false.B
-      mma.io.macReq(c).bits.macLast := false.B
-      mma.io.macReq(c).bits.autoClr := false.B
-      mma.io.macReq(c).bits.autoCvt := false.B
-  //    mma.io.macReq(c).bits.prodLen := 0.U
-      mma.io.macReq(c).bits.dirCal := 0.U
-      mma.io.macReq(c).bits.rm := 0.U
-      mma.io.macReqSrcB(c) := 0.U // todo
-      mma.io.macReqSrcC(c) := 0.U
-    }
-
-    for (c <- 0 until mxuMeshRows) {
-      mma.io.macReqSrcA(c) := 0.U // todo
-      mma.io.macReqSrcD(c) := 0.U
-    }
-
-    mma.io.clrReq.valid := false.B
-    mma.io.clrReq.bits.ridx := 0.U
-
-    for (c <- 0 until numReadPorts) {
-      mma.io.rowReadReq(c).valid := false.B
-      mma.io.colReadReq(c).valid := false.B
-      mma.io.rowReadReq(c).bits.ridx := 0.U
-      mma.io.rowReadReq(c).bits.sidx := 0.U
-      mma.io.rowReadReq(c).bits.sew  := 0.U
-      mma.io.colReadReq(c).bits.ridx := 0.U
-      mma.io.colReadReq(c).bits.sidx := 0.U
-      mma.io.colReadReq(c).bits.sew := 0.U
-    }
-
-    for (c <- 0 until numVLdPorts) {
-      mma.io.rowWriteReq(c).valid := false.B
-      mma.io.colWriteReq(c).valid := false.B
-      mma.io.rowWriteReq(c).bits.ridx := 0.U
-      mma.io.rowWriteReq(c).bits.sidx := 0.U
-      mma.io.rowWriteReq(c).bits.sew := 0.U
-      mma.io.colWriteReq(c).bits.ridx := 0.U
-      mma.io.colWriteReq(c).bits.sidx := 0.U
-      mma.io.colWriteReq(c).bits.sew := 0.U
-      mma.io.rowWriteData(c) := 0.U
-      mma.io.rowWriteMask(c) := 0.U
-      mma.io.colWriteData(c) := 0.U
-      mma.io.colWriteMask(c) := 0.U
-    }
-
-  }
 
 
 
