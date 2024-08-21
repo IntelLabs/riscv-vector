@@ -29,7 +29,7 @@ class RVUissue extends Bundle {
 
 class RVUMemoryReq extends Bundle {
   // ldst queue index
-  val idx   = UInt(nHLsuQueueEntries.W)
+  val idx   = UInt(nLSUMaxQueueWidth.W)
   val flag  = Bool()
   val srcId = UInt(1.W)
   // memop
@@ -43,7 +43,7 @@ class RVUMemoryReq extends Bundle {
 
 class RVUMemoryResp extends Bundle {
   // ldst queue index
-  val idx   = UInt(nHLsuQueueWidth.W)
+  val idx   = UInt(nLSUMaxQueueWidth.W)
   val flag  = Bool()
   val srcId = UInt(1.W)
   // load result

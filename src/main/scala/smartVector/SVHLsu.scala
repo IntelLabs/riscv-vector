@@ -29,7 +29,7 @@ class SplitInfo extends Bundle {
 class SVHLsu(
     implicit p: Parameters
 ) extends Module with HasCircularQueuePtrHelper {
-  val io = IO(new LdstIO())
+  val io = IO(new LSUIO)
 
   // split fsm states
   val uop_idle :: uop_split :: uop_split_finish :: Nil = Enum(3)
@@ -97,34 +97,36 @@ class SVHLsu(
                                 +----------------+
 
    */
-  val (vstart, vl)     = (io.mUop.bits.uop.info.vstart, io.mUop.bits.uop.info.vl)
-  val (uopIdx, uopEnd) = (io.mUop.bits.uop.uopIdx, io.mUop.bits.uop.uopEnd)
+  val (vstart, vl)     = (io.lsuReq.bits.vstart, io.lsuReq.bits.vl)
+  val (uopIdx, uopEnd) = (io.lsuReq.bits.uopIdx, io.lsuReq.bits.uopEnd)
 
-  val ldstCtrl = LSULdstDecoder(io.mUop.bits, io.mUopMergeAttr.bits)
-  val mUopInfo = mUopInfoSelecter(io.mUop.bits, io.mUopMergeAttr.bits)
+  val ldstCtrl = io.lsuReq.bits.ldstCtrl
+  val mUopInfo = io.lsuReq.bits.muopInfo
 
-  io.lsuReady := Mux(uopState === uop_idle, true.B, false.B)
+  io.lsuReq.ready := (uopState === uop_idle)
   // SPLIT FSM -- decide next state
-  when(uopState === uop_idle) {
-    when(io.mUop.valid && io.mUop.bits.uop.ctrl.isLdst && ldstCtrl.nfield === 1.U) { // not segment
-      nextUopState := uop_split
-    }.otherwise {
-      nextUopState := uop_idle
+  switch(uopState) {
+    is(uop_idle) {
+      when(io.lsuReq.valid) { // not segment
+        nextUopState := uop_split
+      }.otherwise {
+        nextUopState := uop_idle
+      }
     }
-  }.elsewhen(uopState === uop_split) {
-    when(stopSplit) {
-      nextUopState := uop_split_finish
-    }.otherwise {
-      nextUopState := uop_split
+    is(uop_split) {
+      when(stopSplit) {
+        nextUopState := uop_split_finish
+      }.otherwise {
+        nextUopState := uop_split
+      }
     }
-  }.elsewhen(uopState === uop_split_finish) {
-    when(completeLdst && !s1_isValidAddr) {
-      nextUopState := uop_idle
-    }.otherwise {
-      nextUopState := uop_split_finish
+    is(uop_split_finish) {
+      when(completeLdst && !s1_isValidAddr) {
+        nextUopState := uop_idle
+      }.otherwise {
+        nextUopState := uop_split_finish
+      }
     }
-  }.otherwise {
-    nextUopState := uop_idle
   }
   // SPLIT FSM -- transition
   uopState := nextUopState
@@ -147,27 +149,25 @@ class SVHLsu(
 
   val vregClean = ParallelOR(vregInfoStatusVec) === 0.U
 
-  when(uopState === uop_idle) {
-    when(io.mUop.valid && io.mUop.bits.uop.ctrl.isLdst && ldstCtrl.nfield === 1.U) {
-      mUopInfoReg := mUopInfo
-      ldstCtrlReg := ldstCtrl
-      addrReg := Mux(
-        io.mUop.bits.uop.uopIdx === 0.U,
-        io.mUop.bits.scalar_opnd_1 + (mUopInfo.segIdx << ldstCtrl.log2Memwb),
-        addrReg,
-      )
-      // Set split info
-      curSplitIdx := 0.U
-      splitCount  := microVl
-      splitStart  := microVstart
-      vstartGeVl  := vstart > actualVl
-      // set vreg
-      when(vregClean) {
-        (0 until vlenb).foreach { i =>
-          val pos = i.U >> ldstCtrl.log2Memwb
-          vregInfoDataVec(i)   := io.mUop.bits.uopRegInfo.old_vd(8 * i + 7, 8 * i)
-          vregInfoStatusVec(i) := Mux(pos < memVl, VRegSegmentStatus.needLdst, VRegSegmentStatus.srcData)
-        }
+  when(io.lsuReq.fire) {
+    mUopInfoReg := mUopInfo
+    ldstCtrlReg := ldstCtrl
+    addrReg := Mux(
+      uopIdx === 0.U,
+      mUopInfo.rs1Val + (mUopInfo.segIdx << ldstCtrl.log2Memwb),
+      addrReg,
+    )
+    // Set split info
+    curSplitIdx := 0.U
+    splitCount  := microVl
+    splitStart  := microVstart
+    vstartGeVl  := vstart > actualVl
+    // set vreg
+    when(vregClean) {
+      (0 until vlenb).foreach { i =>
+        val pos = i.U >> ldstCtrl.log2Memwb
+        vregInfoDataVec(i)   := mUopInfo.old_vd(8 * i + 7, 8 * i)
+        vregInfoStatusVec(i) := Mux(pos < memVl, VRegSegmentStatus.needLdst, VRegSegmentStatus.srcData)
       }
     }
   }
@@ -351,7 +351,7 @@ class SVHLsu(
   val issueUop    = ldstUopQueue(issuePtr.value)
   val isNoXcptUop = issueUop.valid & (~issueUop.xcpt.xcptValid) && !isFull(issuePtr, deqPtr)
 
-  respPtr.value := io.dataExchange.resp.bits.idx(nHLsuQueueWidth - 1, 0)
+  respPtr.value := io.dataExchange.resp.bits.idx(nLSUMaxQueueWidth - 1, 0)
   respPtr.flag  := io.dataExchange.resp.bits.flag
   val respData = io.dataExchange.resp.bits.data
 

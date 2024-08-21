@@ -9,12 +9,12 @@ import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import xiangshan.MicroOp
 import SmartParam._
 
-class VLSUPtr extends CircularQueuePtr[VLSUPtr](vLdstUopQueueSize)
+class VLSUPtr extends CircularQueuePtr[VLSUPtr](vVLSUQueueEntries)
 
 class SVVLsu(
     implicit p: Parameters
 ) extends Module with HasCircularQueuePtrHelper {
-  val io = IO(new LdstIO())
+  val io = IO(new LSUIO)
 
   // * BEGIN
   // * signal define
@@ -23,31 +23,25 @@ class SVVLsu(
   val addrReg = RegInit(0.U(addrWidth.W))
 
   // ldQueue
-  val canEnqueue = WireInit(false.B)
-//   val ldstEnqPtr   = RegInit(0.U(vLdstUopQueueWidth.W))
-//   val issueLdstPtr = RegInit(0.U(vLdstUopQueueWidth.W))
-//   val commitPtr    = RegInit(0.U(vLdstUopQueueWidth.W))
+  val canEnqueue   = WireInit(false.B)
   val enqPtr       = RegInit(0.U.asTypeOf(new VLSUPtr))
   val issuePtr     = RegInit(0.U.asTypeOf(new VLSUPtr))
   val deqPtr       = RegInit(0.U.asTypeOf(new VLSUPtr))
-  val ldstUopQueue = RegInit(VecInit(Seq.fill(vLdstUopQueueSize)(0.U.asTypeOf(new SegLdstUop))))
+  val ldstUopQueue = RegInit(VecInit(Seq.fill(vVLSUQueueEntries)(0.U.asTypeOf(new SegLdstUop))))
 
-//   val ldstQueueCnt  = Mux(ldstEnqPtr >= commitPtr, ldstEnqPtr - commitPtr, ldstEnqPtr + vLdstUopQueueSize.U - commitPtr)
-//   val ldstQueueFull = ldstQueueCnt >= (vLdstUopQueueSize - 1).U
-  val ldstQueueCnt  = distanceBetween(enqPtr, deqPtr)
   val ldstQueueFull = isFull(enqPtr, deqPtr)
 
   // * signal define
   // * END
-  io.lsuReady := !ldstQueueFull
+  io.lsuReq.ready := !ldstQueueFull
 
   // decode nfield / indexed / unit-stride / strided
-  val (vstart, vl)            = (io.mUop.bits.uop.info.vstart, io.mUop.bits.uop.info.vl)
-  val (uopIdx, uopEnd)        = (io.mUop.bits.uop.uopIdx, io.mUop.bits.uop.uopEnd)
-  val (regCount, regStartIdx) = (io.mUopMergeAttr.bits.regCount, io.mUopMergeAttr.bits.regDstIdx)
+  val (vstart, vl)            = (io.lsuReq.bits.vstart, io.lsuReq.bits.vl)
+  val (uopIdx, uopEnd)        = (io.lsuReq.bits.uopIdx, io.lsuReq.bits.uopEnd)
+  val (regCount, regStartIdx) = (io.lsuReq.bits.muopInfo.regCount, io.lsuReq.bits.muopInfo.regDstIdx)
 
-  val ldstCtrl = LSULdstDecoder(io.mUop.bits, io.mUopMergeAttr.bits)
-  val mUopInfo = mUopInfoSelecter(io.mUop.bits, io.mUopMergeAttr.bits)
+  val ldstCtrl = io.lsuReq.bits.ldstCtrl
+  val mUopInfo = io.lsuReq.bits.muopInfo
 
   // * BEGIN
   // * Calculate Addr
@@ -71,9 +65,7 @@ class SVVLsu(
 
   stride := Mux(ldstCtrl.ldstType === Mop.constant_stride, mUopInfo.rs2Val.asSInt, 11111.S)
 
-  val validLdstSegReq = io.mUop.valid && io.mUop.bits.uop.ctrl.isLdst && ldstCtrl.nfield > 1.U
-
-  when(validLdstSegReq) {
+  when(io.lsuReq.fire) {
     when(ldstCtrl.ldstType === Mop.unit_stride) {
       when(mUopInfo.segIdx === 0.U && mUopInfo.uopIdx === 0.U) {
         addr := baseAddr
@@ -114,7 +106,7 @@ class SVVLsu(
   val memw     = ldstCtrl.memwb << 3.U
   val destElem = curVl - ((curVl >> ldstCtrl.log2Mlen) << ldstCtrl.log2Mlen)
   val destMask = (1.U << memw) - 1.U
-  val destData = (io.mUop.bits.uopRegInfo.old_vd >> (destElem << (ldstCtrl.log2Memwb +& 3.U))) & destMask
+  val destData = (mUopInfo.old_vd >> (destElem << (ldstCtrl.log2Memwb +& 3.U))) & destMask
 
   // push request to queue
 
@@ -125,7 +117,7 @@ class SVVLsu(
   // * vl = 0 => dummy masked req
   val isVlEq0  = vl === 0.U
   val isMasked = Mux(ldstCtrl.vm, false.B, !mUopInfo.mask(curVl)) | isVlEq0
-  canEnqueue := validLdstSegReq && ((curVl >= vstart && curVl < vl) || uopEnd)
+  canEnqueue := io.lsuReq.fire && ((curVl >= vstart && curVl < vl) || uopEnd)
 
   val misalignXcpt = 0.U.asTypeOf(new LdstXcpt)
   misalignXcpt.xcptValid := addrMisalign & ~isMasked
@@ -154,23 +146,14 @@ class SVVLsu(
 
   // * BEGIN
   // * Issue LdstUop
-//   val (respLdstPtr, respData) = (io.dataExchange.resp.bits.idx(3, 0), io.dataExchange.resp.bits.data)
-//   val issueLdstUop            = ldstUopQueue(issueLdstPtr)
   val respLdstPtr = 0.U.asTypeOf(new VLSUPtr)
-  respLdstPtr.value := io.dataExchange.resp.bits.idx(nHLsuQueueWidth - 1, 0)
+  respLdstPtr.value := io.dataExchange.resp.bits.idx(nLSUMaxQueueWidth - 1, 0)
   respLdstPtr.flag  := io.dataExchange.resp.bits.flag
   val respData = io.dataExchange.resp.bits.data
 
   val issueLdstUop    = ldstUopQueue(issuePtr.value)
   val isNoXcptMaskUop = issueLdstUop.valid & (~issueLdstUop.commitInfo.xcpt.xcptValid) & (~issueLdstUop.masked)
   val isMaskedUop     = issueLdstUop.valid & issueLdstUop.masked
-
-  // nack index smaller than issuePtr can replay
-//   val issue2CommitDist =
-//     Mux(issueLdstPtr >= commitPtr, issueLdstPtr - commitPtr, issueLdstPtr + vLdstUopQueueSize.U - commitPtr)
-//   val nack2CommitDist =
-//     Mux(respLdstPtr >= commitPtr, respLdstPtr - commitPtr, respLdstPtr + vLdstUopQueueSize.U - commitPtr)
-//   val smallerNack = issue2CommitDist > nack2CommitDist
 
   when(io.dataExchange.resp.bits.nack && (respLdstPtr < issuePtr)) {
     issuePtr := respLdstPtr
@@ -278,7 +261,7 @@ class SVVLsu(
   when(io.lsuOut.fire) {
     when(commitXcpt) {
       // clear ldstUop Queue
-      for (i <- 0 until vLdstUopQueueSize) {
+      for (i <- 0 until vVLSUQueueEntries) {
         ldstUopQueue(i) := 0.U.asTypeOf(new SegLdstUop)
       }
       enqPtr   := 0.U.asTypeOf(new VLSUPtr)

@@ -14,31 +14,41 @@ class SVlsuWrapper(
 ) extends Module {
   val io = IO(new LdstIO())
 
+  // * lsu modules
   val hLsu = Module(new SVHLsu()(p)) // horizontal lsu
   val vLsu = Module(new SVVLsu()(p)) // vertical lsu
 
+  // decode
+  val validReq = io.mUop.valid && io.mUop.bits.uop.ctrl.isLdst && io.lsuReady
+  val ldstCtrl = LSULdstDecoder(io.mUop.bits, io.mUopMergeAttr.bits)
+  val mUopInfo = mUopInfoSelecter(io.mUop.bits, io.mUopMergeAttr.bits)
+
+  // * lsu ready?
   val uopEndInQ = RegInit(false.B)
+  val ldstXcpt  = io.lsuOut.bits.xcpt.exception_vld || io.lsuOut.bits.xcpt.update_vl
 
-  io.lsuReady := vLsu.io.lsuReady && hLsu.io.lsuReady && !uopEndInQ
-
-  hLsu.io.mUop <> io.mUop
-  hLsu.io.mUopMergeAttr <> io.mUopMergeAttr
-  vLsu.io.mUop <> io.mUop
-  vLsu.io.mUopMergeAttr <> io.mUopMergeAttr
-
-  val validReq   = io.mUop.valid && io.lsuReady
-  val validMerge = io.mUopMergeAttr.valid && io.lsuReady
-  hLsu.io.mUop.valid          := validReq
-  vLsu.io.mUop.valid          := validReq
-  hLsu.io.mUopMergeAttr.valid := validMerge
-  vLsu.io.mUopMergeAttr.valid := validMerge
-
-  val ldstXcpt = io.lsuOut.bits.xcpt.exception_vld || io.lsuOut.bits.xcpt.update_vl
-  when(validReq && io.mUop.bits.uop.uopEnd && io.mUop.bits.uop.ctrl.isLdst) {
+  when(validReq && io.mUop.bits.uop.uopEnd) {
     uopEndInQ := true.B
   }.elsewhen(io.lsuOut.valid && (io.lsuOut.bits.muopEnd || ldstXcpt)) {
     uopEndInQ := false.B
   }
+  io.lsuReady := vLsu.io.lsuReq.ready && hLsu.io.lsuReq.ready && !uopEndInQ
+
+  // * construct lsu req
+  val lsuReq = Wire(new LSUReq())
+  lsuReq.ldstCtrl := ldstCtrl
+  lsuReq.muopInfo := mUopInfo
+  lsuReq.uopIdx   := io.mUop.bits.uop.uopIdx
+  lsuReq.uopEnd   := io.mUop.bits.uop.uopEnd
+  lsuReq.vstart   := io.mUop.bits.uop.info.vstart
+  lsuReq.vl       := io.mUop.bits.uop.info.vl
+
+  // * connect lsu
+  hLsu.io.lsuReq.valid := validReq && ldstCtrl.nfield === 1.U
+  hLsu.io.lsuReq.bits  := lsuReq
+
+  vLsu.io.lsuReq.valid := validReq && ldstCtrl.nfield > 1.U
+  vLsu.io.lsuReq.bits  := lsuReq
 
   val dataReqArb = Module(new Arbiter(new RVUMemoryReq(), 2))
   dataReqArb.io.in(0) <> hLsu.io.dataExchange.req

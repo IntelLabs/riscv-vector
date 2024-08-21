@@ -3,6 +3,7 @@ package smartVector
 import chisel3._
 import chisel3.util._
 import chipsalliance.rocketchip.config._
+import scala.math.max
 
 case object SmartParamsKey extends Field[SmartParameters]
 
@@ -34,14 +35,13 @@ trait smartParas {
   val addrWidth = 64
   val dataWidth = 128
   val dataBytes = dataWidth / 8
-  // val ldstUopQueueSize  = 17
-  // val ldstUopQueueWidth = log2Up(ldstUopQueueSize)
 
-  val nHLsuQueueEntries = 4
-  val nHLsuQueueWidth   = log2Up(nHLsuQueueEntries)
-
-  val vLdstUopQueueSize  = 4
-  val vLdstUopQueueWidth = log2Up(vLdstUopQueueSize)
+  val nHLsuQueueEntries   = 4
+  val nHLsuQueueWidth     = log2Up(nHLsuQueueEntries)
+  val vVLSUQueueEntries   = 4
+  val vVLSUQueueWidth     = log2Up(vVLSUQueueEntries)
+  val nLSUMaxQueueEntries = max(nHLsuQueueEntries, vVLSUQueueEntries)
+  val nLSUMaxQueueWidth   = log2Up(nLSUMaxQueueEntries)
 }
 
 object SmartParam extends smartParas

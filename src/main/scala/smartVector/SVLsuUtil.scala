@@ -39,6 +39,26 @@ class LdstIO(
   val lsuReady      = Output(Bool())
 }
 
+class LSUReq(
+    implicit p: Parameters
+) extends ParameterizedBundle()(p) {
+  val ldstCtrl = new LSULdstCtrl
+  val muopInfo = new mUopInfo
+  val vstart   = UInt(bVstart.W)
+  val vl       = UInt(bVL.W)
+  val uopIdx   = UInt(6.W)
+  val uopEnd   = Bool()
+
+}
+
+class LSUIO(
+    implicit p: Parameters
+) extends ParameterizedBundle()(p) {
+  val lsuReq       = Flipped(DecoupledIO(new LSUReq()(p)))
+  val lsuOut       = Output(ValidIO(new LsuOutput))
+  val dataExchange = new RVUMemory()
+}
+
 object VRegSegmentStatus {
   //     0          1          2           3          4       5
   val invalid :: srcData :: needLdst :: notReady :: ready :: xcpt :: Nil = Enum(6)
@@ -137,12 +157,15 @@ class mUopInfo extends Bundle {
   val rs1Val = UInt(XLEN.W)
   val rs2Val = UInt(XLEN.W)
   val vs2    = UInt(VLEN.W)
+  val old_vd = UInt(VLEN.W)
   val mask   = UInt(VLEN.W)
 
   // merge attr
   val muopEnd   = Bool()
   val rfWriteEn = Bool()
   val ldest     = UInt(5.W)
+  val regCount  = UInt(4.W)
+  val regDstIdx = UInt(5.W)
 
 }
 
@@ -157,11 +180,14 @@ object mUopInfoSelecter {
     info.rs1Val := mUop.scalar_opnd_1
     info.rs2Val := mUop.scalar_opnd_2
     info.vs2    := mUop.uopRegInfo.vs2
+    info.old_vd := mUop.uopRegInfo.old_vd
     info.mask   := mUop.uopRegInfo.mask
 
     info.muopEnd   := mUopMergeAttr.muopEnd
     info.rfWriteEn := mUopMergeAttr.rfWriteEn
     info.ldest     := mUopMergeAttr.ldest
+    info.regCount  := mUopMergeAttr.regCount
+    info.regDstIdx := mUopMergeAttr.regDstIdx
 
     info
   }
