@@ -475,7 +475,9 @@ class Vsplit(implicit p : Parameters) extends Module {
     mUopIn.bits.uop.ctrl.load        := ctrl.load
     mUopIn.bits.uop.ctrl.store       := ctrl.store
     mUopIn.bits.uop.ctrl.alu         := ctrl.alu
-    mUopIn.bits.uop.ctrl.matrix      := ctrl.matrix
+    if (hasMatrix) {
+        mUopIn.bits.uop.ctrl.matrix      := ctrl.matrix
+    }
     mUopIn.bits.uop.ctrl.mul         := ctrl.mul
     mUopIn.bits.uop.ctrl.fp          := ctrl.fp  
     mUopIn.bits.uop.ctrl.div         := ctrl.div 
@@ -532,9 +534,14 @@ class Vsplit(implicit p : Parameters) extends Module {
     val vmv_vfmv    = ctrl.alu && !ctrl.opi && ctrl.funct6 === "b010000".U
 
     //val expdLenIn = Mux(ldst, expdLenLdSt, Mux(ctrl.perm || vmv_vfmv, 1.U , maxOfVs12Vd))
-    expdLenIn := Mux(ldst, expdLenLdSt,
-                    Mux(ctrl.perm || vmv_vfmv, 1.U, (Mux(vcpop || viota || vid, lmul, maxOfVs12Vd))))
-    
+    if (hasMatrix) {
+        expdLenIn := Mux(ldst, expdLenLdSt,
+            Mux(ctrl.perm || vmv_vfmv || ctrl.matrix, 1.U, (Mux(vcpop || viota || vid, lmul, maxOfVs12Vd))))
+    } else {
+        expdLenIn := Mux(ldst, expdLenLdSt,
+            Mux(ctrl.perm || vmv_vfmv, 1.U, (Mux(vcpop || viota || vid, lmul, maxOfVs12Vd))))
+    }
+
     when(instDecodeIn){
         expdLenReg := expdLenIn
     }

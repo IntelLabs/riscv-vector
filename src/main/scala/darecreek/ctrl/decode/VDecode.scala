@@ -47,7 +47,12 @@ class VDecode extends Module {
   if (hasMatrix) {
     vCtrl.matrix := io.in === "b00000010110001000000100000001011".U
   }
-  vCtrl.illegal := !(vClasses.reduce(_ || _) | vCtrl.matrix)
+
+  if (hasMatrix) {
+    vCtrl.illegal := !(vClasses.reduce(_ || _) | vCtrl.matrix)
+  } else {
+    vCtrl.illegal := !(vClasses.reduce(_ || _))
+  }
   val vCtrlSigs = Mux1H(vClasses, decodersOut)
 
   val ctrls = Seq(vCtrl.lsrcVal(2), vCtrl.lsrcVal(1), vCtrl.lsrcVal(0),
