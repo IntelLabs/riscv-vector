@@ -35,7 +35,8 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // replace victim way
   val victimWay = WireInit(0.U(log2Up(nWays).W))
 
-  val wbPipeReq = WireInit(0.U.asTypeOf(Decoupled(new WritebackReq(edge.bundle))))
+  val wbPipeReq       = WireInit(0.U.asTypeOf(Decoupled(new WritebackReq(edge.bundle))))
+  val s1_wbqBlockMiss = wbQueue.io.missCheck.blockMiss
 
   // Store -> Load Bypassing
   class BypassStore extends Bundle {
@@ -419,7 +420,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   dontTouch(mshrs.io)
 
   // pipeline miss -> mshr
-  s1_mshrAlloc := s1_validFromCore && ~s1_hit && ~s1_scFail && ~s1_amoNoPermMiss
+  s1_mshrAlloc := s1_validFromCore && ~s1_scFail && (~s1_hit && ~s1_amoNoPermMiss) && ~s1_wbqBlockMiss
   val s1_mshrAllocFail = s1_mshrAlloc && !mshrs.io.req.ready
 
   // mshr get store data in s2
@@ -499,7 +500,6 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // miss check
   wbQueue.io.missCheck.valid    := s1_validFromCore && s1_cacheable && ~s1_hit
   wbQueue.io.missCheck.lineAddr := getLineAddr(s1_req.paddr)
-  val s1_wbqBlockMiss = wbQueue.io.missCheck.blockMiss
   // wbq release
   wbQueue.io.release <> tlBus.c
   // wbq grant: set default value; see TL-D connection
