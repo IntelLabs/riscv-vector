@@ -29,8 +29,6 @@ class MSHRWrapper(
   val mshrs   = Module(new MSHRFile())
   val iomshrs = Module(new IOMSHRFile())
 
-  val IOMSHRType = !io.cacheable || isAMO(io.req.bits.cmd) || io.req.bits.noAlloc
-
   val validIOMSHRReq = (!io.cacheable || isAMO(io.req.bits.cmd) || io.req.bits.noAlloc) && !mshrs.io.addrMatch
   val validMSHRReq = (io.cacheable && !isAMO(io.req.bits.cmd) && !io.req.bits.noAlloc && !iomshrs.io.addrMatch) ||
     (io.req.bits.noAlloc && mshrs.io.addrMatch)
@@ -48,7 +46,7 @@ class MSHRWrapper(
   mshrs.io.pipelineReq.bits.meta.size     := io.req.bits.size
   mshrs.io.pipelineReq.bits.meta.signed   := io.req.bits.signed
 
-  iomshrs.io.req.valid := io.req.valid && validMSHRReq
+  iomshrs.io.req.valid := io.req.valid && validIOMSHRReq
   iomshrs.io.req.bits  := io.req.bits
 
   io.req.ready := Mux(
