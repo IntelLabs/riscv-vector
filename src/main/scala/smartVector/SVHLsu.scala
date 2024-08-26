@@ -296,13 +296,20 @@ class SVHLsu(
   canEnqueue := (ldstCtrlReg.vm || isNotMasked) && (deqSplitInfo.curSplitIdx + deqSplitInfo.canLoadElemCnt >= splitStart)
 
   when(infoQueue.io.deq.fire) {
-    ldstUopQueue(enqPtr.value).valid  := canEnqueue
-    ldstUopQueue(enqPtr.value).status := Mux(s1_addrMisalign, LdstUopStatus.ready, LdstUopStatus.notReady)
-    ldstUopQueue(enqPtr.value).memOp  := ldstCtrlReg.isStore
-    // NOTE: for misalign xcpt, put addr into ldstQueue, output directly to xcpt_addr
-    ldstUopQueue(enqPtr.value).addr := Mux(s1_addrMisalign, deqSplitInfo.addr, s1_alignedAddr)
-    ldstUopQueue(enqPtr.value).pos  := deqSplitInfo.curVl
-    ldstUopQueue(enqPtr.value).xcpt := misalignXcpt
+    ldstUopQueue(enqPtr.value).valid      := canEnqueue
+    ldstUopQueue(enqPtr.value).status     := Mux(s1_addrMisalign, LdstUopStatus.ready, LdstUopStatus.notReady)
+    ldstUopQueue(enqPtr.value).memOp      := ldstCtrlReg.isStore
+    ldstUopQueue(enqPtr.value).addr       := deqSplitInfo.addr
+    ldstUopQueue(enqPtr.value).size       := ldstCtrlReg.log2Memwb
+    ldstUopQueue(enqPtr.value).pos        := deqSplitInfo.curVl
+    ldstUopQueue(enqPtr.value).xcpt       := misalignXcpt
+    ldstUopQueue(enqPtr.value).zeroStride := deqSplitInfo.strideAbs === 0.U
+    ldstUopQueue(enqPtr.value).negStride  := deqSplitInfo.negStride
+    ldstUopQueue(enqPtr.value).log2Stride := deqSplitInfo.log2Stride
+    ldstUopQueue(enqPtr.value).elemCnt    := deqSplitInfo.canLoadElemCnt
+    // FIXME
+    ldstUopQueue(enqPtr.value).destElem :=
+      deqSplitInfo.curVl - ((deqSplitInfo.curVl >> ldstCtrlReg.log2Mlen) << ldstCtrlReg.log2Mlen)
     ldstUopQueue(enqPtr.value).destVRegEnd :=
       (deqSplitInfo.curSplitIdx + deqSplitInfo.canLoadElemCnt >= (splitCount - 1.U)) && mUopInfoReg.destVRegEnd
 
@@ -315,28 +322,14 @@ class SVHLsu(
 
       elemMaskVec(i) := Mux(
         belong,
-        (ldstCtrlReg.vm || mUopInfoReg.mask(maskIdx)) && (curElemPos >= splitStart),
+        (ldstCtrlReg.vm || mUopInfoReg.mask(maskIdx)) && (curElemPos >= splitStart) && (curElemPos < splitCount),
         false.B,
       )
 
       val maskCond = elemMaskVec(i) && !s1_addrMisalign
 
       when(belong) {
-        vregInfoValid(i)  := maskCond
-        vregInfoIdxVec(i) := Mux(maskCond, enqPtr, vregInfoIdxVec(i))
-
-        val elemInnerOffset = s1_offset + (i.U - (curElemPos << ldstCtrlReg.log2Memwb)) // which byte inside the element
-        val curElemOffset = Mux(
-          deqSplitInfo.strideAbs === 0.U,
-          0.U,
-          Mux(
-            negStride,
-            -(curElemPos - deqSplitInfo.startElemPos) << log2Stride,
-            (curElemPos - deqSplitInfo.startElemPos) << log2Stride,
-          ),
-        ) // which element
-
-        vregInfoOffsetVec(i) := Mux(maskCond, elemInnerOffset + curElemOffset, vregInfoOffsetVec(i))
+        vregInfoValid(i) := maskCond
       }
     }
   }
@@ -372,7 +365,7 @@ class SVHLsu(
   }
 
   io.dataExchange.req.valid      := isNoXcptUop
-  io.dataExchange.req.bits.addr  := issueUop.addr
+  io.dataExchange.req.bits.addr  := AddrUtil.getAlignedAddr(issueUop.addr)
   io.dataExchange.req.bits.cmd   := issueUop.memOp
   io.dataExchange.req.bits.srcId := 0.U
   io.dataExchange.req.bits.flag  := issuePtr.flag
@@ -398,13 +391,23 @@ class SVHLsu(
     respUop.xcpt.fromHellaXcpt(io.dataExchange.xcpt)
   }
 
-  when(io.dataExchange.resp.valid) {
-    when(respUop.memOp === VMemCmd.read) {
-      (0 until vlenb).foreach { i =>
-        when(vregInfoIdxVec(i) === respPtr && vregInfoValid(i)) {
-          val offsetOH = UIntToOH(vregInfoOffsetVec(i), dataBytes)
-          vregInfoDataVec(i) := Mux1H(offsetOH, respDataVec)
-        }
+
+  when(io.dataExchange.resp.valid && respUop.memOp === VMemCmd.read) {
+    (0 until vlenb).foreach { i =>
+      val curElemPos = i.U >> ldstCtrlReg.log2Memwb
+      val belong     = (curElemPos >= respUop.destElem) && (curElemPos < (respUop.destElem + respUop.elemCnt))
+      when(belong) {
+        val elemInnerOffset = AddrUtil.getAlignedOffset(respUop.addr) + (i.U - (curElemPos << ldstCtrlReg.log2Memwb))
+        val curElemOffset = Mux(
+          respUop.zeroStride,
+          0.U,
+          Mux(respUop.negStride,
+            -(curElemPos - respUop.destElem) << respUop.log2Stride,
+            (curElemPos - respUop.destElem) << respUop.log2Stride,
+          )
+        )
+
+        vregInfoDataVec(i) := Mux(vregInfoValid(i), respDataVec(elemInnerOffset + curElemOffset), vregInfoDataVec(i))
       }
     }
   }
@@ -440,7 +443,7 @@ class SVHLsu(
 
   // * BEGIN
   // * Writeback to uopQueue
-  val vregWbReady = (splitCount === 0.U || completeLdst) && vregCanCommit
+  val vregWbReady = (splitCount === 0.U && RegNext(io.lsuReq.fire))|| (vregCanCommit && completeLdst)
   val wbValid     = vregWbReady || hasXcpt
   val fofValid    = ldstCtrlReg.unitSMop === UnitStrideMop.fault_only_first && xcptVlReg > 0.U
 

@@ -129,12 +129,17 @@ class LdstXcpt extends Bundle {
 
 class LdstUop extends Bundle {
   val valid       = Bool()
-  val status      = UInt(1.W)   // ready to commit?
-  val memOp       = Bool()      // load or store
+  val status      = UInt(1.W)                         // ready to commit?
+  val memOp       = Bool()                            // load or store
+  val size        = UInt(log2Ceil(dataWidth / 8).W)   // element size
   val addr        = UInt(addrWidth.W)
-  val pos         = UInt(bVL.W) // position in vl
+  val pos         = UInt(bVL.W)                       // position in vl
+  val destElem    = UInt(bVL.W)                       // data position in vreg
   val destVRegEnd = Bool()
-  val canCommit   = Bool()
+  val elemCnt     = UInt((log2Ceil(dataBytes) + 1).W) // 1~8
+  val zeroStride    = Bool()
+  val negStride   = Bool()
+  val log2Stride  = UInt(log2Ceil(dataWidth / 8).W)
   val xcpt        = new LdstXcpt()
 }
 
