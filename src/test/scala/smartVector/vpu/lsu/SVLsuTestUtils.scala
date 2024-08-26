@@ -14,19 +14,21 @@ import smartVector._
 import SmartParam._
 
 case class CtrlBundle(
-    instrn: BitPat,
-    isLoad: Boolean = true,
-    vm:     Boolean = true,
-    ma:     Boolean = false,
-    ta:     Boolean = false,
-    vsew:   Int = 0,
-    vlmul:  Int = 0,
-    vl:     Int = 32,
-    vstart: Int = 0,
-    uopIdx: Int = 0,
-    uopEnd: Boolean = false,
-    segIdx: Int = 0,
-    vs2:    Int = 0,
+    instrn:        BitPat,
+    isLoad:        Boolean = true,
+    vm:            Boolean = true,
+    ma:            Boolean = false,
+    ta:            Boolean = false,
+    vsew:          Int = 0,
+    vlmul:         Int = 0,
+    vl:            Int = 32,
+    vstart:        Int = 0,
+    uopIdx:        Int = 0,
+    uopEnd:        Boolean = false,
+    segIdx:        Int = 0,
+    vs2:           Int = 0,
+    destVRegStart: Boolean = false,
+    destVRegEnd:   Boolean = false,
 )
 
 case class SrcBundleLd(
@@ -59,19 +61,21 @@ trait BundleGenHelper {
           BitPat.bitPatToUInt(c.instrn(31, 26))
         }
       },
-      _.ctrl_funct3 -> BitPat.bitPatToUInt(c.instrn(14, 12)),
-      _.ctrl_load   -> c.isLoad.B,
-      _.ctrl_store  -> (!c.isLoad).B,
-      _.ctrl_vm     -> c.vm.B,
-      _.info_ma     -> c.ma.B,
-      _.info_ta     -> c.ta.B,
-      _.info_vsew   -> c.vsew.U,
-      _.info_vlmul  -> c.vlmul.U,
-      _.info_vl     -> c.vl.U,
-      _.info_vstart -> c.vstart.U,
-      _.splitUopIdx -> c.uopIdx.U,
-      _.splitUopEnd -> c.uopEnd.B,
-      _.segIdx      -> c.segIdx.U,
+      _.ctrl_funct3   -> BitPat.bitPatToUInt(c.instrn(14, 12)),
+      _.ctrl_load     -> c.isLoad.B,
+      _.ctrl_store    -> (!c.isLoad).B,
+      _.ctrl_vm       -> c.vm.B,
+      _.info_ma       -> c.ma.B,
+      _.info_ta       -> c.ta.B,
+      _.info_vsew     -> c.vsew.U,
+      _.info_vlmul    -> c.vlmul.U,
+      _.info_vl       -> c.vl.U,
+      _.info_vstart   -> c.vstart.U,
+      _.splitUopIdx   -> c.uopIdx.U,
+      _.splitUopEnd   -> c.uopEnd.B,
+      _.segIdx        -> c.segIdx.U,
+      _.destVRegStart -> c.destVRegStart.B,
+      _.destVRegEnd   -> c.destVRegEnd.B,
       _.ctrl_vs2 -> {
         if (c.instrn(24, 20).equals(BitPat("b?????"))) {
           0.U
@@ -105,21 +109,23 @@ trait BundleGenHelper {
 }
 
 class VUopTest extends Bundle {
-  val ctrl_vs2    = UInt(5.W)
-  val ctrl_funct6 = UInt(6.W)
-  val ctrl_funct3 = UInt(3.W)
-  val ctrl_load   = Bool()
-  val ctrl_store  = Bool()
-  val ctrl_vm     = Bool()
-  val info_ma     = Bool() // vector mask agnostic, data unknown or undisturbed
-  val info_ta     = Bool() // vector tail agnostic, data unknown or undisturbed
-  val info_vsew   = UInt(3.W)
-  val info_vlmul  = UInt(3.W)
-  val info_vl     = UInt(bVL.W)
-  val info_vstart = UInt(bVstart.W)
-  val splitUopIdx = UInt(3.W)
-  val splitUopEnd = Bool()
-  val segIdx      = UInt(3.W)
+  val ctrl_vs2      = UInt(5.W)
+  val ctrl_funct6   = UInt(6.W)
+  val ctrl_funct3   = UInt(3.W)
+  val ctrl_load     = Bool()
+  val ctrl_store    = Bool()
+  val ctrl_vm       = Bool()
+  val info_ma       = Bool() // vector mask agnostic, data unknown or undisturbed
+  val info_ta       = Bool() // vector tail agnostic, data unknown or undisturbed
+  val info_vsew     = UInt(3.W)
+  val info_vlmul    = UInt(3.W)
+  val info_vl       = UInt(bVL.W)
+  val info_vstart   = UInt(bVstart.W)
+  val splitUopIdx   = UInt(3.W)
+  val splitUopEnd   = Bool()
+  val segIdx        = UInt(3.W)
+  val destVRegStart = Bool()
+  val destVRegEnd   = Bool()
 }
 
 class MuopTest extends Bundle {
@@ -295,10 +301,12 @@ class SmartVectorLsuTestWrapper(isLoad: Boolean) extends Module {
   vLsu.io.mUop.bits.uopRegInfo.mask   := io.mUop.bits.mask
   vLsu.io.mUop.bits.uopRegInfo.vxsat  := false.B
 
-  vLsu.io.mUop.bits.uop.sysUop   := DontCare
-  vLsu.io.mUop.bits.uop.uopIdx   := io.mUop.bits.uop.splitUopIdx
-  vLsu.io.mUop.bits.uop.uopEnd   := io.mUop.bits.uop.splitUopEnd
-  vLsu.io.mUop.bits.uop.segIndex := io.mUop.bits.uop.segIdx
+  vLsu.io.mUop.bits.uop.sysUop        := DontCare
+  vLsu.io.mUop.bits.uop.uopIdx        := io.mUop.bits.uop.splitUopIdx
+  vLsu.io.mUop.bits.uop.uopEnd        := io.mUop.bits.uop.splitUopEnd
+  vLsu.io.mUop.bits.uop.segIndex      := io.mUop.bits.uop.segIdx
+  vLsu.io.mUop.bits.uop.destVRegStart := io.mUop.bits.uop.destVRegStart
+  vLsu.io.mUop.bits.uop.destVRegEnd   := io.mUop.bits.uop.destVRegEnd
 
   vLsu.io.mUop.bits.uop.ctrl.vs2         := io.mUop.bits.uop.ctrl_vs2
   vLsu.io.mUop.bits.uop.ctrl.funct6      := io.mUop.bits.uop.ctrl_funct6

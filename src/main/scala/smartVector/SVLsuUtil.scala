@@ -128,12 +128,14 @@ class LdstXcpt extends Bundle {
 }
 
 class LdstUop extends Bundle {
-  val valid  = Bool()
-  val status = UInt(1.W)   // ready to commit?
-  val memOp  = Bool()      // load or store
-  val addr   = UInt(addrWidth.W)
-  val pos    = UInt(bVL.W) // position in vl
-  val xcpt   = new LdstXcpt()
+  val valid       = Bool()
+  val status      = UInt(1.W)   // ready to commit?
+  val memOp       = Bool()      // load or store
+  val addr        = UInt(addrWidth.W)
+  val pos         = UInt(bVL.W) // position in vl
+  val destVRegEnd = Bool()
+  val canCommit   = Bool()
+  val xcpt        = new LdstXcpt()
 }
 
 class SegLdstUop extends Bundle {
@@ -150,9 +152,11 @@ class SegLdstUop extends Bundle {
 }
 
 class mUopInfo extends Bundle {
-  val uopIdx = UInt(6.W)
-  val uopEnd = Bool()
-  val segIdx = UInt(log2Ceil(8).W)
+  val uopIdx        = UInt(6.W)
+  val uopEnd        = Bool()
+  val segIdx        = UInt(log2Ceil(8).W)
+  val destVRegStart = Bool()
+  val destVRegEnd   = Bool()
 
   val rs1Val = UInt(XLEN.W)
   val rs2Val = UInt(XLEN.W)
@@ -173,9 +177,11 @@ object mUopInfoSelecter {
   def apply(mUop: Muop, mUopMergeAttr: MuopMergeAttr): mUopInfo = {
     val info = Wire(new mUopInfo)
 
-    info.uopIdx := mUop.uop.uopIdx
-    info.uopEnd := mUop.uop.uopEnd
-    info.segIdx := mUop.uop.segIndex
+    info.uopIdx        := mUop.uop.uopIdx
+    info.uopEnd        := mUop.uop.uopEnd
+    info.segIdx        := mUop.uop.segIndex
+    info.destVRegStart := mUop.uop.destVRegStart
+    info.destVRegEnd   := mUop.uop.destVRegEnd
 
     info.rs1Val := mUop.scalar_opnd_1
     info.rs2Val := mUop.scalar_opnd_2
@@ -282,5 +288,4 @@ object AddrUtil {
 
   def getAlignedOffset(addr: UInt): UInt =
     addr(addrOffsetHighIdx, 0)
-  1000
 }
