@@ -121,7 +121,7 @@ class SVHLsu(
       }
     }
     is(uop_split_finish) {
-      when(completeLdst && !s1_isValidAddr) {
+      when((completeLdst && !s1_isValidAddr) || (!mUopInfoReg.destVRegEnd)) {
         nextUopState := uop_idle
       }.otherwise {
         nextUopState := uop_split_finish
@@ -311,7 +311,7 @@ class SVHLsu(
     ldstUopQueue(enqPtr.value).destElem :=
       deqSplitInfo.curVl - ((deqSplitInfo.curVl >> ldstCtrlReg.log2Mlen) << ldstCtrlReg.log2Mlen)
     ldstUopQueue(enqPtr.value).destVRegEnd :=
-      (deqSplitInfo.curSplitIdx + deqSplitInfo.canLoadElemCnt >= (splitCount - 1.U)) && mUopInfoReg.destVRegEnd
+      (deqSplitInfo.curSplitIdx + deqSplitInfo.canLoadElemCnt >= splitCount) && mUopInfoReg.destVRegEnd
 
     enqPtr := Mux(canEnqueue, enqPtr + 1.U, enqPtr)
 
@@ -418,7 +418,7 @@ class SVHLsu(
   // * END
 
   // * BEGIN
-  // * Commit to VRegIngo
+  // * Commit to VRegInfo
 
   val dequeUop = ldstUopQueue(deqPtr.value)
   val canDeque = dequeUop.valid && dequeUop.status === LdstUopStatus.ready
@@ -443,7 +443,7 @@ class SVHLsu(
 
   // * BEGIN
   // * Writeback to uopQueue
-  val vregWbReady = (splitCount === 0.U && RegNext(io.lsuReq.fire))|| (vregCanCommit && completeLdst)
+  val vregWbReady = (splitCount === 0.U && RegNext(io.lsuReq.fire))|| vregCanCommit
   val wbValid     = vregWbReady || hasXcpt
   val fofValid    = ldstCtrlReg.unitSMop === UnitStrideMop.fault_only_first && xcptVlReg > 0.U
 
