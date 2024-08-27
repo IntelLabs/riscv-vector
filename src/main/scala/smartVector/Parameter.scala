@@ -33,7 +33,7 @@ trait smartParas {
 
   // LSU
   val addrWidth = 64
-  val dataWidth = 128
+  val dataWidth = 64
   val dataBytes = dataWidth / 8
 
   val nHLsuQueueEntries   = 4

@@ -11,6 +11,8 @@ import SmartParam._
 
 class HLSUPtr extends CircularQueuePtr[HLSUPtr](nHLsuQueueEntries)
 
+class HLSUInfoPtr extends CircularQueuePtr[HLSUInfoPtr](nHLsuQueueEntries)
+
 class SplitInfo extends Bundle {
   val strideAbs      = UInt(XLEN.W)
   val negStride      = Bool()
@@ -41,18 +43,13 @@ class SVHLsu(
 
   val infoQueue = Module(new Queue(new SplitInfo, 1))
 
+  val hlsuInfoEnqPtr = RegInit(0.U.asTypeOf(new HLSUInfoPtr))
+  val hlsuInfoDeqPtr = RegInit(0.U.asTypeOf(new HLSUInfoPtr))
+  val hlsuInfoQueue  = RegInit(VecInit(Seq.fill(nHLsuQueueEntries)(0.U.asTypeOf(new HLSUInfo))))
+
   // address reg
   val s1_isValidAddr = WireInit(false.B)
   val addrReg        = RegInit(0.U(addrWidth.W))
-
-  // uop & control related
-  val mUopInfoReg = RegInit(0.U.asTypeOf(new mUopInfo))
-  val ldstCtrlReg = RegInit(0.U.asTypeOf(new LSULdstCtrl))
-
-  val vregInfoValid     = RegInit(VecInit(Seq.fill(vlenb)(false.B)))
-  val vregInfoIdxVec    = RegInit(VecInit(Seq.fill(vlenb)(nHLsuQueueEntries.U.asTypeOf(new HLSUPtr))))
-  val vregInfoOffsetVec = RegInit(VecInit(Seq.fill(vlenb)(0.U(log2Ceil(dataBytes).W))))
-  val vregInfoDataVec   = RegInit(VecInit(Seq.fill(vlenb)(0.U(8.W))))
 
   // Split info
   val vstartGeVl  = RegInit(false.B)
@@ -103,7 +100,8 @@ class SVHLsu(
   val ldstCtrl = io.lsuReq.bits.ldstCtrl
   val mUopInfo = io.lsuReq.bits.muopInfo
 
-  io.lsuReq.ready := (uopState === uop_idle)
+  io.lsuReq.ready := (uopState === uop_idle) && !isFull(hlsuInfoEnqPtr, hlsuInfoDeqPtr)
+  val hlsuEnqInfo = hlsuInfoQueue(hlsuInfoEnqPtr.value)
   // SPLIT FSM -- decide next state
   switch(uopState) {
     is(uop_idle) {
@@ -121,8 +119,8 @@ class SVHLsu(
       }
     }
     is(uop_split_finish) {
-      when((completeLdst && !s1_isValidAddr) || (!mUopInfoReg.destVRegEnd)) {
-        nextUopState := uop_idle
+      when(!s1_isValidAddr) {
+        nextUopState   := uop_idle
       }.otherwise {
         nextUopState := uop_split_finish
       }
@@ -148,8 +146,6 @@ class SVHLsu(
   val memVl = leftLen min ldstCtrl.mlen
 
   when(io.lsuReq.fire) {
-    mUopInfoReg := mUopInfo
-    ldstCtrlReg := ldstCtrl
     addrReg := Mux(
       uopIdx === 0.U,
       mUopInfo.rs1Val + (mUopInfo.segIdx << ldstCtrl.log2Memwb),
@@ -163,50 +159,59 @@ class SVHLsu(
     // set vreg
     when(io.lsuReq.bits.muopInfo.destVRegStart) {
       (0 until vlenb).foreach { i =>
-        vregInfoDataVec(i) := mUopInfo.old_vd(8 * i + 7, 8 * i)
+        // vregInfoDataVec(i) := mUopInfo.old_vd(8 * i + 7, 8 * i)
+        hlsuEnqInfo.vregDataVec(i) := mUopInfo.old_vd(8 * i + 7, 8 * i)
       }
+      hlsuEnqInfo.valid    := true.B
+      hlsuEnqInfo.ldstCtrl := ldstCtrl
+      hlsuEnqInfo.muopInfo := mUopInfo
     }
   }
 
+  hlsuInfoEnqPtr := Mux(
+    (uopState === uop_split_finish) && !s1_isValidAddr && hlsuEnqInfo.muopInfo.destVRegEnd, 
+    hlsuInfoEnqPtr + 1.U, 
+    hlsuInfoEnqPtr
+  )
+
   // * BEGIN
   // * Calculate Addr
-
   // pipeline stage 0 --> calc addr
   val addr     = WireInit(0.U(addrWidth.W))
   val offset   = WireInit(0.U(log2Ceil(dataBytes).W))
-  val baseAddr = mUopInfoReg.rs1Val
+  val baseAddr = hlsuEnqInfo.muopInfo.rs1Val
 
-  val curVl       = (mUopInfoReg.uopIdx << ldstCtrlReg.log2MinLen) + curSplitIdx
+  val curVl       = (hlsuEnqInfo.muopInfo.uopIdx << hlsuEnqInfo.ldstCtrl.log2MinLen) + curSplitIdx
   val isValidAddr = uopState === uop_split && !hasXcpt && (curSplitIdx < splitCount)
 
   // indexed addr
   val idxVal  = WireInit(0.U(XLEN.W))
   val idxMask = WireInit(0.U(XLEN.W))
-  val eew     = ldstCtrlReg.eewb << 3.U
+  val eew     = hlsuEnqInfo.ldstCtrl.eewb << 3.U
   val beginIdx =
-    (curVl - ((curVl >> ldstCtrlReg.log2Elen) << ldstCtrlReg.log2Elen)) << (ldstCtrlReg.log2Eewb +& 3.U) // 3.U: to bits
+    (curVl - ((curVl >> hlsuEnqInfo.ldstCtrl.log2Elen) << hlsuEnqInfo.ldstCtrl.log2Elen)) << (hlsuEnqInfo.ldstCtrl.log2Eewb +& 3.U) // 3.U: to bits
   idxMask := (("h1".asUInt(addrWidth.W) << eew) - 1.U)
-  idxVal  := (mUopInfoReg.vs2 >> beginIdx) & idxMask
+  idxVal  := (hlsuEnqInfo.muopInfo.vs2 >> beginIdx) & idxMask
 
   val stride    = WireInit(0.S(XLEN.W))
   val negStride = stride < 0.S
   val strideAbs = Mux(negStride, (-stride).asUInt, stride.asUInt)
 
-  when(ldstCtrlReg.ldstType === Mop.unit_stride) {
-    stride := (ldstCtrlReg.nfield << ldstCtrlReg.log2Memwb).asSInt
-  }.elsewhen(ldstCtrlReg.ldstType === Mop.constant_stride) {
-    stride := mUopInfoReg.rs2Val.asSInt
+  when(hlsuEnqInfo.ldstCtrl.ldstType === Mop.unit_stride) {
+    stride := (hlsuEnqInfo.ldstCtrl.nfield << hlsuEnqInfo.ldstCtrl.log2Memwb).asSInt
+  }.elsewhen(hlsuEnqInfo.ldstCtrl.ldstType === Mop.constant_stride) {
+    stride := hlsuEnqInfo.muopInfo.rs2Val.asSInt
   }.otherwise {
     stride := 11111.S
   }
 
   val accelerateStride = Cat(strideAbs === 8.U, strideAbs === 4.U, strideAbs === 2.U, strideAbs === 1.U)
   val canAccelerate =
-    (accelerateStride =/= 0.U || strideAbs === 0.U) && ~AddrUtil.isAddrMisalign(strideAbs, ldstCtrlReg.log2Memwb)
+    (accelerateStride =/= 0.U || strideAbs === 0.U) && ~AddrUtil.isAddrMisalign(strideAbs, hlsuEnqInfo.ldstCtrl.log2Memwb)
   val log2Stride = Mux(canAccelerate, Mux1H(accelerateStride, Seq(0.U, 1.U, 2.U, 3.U)), 0.U)
 
   val curStridedAddr = Mux(
-    curSplitIdx === 0.U && mUopInfoReg.uopIdx === 0.U,
+    curSplitIdx === 0.U && hlsuEnqInfo.muopInfo.uopIdx === 0.U,
     addrReg,
     (addrReg.asSInt + stride.asSInt).asUInt,
   )
@@ -215,7 +220,7 @@ class SVHLsu(
     addr := addrReg
   }.otherwise {
     addr := Mux1H(
-      ldstCtrlReg.ldstType,
+      hlsuEnqInfo.ldstCtrl.ldstType,
       Seq(
         // unit stride
         curStridedAddr,
@@ -231,8 +236,8 @@ class SVHLsu(
 
   offset := AddrUtil.getAlignedOffset(addr)
 
-  val startElemPos   = curVl - ((curVl >> ldstCtrlReg.log2Mlen) << ldstCtrlReg.log2Mlen)
-  val startVRegIdx   = startElemPos << ldstCtrlReg.log2Memwb
+  val startElemPos   = curVl - ((curVl >> hlsuEnqInfo.ldstCtrl.log2Mlen) << hlsuEnqInfo.ldstCtrl.log2Mlen)
+  val startVRegIdx   = startElemPos << hlsuEnqInfo.ldstCtrl.log2Memwb
   val canLoadElemCnt = WireInit(0.U((log2Ceil(dataBytes) + 1).W))
   canLoadElemCnt := Mux(
     canAccelerate,
@@ -245,7 +250,7 @@ class SVHLsu(
     1.U,
   )
   val endElemPos = startElemPos + canLoadElemCnt
-  val endVRegIdx = Mux(canAccelerate, endElemPos << ldstCtrlReg.log2Memwb, startVRegIdx)
+  val endVRegIdx = Mux(canAccelerate, endElemPos << hlsuEnqInfo.ldstCtrl.log2Memwb, startVRegIdx)
 
   when(infoQueue.io.enq.fire) {
     curSplitIdx := curSplitIdx + canLoadElemCnt
@@ -282,7 +287,7 @@ class SVHLsu(
 
   s1_isValidAddr := infoQueue.io.deq.fire
 
-  val s1_addrMisalign = AddrUtil.isAddrMisalign(deqSplitInfo.addr, ldstCtrlReg.log2Memwb)
+  val s1_addrMisalign = AddrUtil.isAddrMisalign(deqSplitInfo.addr, hlsuEnqInfo.ldstCtrl.log2Memwb)
   val s1_alignedAddr  = AddrUtil.getAlignedAddr(deqSplitInfo.addr)
   val s1_offset       = AddrUtil.getAlignedOffset(deqSplitInfo.addr)
 
@@ -293,43 +298,45 @@ class SVHLsu(
   misalignXcpt.xcptValid := s1_addrMisalign
   misalignXcpt.ma        := s1_addrMisalign
 
-  canEnqueue := (ldstCtrlReg.vm || isNotMasked) && (deqSplitInfo.curSplitIdx + deqSplitInfo.canLoadElemCnt >= splitStart)
+  canEnqueue := (hlsuEnqInfo.ldstCtrl.vm || isNotMasked) && (deqSplitInfo.curSplitIdx + deqSplitInfo.canLoadElemCnt >= splitStart)
 
   when(infoQueue.io.deq.fire) {
-    ldstUopQueue(enqPtr.value).valid      := canEnqueue
-    ldstUopQueue(enqPtr.value).status     := Mux(s1_addrMisalign, LdstUopStatus.ready, LdstUopStatus.notReady)
-    ldstUopQueue(enqPtr.value).memOp      := ldstCtrlReg.isStore
-    ldstUopQueue(enqPtr.value).addr       := deqSplitInfo.addr
-    ldstUopQueue(enqPtr.value).size       := ldstCtrlReg.log2Memwb
-    ldstUopQueue(enqPtr.value).pos        := deqSplitInfo.curVl
-    ldstUopQueue(enqPtr.value).xcpt       := misalignXcpt
-    ldstUopQueue(enqPtr.value).zeroStride := deqSplitInfo.strideAbs === 0.U
-    ldstUopQueue(enqPtr.value).negStride  := deqSplitInfo.negStride
-    ldstUopQueue(enqPtr.value).log2Stride := deqSplitInfo.log2Stride
-    ldstUopQueue(enqPtr.value).elemCnt    := deqSplitInfo.canLoadElemCnt
+    ldstUopQueue(enqPtr.value).valid       := canEnqueue
+    ldstUopQueue(enqPtr.value).status      := Mux(s1_addrMisalign, LdstUopStatus.ready, LdstUopStatus.notReady)
+    ldstUopQueue(enqPtr.value).memOp       := hlsuEnqInfo.ldstCtrl.isStore
+    ldstUopQueue(enqPtr.value).addr        := deqSplitInfo.addr
+    ldstUopQueue(enqPtr.value).size        := hlsuEnqInfo.ldstCtrl.log2Memwb
+    ldstUopQueue(enqPtr.value).pos         := deqSplitInfo.curVl
+    ldstUopQueue(enqPtr.value).xcpt        := misalignXcpt
+    ldstUopQueue(enqPtr.value).zeroStride  := deqSplitInfo.strideAbs === 0.U
+    ldstUopQueue(enqPtr.value).negStride   := deqSplitInfo.negStride
+    ldstUopQueue(enqPtr.value).log2Stride  := deqSplitInfo.log2Stride
+    ldstUopQueue(enqPtr.value).elemCnt     := deqSplitInfo.canLoadElemCnt
+    ldstUopQueue(enqPtr.value).hlsuInfoPtr := hlsuInfoEnqPtr.value
     // FIXME
     ldstUopQueue(enqPtr.value).destElem :=
-      deqSplitInfo.curVl - ((deqSplitInfo.curVl >> ldstCtrlReg.log2Mlen) << ldstCtrlReg.log2Mlen)
+      deqSplitInfo.curVl - ((deqSplitInfo.curVl >> hlsuEnqInfo.ldstCtrl.log2Mlen) << hlsuEnqInfo.ldstCtrl.log2Mlen)
     ldstUopQueue(enqPtr.value).destVRegEnd :=
-      (deqSplitInfo.curSplitIdx + deqSplitInfo.canLoadElemCnt >= splitCount) && mUopInfoReg.destVRegEnd
+      (deqSplitInfo.curSplitIdx + deqSplitInfo.canLoadElemCnt >= splitCount) && hlsuEnqInfo.muopInfo.destVRegEnd
 
     enqPtr := Mux(canEnqueue, enqPtr + 1.U, enqPtr)
 
     (0 until vlenb).foreach { i =>
-      val curElemPos = i.U >> ldstCtrlReg.log2Memwb
+      val curElemPos = i.U >> hlsuEnqInfo.ldstCtrl.log2Memwb
       val belong     = curElemPos >= deqSplitInfo.startElemPos && curElemPos < deqSplitInfo.endElemPos
       val maskIdx    = curElemPos - deqSplitInfo.startElemPos + deqSplitInfo.curVl
 
       elemMaskVec(i) := Mux(
         belong,
-        (ldstCtrlReg.vm || mUopInfoReg.mask(maskIdx)) && (curElemPos >= splitStart) && (curElemPos < splitCount),
+        (hlsuEnqInfo.ldstCtrl.vm || hlsuEnqInfo.muopInfo.mask(maskIdx)) && (curElemPos >= splitStart) && (curElemPos < splitCount),
         false.B,
       )
 
       val maskCond = elemMaskVec(i) && !s1_addrMisalign
 
       when(belong) {
-        vregInfoValid(i) := maskCond
+        // vregInfoValid(i) := maskCond
+        hlsuEnqInfo.vregDataValid(i) := maskCond
       }
     }
   }
@@ -338,9 +345,12 @@ class SVHLsu(
 
   // * BEGIN
   // * Issue LdstUop
+  val hlsuDeqInfo = hlsuInfoQueue(hlsuInfoDeqPtr.value)
 
-  val issueUop    = ldstUopQueue(issuePtr.value)
-  val isNoXcptUop = issueUop.valid & (~issueUop.xcpt.xcptValid) && !isFull(issuePtr, deqPtr)
+  val issueUop = ldstUopQueue(issuePtr.value)
+  val isNoXcptUop = issueUop.valid & (~issueUop.xcpt.xcptValid) &&
+    !isFull(issuePtr, deqPtr) &&
+    (issueUop.hlsuInfoPtr === hlsuInfoDeqPtr.value)
 
   respPtr.value := io.dataExchange.resp.bits.idx(nLSUMaxQueueWidth - 1, 0)
   respPtr.flag  := io.dataExchange.resp.bits.flag
@@ -357,13 +367,26 @@ class SVHLsu(
   val storeMaskVec = VecInit(Seq.fill(dataBytes)(0.U(1.W)))
 
   (0 until vlenb).foreach { i =>
-    when(ldstCtrlReg.isStore && vregInfoIdxVec(i) === issuePtr && vregInfoValid(i)) {
-      val offset = vregInfoOffsetVec(i)
-      storeDataVec(offset) := vregInfoDataVec(i)
-      storeMaskVec(offset) := 1.U
+    val curElemPos = i.U >> hlsuDeqInfo.ldstCtrl.log2Memwb
+    val belong     = (curElemPos >= issueUop.destElem) && (curElemPos < (issueUop.destElem + issueUop.elemCnt))
+    when(belong) {
+      val elemInnerOffset =
+        AddrUtil.getAlignedOffset(issueUop.addr) + (i.U - (curElemPos << hlsuDeqInfo.ldstCtrl.log2Memwb))
+      val curElemOffset = Mux(
+        issueUop.zeroStride,
+        0.U,
+        Mux(
+          issueUop.negStride,
+          -(curElemPos - issueUop.destElem) << issueUop.log2Stride,
+          (curElemPos - issueUop.destElem) << issueUop.log2Stride,
+        ),
+      )
+
+      storeDataVec(elemInnerOffset + curElemOffset) := hlsuDeqInfo.vregDataVec(i)
+      storeMaskVec(elemInnerOffset + curElemOffset) := hlsuDeqInfo.vregDataValid(i)
     }
   }
-
+  
   io.dataExchange.req.valid      := isNoXcptUop
   io.dataExchange.req.bits.addr  := AddrUtil.getAlignedAddr(issueUop.addr)
   io.dataExchange.req.bits.cmd   := issueUop.memOp
@@ -391,23 +414,28 @@ class SVHLsu(
     respUop.xcpt.fromHellaXcpt(io.dataExchange.xcpt)
   }
 
-
   when(io.dataExchange.resp.valid && respUop.memOp === VMemCmd.read) {
     (0 until vlenb).foreach { i =>
-      val curElemPos = i.U >> ldstCtrlReg.log2Memwb
+      val curElemPos = i.U >> hlsuDeqInfo.ldstCtrl.log2Memwb
       val belong     = (curElemPos >= respUop.destElem) && (curElemPos < (respUop.destElem + respUop.elemCnt))
       when(belong) {
-        val elemInnerOffset = AddrUtil.getAlignedOffset(respUop.addr) + (i.U - (curElemPos << ldstCtrlReg.log2Memwb))
+        val elemInnerOffset =
+          AddrUtil.getAlignedOffset(respUop.addr) + (i.U - (curElemPos << hlsuDeqInfo.ldstCtrl.log2Memwb))
         val curElemOffset = Mux(
           respUop.zeroStride,
           0.U,
-          Mux(respUop.negStride,
+          Mux(
+            respUop.negStride,
             -(curElemPos - respUop.destElem) << respUop.log2Stride,
             (curElemPos - respUop.destElem) << respUop.log2Stride,
-          )
+          ),
         )
 
-        vregInfoDataVec(i) := Mux(vregInfoValid(i), respDataVec(elemInnerOffset + curElemOffset), vregInfoDataVec(i))
+        hlsuDeqInfo.vregDataVec(i) := Mux(
+          hlsuDeqInfo.vregDataValid(i), 
+          respDataVec(elemInnerOffset + curElemOffset), 
+          hlsuDeqInfo.vregDataVec(i)
+        )
       }
     }
   }
@@ -443,35 +471,38 @@ class SVHLsu(
 
   // * BEGIN
   // * Writeback to uopQueue
-  val vregWbReady = (splitCount === 0.U && RegNext(io.lsuReq.fire))|| vregCanCommit
+  val vregWbReady = (splitCount === 0.U && RegNext(io.lsuReq.fire)) || vregCanCommit
   val wbValid     = vregWbReady || hasXcpt
-  val fofValid    = ldstCtrlReg.unitSMop === UnitStrideMop.fault_only_first && xcptVlReg > 0.U
+  val fofValid    = hlsuDeqInfo.ldstCtrl.unitSMop === UnitStrideMop.fault_only_first && xcptVlReg > 0.U
 
   io.lsuOut.valid                   := wbValid
-  io.lsuOut.bits.muopEnd            := mUopInfoReg.muopEnd
-  io.lsuOut.bits.rfWriteEn          := mUopInfoReg.rfWriteEn
-  io.lsuOut.bits.rfWriteIdx         := mUopInfoReg.ldest
+  io.lsuOut.bits.muopEnd            := hlsuDeqInfo.muopInfo.muopEnd
+  io.lsuOut.bits.rfWriteEn          := hlsuDeqInfo.muopInfo.rfWriteEn
+  io.lsuOut.bits.rfWriteIdx         := hlsuDeqInfo.muopInfo.ldest
   io.lsuOut.bits.rfWriteMask        := "hffff".U
   io.lsuOut.bits.regCount           := 1.U
-  io.lsuOut.bits.regStartIdx        := mUopInfoReg.ldest
+  io.lsuOut.bits.regStartIdx        := hlsuDeqInfo.muopInfo.ldest
   io.lsuOut.bits.isSegLoad          := false.B
-  io.lsuOut.bits.data               := Cat(vregInfoDataVec.reverseMap(entry => entry))
+  io.lsuOut.bits.data               := Cat(hlsuDeqInfo.vregDataVec.reverseMap(entry => entry))
   io.lsuOut.bits.xcpt.exception_vld := hasXcpt & ~fofValid
   io.lsuOut.bits.xcpt.xcpt_cause    := Mux(fofValid, 0.U.asTypeOf(new HellaCacheExceptions), hellaXcptReg)
   io.lsuOut.bits.xcpt.xcpt_addr     := xcptAddrReg
   io.lsuOut.bits.xcpt.update_vl     := hasXcpt & fofValid
   io.lsuOut.bits.xcpt.update_data   := xcptVlReg
 
+  when(vregWbReady) {
+    hlsuDeqInfo.valid := false.B
+    hlsuDeqInfo.vregDataValid.foreach(_ := false.B)
+    hlsuInfoDeqPtr := hlsuInfoDeqPtr + 1.U
+  }.elsewhen(hasXcpt) {
+    hlsuInfoQueue.foreach(info => info.valid := false.B)
+    hlsuInfoQueue.foreach(info => info.vregDataValid.foreach(_ := false.B))
+    hlsuInfoEnqPtr := 0.U.asTypeOf(new HLSUInfoPtr)
+    hlsuInfoDeqPtr := 0.U.asTypeOf(new HLSUInfoPtr)
+  }
+
   when(wbValid) {
     vregCanCommit := false.B
-    // Reset vreg info
-    for (i <- 0 until vlenb) {
-      vregInfoIdxVec(i).value := nHLsuQueueEntries.U
-      vregInfoValid(i)        := false.B
-      vregInfoOffsetVec(i)    := DontCare
-      vregInfoDataVec(i)      := DontCare
-    }
-
   }
 
   when(hasXcpt) {

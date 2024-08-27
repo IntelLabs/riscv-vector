@@ -80,7 +80,7 @@ trait VLsuBehavior_st {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vse8.copy(vl=8, uopIdx=0, uopEnd=true, isLoad=false), stReqSrc_default),
+                (vse8.copy(vl=8, uopIdx=0, uopEnd=true, isLoad=false, destVRegStart = true, destVRegEnd = true), stReqSrc_default),
             )
 
             for ((c, s) <- stReqs) {
@@ -111,8 +111,8 @@ trait VLsuBehavior_st {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vse8.copy(vl=19, uopIdx=0, uopEnd=false, isLoad=false), stReqSrc_default),
-                (vse8.copy(vl=19, uopIdx=1, uopEnd=true,  isLoad=false), stReqSrc_default),
+                (vse8.copy(vl=19, uopIdx=0, uopEnd=false, isLoad=false, destVRegStart = true, destVRegEnd = true), stReqSrc_default),
+                (vse8.copy(vl=19, uopIdx=1, uopEnd=true,  isLoad=false, destVRegStart = true, destVRegEnd = true), stReqSrc_default),
             )
 
             for ((c, s) <- stReqs) {
@@ -144,10 +144,10 @@ trait VLsuBehavior_st {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vse16.copy(vl=27, uopIdx=0, uopEnd=false, isLoad=false), stReqSrc_default),
-                (vse16.copy(vl=27, uopIdx=1, uopEnd=false, isLoad=false), SrcBundleSt(vs3="hfedcba98765432100f0f0f0f0f0f0f0f")),
-                (vse16.copy(vl=27, uopIdx=2, uopEnd=false, isLoad=false), SrcBundleSt(vs3="h01010101010101011234567890123456")),
-                (vse16.copy(vl=27, uopIdx=3, uopEnd=true, isLoad=false),  SrcBundleSt(vs3="h201f1e1d1c1b1a191817678901234567")),
+                (vse16.copy(vl=27, uopIdx=0, uopEnd=false, isLoad=false, destVRegStart = true, destVRegEnd = true), stReqSrc_default),
+                (vse16.copy(vl=27, uopIdx=1, uopEnd=false, isLoad=false, destVRegStart = true, destVRegEnd = true), SrcBundleSt(vs3="hfedcba98765432100f0f0f0f0f0f0f0f")),
+                (vse16.copy(vl=27, uopIdx=2, uopEnd=false, isLoad=false, destVRegStart = true, destVRegEnd = true), SrcBundleSt(vs3="h01010101010101011234567890123456")),
+                (vse16.copy(vl=27, uopIdx=3, uopEnd=true, isLoad=false, destVRegStart = true, destVRegEnd = true),  SrcBundleSt(vs3="h201f1e1d1c1b1a191817678901234567")),
             )
 
             for ((c, s) <- stReqs) {
@@ -183,9 +183,9 @@ trait VLsuBehavior_st {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vse32.copy(vl=10, uopIdx=0, uopEnd=false, isLoad=false), stReqSrc_default),
-                (vse32.copy(vl=10, uopIdx=1, uopEnd=false, isLoad=false), SrcBundleSt(vs3="hfedcba98765432100f0f0f0f0f0f0f0f")),
-                (vse32.copy(vl=10, uopIdx=2, uopEnd=true, isLoad=false),  SrcBundleSt(vs3="h01010101010101011234567890123456")),
+                (vse32.copy(vl=10, uopIdx=0, uopEnd=false, isLoad=false, destVRegStart = true, destVRegEnd = true), stReqSrc_default),
+                (vse32.copy(vl=10, uopIdx=1, uopEnd=false, isLoad=false, destVRegStart = true, destVRegEnd = true), SrcBundleSt(vs3="hfedcba98765432100f0f0f0f0f0f0f0f")),
+                (vse32.copy(vl=10, uopIdx=2, uopEnd=true, isLoad=false, destVRegStart = true, destVRegEnd = true),  SrcBundleSt(vs3="h01010101010101011234567890123456")),
             )
 
             for ((c, s) <- stReqs) {
@@ -219,8 +219,8 @@ trait VLsuBehavior_st {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vse64.copy(vl=3, uopIdx=0, uopEnd=false, isLoad=false), stReqSrc_default),
-                (vse64.copy(vl=3, uopIdx=1, uopEnd=true, isLoad=false),  SrcBundleSt(vs3="hfedcba98765432100f0f0f0f0f0f0f0f")),
+                (vse64.copy(vl=3, uopIdx=0, uopEnd=false, isLoad=false, destVRegStart = true, destVRegEnd = true), stReqSrc_default),
+                (vse64.copy(vl=3, uopIdx=1, uopEnd=true, isLoad=false, destVRegStart = true, destVRegEnd = true),  SrcBundleSt(vs3="hfedcba98765432100f0f0f0f0f0f0f0f")),
             )
 
             for ((c, s) <- stReqs) {
@@ -252,8 +252,8 @@ trait VLsuBehavior_st {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vse64.copy(vl=3, vstart=1, uopIdx=0, uopEnd=false, isLoad=false), stReqSrc_default),
-                (vse64.copy(vl=3, vstart=1, uopIdx=1, uopEnd=true, isLoad=false),  SrcBundleSt(vs3="hfedcba98765432100f0f0f0f0f0f0f0f")),
+                (vse64.copy(vl=3, vstart=1, uopIdx=0, uopEnd=false, isLoad=false, destVRegStart = true, destVRegEnd = true), stReqSrc_default),
+                (vse64.copy(vl=3, vstart=1, uopIdx=1, uopEnd=true, isLoad=false, destVRegStart = true, destVRegEnd = true),  SrcBundleSt(vs3="hfedcba98765432100f0f0f0f0f0f0f0f")),
             )
 
             for ((c, s) <- stReqs) {
@@ -285,7 +285,7 @@ trait VLsuBehavior_st {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsm.copy(vl=27, uopIdx=0, uopEnd=true, isLoad=false), stReqSrc_default),
+                (vsm.copy(vl=27, uopIdx=0, uopEnd=true, isLoad=false, destVRegStart = true, destVRegEnd = true), stReqSrc_default),
             )
 
             for ((c, s) <- stReqs) {
@@ -315,7 +315,7 @@ trait VLsuBehavior_st {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsse8.copy(vl=6, uopIdx=0, uopEnd=true, isLoad=false), SrcBundleSt(scalar_opnd_2="hffffffff_fffffffb"))
+                (vsse8.copy(vl=6, uopIdx=0, uopEnd=true, isLoad=false, destVRegStart = true, destVRegEnd = true), SrcBundleSt(scalar_opnd_2="hffffffff_fffffffb"))
             )
 
             for ((c, s) <- stReqs) {
@@ -348,7 +348,7 @@ trait VLsuBehavior_st {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsse32.copy(vl=2, uopIdx=0, uopEnd=true, isLoad=false), SrcBundleSt(scalar_opnd_2="hffffffff_ffffffff"))
+                (vsse32.copy(vl=2, uopIdx=0, uopEnd=true, isLoad=false, destVRegStart = true, destVRegEnd = true), SrcBundleSt(scalar_opnd_2="hffffffff_ffffffff"))
             )
 
             for ((c, s) <- stReqs) {
@@ -381,8 +381,8 @@ trait VLsuBehavior_st {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsse16.copy(vl=10, uopIdx=0, uopEnd=false, isLoad=false), SrcBundleSt(scalar_opnd_2="h8")),
-                (vsse16.copy(vl=10, uopIdx=1, uopEnd=true, isLoad=false), SrcBundleSt(scalar_opnd_2="h8"))
+                (vsse16.copy(vl=10, uopIdx=0, uopEnd=false, isLoad=false, destVRegStart = true, destVRegEnd = true), SrcBundleSt(scalar_opnd_2="h8")),
+                (vsse16.copy(vl=10, uopIdx=1, uopEnd=true, isLoad=false, destVRegStart = true, destVRegEnd = true), SrcBundleSt(scalar_opnd_2="h8"))
             )
 
             for ((c, s) <- stReqs) {
@@ -416,8 +416,8 @@ trait VLsuBehavior_st {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vsse16.copy(vm=false, vl=10, uopIdx=0, uopEnd=false, isLoad=false), SrcBundleSt(scalar_opnd_2="h8", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fefe")),
-                (vsse16.copy(vm=false, vl=10, uopIdx=1, uopEnd=true, isLoad=false), SrcBundleSt(scalar_opnd_2="h8", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fefe"))
+                (vsse16.copy(vm=false, vl=10, uopIdx=0, uopEnd=false, isLoad=false, destVRegStart = true, destVRegEnd = true), SrcBundleSt(scalar_opnd_2="h8", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fefe")),
+                (vsse16.copy(vm=false, vl=10, uopIdx=1, uopEnd=true, isLoad=false, destVRegStart = true, destVRegEnd = true), SrcBundleSt(scalar_opnd_2="h8", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_fefe"))
             )
 
             for ((c, s) <- stReqs) {
@@ -452,7 +452,7 @@ trait VLsuBehavior_st {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vse8.copy(vl=19, uopIdx=0, uopEnd=false, isLoad=false), SrcBundleSt(scalar_opnd_1="h1058")),
+                (vse8.copy(vl=19, uopIdx=0, uopEnd=false, isLoad=false, destVRegStart = true, destVRegEnd = true), SrcBundleSt(scalar_opnd_1="h1058")),
             )
 
             for ((c, s) <- stReqs) {
@@ -484,8 +484,8 @@ trait VLsuBehavior_st {
             dut.clock.setTimeout(1000)
             dut.clock.step(1)
             val stReqs = Seq(
-                (vs2r.copy(vl=19, uopIdx=0, uopEnd=false, isLoad=false), stReqSrc_default),
-                (vs2r.copy(vl=19, uopIdx=1, uopEnd=true,  isLoad=false), SrcBundleSt(vs3="hfedcba98765432100f0f0f0f0f0f0f0f")),
+                (vs2r.copy(vl=19, uopIdx=0, uopEnd=false, isLoad=false, destVRegStart = true, destVRegEnd = true), stReqSrc_default),
+                (vs2r.copy(vl=19, uopIdx=1, uopEnd=true,  isLoad=false, destVRegStart = true, destVRegEnd = true), SrcBundleSt(vs3="hfedcba98765432100f0f0f0f0f0f0f0f")),
             )
 
             for ((c, s) <- stReqs) {

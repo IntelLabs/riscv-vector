@@ -89,6 +89,14 @@ object LdstUopStatus {
   val ready    = 1.U
 }
 
+class HLSUInfo extends Bundle {
+  val valid    = Bool()
+  val ldstCtrl = new LSULdstCtrl
+  val muopInfo = new mUopInfo
+  val vregDataVec = Vec(vlenb, UInt(8.W))
+  val vregDataValid = Vec(vlenb, Bool())
+}
+
 class CommitInfoRecorded extends Bundle {
   val muopEnd     = Bool()
   val regCount    = UInt(4.W)
@@ -137,10 +145,11 @@ class LdstUop extends Bundle {
   val destElem    = UInt(bVL.W)                       // data position in vreg
   val destVRegEnd = Bool()
   val elemCnt     = UInt((log2Ceil(dataBytes) + 1).W) // 1~8
-  val zeroStride    = Bool()
+  val zeroStride  = Bool()
   val negStride   = Bool()
   val log2Stride  = UInt(log2Ceil(dataWidth / 8).W)
   val xcpt        = new LdstXcpt()
+  val hlsuInfoPtr = UInt(2.W)
 }
 
 class SegLdstUop extends Bundle {

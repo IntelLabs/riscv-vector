@@ -138,62 +138,62 @@ class MuopTest extends Bundle {
   val mask          = UInt(VLEN.W)
 }
 
-// object DataTable {
-//   val dataTable = Seq(
-//       // addr, data, exception
-//       (0x0fd0.U, BigInt("4040404040404404", 16).U, false.B),
-//       (0x0fd8.U, BigInt("3030303030303030", 16).U, false.B),
-//       (0x0fe0.U, BigInt("2020202020202020", 16).U, false.B),
-//       (0x0fe8.U, BigInt("1010101010101010", 16).U, false.B),
-//       (0x0ff0.U, BigInt("5678901234503489", 16).U, false.B),
-//       (0x0ff8.U, BigInt("eeeeeeeeeeeeeeee", 16).U, false.B),
-//       (0x1000.U, BigInt("0123456789abcdef", 16).U, false.B),
-//       (0x1008.U, BigInt("ffffffffffffffff", 16).U, false.B),
-//       (0x1010.U, BigInt("0f0f0f0f0f0f0f0f", 16).U, false.B),
-//       (0x1018.U, BigInt("fedcba9876543210", 16).U, false.B),
-//       (0x1020.U, BigInt("1234567890123456", 16).U, false.B),
-//       (0x1028.U, BigInt("0101010101010101", 16).U, false.B),
-//       (0x1030.U, BigInt("2345678901234567", 16).U, false.B),
-//       (0x1038.U, BigInt("1111111111111111", 16).U, false.B),
-//       (0x1040.U, BigInt("2222222222222222", 16).U, false.B),
-//       (0x1048.U, BigInt("3333333333333333", 16).U, false.B),
-//       (0x1050.U, BigInt("4444444444444444", 16).U, false.B),
-//       (0x1058.U, BigInt("5555555555555555", 16).U, false.B),
-//       (0x1060.U, BigInt("6666666666666666", 16).U, true.B),
-//       (0x1068.U, BigInt("0807060504030201", 16).U, false.B),
-//       (0x1070.U, BigInt("1615141312111009", 16).U, false.B),
-//       (0x1078.U, BigInt("081814100c1c0004", 16).U, false.B),
-//       (0x1080.U, BigInt("00080000000c0004", 16).U, false.B),
-//       (0x1088.U, BigInt("000000080004001c", 16).U, false.B),
-//       (0x1090.U, BigInt("00080004000c0018", 16).U, false.B),
-//       (0x1098.U, BigInt("00380004000c0020", 16).U, false.B),
-//       (0x1100.U, BigInt("00080001000c0004", 16).U, false.B),
-//       (0x1108.U, BigInt("000000080004001c", 16).U, false.B),
-//       (0x1110.U, BigInt("00080060000c0004", 16).U, false.B),
-//       (0x1118.U, BigInt("000000080004001c", 16).U, false.B),
-//   )
-// }
-
 object DataTable {
   val dataTable = Seq(
-    // addr, data, exception
-    (0x0fd0.U, BigInt("30303030303030304040404040404404", 16).U, false.B),
-    (0x0fe0.U, BigInt("10101010101010102020202020202020", 16).U, false.B),
-    (0x0ff0.U, BigInt("eeeeeeeeeeeeeeee5678901234503489", 16).U, false.B),
-    (0x1000.U, BigInt("ffffffffffffffff0123456789abcdef", 16).U, false.B),
-    (0x1010.U, BigInt("fedcba98765432100f0f0f0f0f0f0f0f", 16).U, false.B),
-    (0x1020.U, BigInt("01010101010101011234567890123456", 16).U, false.B),
-    (0x1030.U, BigInt("11111111111111112345678901234567", 16).U, false.B),
-    (0x1040.U, BigInt("33333333333333332222222222222222", 16).U, false.B),
-    (0x1050.U, BigInt("55555555555555554444444444444444", 16).U, false.B),
-    (0x1060.U, BigInt("08070605040302016666666666666666", 16).U, true.B),
-    (0x1070.U, BigInt("081814100c1c00041615141312111009", 16).U, false.B),
-    (0x1080.U, BigInt("000000080004001c00080000000c0004", 16).U, false.B),
-    (0x1090.U, BigInt("00380004000c002000080004000c0018", 16).U, false.B),
-    (0x1100.U, BigInt("000000080004001c00080001000c0004", 16).U, false.B),
-    (0x1110.U, BigInt("000000080004001c00080060000c0004", 16).U, false.B),
+      // addr, data, exception
+      (0x0fd0.U, BigInt("4040404040404404", 16).U, false.B),
+      (0x0fd8.U, BigInt("3030303030303030", 16).U, false.B),
+      (0x0fe0.U, BigInt("2020202020202020", 16).U, false.B),
+      (0x0fe8.U, BigInt("1010101010101010", 16).U, false.B),
+      (0x0ff0.U, BigInt("5678901234503489", 16).U, false.B),
+      (0x0ff8.U, BigInt("eeeeeeeeeeeeeeee", 16).U, false.B),
+      (0x1000.U, BigInt("0123456789abcdef", 16).U, false.B),
+      (0x1008.U, BigInt("ffffffffffffffff", 16).U, false.B),
+      (0x1010.U, BigInt("0f0f0f0f0f0f0f0f", 16).U, false.B),
+      (0x1018.U, BigInt("fedcba9876543210", 16).U, false.B),
+      (0x1020.U, BigInt("1234567890123456", 16).U, false.B),
+      (0x1028.U, BigInt("0101010101010101", 16).U, false.B),
+      (0x1030.U, BigInt("2345678901234567", 16).U, false.B),
+      (0x1038.U, BigInt("1111111111111111", 16).U, false.B),
+      (0x1040.U, BigInt("2222222222222222", 16).U, false.B),
+      (0x1048.U, BigInt("3333333333333333", 16).U, false.B),
+      (0x1050.U, BigInt("4444444444444444", 16).U, false.B),
+      (0x1058.U, BigInt("5555555555555555", 16).U, false.B),
+      (0x1060.U, BigInt("6666666666666666", 16).U, true.B),
+      (0x1068.U, BigInt("0807060504030201", 16).U, false.B),
+      (0x1070.U, BigInt("1615141312111009", 16).U, false.B),
+      (0x1078.U, BigInt("081814100c1c0004", 16).U, false.B),
+      (0x1080.U, BigInt("00080000000c0004", 16).U, false.B),
+      (0x1088.U, BigInt("000000080004001c", 16).U, false.B),
+      (0x1090.U, BigInt("00080004000c0018", 16).U, false.B),
+      (0x1098.U, BigInt("00380004000c0020", 16).U, false.B),
+      (0x1100.U, BigInt("00080001000c0004", 16).U, false.B),
+      (0x1108.U, BigInt("000000080004001c", 16).U, false.B),
+      (0x1110.U, BigInt("00080060000c0004", 16).U, false.B),
+      (0x1118.U, BigInt("000000080004001c", 16).U, false.B),
   )
 }
+
+// object DataTable {
+//   val dataTable = Seq(
+//     // addr, data, exception
+//     (0x0fd0.U, BigInt("30303030303030304040404040404404", 16).U, false.B),
+//     (0x0fe0.U, BigInt("10101010101010102020202020202020", 16).U, false.B),
+//     (0x0ff0.U, BigInt("eeeeeeeeeeeeeeee5678901234503489", 16).U, false.B),
+//     (0x1000.U, BigInt("ffffffffffffffff0123456789abcdef", 16).U, false.B),
+//     (0x1010.U, BigInt("fedcba98765432100f0f0f0f0f0f0f0f", 16).U, false.B),
+//     (0x1020.U, BigInt("01010101010101011234567890123456", 16).U, false.B),
+//     (0x1030.U, BigInt("11111111111111112345678901234567", 16).U, false.B),
+//     (0x1040.U, BigInt("33333333333333332222222222222222", 16).U, false.B),
+//     (0x1050.U, BigInt("55555555555555554444444444444444", 16).U, false.B),
+//     (0x1060.U, BigInt("08070605040302016666666666666666", 16).U, true.B),
+//     (0x1070.U, BigInt("081814100c1c00041615141312111009", 16).U, false.B),
+//     (0x1080.U, BigInt("000000080004001c00080000000c0004", 16).U, false.B),
+//     (0x1090.U, BigInt("00380004000c002000080004000c0018", 16).U, false.B),
+//     (0x1100.U, BigInt("000000080004001c00080001000c0004", 16).U, false.B),
+//     (0x1110.U, BigInt("000000080004001c00080060000c0004", 16).U, false.B),
+//   )
+// }
 
 class LSUFakeDCache extends Module {
   val io = IO(new Bundle {
