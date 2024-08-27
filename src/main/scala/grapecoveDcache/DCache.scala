@@ -23,6 +23,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   def onReset     = Metadata(0.U, ClientMetadata.onReset.state)
   val metaArray   = Module(new MetaArray[Metadata](() => onReset))
   val dataArray   = Module(new DataArray)
+  val amoalu      = Module(new AMOALU(XLEN))
   val mshrs       = Module(new MSHRWrapper)
   val wbQueue     = Module(new WritebackQueue)
   val probeQueue  = Module(new ProbeQueue)
@@ -174,12 +175,6 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_noDataMiss      = !s1_isTagMatch                    // e.g. N->B or N->T miss
   val s1_upgradePermMiss = s1_isTagMatch && !s1_hasPerm      // e.g. B->T miss
 
-  val s1_newStoreMask = Mux(
-    s1_req.cmd === M_PWR,
-    s1_req.wmask,
-    new StoreGen(s1_req.size, s1_req.paddr, 0.U, dataBytes).mask,
-  )
-
   assert(
     !(s1_validFromCore && s1_req.cmd === M_PWR && s1_req.size =/= 6.U),
     "Only support partial write 64 bytes",
@@ -297,25 +292,43 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s2_updateData = RegNext(s1_updateData)
   val s2_tag        = RegEnable(s1_tag, s1_needUpdate)
   val s2_data       = RegEnable(s1_data, s1_needUpdate)
-  val s2_req        = RegInit(0.U.asTypeOf(new MainPipeReq))
-  // need to calculate hit store data & miss store data
-  when(s1_needUpdate | (s1_mshrAlloc && isWrite(s1_req.cmd))) {
-    s2_req       := s1_req
-    s2_req.wmask := s1_newStoreMask
-  }
 
-  // * store data
-  val amoaluOutVec = VecInit(Seq.fill(dataBytes / XLEN)(0.U(XLEN.W)))
-  val amoalus = (0 until dataBytes / XLEN).map { i =>
-    val amoalu = Module(new AMOALU(XLEN))
-    amoaluOutVec(i) := amoalu.io.out
-    amoalu.io.mask  := s2_req.wmask >> (i * (XLEN / 8))
-    amoalu.io.cmd   := s2_req.cmd
-    amoalu.io.lhs   := s2_data >> (i * XLEN)
-    amoalu.io.rhs   := s2_req.wdata >> (i * XLEN)
-    amoalu
-  }
-  val s2_storeData = Mux(s2_req.isRefill, s1_refillData, amoaluOutVec.asUInt)
+  // need to calculate hit store data & miss store data
+  val s2_req = RegEnable(s1_req, s1_needUpdate | (s1_mshrAlloc && isWrite(s1_req.cmd)))
+
+  // * cpu store data
+  val s2_storeGenMask = new StoreGen(s2_req.size, s2_req.paddr, 0.U, dataBytes).mask
+  val s2_maskInBytes = Mux(
+    s2_req.isRefill,
+    Fill(dataBytes, 1.U),   // refill don't need mask
+    Mux(                    //
+      s2_req.cmd === M_PWR, // condition: is partial write?
+      s2_req.wmask,         // partial store mask
+      s2_storeGenMask,      // store gen mask
+    ),
+  )
+  val s2_mask           = FillInterleaved(8, s2_maskInBytes)
+  val s2_mergeStoreData = s2_req.wdata & s2_mask | s2_data & ~s2_mask
+
+  // * cpu amo store data
+  // NOTE: operate in 8Bytes
+  val s2_bankOffset = getBankIdx(s2_req.paddr)
+  val s2_dataVec = VecInit(
+    (0 until nBanks).map(i => s2_data((i + 1) * rowBits - 1, i * rowBits))
+  )
+  val s2_amoStoreDataVec = VecInit(
+    (0 until nBanks).map(i => s2_data((i + 1) * rowBits - 1, i * rowBits))
+  )
+  s2_amoStoreDataVec(s2_bankOffset) := amoalu.io.out
+
+  val s2_amoStoreData = (s2_amoStoreDataVec.asUInt & s2_mask) | s2_data & ~s2_mask
+
+  amoalu.io.mask := new StoreGen(s2_req.size, s2_req.paddr, 0.U, XLEN).mask // XLEN mask
+  amoalu.io.cmd  := s2_req.cmd
+  amoalu.io.lhs  := s2_dataVec(s2_bankOffset)
+  amoalu.io.rhs  := s2_req.wdata
+
+  val s2_storeData = Mux(isAMO(s2_req.cmd), s2_amoStoreData, s2_mergeStoreData)
   // * pipeline stage 2 End
 
   // * pipeline stage 3 Begin
@@ -412,8 +425,8 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // mshr get store data in s2
   val s2_upgradePermMiss      = RegNext(s1_upgradePermMiss)
-  val s2_mshrStoreData        = Mux(s2_upgradePermMiss, s2_storeData, s2_req.wdata)
-  val s2_mshrStoreMaskInBytes = Mux(s2_upgradePermMiss, Fill(dataBytes, 1.U), s2_req.wmask)
+  val s2_mshrStoreData        = Mux(s2_upgradePermMiss, s2_mergeStoreData, s2_req.wdata)
+  val s2_mshrStoreMaskInBytes = Mux(s2_upgradePermMiss, Fill(dataBytes, 1.U), s2_maskInBytes)
 
   val mshrReq = WireDefault(s1_req)
   mshrReq.wdata := s2_mshrStoreData
