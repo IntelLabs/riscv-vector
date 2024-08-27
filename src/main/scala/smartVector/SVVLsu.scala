@@ -9,7 +9,7 @@ import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import xiangshan.MicroOp
 import SmartParam._
 
-class VLSUPtr extends CircularQueuePtr[VLSUPtr](vVLSUQueueEntries)
+class VLdstQueuePtr extends CircularQueuePtr[VLdstQueuePtr](vVLSUQueueEntries)
 
 class SVVLsu(
     implicit p: Parameters
@@ -24,9 +24,9 @@ class SVVLsu(
 
   // ldQueue
   val canEnqueue   = WireInit(false.B)
-  val enqPtr       = RegInit(0.U.asTypeOf(new VLSUPtr))
-  val issuePtr     = RegInit(0.U.asTypeOf(new VLSUPtr))
-  val deqPtr       = RegInit(0.U.asTypeOf(new VLSUPtr))
+  val enqPtr       = RegInit(0.U.asTypeOf(new VLdstQueuePtr))
+  val issuePtr     = RegInit(0.U.asTypeOf(new VLdstQueuePtr))
+  val deqPtr       = RegInit(0.U.asTypeOf(new VLdstQueuePtr))
   val ldstUopQueue = RegInit(VecInit(Seq.fill(vVLSUQueueEntries)(0.U.asTypeOf(new SegLdstUop))))
 
   val ldstQueueFull = isFull(enqPtr, deqPtr)
@@ -146,7 +146,7 @@ class SVVLsu(
 
   // * BEGIN
   // * Issue LdstUop
-  val respLdstPtr = 0.U.asTypeOf(new VLSUPtr)
+  val respLdstPtr = 0.U.asTypeOf(new VLdstQueuePtr)
   respLdstPtr.value := io.dataExchange.resp.bits.idx(nLSUMaxQueueWidth - 1, 0)
   respLdstPtr.flag  := io.dataExchange.resp.bits.flag
   val respData = io.dataExchange.resp.bits.data
@@ -264,9 +264,9 @@ class SVVLsu(
       for (i <- 0 until vVLSUQueueEntries) {
         ldstUopQueue(i) := 0.U.asTypeOf(new SegLdstUop)
       }
-      enqPtr   := 0.U.asTypeOf(new VLSUPtr)
-      issuePtr := 0.U.asTypeOf(new VLSUPtr)
-      deqPtr   := 0.U.asTypeOf(new VLSUPtr)
+      enqPtr   := 0.U.asTypeOf(new VLdstQueuePtr)
+      issuePtr := 0.U.asTypeOf(new VLdstQueuePtr)
+      deqPtr   := 0.U.asTypeOf(new VLdstQueuePtr)
     }.otherwise {
       deqPtr                            := deqPtr + 1.U
       ldstUopQueue(deqPtr.value).status := LdstUopStatus.notReady
