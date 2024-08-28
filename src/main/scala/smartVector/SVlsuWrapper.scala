@@ -44,10 +44,10 @@ class SVlsuWrapper(
   lsuReq.vl       := io.mUop.bits.uop.info.vl
 
   // * connect lsu
-  hLsu.io.lsuReq.valid := validReq && ldstCtrl.nfield === 1.U
+  hLsu.io.lsuReq.valid := validReq && (ldstCtrl.nfield === 1.U)
   hLsu.io.lsuReq.bits  := lsuReq
 
-  vLsu.io.lsuReq.valid := validReq && ldstCtrl.nfield > 1.U
+  vLsu.io.lsuReq.valid := validReq && (ldstCtrl.nfield > 1.U)
   vLsu.io.lsuReq.bits  := lsuReq
 
   val dataReqArb = Module(new Arbiter(new RVUMemoryReq(), 2))

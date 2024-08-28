@@ -47,11 +47,12 @@ class SVHLsu(
   val addrReg   = RegInit(0.U(addrWidth.W))
 
   // hlsu meta queue
-  val metaQueue  = RegInit(VecInit(Seq.fill(nHLsuMetaEntries)(0.U.asTypeOf(new HLSUMeta))))
-  val metaEnqPtr = RegInit(0.U.asTypeOf(new HLSUMetaPtr))
-  val metaDeqPtr = RegInit(0.U.asTypeOf(new HLSUMetaPtr))
-  val enqMeta    = metaQueue(metaEnqPtr.value)
-  val deqMeta    = metaQueue(metaDeqPtr.value)
+  val metaQueue      = RegInit(VecInit(Seq.fill(nHLsuMetaEntries)(0.U.asTypeOf(new HLSUMeta))))
+  val metaEnqPtr     = RegInit(0.U.asTypeOf(new HLSUMetaPtr))
+  val metaLastEnqPtr = RegInit(0.U.asTypeOf(new HLSUMetaPtr))
+  val metaDeqPtr     = RegInit(0.U.asTypeOf(new HLSUMetaPtr))
+  val enqMeta        = metaQueue(metaLastEnqPtr.value)
+  val deqMeta        = metaQueue(metaDeqPtr.value)
 
   // ldQueue
   val ldstUopQueue = RegInit(VecInit(Seq.fill(nHLsuQueueEntries)(0.U.asTypeOf(new LdstUop))))
@@ -97,14 +98,6 @@ class SVHLsu(
   // SPLIT FSM -- transition
   uopState := nextUopState
 
-  // HLSU info queue update logic
-
-  metaEnqPtr := Mux(
-    ((uopState === uop_split) && stopSplit) && enqMeta.muopInfo.destVRegEnd,
-    metaEnqPtr + 1.U,
-    metaEnqPtr,
-  )
-
   // if exception occurs or split finished, stop split
   stopSplit := hasXcpt || (curSplitIdx >= splitCount) || (splitCount === 0.U)
 
@@ -132,23 +125,26 @@ class SVHLsu(
     vstartGeVl  := vstart > actualVl
     // set hlsu info
     when(io.lsuReq.bits.muopInfo.destVRegStart) {
-      enqMeta.valid     := true.B
-      enqMeta.ldstCtrl  := ldstCtrl
-      enqMeta.muopInfo  := mUopInfo
-      enqMeta.canCommit := (microVl === 0.U) // FIXME
+      metaQueue(metaEnqPtr.value).valid     := true.B
+      metaQueue(metaEnqPtr.value).ldstCtrl  := ldstCtrl
+      metaQueue(metaEnqPtr.value).muopInfo  := mUopInfo
+      metaQueue(metaEnqPtr.value).canCommit := (microVl === 0.U) // FIXME
       (0 until vlenb).foreach { i =>
-        enqMeta.vregDataVec(i) := mUopInfo.old_vd(8 * i + 7, 8 * i)
+        metaQueue(metaEnqPtr.value).vregDataVec(i) :=
+          mUopInfo.old_vd(8 * i + 7, 8 * i)
       }
+
+      metaLastEnqPtr := metaEnqPtr
+      metaEnqPtr     := metaEnqPtr + 1.U
     }
   }
 
   // * BEGIN
   // * Calculate Addr
   // pipeline stage 0 --> calc addr
-  val addr     = WireInit(0.U(addrWidth.W))
-  val offset   = WireInit(0.U(log2Ceil(dataBytes).W))
-  val baseAddr = enqMeta.muopInfo.rs1Val
-
+  val addr        = WireInit(0.U(addrWidth.W))
+  val offset      = WireInit(0.U(log2Ceil(dataBytes).W))
+  val baseAddr    = enqMeta.muopInfo.rs1Val
   val curVl       = (enqMeta.muopInfo.uopIdx << enqMeta.ldstCtrl.log2MinLen) + curSplitIdx
   val isValidAddr = uopState === uop_split && !hasXcpt && (curSplitIdx < splitCount)
 
@@ -157,28 +153,34 @@ class SVHLsu(
   val idxMask = WireInit(0.U(XLEN.W))
   val eew     = enqMeta.ldstCtrl.eewb << 3.U
   // FIXME
+  val elenMask = WireInit(0.U(XLEN.W))
+  elenMask := ((1.U << enqMeta.ldstCtrl.log2Elen) - 1.U)
   val beginIdx =
-    (curVl - ((curVl >> enqMeta.ldstCtrl.log2Elen) << enqMeta.ldstCtrl.log2Elen)) << (enqMeta.ldstCtrl.log2Eewb +& 3.U) // 3.U: to bits
+    (curVl & elenMask) << (enqMeta.ldstCtrl.log2Eewb +& 3.U) // 3.U: to bits
   idxMask := (("h1".asUInt(addrWidth.W) << eew) - 1.U)
   idxVal  := (enqMeta.muopInfo.vs2 >> beginIdx) & idxMask
 
-  val stride    = WireInit(0.S(XLEN.W))
-  val negStride = stride < 0.S
-  val strideAbs = Mux(negStride, (-stride).asUInt, stride.asUInt)
+  // * stride addr
+  val stride     = WireInit(0.S(XLEN.W))
+  val zeroStride = stride === 0.S
+  val negStride  = stride < 0.S
+  val strideAbs  = stride.abs().asUInt
 
-  when(enqMeta.ldstCtrl.ldstType === Mop.unit_stride) {
-    stride := (enqMeta.ldstCtrl.nfield << enqMeta.ldstCtrl.log2Memwb).asSInt
-  }.elsewhen(enqMeta.ldstCtrl.ldstType === Mop.constant_stride) {
-    stride := enqMeta.muopInfo.rs2Val.asSInt
-  }.otherwise {
-    stride := 11111.S
-  }
+  stride := MuxLookup(
+    enqMeta.ldstCtrl.ldstType,
+    11111.U, // illegal value
+    Seq(
+      Mop.unit_stride     -> enqMeta.ldstCtrl.memwb,
+      Mop.constant_stride -> enqMeta.muopInfo.rs2Val,
+    ),
+  ).asSInt
 
-  val accelerateStride = Cat(strideAbs === 8.U, strideAbs === 4.U, strideAbs === 2.U, strideAbs === 1.U)
+  val accelerateStrideList     = Seq.tabulate(log2Up(dataBytes))(i => 1.U << i)
+  val accelerateLog2StrideList = Seq.tabulate(log2Up(dataBytes))(i => i.U)
+  val accelerateStride         = Cat(accelerateStrideList.reverseMap(strideAbs === _))
   val canAccelerate =
-    (accelerateStride =/= 0.U || strideAbs === 0.U) &&
-      ~isAddrMisalign(strideAbs, enqMeta.ldstCtrl.log2Memwb)
-  val log2Stride = Mux(canAccelerate, Mux1H(accelerateStride, Seq(0.U, 1.U, 2.U, 3.U)), 0.U)
+    (accelerateStride =/= 0.U || zeroStride) && ~isAddrMisalign(strideAbs, enqMeta.ldstCtrl.log2Memwb)
+  val log2Stride = Mux(canAccelerate, Mux1H(accelerateStride, accelerateLog2StrideList), 0.U)
 
   val curStridedAddr = Mux(
     curSplitIdx === 0.U && enqMeta.muopInfo.uopIdx === 0.U,
@@ -186,14 +188,14 @@ class SVHLsu(
     (addrReg.asSInt + stride.asSInt).asUInt,
   )
 
-  enqMeta.zeroStride := strideAbs === 0.U
+  enqMeta.zeroStride := zeroStride
   enqMeta.negStride  := negStride
   enqMeta.log2Stride := log2Stride
 
-  when(canAccelerate) {
-    addr := addrReg
-  }.otherwise {
-    addr := Mux1H(
+  addr := Mux(
+    canAccelerate,
+    addrReg,
+    Mux1H(
       enqMeta.ldstCtrl.ldstType,
       Seq(
         // unit stride
@@ -205,8 +207,8 @@ class SVHLsu(
         // index_odered
         (Cat(false.B, baseAddr).asSInt + idxVal.asSInt).asUInt,
       ),
-    )
-  }
+    ),
+  )
 
   offset := getAlignedOffset(addr)
 
@@ -228,7 +230,7 @@ class SVHLsu(
   when(addrQueue.io.enq.fire) {
     curSplitIdx := curSplitIdx + elemCnt
     addrReg := Mux(
-      canAccelerate && strideAbs =/= 0.U,
+      canAccelerate && ~zeroStride,
       Mux(negStride, addr - (elemCnt << log2Stride), addr + (elemCnt << log2Stride)),
       addr,
     )
@@ -243,19 +245,15 @@ class SVHLsu(
   addrQueue.io.enq.bits.elemCnt     := elemCnt
   addrQueue.io.enq.bits.curSplitIdx := curSplitIdx
   addrQueue.io.enq.bits.curVl       := curVl
-  addrQueue.io.enq.bits.metaPtr     := metaEnqPtr.value
+  addrQueue.io.enq.bits.metaPtr     := metaLastEnqPtr.value
   addrQueue.io.deq.ready            := !isFull(uopEnqPtr, uopDeqPtr)
 
-  // pipeline stage 1
   val deqAddrInfoValid = addrQueue.io.deq.valid
   val deqAddrInfo      = addrQueue.io.deq.bits
-
-  val accessMeta      = metaQueue(deqAddrInfo.metaPtr)
-  val s1_addrMisalign = isAddrMisalign(deqAddrInfo.addr, accessMeta.ldstCtrl.log2Memwb)
-
-  val elemMaskVec = VecInit(Seq.fill(vlenb)(false.B))
-  val isNotMasked = elemMaskVec.asUInt =/= 0.U
-
+  val accessMeta       = metaQueue(deqAddrInfo.metaPtr)
+  val s1_addrMisalign  = isAddrMisalign(deqAddrInfo.addr, accessMeta.ldstCtrl.log2Memwb)
+  val elemMaskVec      = VecInit(Seq.fill(vlenb)(false.B))
+  val isNotMasked      = elemMaskVec.asUInt =/= 0.U
   val canEnqueue =
     (accessMeta.ldstCtrl.vm || isNotMasked) && (deqAddrInfo.curSplitIdx + deqAddrInfo.elemCnt >= splitStart)
   val canWriteback =
