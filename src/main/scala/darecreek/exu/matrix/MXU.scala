@@ -57,12 +57,12 @@ object AccTileConstants {
   val rLen = 128
   val numReadPorts = 1
   val numVLdPorts = 1
-  val mxuPERows = 8
-  val mxuPECols = 8
   val mxuTileRows = 8
   val mxuTileCols = 8
   val mxuMeshRows = 1
   val mxuMeshCols = 1
+  val mxuPERows = mxuMeshRows * mxuTileRows
+  val mxuPECols = mxuMeshCols * mxuTileCols
   val rLenb = 16
 
 }
@@ -439,6 +439,7 @@ class PE(
     val macOutSrcB = Output(UInt(32.W)) // for systolic vertically
     val macOutSrcC = Output(UInt(16.W)) // for systolic vertically
     val macOutSrcD = Output(UInt(16.W)) // for systolic horizontally
+    val accout = Output(Valid(UInt(32.W)))
     // clear tile slices, control signals propagated vertically
     val clrReqIn = Input(Valid(new ClrCtrls()))
     val clrReqOut = Output(Valid(new ClrCtrls()))
@@ -487,7 +488,7 @@ class PE(
   fpMac.io.src1 := Mux(macReqCtrls.aluType === MACC && macReqCtrls.dirCal === 0.U, io.macReqSrcA, c0(macReqCtrls.src1Ridx))
 
   fpMac.io.src2 := Mux(macReqCtrls.dirCal === 1.U, io.macReqSrcC,
-    Mux(macReqCtrls.dirCal === 2.U, io.macReqSrcA, io.macReqSrcB(15,0)))
+    Mux(macReqCtrls.dirCal === 2.U, io.macReqSrcA, io.macReqSrcB(15, 0)))
   fpMac.io.src3 := Mux(macReqCtrls.aluType === MULT, 0.U,
     Mux(macReqCtrls.dirCal === 1.U, io.macReqSrcB,
       Mux(macReqCtrls.dirCal === 2.U, io.macReqSrcD, c0(macReqCtrls.src2Ridx))))
@@ -554,6 +555,8 @@ class PE(
     io.rowReadDout(i) := rowRdata
   }
 
+  io.accout.valid := io.rowReadReq(0).valid
+  io.accout.bits := c0(0)
   // -----------------------------------------------------------------------------------
   // write row slices
   // -----------------------------------------------------------------------------------
@@ -636,6 +639,7 @@ class Tile(
     // clear tile slices, control signals propagated vertically
     val clrReqIn = Input(Valid(new ClrCtrls()))
     val clrReqOut = Output(Valid(new ClrCtrls()))
+    val accout = Output(Vec(mxuTileRows * mxuTileCols, Valid(UInt(32.W))))
     // read row slices, control signals propagated vertically
     val rowReadReq = Input(Vec(numReadPorts, Valid(new SliceCtrls())))
     val rowReadDin = Input(Vec(numReadPorts, UInt((mxuTileCols * 64).W)))
@@ -664,6 +668,14 @@ class Tile(
 
   val tile = Seq.tabulate(mxuTileRows, mxuTileCols)((i, j) => Module(new PE(indexh + i, indexv + j, numReadPorts)))
   val tileT = tile.transpose
+
+  for (i <- 0 until mxuTileRows) {
+    for (j <- 0 until mxuTileCols) {
+      val index = i * mxuTileCols + j
+      io.accout(index).bits := tile(i)(j).io.accout.bits
+      io.accout(index).valid := tile(i)(j).io.accout.valid
+    }
+  }
 
   // broadcast horizontally across the tile
   for (r <- 0 until mxuTileRows) {
@@ -888,6 +900,8 @@ class Mesh(
     // clear tile slices, control signals propagated vertically
     val clrReq = Input(Valid(new ClrCtrls()))
     val clrResp = Output(Valid(new ClrCtrls()))
+
+    val accout = Output(Vec(mxuMeshRows * mxuMeshCols, Valid(UInt((mxuTileRows * mxuTileCols * 32).W))))
     // read row slices, control signals propagated vertically
     val rowReadReq = Input(Vec(numReadPorts, Valid(new SliceCtrls())))
     val rowReadResp = Output(Vec(numReadPorts, Valid(new SliceCtrls())))
@@ -910,6 +924,14 @@ class Mesh(
 
   val mesh = Seq.tabulate(mxuMeshRows, mxuMeshCols)((i, j) => Module(new Tile(i * mxuTileRows, j * mxuTileCols, numReadPorts)))
   val meshT = mesh.transpose
+
+  for (i <- 0 until mxuMeshRows) {
+    for (j <- 0 until mxuMeshCols) {
+      val index = i * mxuMeshRows + j
+      io.accout(index).bits := RegEnable(Cat(mesh(i)(j).io.accout.map(_.bits).reverse), mesh(i)(j).io.accout(0).valid)
+      io.accout(index).valid := mesh(i)(j).io.accout(0).valid
+    }
+  }
 
   // propagate horizontally across the mesh
   for (r <- 0 until mxuMeshRows) {

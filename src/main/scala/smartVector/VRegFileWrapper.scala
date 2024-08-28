@@ -7,6 +7,7 @@ import chipsalliance.rocketchip.config
 import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import SmartParam._
 import darecreek.exu.vfu.VPermOutput
+import matrix.MatrixParameters.hasMatrix
 
 
 class SVRegFileWrapper(implicit p : Parameters) extends Module{ 
@@ -15,6 +16,7 @@ class SVRegFileWrapper(implicit p : Parameters) extends Module{
         val in = new Bundle{
             val readIn = Input(new regReadIn)
             val writeIn = Input(new regWriteIn)
+            val mma_toRegFileWrite = if (hasMatrix) Some(Input(Vec(NVPhyRegs / 2, new regWriteIn))) else None
             val permReadIn = Input(new VPermOutput)
         }
         val out = Output(new regOut)
@@ -24,9 +26,9 @@ class SVRegFileWrapper(implicit p : Parameters) extends Module{
     })
 
     val nVRFReadPorts = 5
-    val nVRFWritePorts = 1
+    val nVRFWritePorts = 16
   
-    val regFile = Module(new SVRegFile(nVRFReadPorts, nVRFWritePorts))
+    val regFile = Module(new SVRegFile()(p, nVRFReadPorts, nVRFWritePorts))
 
     val writeData = Wire(Vec(NLanes, UInt((VLEN/NLanes).W)))
     val writeMask = Wire(Vec(NLanes, UInt((VLEN/NLanes/8).W)))
@@ -35,7 +37,15 @@ class SVRegFileWrapper(implicit p : Parameters) extends Module{
         writeData(i) := io.in.writeIn.rfWriteData((i+1)*VLEN/NLanes-1, i*VLEN/NLanes)
         writeMask(i) := io.in.writeIn.rfWriteMask((i+1)*VLEN/NLanes/8-1, i*VLEN/NLanes/8)
     }
-    
+
+    for (i <- 0 until 16) {
+        regFile.io.write(i).wen   := false.B
+        regFile.io.write(i).addr  := io.in.writeIn.rfWriteIdx
+        regFile.io.write(i).data  := writeData
+        regFile.io.write(i).wmask := writeMask
+    }
+
+    regFile.io.mma_toRegFileWrite.get := io.in.mma_toRegFileWrite.get
     regFile.io.write(0).wen   := io.in.writeIn.rfWriteEn
     regFile.io.write(0).addr  := io.in.writeIn.rfWriteIdx
     regFile.io.write(0).data  := writeData

@@ -5,6 +5,6 @@ import chisel3._
 import chisel3.util._
 
 object MatrixParameters {
-  val hasMatrix = true
+  var hasMatrix: Boolean = true
 }
 
