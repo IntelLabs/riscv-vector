@@ -64,12 +64,12 @@ class VIexWrapper(implicit p: Parameters) extends Module {
     val mma = Module(new Mesh()(p))
     io.matrix_out.get := mma.io.accout(0)
     for (c <- 0 until mxuMeshCols) {
-      mma.io.macReq(c).valid := mUopValid
+      mma.io.macReq(c).valid := io.matrix_in.get.valid
       mma.io.macReq(c).bits.src1Ridx := 0.U
       mma.io.macReq(c).bits.src2Ridx := 0.U
       mma.io.macReq(c).bits.dstRidx := 0.U
-      mma.io.macReq(c).bits.srcType := 0.U
-      mma.io.macReq(c).bits.outType := 2.U
+      mma.io.macReq(c).bits.srcType := io.matrix_in.get.bits.srcType
+      mma.io.macReq(c).bits.outType := io.matrix_in.get.bits.dstType
       mma.io.macReq(c).bits.aluType := 0.U
       mma.io.macReq(c).bits.macInit := false.B
       mma.io.macReq(c).bits.macLast := false.B
@@ -78,12 +78,12 @@ class VIexWrapper(implicit p: Parameters) extends Module {
       //    mma.io.macReq(c).bits.prodLen := 0.U
       mma.io.macReq(c).bits.dirCal := 0.U
       mma.io.macReq(c).bits.rm := 0.U
-      mma.io.macReqSrcB(c) := 0.U // todo
+      mma.io.macReqSrcB(c) := io.matrix_in.get.bits.srcB
       mma.io.macReqSrcC(c) := 0.U
     }
 
     for (c <- 0 until mxuMeshRows) {
-      mma.io.macReqSrcA(c) := 0.U // todo
+      mma.io.macReqSrcA(c) := io.matrix_in.get.bits.srcA
       mma.io.macReqSrcD(c) := 0.U
     }
 
