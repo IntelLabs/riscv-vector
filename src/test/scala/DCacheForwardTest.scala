@@ -185,6 +185,7 @@ trait DCacheForwardTestTrait {
         dut.io.req.valid.poke(true.B)
         dut.io.req.bits.poke(genReq(cacheReq.copy(
           paddr = "h8000e000",
+          size = 6,
           isRefill = true,
           refillWay = 3,
           refillCoh = ClientStates.Dirty,

@@ -175,6 +175,14 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_noDataMiss      = !s1_isTagMatch                    // e.g. N->B or N->T miss
   val s1_upgradePermMiss = s1_isTagMatch && !s1_hasPerm      // e.g. B->T miss
 
+  val storeGen        = new StoreGen(s1_req.size, s1_req.paddr, s1_req.wdata, dataBytes)
+  val s1_newStoreData = storeGen.data
+  val s1_newStoreMask = Mux(
+    s1_req.cmd === M_PWR,
+    s1_req.wmask,
+    storeGen.mask,
+  )
+
   assert(
     !(s1_validFromCore && s1_req.cmd === M_PWR && s1_req.size =/= 6.U),
     "Only support partial write 64 bytes",
@@ -292,22 +300,16 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s2_updateData = RegNext(s1_updateData)
   val s2_tag        = RegEnable(s1_tag, s1_needUpdate)
   val s2_data       = RegEnable(s1_data, s1_needUpdate)
-
+  val s2_req        = RegInit(0.U.asTypeOf(new MainPipeReq))
   // need to calculate hit store data & miss store data
-  val s2_req = RegEnable(s1_req, s1_needUpdate | (s1_mshrAlloc && isWrite(s1_req.cmd)))
+  when(s1_needUpdate | (s1_mshrAlloc && isWrite(s1_req.cmd))) {
+    s2_req       := s1_req
+    s2_req.wdata := s1_newStoreData
+    s2_req.wmask := s1_newStoreMask
+  }
 
   // * cpu store data
-  val s2_storeGenMask = new StoreGen(s2_req.size, s2_req.paddr, 0.U, dataBytes).mask
-  val s2_maskInBytes = Mux(
-    s2_req.isRefill,
-    Fill(dataBytes, 1.U),   // refill don't need mask
-    Mux(                    //
-      s2_req.cmd === M_PWR, // condition: is partial write?
-      s2_req.wmask,         // partial store mask
-      s2_storeGenMask,      // store gen mask
-    ),
-  )
-  val s2_mask           = FillInterleaved(8, s2_maskInBytes)
+  val s2_mask           = FillInterleaved(8, s2_req.wmask)
   val s2_mergeStoreData = s2_req.wdata & s2_mask | s2_data & ~s2_mask
 
   // * cpu amo store data
@@ -426,7 +428,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // mshr get store data in s2
   val s2_upgradePermMiss      = RegNext(s1_upgradePermMiss)
   val s2_mshrStoreData        = Mux(s2_upgradePermMiss, s2_mergeStoreData, s2_req.wdata)
-  val s2_mshrStoreMaskInBytes = Mux(s2_upgradePermMiss, Fill(dataBytes, 1.U), s2_maskInBytes)
+  val s2_mshrStoreMaskInBytes = Mux(s2_upgradePermMiss, Fill(dataBytes, 1.U), s2_req.wmask)
 
   val mshrReq = WireDefault(s1_req)
   mshrReq.wdata := s2_mshrStoreData

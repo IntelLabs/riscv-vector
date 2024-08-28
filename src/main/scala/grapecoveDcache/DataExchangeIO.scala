@@ -80,13 +80,15 @@ object MainPipeReqConverter {
     mainPipeReq.isRefill   := req.isRefill
     mainPipeReq.refillWay  := req.refillWay
     mainPipeReq.refillCoh  := req.refillCoh
+
+    assert(!req.isRefill || (req.isRefill && (req.size === log2Up(dataBytes).U)))
     mainPipeReq
   }
 
   // ProbeReq => MainPipeReq
   def apply(req: TLBundleB): MainPipeReq = {
     val mainPipeReq = WireInit(0.U.asTypeOf(new MainPipeReq))
-
+    mainPipeReq.size      := log2Up(dataBytes).U
     mainPipeReq.source    := req.source
     mainPipeReq.paddr     := req.address
     mainPipeReq.cmd       := req.opcode
@@ -99,6 +101,7 @@ object MainPipeReqConverter {
   def apply(req: MSHRReplace, victimWay: UInt): MainPipeReq = {
     val mainPipeReq = WireInit(0.U.asTypeOf(new MainPipeReq))
 
+    mainPipeReq.size      := log2Up(dataBytes).U
     mainPipeReq.paddr     := req.lineAddr << blockOffBits
     mainPipeReq.isRefill  := true.B
     mainPipeReq.refillCoh := req.state
