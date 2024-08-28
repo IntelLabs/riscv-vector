@@ -9,6 +9,21 @@ import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import xiangshan.MicroOp
 import SmartParam._
 
+object AddrUtil {
+  val addrOffsetHighIdx = log2Ceil(dataWidth / 8) - 1
+
+  def isAddrMisalign(addr: UInt, size: UInt): Bool = {
+    val mask = (1.U << size) - 1.U
+    (addr & mask) =/= 0.U
+  }
+
+  def getAlignedAddr(addr: UInt): UInt =
+    Cat(addr(addrWidth - 1, addrOffsetHighIdx + 1), 0.U((addrOffsetHighIdx + 1).W))
+
+  def getAlignedOffset(addr: UInt): UInt =
+    addr(addrOffsetHighIdx, 0)
+}
+
 class VLSUXcpt extends Bundle {
   val exception_vld = Bool()
   val update_vl     = Bool()
@@ -100,6 +115,9 @@ class HLSUMeta extends Bundle {
   val log2Stride    = UInt(log2Ceil(dataWidth / 8).W)
   val xcpt          = new LdstXcpt()
   val xcptVl        = UInt(bVL.W)
+  val xcptAddr      = UInt(addrWidth.W)
+  val hasXcpt       = Bool()
+  val canCommit     = Bool()
 }
 
 class CommitInfoRecorded extends Bundle {
@@ -142,17 +160,15 @@ class LdstXcpt extends Bundle {
 
 class LdstUop extends Bundle {
   val valid        = Bool()
-  val status       = UInt(1.W)                         // ready to commit?
-  val memOp        = Bool()                            // load or store
-  val size         = UInt(log2Ceil(dataWidth / 8).W)   // element size
+  val status       = UInt(1.W)          // ready to commit?
   val addr         = UInt(addrWidth.W)
-  val pos          = UInt(bVL.W)                       // position in vl
-  val destElem     = UInt(bVL.W)                       // data position in vreg
-  val destVRegEnd  = Bool()
-  val elemCnt      = UInt((log2Ceil(dataBytes) + 1).W) // 1~8
+  val pos          = UInt(bVL.W)        // position in vl
+  val startElem    = UInt(vlenbWidth.W) // data position in vreg
+  val elemCnt      = UInt((log2Ceil(dataBytes) + 1).W)
+  val writeback    = Bool()             // last uop to writeback
   val xcptValid    = Bool()
   val addrMisalign = Bool()
-  val metaPtr  = UInt(nHLsuMetaWidth.W)
+  val metaPtr      = UInt(nHLsuMetaWidth.W)
 }
 
 class SegLdstUop extends Bundle {
@@ -290,19 +306,4 @@ object LSULdstDecoder {
 
     ctrl
   }
-}
-
-object AddrUtil {
-  val addrOffsetHighIdx = log2Ceil(dataWidth / 8) - 1
-
-  def isAddrMisalign(addr: UInt, size: UInt): Bool = {
-    val mask = (1.U << size) - 1.U
-    (addr & mask) =/= 0.U
-  }
-
-  def getAlignedAddr(addr: UInt): UInt =
-    Cat(addr(addrWidth - 1, addrOffsetHighIdx + 1), 0.U((addrOffsetHighIdx + 1).W))
-
-  def getAlignedOffset(addr: UInt): UInt =
-    addr(addrOffsetHighIdx, 0)
 }
