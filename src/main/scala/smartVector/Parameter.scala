@@ -42,6 +42,9 @@ trait smartParas {
   val vVLSUQueueWidth     = log2Up(vVLSUQueueEntries)
   val nLSUMaxQueueEntries = max(nHLsuQueueEntries, vVLSUQueueEntries)
   val nLSUMaxQueueWidth   = log2Up(nLSUMaxQueueEntries)
+
+  val nHLsuMetaEntries = 2
+  val nHLsuMetaWidth   = log2Up(nHLsuMetaEntries)
 }
 
 object SmartParam extends smartParas

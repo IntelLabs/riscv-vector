@@ -89,7 +89,7 @@ object LdstUopStatus {
   val ready    = 1.U
 }
 
-class HLSUInfo extends Bundle {
+class HLSUMeta extends Bundle {
   val valid         = Bool()
   val ldstCtrl      = new LSULdstCtrl
   val muopInfo      = new mUopInfo
@@ -98,6 +98,8 @@ class HLSUInfo extends Bundle {
   val zeroStride    = Bool()
   val negStride     = Bool()
   val log2Stride    = UInt(log2Ceil(dataWidth / 8).W)
+  val xcpt          = new LdstXcpt()
+  val xcptVl        = UInt(bVL.W)
 }
 
 class CommitInfoRecorded extends Bundle {
@@ -139,20 +141,18 @@ class LdstXcpt extends Bundle {
 }
 
 class LdstUop extends Bundle {
-  val valid       = Bool()
-  val status      = UInt(1.W)                         // ready to commit?
-  val memOp       = Bool()                            // load or store
-  val size        = UInt(log2Ceil(dataWidth / 8).W)   // element size
-  val addr        = UInt(addrWidth.W)
-  val pos         = UInt(bVL.W)                       // position in vl
-  val destElem    = UInt(bVL.W)                       // data position in vreg
-  val destVRegEnd = Bool()
-  val elemCnt     = UInt((log2Ceil(dataBytes) + 1).W) // 1~8
-  // val zeroStride  = Bool()
-  // val negStride   = Bool()
-  // val log2Stride  = UInt(log2Ceil(dataWidth / 8).W)
-  val xcpt        = new LdstXcpt()
-  val hlsuInfoPtr = UInt(2.W)
+  val valid        = Bool()
+  val status       = UInt(1.W)                         // ready to commit?
+  val memOp        = Bool()                            // load or store
+  val size         = UInt(log2Ceil(dataWidth / 8).W)   // element size
+  val addr         = UInt(addrWidth.W)
+  val pos          = UInt(bVL.W)                       // position in vl
+  val destElem     = UInt(bVL.W)                       // data position in vreg
+  val destVRegEnd  = Bool()
+  val elemCnt      = UInt((log2Ceil(dataBytes) + 1).W) // 1~8
+  val xcptValid    = Bool()
+  val addrMisalign = Bool()
+  val metaPtr  = UInt(nHLsuMetaWidth.W)
 }
 
 class SegLdstUop extends Bundle {
