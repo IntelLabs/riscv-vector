@@ -472,11 +472,26 @@ class Vsplit(
 
   val hasExcp = ctrl.illegal || io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl
 
-  mUopIn.bits.uop.uopIdx        := uopIdx
-  mUopIn.bits.uop.segIndex      := segIndex
-  mUopIn.bits.uop.uopEnd        := (idx + 1.U === expdLen)
-  mUopIn.bits.uop.destVRegStart := (idx >> indexIncBase) === 0.U
-  mUopIn.bits.uop.destVRegEnd   := ((idx + 1.U) >> indexIncBase) === 0.U || (idx + 1.U === expdLen)
+  mUopIn.bits.uop.uopIdx   := uopIdx
+  mUopIn.bits.uop.segIndex := segIndex
+  mUopIn.bits.uop.uopEnd   := (idx + 1.U === expdLen)
+
+  when(ldst && ldstCtrl.indexed) {
+    mUopIn.bits.uop.destVRegStart := Mux(
+      idxVs2Inc,
+      (idx >> indexIncBase) === 0.U,
+      true.B,
+    )
+
+    mUopIn.bits.uop.destVRegEnd := Mux(
+      idxVdInc,
+      ((idx + 1.U) >> indexIncBase) === 0.U,
+      true.B,
+    )
+  }.otherwise {
+    mUopIn.bits.uop.destVRegStart := true.B
+    mUopIn.bits.uop.destVRegEnd   := true.B
+  }
 
   mUopIn.bits.uop.ctrl.funct6           := ctrl.funct6
   mUopIn.bits.uop.ctrl.funct3           := ctrl.funct3

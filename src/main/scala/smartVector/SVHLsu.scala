@@ -429,7 +429,7 @@ class SVHLsu(
   io.lsuOut.bits.muopEnd            := deqMeta.muopInfo.muopEnd
   io.lsuOut.bits.rfWriteEn          := deqMeta.muopInfo.rfWriteEn
   io.lsuOut.bits.rfWriteIdx         := deqMeta.muopInfo.ldest
-  io.lsuOut.bits.rfWriteMask        := "hffff".U
+  io.lsuOut.bits.rfWriteMask        := "h0".U // FIXME xcpt mask
   io.lsuOut.bits.regCount           := 1.U
   io.lsuOut.bits.regStartIdx        := deqMeta.muopInfo.ldest
   io.lsuOut.bits.isSegLoad          := false.B
