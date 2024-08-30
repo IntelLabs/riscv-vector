@@ -144,7 +144,7 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   io.out.valid := validReg
   io.out.bits  := bitsReg
 
-  io.out.bits.vCtrl.illegal := vIllegalInstrn.io.ill.valid
+  io.out.bits.vCtrl.illegal := vIllegalInstrn.io.ill.valid && io.out.valid
 
   io.in.ready := !bufferValidReg
 }
