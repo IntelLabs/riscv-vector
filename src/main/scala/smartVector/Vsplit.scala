@@ -1,10 +1,9 @@
 package smartVector
 
-import chisel3._
+import chisel3.{when, _}
 import chisel3.util._
 import darecreek.VDecode
 import darecreek.exu.vfu.VUopInfo
-
 import chipsalliance.rocketchip.config
 import chipsalliance.rocketchip.config.{Config, Field, Parameters}
 import freechips.rocketchip.rocket._
@@ -299,8 +298,6 @@ class Vsplit(implicit p: Parameters) extends Module {
     io.out.mma_in.get.valid := cnt_en.asBool
     io.out.mma_in.get.bits.srcType := 0.U
     io.out.mma_in.get.bits.dstType := 2.U
-    io.out.mma_in.get.bits.srcA := 0.U
-    io.out.mma_in.get.bits.srcB := 0.U
 
     when(cnt === 0.U) {
       io.out.mma_in.get.bits.srcA := Cat(io.in.rfData.get(11)(3 * VLEN / 4 - 1, VLEN / 2),
@@ -321,8 +318,29 @@ class Vsplit(implicit p: Parameters) extends Module {
         io.in.rfData.get(12)(3 * VLEN / 4 - 1, VLEN / 2),
         io.in.rfData.get(12)(VLEN / 4 - 1, 0),
       )
+    }.elsewhen(cnt === 1.U) {
+      io.out.mma_in.get.bits.srcA := Cat(io.in.rfData.get(11)(VLEN - 1, 3 * VLEN / 4),
+        io.in.rfData.get(11)(VLEN / 2 - 1, VLEN / 4),
+        io.in.rfData.get(10)(VLEN - 1, 3 * VLEN / 4),
+        io.in.rfData.get(10)(VLEN / 2 - 1, VLEN / 4),
+        io.in.rfData.get(9)(VLEN - 1, 3 * VLEN / 4),
+        io.in.rfData.get(9)(VLEN / 2 - 1, VLEN / 4),
+        io.in.rfData.get(8)(VLEN - 1, 3 * VLEN / 4),
+        io.in.rfData.get(8)(VLEN / 2 - 1, VLEN / 4),
+      )
+      io.out.mma_in.get.bits.srcB := Cat(io.in.rfData.get(15)(VLEN - 1, 3 * VLEN / 4),
+        io.in.rfData.get(15)(VLEN / 2 - 1, VLEN / 4),
+        io.in.rfData.get(14)(VLEN - 1, 3 * VLEN / 4),
+        io.in.rfData.get(14)(VLEN / 2 - 1, VLEN / 4),
+        io.in.rfData.get(13)(VLEN - 1, 3 * VLEN / 4),
+        io.in.rfData.get(13)(VLEN / 2 - 1, VLEN / 4),
+        io.in.rfData.get(12)(VLEN - 1, 3 * VLEN / 4),
+        io.in.rfData.get(12)(VLEN / 2 - 1, VLEN / 4)
+      )
+    }.otherwise {
+      io.out.mma_in.get.bits.srcA := 0.U
+      io.out.mma_in.get.bits.srcB := 0.U
     }
-
   }
 
   // * BEGIN

@@ -555,7 +555,7 @@ class PE(
     io.rowReadDout(i) := rowRdata
   }
 
-  io.accout.valid := io.rowReadReq(0).valid
+  io.accout.valid := io.macReqIn.valid
   io.accout.bits := c0(0)
   // -----------------------------------------------------------------------------------
   // write row slices

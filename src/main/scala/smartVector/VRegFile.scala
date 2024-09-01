@@ -99,13 +99,13 @@ class SVRegFile(implicit p : Parameters, numRead: Int, numWrite: Int) extends Mo
     io.rfData(i) := Cat(subRFs(1).io.rfData(i), subRFs(0).io.rfData(i))
   }
 
-  for(i <- 0 until NVPhyRegs/2) {
-    for (j <- 0 until NLanes) {
-      subRFs(j).io.write(i).wen   := io.mma_toRegFileWrite.get(i).rfWriteEn
-      subRFs(j).io.write(i).wmask := io.mma_toRegFileWrite.get(i).rfWriteMask(4*(j+1)-1,4*j)
-      subRFs(j).io.write(i).addr  := (i+16).U
-      subRFs(j).io.write(i).data  := io.mma_toRegFileWrite.get(i).rfWriteData(64*(j+1)-1,64*j)
-    }
-  }
+ for(i <- 0 until NVPhyRegs/2) {
+   for (j <- 0 until NLanes) {
+     subRFs(j).io.write(i).wen   := io.mma_toRegFileWrite.get(i).rfWriteEn
+     subRFs(j).io.write(i).wmask := io.mma_toRegFileWrite.get(i).rfWriteMask(4*(j+1)-1,4*j)
+     subRFs(j).io.write(i).addr  := (i+16).U
+     subRFs(j).io.write(i).data  := io.mma_toRegFileWrite.get(i).rfWriteData(64*(j+1)-1,64*j)
+   }
+ }
     //io.rfData := Vec.tabulate(NVPhyRegs){i=>Cat(subRFs(1).io.rfData, subRFs(0).io.rfData)}
 }

@@ -49,6 +49,23 @@ class VMerge(implicit p: Parameters) extends Module {
   val permExpdLen = RegEnable(io.in.mergeInfo.bits.permExpdLen, io.in.mergeInfo.valid)
   val regDstIdx = RegEnable(io.in.mergeInfo.bits.regDstIdx, io.in.mergeInfo.valid)
 
+  val cnt_en = RegInit(false.B)
+  val cnt = RegInit(0.U(5.W))
+
+  when(io.in.matrix_out.get.valid) {
+    when(cnt_en && (cnt === 15.U)) {
+      cnt_en := false.B
+    }.otherwise {
+      cnt_en := true.B
+    }
+  }
+
+  when(cnt_en) {
+    cnt := cnt + 1.U
+  }.otherwise {
+    cnt := 0.U
+  }
+
   when(io.in.aluIn.valid && rfWriteEn) {
     when(regBackWidth === "b111".U) {
       io.out.toRegFileWrite.rfWriteEn := true.B
@@ -82,6 +99,11 @@ class VMerge(implicit p: Parameters) extends Module {
     io.out.toRegFileWrite.rfWriteMask := io.in.lsuIn.bits.rfWriteMask
     io.out.toRegFileWrite.rfWriteIdx := io.in.lsuIn.bits.rfWriteIdx
     io.out.toRegFileWrite.rfWriteData := io.in.lsuIn.bits.data
+  }.elsewhen(cnt_en) {
+    io.out.toRegFileWrite.rfWriteEn := true.B
+    io.out.toRegFileWrite.rfWriteMask := Fill(VLEN / 8, 0.U)
+    io.out.toRegFileWrite.rfWriteIdx := cnt + 16.U
+    io.out.toRegFileWrite.rfWriteData := io.in.matrix_out.get.bits.asTypeOf(Vec(16, UInt(VLEN.W)))(cnt)
   }.otherwise {
     io.out.toRegFileWrite := 0.U.asTypeOf(new regWriteIn)
   }
@@ -89,8 +111,8 @@ class VMerge(implicit p: Parameters) extends Module {
   for (i <- 0 until NVPhyRegs / 2) {
     io.out.mma_toRegFileWrite.getOrElse(VecInit(Seq.fill(NVPhyRegs / 2)(Wire(new regWriteIn))))(i).rfWriteEn := io.in.matrix_out.get.valid
     io.out.mma_toRegFileWrite.getOrElse(VecInit(Seq.fill(NVPhyRegs / 2)(Wire(new regWriteIn))))(i).rfWriteMask := Fill(VLEN / 8, 0.U)
-    io.out.mma_toRegFileWrite.getOrElse(VecInit(Seq.fill(NVPhyRegs / 2)(Wire(new regWriteIn))))(i).rfWriteIdx := (i+16).U
-    io.out.mma_toRegFileWrite.getOrElse(VecInit(Seq.fill(NVPhyRegs / 2)(Wire(new regWriteIn))))(i).rfWriteData := io.in.matrix_out.get.bits(128*(i+1)-1,128*i)
+    io.out.mma_toRegFileWrite.getOrElse(VecInit(Seq.fill(NVPhyRegs / 2)(Wire(new regWriteIn))))(i).rfWriteIdx := (i + 16).U
+    io.out.mma_toRegFileWrite.getOrElse(VecInit(Seq.fill(NVPhyRegs / 2)(Wire(new regWriteIn))))(i).rfWriteData := io.in.matrix_out.get.bits(128 * (i + 1) - 1, 128 * i)
   }
 
   when(io.in.aluIn.valid) {

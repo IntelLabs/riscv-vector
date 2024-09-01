@@ -38,12 +38,12 @@ class SVRegFileWrapper(implicit p : Parameters) extends Module{
         writeMask(i) := io.in.writeIn.rfWriteMask((i+1)*VLEN/NLanes/8-1, i*VLEN/NLanes/8)
     }
 
-    for (i <- 0 until 16) {
-        regFile.io.write(i).wen   := false.B
-        regFile.io.write(i).addr  := io.in.writeIn.rfWriteIdx
-        regFile.io.write(i).data  := writeData
-        regFile.io.write(i).wmask := writeMask
-    }
+   for (i <- 0 until 16) {
+       regFile.io.write(i).wen   := false.B
+       regFile.io.write(i).addr  := io.in.writeIn.rfWriteIdx
+       regFile.io.write(i).data  := writeData
+       regFile.io.write(i).wmask := writeMask
+   }
 
     regFile.io.mma_toRegFileWrite.get := io.in.mma_toRegFileWrite.get
     regFile.io.write(0).wen   := io.in.writeIn.rfWriteEn

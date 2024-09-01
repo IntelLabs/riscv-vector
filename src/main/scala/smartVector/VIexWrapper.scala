@@ -257,8 +257,6 @@ class VIexWrapper(implicit p: Parameters) extends Module {
     io.out.bits.vxsat := false.B
   }
   io.out.valid := outValid
-
-
 }
 
 
