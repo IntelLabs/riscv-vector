@@ -52,6 +52,11 @@ class SVHLsu(
   val enqMeta        = metaQueue(metaLastEnqPtr.value)
   val deqMeta        = metaQueue(metaDeqPtr.value)
 
+  val deqMetaByteLevelMask = MaskGen.genByteLevelMask(
+    deqMeta.elementMask.asUInt,
+    deqMeta.ldstCtrl.log2Memwb,
+  )
+
   // ldQueue
   val ldstUopQueue = RegInit(VecInit(Seq.fill(nHLsuQueueEntries)(0.U.asTypeOf(new LdstUop))))
   val uopEnqPtr    = RegInit(0.U.asTypeOf(new HLdstQueuePtr))
@@ -101,12 +106,16 @@ class SVHLsu(
   val curUopElemCnt   = ldstCtrl.minLen min leftVl
   val curUopElemStart = Mux(vstart < doneVl, 0.U, ldstCtrl.minLen min (vstart - doneVl))
 
+  val doneElemCnt = RegInit(0.U(vlenbWidth.W))
+
   when(io.lsuReq.fire) {
     addrReg := Mux(
       uopIdx === 0.U,
       mUopInfo.rs1Val + (mUopInfo.segIdx << ldstCtrl.log2Memwb),
       addrReg,
     )
+
+    doneElemCnt := Mux(uopIdx === 0.U, 0.U, doneElemCnt + curUopElemCnt)
     // Set split info
     curSplitIdx := 0.U
     splitCount  := curUopElemCnt
@@ -122,13 +131,14 @@ class SVHLsu(
           mUopInfo.old_vd(8 * i + 7, 8 * i)
       }
 
-      // val curVl = uopIdx << ldstCtrl.log2MinLen
-
-      // (0 until vlenb).foreach { i =>
-      //   val pos = i.U >> ldstCtrl.log2Memwb
-      //   metaQueue(metaEnqPtr.value).vregDataValid(i) :=
-      //     mUopInfo.mask(curVl + pos) && (i.U >= curVl) && (i.U < (curVl + curUopElemCnt))
-      // }
+      metaQueue(metaEnqPtr.value).elementMask :=
+        MaskGen.genElementLevelMask(
+          ldstCtrl.vm,
+          mUopInfo.mask,
+          doneElemCnt,
+          curUopElemStart,
+          curUopElemCnt,
+        )
 
       metaLastEnqPtr := metaEnqPtr
       metaEnqPtr     := metaEnqPtr + 1.U
@@ -240,8 +250,8 @@ class SVHLsu(
   val deqAddrInfo      = addrQueue.io.deq.bits
   val accessMeta       = metaQueue(deqAddrInfo.metaPtr)
   val addrMisalign     = isAddrMisalign(deqAddrInfo.addr, accessMeta.ldstCtrl.log2Memwb)
-  val elemMaskVec      = VecInit(Seq.fill(vlenb)(false.B))
-  val isNotMasked      = elemMaskVec.asUInt =/= 0.U
+  // val elemMaskVec      = VecInit(Seq.fill(vlenb)(false.B))
+  val isNotMasked = true.B
   val canEnqueue =
     (accessMeta.ldstCtrl.vm || isNotMasked) && (deqAddrInfo.curSplitIdx + deqAddrInfo.elemCnt >= splitStart)
   val canWriteback =
@@ -260,24 +270,6 @@ class SVHLsu(
     ldstUopQueue(uopEnqPtr.value).metaPtr      := deqAddrInfo.metaPtr
 
     uopEnqPtr := Mux(canEnqueue, uopEnqPtr + 1.U, uopEnqPtr)
-
-    (0 until vlenb).foreach { i =>
-      val curElemPos = i.U >> accessMeta.ldstCtrl.log2Memwb
-      val belong =
-        curElemPos >= deqAddrInfo.startElem && curElemPos < (deqAddrInfo.startElem + deqAddrInfo.elemCnt)
-      val maskIdx = curElemPos - deqAddrInfo.startElem + deqAddrInfo.curVl
-
-      elemMaskVec(i) := Mux(
-        belong,
-        (accessMeta.ldstCtrl.vm || accessMeta.muopInfo.mask(maskIdx))
-          && (curElemPos >= splitStart) && (curElemPos < splitCount),
-        false.B,
-      )
-
-      when(belong) {
-        accessMeta.vregDataValid(i) := elemMaskVec(i) && !addrMisalign
-      }
-    }
   }
 
   // * Split LdstUop
@@ -320,7 +312,7 @@ class SVHLsu(
       )
 
       storeDataVec(elemInnerOffset + curElemOffset) := deqMeta.vregDataVec(i)
-      storeMaskVec(elemInnerOffset + curElemOffset) := deqMeta.vregDataValid(i)
+      storeMaskVec(elemInnerOffset + curElemOffset) := deqMetaByteLevelMask(i)
     }
   }
 
@@ -372,7 +364,7 @@ class SVHLsu(
         )
 
         deqMeta.vregDataVec(i) := Mux(
-          deqMeta.vregDataValid(i),
+          deqMetaByteLevelMask(i),
           respDataVec(elemInnerOffset + curElemOffset),
           deqMeta.vregDataVec(i),
         )

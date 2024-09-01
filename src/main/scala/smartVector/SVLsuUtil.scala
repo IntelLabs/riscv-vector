@@ -35,7 +35,7 @@ class VLSUXcpt extends Bundle {
 class LsuOutput extends Bundle {
   val data        = UInt(VLEN.W)
   val rfWriteEn   = Bool()
-  val rfWriteMask = UInt((VLEN / 8).W)
+  val rfWriteMask = UInt(vlenb.W)
   val rfWriteIdx  = UInt(5.W)
   val muopEnd     = Bool()
   val isSegLoad   = Bool()
@@ -110,6 +110,7 @@ class HLSUMeta extends Bundle {
   val muopInfo      = new mUopInfo
   val vregDataVec   = Vec(vlenb, UInt(8.W))
   val vregDataValid = Vec(vlenb, Bool())
+  val elementMask   = Vec(vlenb, Bool())
   val zeroStride    = Bool()
   val negStride     = Bool()
   val log2Stride    = UInt(log2Ceil(dataWidth / 8).W)
@@ -305,5 +306,56 @@ object LSULdstDecoder {
     ctrl.log2MinLen := ctrl.log2Elen min ctrl.log2Mlen
 
     ctrl
+  }
+}
+
+// def multiShifter(right: Boolean, multiSize: Int)(data: UInt, shifterSize: UInt): UInt =
+//   VecInit(data.asBools.grouped(multiSize).toSeq.transpose.map { dataGroup =>
+//     if (right) {
+//       (VecInit(dataGroup).asUInt >> shifterSize).asBools
+//     } else {
+//       (VecInit(dataGroup).asUInt << shifterSize).asBools
+//     }
+//   }.transpose.map(VecInit(_).asUInt)).asUInt
+
+object MaskGen {
+
+  def genElementLevelMask(
+      vm:             Bool,
+      maskVReg:       UInt,
+      maskStartIdx:   UInt,
+      maskGroupStart: UInt,
+      maskGroupEnd:   UInt,
+  ): Vec[Bool] = {
+    val maskBanks   = VecInit(maskVReg.asBools.grouped(vlenb).toSeq.map(_.asUInt))
+    val bankIdx     = maskStartIdx >> log2Ceil(vlenb)
+    val bankOffset  = maskStartIdx(log2Ceil(vlenb) - 1, 0)
+    val curMaskBank = maskBanks(bankIdx).asBools.padTo(2 * vlenb, false.B).asUInt
+    val curMask = VecInit((0 until vlenb).map(i =>
+      Mux(i.U >= maskGroupStart && i.U < maskGroupEnd, vm | curMaskBank(i.U + bankOffset), false.B)
+    ))
+    curMask
+  }
+
+  def xcptMaskRegen(
+      elementLevelMask: Vec[Bool],
+      xcptVl:           UInt,
+  ): Vec[Bool] = {
+    val xcptMask = VecInit((0 until vlenb).map(i =>
+      Mux(i.U < xcptVl, elementLevelMask(i.U), false.B)
+    ))
+    xcptMask
+  }
+
+  def genByteLevelMask(elementLevelMask: UInt, log2Memwb: UInt): UInt = {
+    // (maskEEW8, maskEEW16, maskEEW32, maskEEW64)
+    val maskMemVec = (0 until 4).map(log2Memwb =>
+      (0 until vlenb / (1 << log2Memwb)).map { i =>
+        FillInterleaved(1 << log2Memwb, elementLevelMask(i))
+      }.asUInt
+    )
+    val mask = Mux1H(UIntToOH(log2Memwb), maskMemVec)
+
+    mask
   }
 }
