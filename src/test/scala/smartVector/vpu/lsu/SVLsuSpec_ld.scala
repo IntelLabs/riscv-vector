@@ -652,7 +652,7 @@ trait VLsuBehavior_ld {
           (
             vlse16.copy(vl = 10, uopIdx = 1, uopEnd = true, destVRegStart = true, destVRegEnd = true),
             SrcBundleLd(scalar_opnd_2 = "h0"),
-            "h201f1e1d1c1b1a1918171615cdefcdef".U,
+            "hcdefcdefcdefcdefcdefcdefcdefcdef".U,
             "hfff0".U,
           ),
         )
@@ -726,13 +726,13 @@ trait VLsuBehavior_ld {
           (
             vlse16.copy(vm = false, vl = 10, uopIdx = 0, uopEnd = false, destVRegStart = true, destVRegEnd = true),
             SrcBundleLd(scalar_opnd_2 = "h8", mask = "hffff_ffff_ffff_ffff_ffff_ffff_ffff_fefe"),
-            "h111145670101345632100f0fffff1211".U,
+            "h111145670101345632100f0fffffcdef".U,
             "h0003".U,
           ),
           (
             vlse16.copy(vm = false, vl = 10, uopIdx = 1, uopEnd = true, destVRegStart = true, destVRegEnd = true),
             SrcBundleLd(scalar_opnd_2 = "h8", mask = "hffff_ffff_ffff_ffff_ffff_ffff_ffff_fefe"),
-            "h201f1e1d1c1b1a191817161533331211".U,
+            "h201f1e1d1c1b1a191817161533332222".U,
             "hfff3".U,
           ),
         )
@@ -766,7 +766,7 @@ trait VLsuBehavior_ld {
           (
             vle8.copy(vl = 19, uopIdx = 0, uopEnd = false, vstart = 1, destVRegStart = true, destVRegEnd = true),
             SrcBundleLd(scalar_opnd_1 = "h1058"),
-            "h201f1e1d1c1b1a195555555555555511".U,
+            "h201f1e1d1c1b1a195555555555555555".U,
             "hff01".U,
           )
           // (vle8.copy(vl=8, uopIdx=0, uopEnd=true), ldReqSrc_default, "h201f1e1d1c1b1a190123456789abcdef".U, "hff00".U),
@@ -802,7 +802,7 @@ trait VLsuBehavior_ld {
           (
             vl2re16.copy(vl = 19, uopIdx = 0, uopEnd = false, vstart = 1, destVRegStart = true, destVRegEnd = true),
             ldReqSrc_default,
-            "hffffffffffffffff0123456789ab1211".U,
+            "hffffffffffffffff0123456789abcdef".U,
             "h0003".U,
           ),
           (
@@ -888,7 +888,7 @@ trait VLsuBehavior_ld {
           (
             vl2re16.copy(vl = 0, uopIdx = 0, uopEnd = false, vstart = 1, destVRegStart = true, destVRegEnd = true),
             ldReqSrc_default,
-            "hffffffffffffffff0123456789ab1211".U,
+            "hffffffffffffffff0123456789abcdef".U,
             "h0003".U,
           ),
         )

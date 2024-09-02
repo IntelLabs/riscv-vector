@@ -419,7 +419,7 @@ class SVHLsu(
     // * 6. vreg merge data gen
     deqMeta.vregDataVec := Mux(
       deqMeta.zeroStride,
-      zeroStridedData,
+      VecInit(zeroStridedData.asBools.grouped(8).toSeq.map(_.asUInt)),
       LoadDataGen.unitStrideMerge(
         deqMeta.vregDataVec,
         VecInit(shiftedData2.asBools.grouped(8).toSeq.map(_.asUInt)),
