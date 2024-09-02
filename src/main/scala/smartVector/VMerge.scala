@@ -51,12 +51,10 @@ class VMerge(implicit p: Parameters) extends Module {
   val cnt_en = RegInit(false.B)
   val cnt = RegInit(0.U(5.W))
 
-  when(io.in.matrix_out.get.valid) {
-    when(cnt_en && (cnt === 15.U)) {
-      cnt_en := false.B
-    }.otherwise {
-      cnt_en := true.B
-    }
+  when(cnt_en && (cnt === 15.U)) {
+    cnt_en := false.B
+  }.elsewhen(io.in.matrix_out.get.valid) {
+    cnt_en := true.B
   }
 
   when(cnt_en) {
@@ -135,7 +133,7 @@ class VMerge(implicit p: Parameters) extends Module {
     io.out.commitInfo.bits.data := io.in.lsuIn.bits.data
     io.out.commitInfo.bits.vxsat := false.B
     io.out.commitInfo.bits.fflags := 0.U
-  } .elsewhen(io.in.matrix_out.get.valid) {
+  }.elsewhen(cnt_en && (cnt === 15.U)) {
     io.out.commitInfo.valid := true.B
     io.out.commitInfo.bits.scalarRegWriteEn := false.B
     io.out.commitInfo.bits.floatRegWriteEn := false.B
