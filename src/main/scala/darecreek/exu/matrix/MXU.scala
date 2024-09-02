@@ -555,7 +555,7 @@ class PE(
     io.rowReadDout(i) := rowRdata
   }
 
-  io.accout.valid := io.macReqIn.valid
+  io.accout.valid := RegNext(io.macReqIn.valid)
   io.accout.bits := c0(0)
   // -----------------------------------------------------------------------------------
   // write row slices
@@ -928,7 +928,7 @@ class Mesh(
   for (i <- 0 until mxuMeshRows) {
     for (j <- 0 until mxuMeshCols) {
       val index = i * mxuMeshRows + j
-      io.accout(index).bits := RegEnable(Cat(mesh(i)(j).io.accout.map(_.bits).reverse), mesh(i)(j).io.accout(0).valid)
+      io.accout(index).bits := Cat(mesh(i)(j).io.accout.map(_.bits).reverse)
       io.accout(index).valid := mesh(i)(j).io.accout(0).valid
     }
   }
