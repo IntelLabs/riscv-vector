@@ -188,10 +188,9 @@ class SVHLsu(
     ),
   ).asSInt
 
-  // val accelStrideList     = Seq.tabulate(log2Up(dataBytes))(i => 1.U << i)
-  // val accelLog2StrideList = Seq.tabulate(log2Up(dataBytes))(i => i.U)
-  val accelStrideList     = Seq(1.U, 2.U, 4.U)
-  val accelLog2StrideList = Seq(0.U, 1.U, 2.U)
+  val maxAccelerateStride = 4
+  val accelStrideList     = Seq.tabulate(log2Up(maxAccelerateStride) + 1)(i => 1.U << i)
+  val accelLog2StrideList = Seq.tabulate(log2Up(maxAccelerateStride) + 1)(i => i.U)
   val accelStride         = Cat(accelStrideList.reverseMap(strideAbs === _))
   val canAccel            = (accelStride =/= 0.U || zeroStride) && ~isAddrMisalign(strideAbs, enqLsCtrl.log2Memwb)
   val log2Stride          = Mux(canAccel, Mux1H(accelStride, accelLog2StrideList), 0.U)
@@ -374,7 +373,6 @@ class SVHLsu(
     addrOffsetShiftedData := LoadDataGen.multiShifter(true, 8)(ldDataReversed, addrOffset)
 
     // * 3. strided data selected
-    val maxAccelerateStride = 4
     val stridedData = Mux(
       deqMeta.log2Stride === 0.U,
       addrOffsetShiftedDataVec.asUInt,
