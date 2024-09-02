@@ -309,15 +309,6 @@ object LSULdstDecoder {
   }
 }
 
-// def multiShifter(right: Boolean, multiSize: Int)(data: UInt, shifterSize: UInt): UInt =
-//   VecInit(data.asBools.grouped(multiSize).toSeq.transpose.map { dataGroup =>
-//     if (right) {
-//       (VecInit(dataGroup).asUInt >> shifterSize).asBools
-//     } else {
-//       (VecInit(dataGroup).asUInt << shifterSize).asBools
-//     }
-//   }.transpose.map(VecInit(_).asUInt)).asUInt
-
 object MaskGen {
 
   def genElementLevelMask(
@@ -357,5 +348,29 @@ object MaskGen {
     val mask = Mux1H(UIntToOH(log2Memwb), maskMemVec)
 
     mask
+  }
+}
+
+object LoadDataGen {
+
+  def multiShifter(right: Boolean, multiSize: Int)(data: UInt, shifterSize: UInt): UInt =
+    VecInit(data.asBools.grouped(multiSize).toSeq.transpose.map { dataGroup =>
+      if (right) {
+        (VecInit(dataGroup).asUInt >> shifterSize).asBools
+      } else {
+        (VecInit(dataGroup).asUInt << shifterSize).asBools
+      }
+    }.transpose.map(VecInit(_).asUInt)).asUInt
+
+  def shifted(originalData: UInt, offset: UInt): UInt = {
+    val shiftedData = multiShifter(true, 8)(originalData, offset)
+    return shiftedData
+  }
+
+  def unitStrideMerge(oldData: Vec[UInt], newData: Vec[UInt], mask: UInt): Vec[UInt] = {
+    val mergedData = VecInit((0 until vlenb).map(i =>
+      Mux(mask(i), newData(i), oldData(i))
+    ))
+    mergedData
   }
 }

@@ -61,8 +61,8 @@ trait VLsuBehavior_ld {
               dut.clock.step(1)
             }
             dut.io.lsuOut.valid.expect(true.B)
+            dut.io.lsuOut.bits.rfWriteMask.expect(m)
             dut.io.lsuOut.bits.data.expect(r)
-            // // dut.io.lsuOut.bits.rfWriteMask.expect(m)
 
             // val data = dut.io.lsuOut.bits.data.peek().litValue
             // val mask = dut.io.lsuOut.bits.rfWriteMask.peek().litValue
@@ -113,7 +113,7 @@ trait VLsuBehavior_ld {
             }
             dut.io.lsuOut.valid.expect(true.B)
             dut.io.lsuOut.bits.data.expect(r)
-            // // dut.io.lsuOut.bits.rfWriteMask.expect(m)
+            dut.io.lsuOut.bits.rfWriteMask.expect(m)
             dut.clock.step(1)
           }
         }.join()
@@ -169,7 +169,7 @@ trait VLsuBehavior_ld {
             }
             dut.io.lsuOut.valid.expect(true.B)
             dut.io.lsuOut.bits.data.expect(r)
-            // dut.io.lsuOut.bits.rfWriteMask.expect(m)
+            dut.io.lsuOut.bits.rfWriteMask.expect(m)
             dut.clock.step(1)
           }
         }.join()
@@ -219,7 +219,7 @@ trait VLsuBehavior_ld {
             }
             dut.io.lsuOut.valid.expect(true.B)
             dut.io.lsuOut.bits.data.expect(r)
-            // dut.io.lsuOut.bits.rfWriteMask.expect(m)
+            dut.io.lsuOut.bits.rfWriteMask.expect(m)
             dut.clock.step(1)
           }
         }.join()
@@ -263,7 +263,7 @@ trait VLsuBehavior_ld {
             }
             dut.io.lsuOut.valid.expect(true.B)
             dut.io.lsuOut.bits.data.expect(r)
-            // dut.io.lsuOut.bits.rfWriteMask.expect(m)
+            dut.io.lsuOut.bits.rfWriteMask.expect(m)
             dut.clock.step(1)
           }
         }.join()
@@ -278,7 +278,7 @@ trait VLsuBehavior_ld {
           (
             vle64.copy(vl = 3, vstart = 1, uopIdx = 0, uopEnd = false, destVRegStart = true, destVRegEnd = true),
             ldReqSrc_default,
-            "hffffffffffffffff1817161514131211".U,
+            "hffffffffffffffff0123456789abcdef".U,
             "h00ff".U,
           ),
           (
@@ -307,7 +307,7 @@ trait VLsuBehavior_ld {
             }
             dut.io.lsuOut.valid.expect(true.B)
             dut.io.lsuOut.bits.data.expect(r)
-            // dut.io.lsuOut.bits.rfWriteMask.expect(m)
+            dut.io.lsuOut.bits.rfWriteMask.expect(m)
             dut.clock.step(1)
           }
         }.join()
@@ -345,7 +345,7 @@ trait VLsuBehavior_ld {
             }
             dut.io.lsuOut.valid.expect(true.B)
             dut.io.lsuOut.bits.data.expect(r)
-            // dut.io.lsuOut.bits.rfWriteMask.expect(m)
+            dut.io.lsuOut.bits.rfWriteMask.expect(m)
             dut.clock.step(1)
           }
         }.join()
@@ -360,7 +360,7 @@ trait VLsuBehavior_ld {
           (
             vle8ff.copy(vl = 19, uopIdx = 0, uopEnd = false, vstart = 1, destVRegStart = true, destVRegEnd = true),
             SrcBundleLd(scalar_opnd_1 = "h1058"),
-            "h201f1e1d1c1b1a195555555555555511".U,
+            "h201f1e1d1c1b1a195555555555555555".U,
             "hff01".U,
           )
         )
@@ -384,7 +384,7 @@ trait VLsuBehavior_ld {
           dut.io.xcpt.xcpt_addr.expect("h1060".U)
           dut.io.xcpt.update_data.expect(8.U)
           dut.io.lsuOut.bits.data.expect(r)
-          // dut.io.lsuOut.bits.rfWriteMask.expect(m)
+          dut.io.lsuOut.bits.rfWriteMask.expect(m)
           dut.clock.step(4)
         }
       }
@@ -422,7 +422,7 @@ trait VLsuBehavior_ld {
           dut.io.xcpt.xcpt_addr.expect("h1060".U)
           dut.io.xcpt.update_data.expect(0.U)
           dut.io.lsuOut.bits.data.expect(r)
-          // dut.io.lsuOut.bits.rfWriteMask.expect(m)
+          dut.io.lsuOut.bits.rfWriteMask.expect(m)
           dut.clock.step(4)
         }
       }
@@ -460,7 +460,7 @@ trait VLsuBehavior_ld {
           dut.io.xcpt.xcpt_addr.expect("h1060".U)
           dut.io.xcpt.update_data.expect(1.U)
           dut.io.lsuOut.bits.data.expect(r)
-          // dut.io.lsuOut.bits.rfWriteMask.expect(m)
+          dut.io.lsuOut.bits.rfWriteMask.expect(m)
           dut.clock.step(4)
         }
       }
@@ -551,7 +551,7 @@ trait VLsuBehavior_ld {
           }
           dut.io.lsuOut.valid.expect(true.B)
           dut.io.lsuOut.bits.data.expect(r)
-          // dut.io.lsuOut.bits.rfWriteMask.expect(m)
+          dut.io.lsuOut.bits.rfWriteMask.expect(m)
           dut.clock.step(4)
         }
       }
@@ -593,7 +593,7 @@ trait VLsuBehavior_ld {
           dut.io.xcpt.update_vl.expect(false.B)
           dut.io.xcpt.update_data.expect(1.U)
           dut.io.lsuOut.bits.data.expect(r)
-          // dut.io.lsuOut.bits.rfWriteMask.expect(m)
+          dut.io.lsuOut.bits.rfWriteMask.expect(m)
           dut.clock.step(4)
         }
       }
@@ -632,7 +632,7 @@ trait VLsuBehavior_ld {
           }
           dut.io.lsuOut.valid.expect(true.B)
           dut.io.lsuOut.bits.data.expect(r)
-          // dut.io.lsuOut.bits.rfWriteMask.expect(m)
+          dut.io.lsuOut.bits.rfWriteMask.expect(m)
           dut.clock.step(4)
         }
       }
@@ -671,7 +671,7 @@ trait VLsuBehavior_ld {
           }
           dut.io.lsuOut.valid.expect(true.B)
           dut.io.lsuOut.bits.data.expect(r)
-          // dut.io.lsuOut.bits.rfWriteMask.expect(m)
+          dut.io.lsuOut.bits.rfWriteMask.expect(m)
           dut.clock.step(4)
         }
       }
@@ -710,7 +710,7 @@ trait VLsuBehavior_ld {
           }
           dut.io.lsuOut.valid.expect(true.B)
           dut.io.lsuOut.bits.data.expect(r)
-          // dut.io.lsuOut.bits.rfWriteMask.expect(m)
+          dut.io.lsuOut.bits.rfWriteMask.expect(m)
           dut.clock.step(4)
         }
       }
@@ -752,7 +752,7 @@ trait VLsuBehavior_ld {
           dut.io.lsuOut.valid.expect(true.B)
           // dut.clock.step(100)
           dut.io.lsuOut.bits.data.expect(r)
-          // dut.io.lsuOut.bits.rfWriteMask.expect(m)
+          dut.io.lsuOut.bits.rfWriteMask.expect(m)
           dut.clock.step(4)
         }
       }
@@ -788,7 +788,7 @@ trait VLsuBehavior_ld {
           dut.io.xcpt.update_vl.expect(false.B)
           dut.io.xcpt.update_data.expect(8.U)
           dut.io.lsuOut.bits.data.expect(r)
-          // dut.io.lsuOut.bits.rfWriteMask.expect(m)
+          dut.io.lsuOut.bits.rfWriteMask.expect(m)
           dut.clock.step(4)
         }
       }
@@ -828,7 +828,7 @@ trait VLsuBehavior_ld {
           dut.io.lsuOut.valid.expect(true.B)
           // dut.clock.step(100)
           dut.io.lsuOut.bits.data.expect(r)
-          // dut.io.lsuOut.bits.rfWriteMask.expect(m)
+          dut.io.lsuOut.bits.rfWriteMask.expect(m)
           dut.clock.step(4)
         }
       }
@@ -868,7 +868,7 @@ trait VLsuBehavior_ld {
           dut.io.lsuOut.valid.expect(true.B)
           // dut.clock.step(50)
           dut.io.lsuOut.bits.data.expect(r)
-          // dut.io.lsuOut.bits.rfWriteMask.expect(m)
+          dut.io.lsuOut.bits.rfWriteMask.expect(m)
           dut.clock.step(4)
         }
       }
@@ -908,7 +908,7 @@ trait VLsuBehavior_ld {
           dut.io.lsuOut.valid.expect(true.B)
           // dut.clock.step(50)
           dut.io.lsuOut.bits.data.expect(r)
-          // dut.io.lsuOut.bits.rfWriteMask.expect(m)
+          dut.io.lsuOut.bits.rfWriteMask.expect(m)
           dut.clock.step(4)
         }
       }
