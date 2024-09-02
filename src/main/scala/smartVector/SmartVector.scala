@@ -97,7 +97,6 @@ class SmartVector extends Module {
     split.io.in.rfData.get <> regFile.io.rfData
     iex.io.matrix_in.get <> split.io.out.mma_in.get
     merge.io.in.matrix_out.get <> iex.io.matrix_out.get
-    regFile.io.in.mma_toRegFileWrite.get <> merge.io.out.mma_toRegFileWrite.get
   }
   iex.io.in <> split.io.out.mUop
   merge.io.in.aluIn <> iex.io.out

@@ -5,7 +5,6 @@ import chisel3.util._
 import chipsalliance.rocketchip.config
 import SmartParam._
 import chipsalliance.rocketchip.config.Parameters
-import matrix.MatrixParameters.hasMatrix
 
 class subVRFReadPort(regLen: Int) extends Bundle {
   val ren  = Input(Bool())
@@ -70,11 +69,10 @@ class VRFWritePort(regLen: Int) extends Bundle {
   //   new VRFWritePort(regLen).asInstanceOf[this.type]
 }
 
-class SVRegFile(implicit p : Parameters, numRead: Int, numWrite: Int) extends Module {
+class SVRegFile(numRead: Int, numWrite: Int) extends Module {
   val io = IO(new Bundle {
     val read  = Vec(numRead,  new VRFReadPort(LaneWidth))
     val write = Vec(numWrite, new VRFWritePort(LaneWidth))
-    val mma_toRegFileWrite = if (hasMatrix) Some(Input(Vec(NVPhyRegs / 2, new regWriteIn))) else None
     //TODO: This is reserved for verification, delete it later
     val rfData = Output(Vec(NVPhyRegs, UInt(VLEN.W)))
   })
@@ -99,13 +97,5 @@ class SVRegFile(implicit p : Parameters, numRead: Int, numWrite: Int) extends Mo
     io.rfData(i) := Cat(subRFs(1).io.rfData(i), subRFs(0).io.rfData(i))
   }
 
- for(i <- 0 until NVPhyRegs/2) {
-   for (j <- 0 until NLanes) {
-     subRFs(j).io.write(i).wen   := io.mma_toRegFileWrite.get(i).rfWriteEn
-     subRFs(j).io.write(i).wmask := io.mma_toRegFileWrite.get(i).rfWriteMask(4*(j+1)-1,4*j)
-     subRFs(j).io.write(i).addr  := (i+16).U
-     subRFs(j).io.write(i).data  := io.mma_toRegFileWrite.get(i).rfWriteData(64*(j+1)-1,64*j)
-   }
- }
-    //io.rfData := Vec.tabulate(NVPhyRegs){i=>Cat(subRFs(1).io.rfData, subRFs(0).io.rfData)}
+   //io.rfData := Vec.tabulate(NVPhyRegs){i=>Cat(subRFs(1).io.rfData, subRFs(0).io.rfData)}
 }

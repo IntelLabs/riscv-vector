@@ -25,7 +25,6 @@ class VMerge(implicit p: Parameters) extends Module {
     val out = new Bundle {
       //update register file
       val toRegFileWrite = Output(new regWriteIn)
-      val mma_toRegFileWrite = if (hasMatrix) Some(Output(Vec(NVPhyRegs / 2, new regWriteIn))) else None
       val commitInfo = ValidIO(new CommitInfo)
     }
     val scoreBoardCleanIO = Flipped(new ScoreboardClearIO)
@@ -108,13 +107,6 @@ class VMerge(implicit p: Parameters) extends Module {
     io.out.toRegFileWrite := 0.U.asTypeOf(new regWriteIn)
   }
 
-  for (i <- 0 until NVPhyRegs / 2) {
-    io.out.mma_toRegFileWrite.getOrElse(VecInit(Seq.fill(NVPhyRegs / 2)(Wire(new regWriteIn))))(i).rfWriteEn := io.in.matrix_out.get.valid
-    io.out.mma_toRegFileWrite.getOrElse(VecInit(Seq.fill(NVPhyRegs / 2)(Wire(new regWriteIn))))(i).rfWriteMask := Fill(VLEN / 8, 0.U)
-    io.out.mma_toRegFileWrite.getOrElse(VecInit(Seq.fill(NVPhyRegs / 2)(Wire(new regWriteIn))))(i).rfWriteIdx := (i + 16).U
-    io.out.mma_toRegFileWrite.getOrElse(VecInit(Seq.fill(NVPhyRegs / 2)(Wire(new regWriteIn))))(i).rfWriteData := io.in.matrix_out.get.bits(128 * (i + 1) - 1, 128 * i)
-  }
-
   when(io.in.aluIn.valid) {
     vxsatBufferIn := io.in.aluIn.bits.vxsat || vxsatBuffer
     fflagsBufferIn := io.in.aluIn.bits.fflags | fflagsBuffer
@@ -174,9 +166,9 @@ class VMerge(implicit p: Parameters) extends Module {
   val sboardClearAll = io.in.lsuIn.valid && ldstXcpt
 
   io.scoreBoardCleanIO.clearEn := io.out.toRegFileWrite.rfWriteEn && !(io.in.lsuIn.valid && io.in.lsuIn.bits.isSegLoad)
-  io.scoreBoardCleanIO.clearAddr := Mux(io.out.mma_toRegFileWrite.get(0).rfWriteEn, 16.U, Mux(sboardClearMulti, io.in.lsuIn.bits.regStartIdx,
+  io.scoreBoardCleanIO.clearAddr := Mux(io.in.matrix_out.get.valid, 16.U, Mux(sboardClearMulti, io.in.lsuIn.bits.regStartIdx,
     io.out.toRegFileWrite.rfWriteIdx))
-  io.scoreBoardCleanIO.clearMultiEn := sboardClearMulti || io.out.mma_toRegFileWrite.get(0).rfWriteEn
-  io.scoreBoardCleanIO.clearNum := Mux(io.out.mma_toRegFileWrite.get(0).rfWriteEn, 16.U, io.in.lsuIn.bits.regCount)
+  io.scoreBoardCleanIO.clearMultiEn := sboardClearMulti || io.in.matrix_out.get.valid
+  io.scoreBoardCleanIO.clearNum := Mux(io.in.matrix_out.get.valid, 16.U, io.in.lsuIn.bits.regCount)
   io.scoreBoardCleanIO.clearAll := sboardClearAll
 }
