@@ -68,7 +68,7 @@ class SVHLsu(
   val uopRespPtr   = WireInit(0.U.asTypeOf(new HLdstQueuePtr))
   val issueUop     = WireInit(0.U.asTypeOf(new LdstUop))
   val respUop      = ldstUopQueue(uopRespPtr.value)
-  val deqUop       = ldstUopQueue(uopDeqPtr.value)
+  val deqUop       = WireInit(0.U.asTypeOf(new LdstUop))
 
   // val hasXcptHappened
   // assert
@@ -385,9 +385,20 @@ class SVHLsu(
     respDataVec(i) := respData(8 * i + 7, 8 * i)
   }
 
+  val updatedRespUop = WireInit(0.U.asTypeOf(new LdstUop))
+  updatedRespUop           := respUop
+  updatedRespUop.status    := Mux(io.dataExchange.resp.valid || memXcpt, LdstUopStatus.ready, LdstUopStatus.notReady)
+  updatedRespUop.xcptValid := memXcpt
+
+  // when((io.dataExchange.resp.valid || memXcpt) && uopRespPtr =/= uopDeqPtr) {
+  //   respUop.status    := LdstUopStatus.ready
+  //   respUop.xcptValid := memXcpt
+  // }
+
   when(io.dataExchange.resp.valid || memXcpt) {
-    respUop.status    := LdstUopStatus.ready
-    respUop.xcptValid := memXcpt
+    when(uopRespPtr =/= uopDeqPtr) {
+      ldstUopQueue(uopRespPtr.value) := updatedRespUop
+    }
   }
 
   deqMeta.xcpt.xcptValid := memXcpt
@@ -398,7 +409,11 @@ class SVHLsu(
 
   when(io.dataExchange.resp.valid && deqLsCtrl.isLoad) {
     // * 1. neg stride reverse
-    val ldDataReversed = Mux(deqMeta.negStride, DataGen.reverseData(false)(respData, deqLsCtrl.log2Memwb), respData)
+    val ldDataReversed = Mux(
+      deqMeta.negStride,
+      DataGen.reverseData(false)(respData, deqLsCtrl.log2Memwb),
+      respData,
+    )
 
     // * 2. address offset shift
     val addrOffset = WireInit(0.U(log2Ceil(dataBytes).W))
@@ -455,28 +470,33 @@ class SVHLsu(
 
   // * BEGIN
   // * Commit to VRegInfo
-  val canDeque = deqUop.valid && deqUop.status === LdstUopStatus.ready
-  val deqXcpt  = canDeque && deqUop.xcptValid
+  // pass through queue
+  deqUop := Mux(uopDeqPtr === uopRespPtr, updatedRespUop, ldstUopQueue(uopDeqPtr.value))
 
-  when(deqXcpt) {
-    val misalignXcpt = WireInit(0.U.asTypeOf(new LdstXcpt))
-    misalignXcpt.ma := deqUop.addrMisalign
+  val canDeque     = deqUop.valid && deqUop.status === LdstUopStatus.ready
+  val misalignXcpt = WireInit(0.U.asTypeOf(new LdstXcpt))
+  misalignXcpt.ma := deqUop.addrMisalign
 
-    deqMeta.hasXcpt   := true.B
-    deqMeta.canCommit := true.B
-    deqMeta.xcptVl    := deqUop.pos
-    deqMeta.xcptAddr  := deqUop.addr
+  deqMeta.hasXcpt := canDeque && deqUop.xcptValid
+
+  when(canDeque && deqUop.xcptValid) {
+    deqMeta.xcptVl   := deqUop.pos
+    deqMeta.xcptAddr := deqUop.addr
+
     when(deqUop.addrMisalign) {
       deqMeta.xcpt := misalignXcpt
     }
+    deqMeta.elementMask.zipWithIndex.foreach { case (elem, i) =>
+      elem := Mux(i.U >= deqUop.startElem, false.B, elem)
+    }
 
-    deqMeta.elementMask.zipWithIndex.foreach { case (elem, i) => elem := Mux(i.U >= deqUop.startElem, false.B, elem) }
+    deqMeta.canCommit := true.B
+  }
 
-  }.elsewhen(canDeque) {
-    deqUop.valid := false.B
-    uopDeqPtr    := uopDeqPtr + 1.U
-
-    deqMeta.canCommit := deqUop.writeback
+  when(canDeque && !deqUop.xcptValid) {
+    ldstUopQueue(uopDeqPtr.value).valid := false.B
+    uopDeqPtr                           := uopDeqPtr + 1.U
+    deqMeta.canCommit                   := deqUop.writeback
   }
 
   // * Commit to VRegIngo
