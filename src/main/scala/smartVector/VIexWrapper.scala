@@ -140,7 +140,7 @@ class VIexWrapper(implicit p: Parameters) extends Module {
 
   switch(currentState) {
     is(empty) {
-      when(mUopValid && ~mUop.uop.ctrl.alu && ~mUop.uop.ctrl.isLdst && ~mUop.uop.ctrl.mask && ~(mUop.uop.ctrl.narrow_to_1 && ~mUop.uop.uopEnd)) {
+      when(mUopValid && !io.matrix_in.get.valid && ~mUop.uop.ctrl.alu && ~mUop.uop.ctrl.isLdst && ~mUop.uop.ctrl.mask && ~(mUop.uop.ctrl.narrow_to_1 && ~mUop.uop.uopEnd)) {
         currentStateNext := ongoing
       }.otherwise {
         currentStateNext := empty
