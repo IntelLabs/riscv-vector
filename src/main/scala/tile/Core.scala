@@ -22,7 +22,7 @@ trait CoreParams {
   val useAtomics: Boolean
   val useAtomicsOnlyForIO: Boolean
   val useCompressed: Boolean
-  val useVector: Boolean = false
+  val useVector: Boolean = true
   val vectorUseDCache: Boolean = false
   val useRVE: Boolean
   val useConditionalZero: Boolean

@@ -205,6 +205,12 @@ class FPUCoreIO(implicit p: Parameters) extends CoreBundle()(p) {
   val sboard_clra = Output(UInt(5.W))
 
   val keep_clock_enabled = Input(Bool())
+  
+  // Vector write-back
+  val vfp_wb = Flipped(Decoupled(new Bundle {
+    val wdata = UInt(xLen.W)
+    val waddr = UInt(5.W)
+  }))
 }
 
 class FPUIO(implicit p: Parameters) extends FPUCoreIO ()(p) {
@@ -792,6 +798,12 @@ class FPU(cfg: FPUParams)(implicit p: Parameters) extends FPUModule()(p) {
 
   // regfile
   val regfile = Mem(32, Bits((fLen+1).W))
+
+  // Vector write-back
+  when (io.vfp_wb.fire) {
+    regfile(io.vfp_wb.bits.waddr) := io.vfp_wb.bits.wdata
+  }
+
   when (load_wb) {
     val wdata = recode(load_wb_data, load_wb_typeTag)
     regfile(load_wb_tag) := wdata
@@ -948,6 +960,8 @@ class FPU(cfg: FPUParams)(implicit p: Parameters) extends FPUModule()(p) {
   if (useDebugROB) {
     DebugROB.pushWb(clock, reset, io.hartid, (!wbInfo(0).cp && wen(0)) || divSqrt_wen, waddr + 32.U, ieee(wdata))
   }
+
+  io.vfp_wb.ready := !(load_wb || (!wbInfo(0).cp && wen(0)) || divSqrt_wen)
 
   when (wbInfo(0).cp && wen(0)) {
     io.cp_resp.bits.data := wdata

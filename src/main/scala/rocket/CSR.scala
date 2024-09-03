@@ -15,6 +15,12 @@ import scala.collection.mutable.LinkedHashMap
 import Instructions._
 import CustomInstructions._
 
+object temp_gpc_param {
+  val decodeWidthGpc = 2
+  val retireWidthGpc = 2
+}
+import temp_gpc_param._
+
 class MStatus extends Bundle {
   // not truly part of mstatus, but convenient
   val debug = Bool()
@@ -133,7 +139,7 @@ class Envcfg extends Bundle {
   val cbie = UInt(2.W)
   val zero3 = UInt(3.W)
   val fiom = Bool()
-  def write(wdata: UInt) {
+  def write(wdata: UInt): Unit = {
     val new_envcfg = wdata.asTypeOf(new Envcfg)
     fiom := new_envcfg.fiom // only FIOM is writable currently
   }
@@ -217,7 +223,7 @@ object CSR
 class PerfCounterIO(implicit p: Parameters) extends CoreBundle
     with HasCoreParameters {
   val eventSel = Output(UInt(xLen.W))
-  val inc = Input(UInt(log2Ceil(1+retireWidth).W))
+  val inc = Input(UInt(log2Ceil(1+retireWidthGpc).W))
 }
 
 class TracedInstruction(implicit p: Parameters) extends CoreBundle {
@@ -266,7 +272,8 @@ class CSRFileIO(hasBeu: Boolean)(implicit p: Parameters) extends CoreBundle
     val wdata = Input(Bits(xLen.W))
   }
 
-  val decode = Vec(decodeWidth, new CSRDecodeIO)
+  // val decode = Vec(decodeWidth, new CSRDecodeIO)
+  val decode = Vec(decodeWidthGpc, new CSRDecodeIO)
 
   val csr_stall = Output(Bool()) // stall retire for wfi
   val rw_stall = Output(Bool()) // stall rw, rw will have no effect while rw_stall
@@ -281,7 +288,7 @@ class CSRFileIO(hasBeu: Boolean)(implicit p: Parameters) extends CoreBundle
   val vsatp = Output(new PTBR())
   val evec = Output(UInt(vaddrBitsExtended.W))
   val exception = Input(Bool())
-  val retire = Input(UInt(log2Up(1+retireWidth).W))
+  val retire = Input(UInt(log2Up(1+retireWidthGpc).W))
   val cause = Input(UInt(xLen.W))
   val pc = Input(UInt(vaddrBitsExtended.W))
   val tval = Input(UInt(vaddrBitsExtended.W))
@@ -299,8 +306,8 @@ class CSRFileIO(hasBeu: Boolean)(implicit p: Parameters) extends CoreBundle
   val counters = Vec(nPerfCounters, new PerfCounterIO)
   val csrw_counter = Output(UInt(CSR.nCtr.W))
   val inhibit_cycle = Output(Bool())
-  val inst = Input(Vec(retireWidth, UInt(iLen.W)))
-  val trace = Output(Vec(retireWidth, new TracedInstruction))
+  val inst = Input(Vec(retireWidthGpc, UInt(iLen.W)))
+  val trace = Output(Vec(retireWidthGpc, new TracedInstruction))
   val mcontext = Output(UInt(coreParams.mcontextWidth.W))
   val scontext = Output(UInt(coreParams.scontextWidth.W))
   val fiom = Output(Bool())
