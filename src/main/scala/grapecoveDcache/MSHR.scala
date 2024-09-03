@@ -241,7 +241,7 @@ class ReplayModule extends Module() {
     state === mode_idle,
     io.innerIO.bits.counter,
     totalCounter,
-  )) && !isWriteIntent(io.innerIO.bits.meta.cmd)
+  )) && !(isPrefetch(io.innerIO.bits.meta.cmd) || isWriteIntent(io.innerIO.bits.meta.cmd))
 
   io.toPipe.valid         := RegNext(io.toPipe.bits.nextCycleWb)
   io.toPipe.bits.regIdx   := replayMeta.regIdx
