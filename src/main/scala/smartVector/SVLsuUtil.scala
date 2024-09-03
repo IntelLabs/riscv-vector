@@ -349,6 +349,28 @@ object MaskGen {
 
     mask
   }
+
+  // def genStridedByteLevelMask(elementLevelMask: UInt, log2Memwb: UInt, log2Stride: UInt): UInt = {
+  //   val maskMemVec = (0 until 4).map(log2Memwb =>
+  //     (0 until dataBytes / (1 << log2Memwb)).map { i =>
+  //       FillInterleaved(1 << log2Memwb, elementLevelMask(i))
+  //     }.asUInt
+  //   )
+  //   val mask = Mux1H(UIntToOH(log2Memwb), maskMemVec)
+
+  //   val maskStride = MuxLookup(
+  //     log2Stride,
+  //     mask,
+  //     (0 until log2Up(maxAccelerateStride) + 1).map(i =>
+  //       i.U -> (0 until dataBytes / (1 << log2Memwb)).map { j =>
+  //         FillInterleaved(1 << log2Memwb, elementLevelMask(j))
+  //       }.asUInt
+  //     ),
+  //   )
+  //   maskStride
+  // }
+
+  // def genStoreMask(): UInt = {}
 }
 
 object LoadDataGen {
