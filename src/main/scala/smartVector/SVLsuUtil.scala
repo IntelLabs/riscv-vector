@@ -349,33 +349,75 @@ object MaskGen {
 
     mask
   }
-
-  // def genStridedByteLevelMask(elementLevelMask: UInt, log2Memwb: UInt, log2Stride: UInt): UInt = {
-  //   val maskMemVec = (0 until 4).map(log2Memwb =>
-  //     (0 until dataBytes / (1 << log2Memwb)).map { i =>
-  //       FillInterleaved(1 << log2Memwb, elementLevelMask(i))
-  //     }.asUInt
-  //   )
-  //   val mask = Mux1H(UIntToOH(log2Memwb), maskMemVec)
-
-  //   val maskStride = MuxLookup(
-  //     log2Stride,
-  //     mask,
-  //     (0 until log2Up(maxAccelerateStride) + 1).map(i =>
-  //       i.U -> (0 until dataBytes / (1 << log2Memwb)).map { j =>
-  //         FillInterleaved(1 << log2Memwb, elementLevelMask(j))
-  //       }.asUInt
-  //     ),
-  //   )
-  //   maskStride
-  // }
-
-  // def genStoreMask(): UInt = {}
 }
 
-object LoadDataGen {
+object DataGen {
+  def reverseData(isMask: Boolean = false)(data: UInt, log2Memwb: UInt): UInt =
+    Mux1H(
+      UIntToOH(log2Memwb),
+      Seq(8, 16, 32, 64).map(mew =>
+        if (isMask)
+          DataGenUtil.groupReverse(mew / 8)(data)
+        else
+          DataGenUtil.groupReverse(mew)(data)
+      ),
+    )
 
-  def multiShifter(right: Boolean, multiSize: Int)(data: UInt, shifterSize: UInt): UInt =
+  def genStridedStoreData(dataBytes: Int, isMask: Boolean)(
+      data:          UInt,
+      curLog2Memwb:  UInt,
+      curLog2Stride: UInt,
+  ): UInt = {
+    val strideData = MuxLookup(
+      curLog2Stride,
+      data,
+      (0 until log2Up(maxAccelerateStride) + 1).map(log2Stride =>
+        log2Stride.U -> Mux1H(
+          UIntToOH(curLog2Memwb),
+          Seq.tabulate(4) { log2Memwb =>
+            if (log2Stride >= log2Memwb)
+              DataGenUtil.groupScatter(1 << log2Memwb, 1 << log2Stride, dataBytes, isMask)(data)
+            else data
+          },
+        )
+      ),
+    )
+    return strideData
+  }
+
+  def genStridedLoadData(dataBytes: Int)(
+      data:          UInt,
+      curLog2Memwb:  UInt,
+      curLog2Stride: UInt,
+  ): UInt = {
+    val strideData = MuxLookup(
+      curLog2Stride,
+      data,
+      (0 until log2Up(maxAccelerateStride) + 1).map(log2Stride =>
+        log2Stride.U -> Mux1H(
+          UIntToOH(curLog2Memwb),
+          Seq.tabulate(4) { log2Memwb =>
+            if (log2Stride >= log2Memwb)
+              DataGenUtil.groupGather(1 << log2Memwb, 1 << log2Stride, dataBytes)(data)
+            else data
+          },
+        )
+      ),
+    )
+    return strideData
+  }
+
+  def mergeData(oldData: Vec[UInt], newData: Vec[UInt], mask: UInt): Vec[UInt] = {
+    val mergedData = VecInit((0 until vlenb).map(i =>
+      Mux(mask(i), newData(i), oldData(i))
+    ))
+    mergedData
+  }
+}
+
+object DataGenUtil {
+
+  def groupShifter(right: Boolean, multiSize: Int)(data: UInt, shifterSize: UInt): UInt =
     VecInit(data.asBools.grouped(multiSize).toSeq.transpose.map { dataGroup =>
       if (right) {
         (VecInit(dataGroup).asUInt >> shifterSize).asBools
@@ -384,15 +426,29 @@ object LoadDataGen {
       }
     }.transpose.map(VecInit(_).asUInt)).asUInt
 
-  def shifted(originalData: UInt, offset: UInt): UInt = {
-    val shiftedData = multiShifter(true, 8)(originalData, offset)
-    return shiftedData
+  def groupReverse(groupBits: Int)(data: UInt): UInt =
+    VecInit(data.asBools.grouped(groupBits).toSeq.reverse.flatten).asUInt
+
+  def groupScatter(groupBytes: Int, scatterBytes: Int, dataBytes: Int, isMask: Boolean)(data: UInt): UInt = {
+    val groupVec = if (isMask)
+      VecInit(data.asBools.grouped(groupBytes).toSeq.map(_.asUInt))
+    else VecInit(data.asBools.grouped(groupBytes * 8).toSeq.map(_.asUInt))
+
+    val groupVecUInt = groupVec.asUInt
+    dontTouch(groupVecUInt)
+    val scatterData = (0 until dataBytes / groupBytes).map { i =>
+      if (i % scatterBytes == 0)
+        groupVec(i / scatterBytes)
+      else
+        0.U
+    }.asUInt
+    return scatterData
   }
 
-  def unitStrideMerge(oldData: Vec[UInt], newData: Vec[UInt], mask: UInt): Vec[UInt] = {
-    val mergedData = VecInit((0 until vlenb).map(i =>
-      Mux(mask(i), newData(i), oldData(i))
-    ))
-    mergedData
+  def groupGather(groupBytes: Int, gatherBytes: Int, dataBytes: Int)(data: UInt): UInt = {
+    val groupVec = VecInit(data.asBools.grouped(groupBytes * 8).toSeq.map(_.asUInt))
+    return (0 until dataBytes / gatherBytes).map { i =>
+      groupVec(i * gatherBytes / groupBytes)
+    }.asUInt
   }
 }

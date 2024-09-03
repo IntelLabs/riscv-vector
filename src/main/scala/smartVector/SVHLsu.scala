@@ -52,9 +52,12 @@ class SVHLsu(
   val enqMeta        = metaQueue(metaLastEnqPtr.value)
   val deqMeta        = metaQueue(metaDeqPtr.value)
 
+  val deqLsCtrl   = deqMeta.ldstCtrl
+  val deqMuopInfo = deqMeta.muopInfo
+
   val deqMetaByteLevelMask = MaskGen.genByteLevelMask(
     deqMeta.elementMask.asUInt,
-    deqMeta.ldstCtrl.log2Memwb,
+    deqLsCtrl.log2Memwb,
   )
 
   // ldQueue
@@ -188,7 +191,6 @@ class SVHLsu(
     ),
   ).asSInt
 
-  val maxAccelerateStride = 4
   val accelStrideList     = Seq.tabulate(log2Up(maxAccelerateStride) + 1)(i => 1.U << i)
   val accelLog2StrideList = Seq.tabulate(log2Up(maxAccelerateStride) + 1)(i => i.U)
   val accelStride         = Cat(accelStrideList.reverseMap(strideAbs === _))
@@ -278,6 +280,7 @@ class SVHLsu(
 
   // * BEGIN
   // * Issue LdstUop
+
   val isNoXcptUop = issueUop.valid & (~issueUop.xcptValid) &&
     !isFull(uopIssuePtr, uopDeqPtr) &&
     (issueUop.metaPtr === metaDeqPtr.value)
@@ -297,134 +300,71 @@ class SVHLsu(
   val storeMaskVec = VecInit(Seq.fill(dataBytes)(0.U(1.W)))
 
   // * 1. vreg offset shift
-  val stVRegOffset         = issueUop.startElem << deqMeta.ldstCtrl.log2Memwb
+  val stVRegOffset         = issueUop.startElem << deqLsCtrl.log2Memwb
   val stVRegOffShiftedData = WireInit(0.U(dataWidth.W))
   val stVRegOffShiftedMask = WireInit(0.U(dataBytes.W))
-  val stElemMask =
-    (0 until vlenb).map(i =>
-      (i.U >= issueUop.startElem && i.U < (issueUop.startElem + issueUop.elemCnt)) & deqMeta.elementMask(i)
-    )
-  stVRegOffShiftedMask := MaskGen.genByteLevelMask(
-    stElemMask.asUInt,
-    deqMeta.ldstCtrl.log2Memwb,
-  ) >> stVRegOffset // FIXME
-  stVRegOffShiftedData := LoadDataGen.multiShifter(true, 8)(deqMeta.vregDataVec.asUInt, stVRegOffset)
+  val stPaddingMask        = VecInit(deqMeta.elementMask ++ VecInit(Seq.fill(vlenb)(false.B)))
+  val stElemMask = (0 until vlenb).map(i =>
+    (i.U < issueUop.elemCnt) & stPaddingMask(i.U + issueUop.startElem)
+  )
+  stVRegOffShiftedMask := MaskGen.genByteLevelMask(stElemMask.asUInt, deqLsCtrl.log2Memwb)
+  stVRegOffShiftedData := DataGenUtil.groupShifter(true, 8)(deqMeta.vregDataVec.asUInt, stVRegOffset)
 
   // * 2. strided data selected
   val stStridedData = Mux(
-    deqMeta.log2Stride === 0.U,
-    stVRegOffShiftedData,
-    MuxLookup(
-      deqMeta.log2Stride,
+    deqLsCtrl.ldstType === Mop.constant_stride,
+    DataGen.genStridedStoreData(dataBytes, false)(
       stVRegOffShiftedData,
-      (1 until log2Up(maxAccelerateStride) + 1).map { log2Stride =>
-        log2Stride.U -> Mux1H(
-          UIntToOH(deqMeta.ldstCtrl.log2Memwb),
-          Seq.tabulate(4) { memw =>
-            if (log2Stride > memw)
-              (0 until dataBytes).map(i =>
-                if (i % (1 << log2Stride) == 0)
-                  Cat((0 until (1 << memw)).map(j => stVRegOffShiftedData(i / (1 << log2Stride) + j)).reverse)
-                else 0.U
-              ).asUInt
-            else 0.U
-          },
-        )
-      },
+      deqLsCtrl.log2Memwb,
+      deqMeta.log2Stride,
     ),
+    stVRegOffShiftedData,
   )
 
   val stStridedMask = Mux(
-    deqMeta.log2Stride === 0.U,
-    stVRegOffShiftedMask,
-    MuxLookup(
-      deqMeta.log2Stride,
+    deqLsCtrl.ldstType === Mop.constant_stride,
+    DataGen.genStridedStoreData(dataBytes, true)(
       stVRegOffShiftedMask,
-      (1 until log2Up(maxAccelerateStride) + 1).map { log2Stride =>
-        log2Stride.U -> Mux1H(
-          UIntToOH(deqMeta.ldstCtrl.log2Memwb),
-          Seq.tabulate(4) { memw =>
-            if (log2Stride > memw)
-              (0 until dataBytes).map(i =>
-                if (i % (1 << log2Stride) == 0)
-                  Cat((0 until (1 << memw)).map(j => stVRegOffShiftedMask(i / (1 << log2Stride) + j)).reverse)
-                else 0.U
-              ).asUInt
-            else 0.U
-          },
-        )
-      },
+      deqLsCtrl.log2Memwb,
+      deqMeta.log2Stride,
     ),
-  )
-
-  val stStridedData1 = Mux(
-    deqMeta.ldstCtrl.ldstType === Mop.constant_stride,
-    stStridedData,
-    stVRegOffShiftedData,
-  )
-
-  val stStridedMask1 = Mux(
-    deqMeta.ldstCtrl.ldstType === Mop.constant_stride,
-    stStridedMask,
     stVRegOffShiftedMask,
   )
 
   // * address offset shift
-  val stAddrOffset = WireInit(0.U(log2Ceil(dataBytes).W))
+  val stAddrOffsetShiftedData = WireInit(0.U(dataWidth.W))
+  val stAddrOffsetShiftedMask = WireInit(0.U(dataBytes.W))
+  val stAddrOffset            = WireInit(0.U(log2Ceil(dataBytes).W))
+
   stAddrOffset := Mux(
     deqMeta.negStride,
-    dataBytes.U - getAlignedOffset(issueUop.addr + deqMeta.ldstCtrl.memwb),
+    dataBytes.U - getAlignedOffset(issueUop.addr + deqLsCtrl.memwb),
     getAlignedOffset(issueUop.addr),
   )
-  val stAddrOffsetShiftedData    = WireInit(0.U(dataWidth.W))
-  val stAddrOffsetShiftedDataVec = (0 until dataBytes).map(i => stAddrOffsetShiftedData(8 * i + 7, 8 * i))
-  stAddrOffsetShiftedData := LoadDataGen.multiShifter(false, 8)(stStridedData1, stAddrOffset)
 
-  val stAddrOffsetShiftedMask    = WireInit(0.U(dataBytes.W))
-  val stAddrOffsetShiftedMaskVec = (0 until dataBytes).map(i => stStridedMask1(i))
-  stAddrOffsetShiftedMask := stStridedMask1 << stAddrOffset
+  stAddrOffsetShiftedData := DataGenUtil.groupShifter(false, 8)(stStridedData, stAddrOffset)
+  stAddrOffsetShiftedMask := stStridedMask << stAddrOffset
 
   // * store data reverse
-
-  val stDataReversed = WireInit(0.U(dataWidth.W))
-  val stMaskReversed = WireInit(0.U(dataBytes.W))
-  stDataReversed := Mux(
+  val stDataReversed = Mux(
     deqMeta.negStride,
-    Mux1H(
-      UIntToOH(deqMeta.ldstCtrl.log2Memwb),
-      Seq(8, 16, 32, 64).map(mew =>
-        Cat(VecInit(stAddrOffsetShiftedData.asBools.grouped(mew).toSeq.map(VecInit(_).asUInt)))
-      ),
-    ),
+    DataGen.reverseData(false)(stAddrOffsetShiftedData, deqLsCtrl.log2Memwb),
     stAddrOffsetShiftedData,
   )
-  stMaskReversed := Mux(
+
+  val stMaskReversed = Mux(
     deqMeta.negStride,
-    Mux1H(
-      UIntToOH(deqMeta.ldstCtrl.log2Memwb),
-      Seq(8, 16, 32, 64).map(mew =>
-        Cat(VecInit(stAddrOffsetShiftedMask.asBools.grouped(mew / 8).toSeq.map(VecInit(_).asUInt)))
-      ),
-    ),
+    DataGen.reverseData(true)(stAddrOffsetShiftedMask, deqLsCtrl.log2Memwb),
     stAddrOffsetShiftedMask,
   )
 
-  // * gen store data
-  (0 until dataBytes).foreach { i =>
-    storeDataVec(i) := stDataReversed(8 * i + 7, 8 * i)
-  }
-  // * gen store mask
-  // addr begin <----> addr end & drop stride
-  (0 until dataBytes).foreach { i =>
-    storeMaskVec(i) := stMaskReversed(i)
-  }
-  // * 3. shift to addr offset
-
-  // *
+  // * gen store data & mask
+  storeDataVec := VecInit(stDataReversed.asBools.grouped(8).toSeq.map(_.asUInt))
+  storeMaskVec := VecInit(stMaskReversed.asBools)
 
   io.dataExchange.req.valid      := isNoXcptUop
   io.dataExchange.req.bits.addr  := getAlignedAddr(issueUop.addr)
-  io.dataExchange.req.bits.cmd   := deqMeta.ldstCtrl.isStore
+  io.dataExchange.req.bits.cmd   := deqLsCtrl.isStore
   io.dataExchange.req.bits.srcId := 0.U
   io.dataExchange.req.bits.flag  := uopIssuePtr.flag
   io.dataExchange.req.bits.idx   := uopIssuePtr.value
@@ -452,78 +392,52 @@ class SVHLsu(
     deqMeta.xcpt.fromHellaXcpt(io.dataExchange.xcpt)
   }
 
-  when(io.dataExchange.resp.valid && deqMeta.ldstCtrl.isLoad) {
+  when(io.dataExchange.resp.valid && deqLsCtrl.isLoad) {
     // * 1. neg stride reverse
-    val ldDataReversed = Mux(
-      deqMeta.negStride,
-      Mux1H(
-        UIntToOH(deqMeta.ldstCtrl.log2Memwb),
-        Seq(8, 16, 32, 64).map(mew =>
-          Cat(VecInit(respData.asBools.grouped(mew).toSeq.map(VecInit(_).asUInt)))
-        ),
-      ),
-      respData,
-    )
+    val ldDataReversed = Mux(deqMeta.negStride, DataGen.reverseData(false)(respData, deqLsCtrl.log2Memwb), respData)
 
     // * 2. address offset shift
     val addrOffset = WireInit(0.U(log2Ceil(dataBytes).W))
     addrOffset := Mux(
       deqMeta.negStride,
-      dataBytes.U - getAlignedOffset(respUop.addr + deqMeta.ldstCtrl.memwb),
+      dataBytes.U - getAlignedOffset(respUop.addr + deqLsCtrl.memwb),
       getAlignedOffset(respUop.addr),
     )
 
     val addrOffsetShiftedData    = WireInit(0.U(dataWidth.W))
     val addrOffsetShiftedDataVec = (0 until dataBytes).map(i => addrOffsetShiftedData(8 * i + 7, 8 * i))
-    addrOffsetShiftedData := LoadDataGen.multiShifter(true, 8)(ldDataReversed, addrOffset)
+    addrOffsetShiftedData := DataGenUtil.groupShifter(true, 8)(ldDataReversed, addrOffset)
 
     // * 3. strided data selected
-    val stridedData = Mux(
-      deqMeta.log2Stride === 0.U,
+    val stridedData = DataGen.genStridedLoadData(dataBytes)(
       addrOffsetShiftedDataVec.asUInt,
-      MuxLookup(
-        deqMeta.log2Stride,
-        addrOffsetShiftedDataVec.asUInt,
-        (1 until log2Up(maxAccelerateStride) + 1).map { log2Stride =>
-          log2Stride.U -> Mux1H(
-            UIntToOH(deqMeta.ldstCtrl.log2Memwb),
-            Seq.tabulate(4) { memw =>
-              if (log2Stride > memw)
-                (0 until dataBytes / (1 << log2Stride)).map(i =>
-                  Cat(
-                    VecInit((0 until (1 << memw)).map(j => addrOffsetShiftedDataVec(i * (1 << log2Stride) + j))).reverse
-                  )
-                ).asUInt
-              else 0.U
-            },
-          )
-        },
-      ),
+      deqLsCtrl.log2Memwb,
+      deqMeta.log2Stride,
     )
 
     val zeroStridedData = Mux1H(
-      UIntToOH(deqMeta.ldstCtrl.log2Memwb),
+      UIntToOH(deqLsCtrl.log2Memwb),
       Seq(8, 16, 32, 64).map(mew =>
         Fill(VLEN / mew, addrOffsetShiftedData(mew - 1, 0))
       ),
     )
     // * 4. shift to vreg offset
-    val destVRegOffset = respUop.startElem << deqMeta.ldstCtrl.log2Memwb
+    val destVRegOffset = respUop.startElem << deqLsCtrl.log2Memwb
     val shiftedData2   = WireInit(0.U(VLEN.W))
-    shiftedData2 := LoadDataGen.multiShifter(false, 8)(
-      Mux(deqMeta.ldstCtrl.ldstType === Mop.constant_stride, stridedData, addrOffsetShiftedData),
+    shiftedData2 := DataGenUtil.groupShifter(false, 8)(
+      Mux(deqLsCtrl.ldstType === Mop.constant_stride, stridedData, addrOffsetShiftedData),
       destVRegOffset,
     )
     // * 5. vreg element merge mask gen
     val mergeElemMask =
       (0 until vlenb).map(i => i.U >= respUop.startElem && i.U < (respUop.startElem + respUop.elemCnt))
-    val mergeByteMask = MaskGen.genByteLevelMask(mergeElemMask.asUInt, deqMeta.ldstCtrl.log2Memwb)
+    val mergeByteMask = MaskGen.genByteLevelMask(mergeElemMask.asUInt, deqLsCtrl.log2Memwb)
 
     // * 6. vreg merge data gen
     deqMeta.vregDataVec := Mux(
       deqMeta.zeroStride,
       VecInit(zeroStridedData.asBools.grouped(8).toSeq.map(_.asUInt)),
-      LoadDataGen.unitStrideMerge(
+      DataGen.mergeData(
         deqMeta.vregDataVec,
         VecInit(shiftedData2.asBools.grouped(8).toSeq.map(_.asUInt)),
         mergeByteMask,
@@ -566,7 +480,7 @@ class SVHLsu(
 
   // * BEGIN
   // * Writeback to uopQueue
-  val fofValid = deqMeta.ldstCtrl.unitSMop === UnitStrideMop.fault_only_first && deqMeta.xcptVl > 0.U
+  val fofValid = deqLsCtrl.unitSMop === UnitStrideMop.fault_only_first && deqMeta.xcptVl > 0.U
 
   io.lsuOut.valid                   := deqMeta.canCommit
   io.lsuOut.bits.muopEnd            := deqMeta.muopInfo.muopEnd
@@ -581,7 +495,7 @@ class SVHLsu(
   io.lsuOut.bits.xcpt.xcpt_cause := Mux(
     fofValid,
     0.U.asTypeOf(new HellaCacheExceptions),
-    deqMeta.xcpt.generateHellaXcpt(deqMeta.ldstCtrl.isStore),
+    deqMeta.xcpt.generateHellaXcpt(deqLsCtrl.isStore),
   )
   io.lsuOut.bits.xcpt.xcpt_addr   := deqMeta.xcptAddr
   io.lsuOut.bits.xcpt.update_vl   := deqMeta.hasXcpt & fofValid

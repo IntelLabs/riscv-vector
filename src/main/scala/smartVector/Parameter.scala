@@ -36,6 +36,8 @@ trait smartParas {
   val dataWidth = 64
   val dataBytes = dataWidth / 8
 
+  val maxAccelerateStride = 4
+
   val nHLsuQueueEntries   = 4
   val nHLsuQueueWidth     = log2Up(nHLsuQueueEntries)
   val vVLSUQueueEntries   = 4
