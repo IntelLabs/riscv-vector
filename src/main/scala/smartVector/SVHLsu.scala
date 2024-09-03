@@ -66,7 +66,7 @@ class SVHLsu(
   val uopIssuePtr  = RegInit(0.U.asTypeOf(new HLdstQueuePtr))
   val uopDeqPtr    = RegInit(0.U.asTypeOf(new HLdstQueuePtr))
   val uopRespPtr   = WireInit(0.U.asTypeOf(new HLdstQueuePtr))
-  val issueUop     = ldstUopQueue(uopIssuePtr.value)
+  val issueUop     = WireInit(0.U.asTypeOf(new LdstUop))
   val respUop      = ldstUopQueue(uopRespPtr.value)
   val deqUop       = ldstUopQueue(uopDeqPtr.value)
 
@@ -260,19 +260,21 @@ class SVHLsu(
   val canWriteback =
     (deqAddrInfo.curSplitIdx + deqAddrInfo.elemCnt >= splitCount) && accessMeta.muopInfo.destVRegEnd
 
-  when(addrQueue.io.deq.fire) {
-    ldstUopQueue(uopEnqPtr.value).valid        := canEnqueue
-    ldstUopQueue(uopEnqPtr.value).status       := Mux(addrMisalign, LdstUopStatus.ready, LdstUopStatus.notReady)
-    ldstUopQueue(uopEnqPtr.value).addr         := deqAddrInfo.addr
-    ldstUopQueue(uopEnqPtr.value).pos          := deqAddrInfo.curVl
-    ldstUopQueue(uopEnqPtr.value).xcptValid    := addrMisalign
-    ldstUopQueue(uopEnqPtr.value).addrMisalign := addrMisalign
-    ldstUopQueue(uopEnqPtr.value).startElem    := deqAddrInfo.startElem
-    ldstUopQueue(uopEnqPtr.value).elemCnt      := deqAddrInfo.elemCnt
-    ldstUopQueue(uopEnqPtr.value).writeback    := canWriteback
-    ldstUopQueue(uopEnqPtr.value).metaPtr      := deqAddrInfo.metaPtr
+  val ldstEnqEntry = WireInit(0.U.asTypeOf(new LdstUop))
+  ldstEnqEntry.valid        := canEnqueue && addrQueue.io.deq.fire
+  ldstEnqEntry.status       := Mux(addrMisalign, LdstUopStatus.ready, LdstUopStatus.notReady)
+  ldstEnqEntry.addr         := deqAddrInfo.addr
+  ldstEnqEntry.pos          := deqAddrInfo.curVl
+  ldstEnqEntry.xcptValid    := addrMisalign
+  ldstEnqEntry.addrMisalign := addrMisalign
+  ldstEnqEntry.startElem    := deqAddrInfo.startElem
+  ldstEnqEntry.elemCnt      := deqAddrInfo.elemCnt
+  ldstEnqEntry.writeback    := canWriteback
+  ldstEnqEntry.metaPtr      := deqAddrInfo.metaPtr
 
-    uopEnqPtr := Mux(canEnqueue, uopEnqPtr + 1.U, uopEnqPtr)
+  when(addrQueue.io.deq.fire) {
+    ldstUopQueue(uopEnqPtr.value) := ldstEnqEntry
+    uopEnqPtr                     := Mux(canEnqueue, uopEnqPtr + 1.U, uopEnqPtr)
   }
 
   // * Split LdstUop
@@ -280,6 +282,8 @@ class SVHLsu(
 
   // * BEGIN
   // * Issue LdstUop
+
+  issueUop := Mux(uopEnqPtr === uopIssuePtr, ldstEnqEntry, ldstUopQueue(uopIssuePtr.value))
 
   val isNoXcptUop = issueUop.valid & (~issueUop.xcptValid) &&
     !isFull(uopIssuePtr, uopDeqPtr) &&
