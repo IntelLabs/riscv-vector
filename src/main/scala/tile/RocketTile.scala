@@ -2,7 +2,6 @@
 // See LICENSE.Berkeley for license details.
 
 package freechips.rocketchip.tile
-import freechips.rocketchip.rocket.frontend._
 
 import chisel3._
 import org.chipsalliance.cde.config._
@@ -14,8 +13,6 @@ import freechips.rocketchip.rocket._
 import freechips.rocketchip.subsystem.HierarchicalElementCrossingParamsLike
 import freechips.rocketchip.util._
 import freechips.rocketchip.prci.{ClockSinkParameters}
-
-import gpc.mainpipe._
 
 case class RocketTileBoundaryBufferParams(force: Boolean = false)
 
@@ -128,7 +125,7 @@ class RocketTileModuleImp(outer: RocketTile) extends BaseTileModuleImp(outer)
     with HasICacheFrontendModule {
   Annotated.params(this, outer.rocketParams)
 
-  val core = Module(new Gpc(outer)(outer.p))
+  val core = Module(new Rocket(outer)(outer.p))
 
   // reset vector is connected in the Frontend to s2_pc
   core.io.reset_vector := DontCare
@@ -164,32 +161,7 @@ class RocketTileModuleImp(outer: RocketTile) extends BaseTileModuleImp(outer)
     s"core hartid wire (${core.io.hartid.getWidth}b) truncates external hartid wire (${outer.hartIdSinkNode.bundle.getWidth}b)")
 
   // Connect the core pipeline to other intra-tile modules
-  // outer.frontend.module.io.cpu <> core.io.imem
-  // ---- temp start----
-  outer.frontend.module.io.cpu.might_request := core.io.imem.might_request
-  outer.frontend.module.io.cpu.req := core.io.imem.req
-  outer.frontend.module.io.cpu.sfence := core.io.imem.sfence
-  core.io.imem.resp foreach { c =>
-    c.valid := outer.frontend.module.io.cpu.resp.valid
-    c.bits.btb := outer.frontend.module.io.cpu.resp.bits.btb
-    c.bits.pc := outer.frontend.module.io.cpu.resp.bits.pc
-    c.bits.inst := outer.frontend.module.io.cpu.resp.bits.data
-    c.bits.raw_inst := outer.frontend.module.io.cpu.resp.bits.data
-    c.bits.rvc := false.B
-    c.bits.xcpt := outer.frontend.module.io.cpu.resp.bits.xcpt
-    c.bits.replay := outer.frontend.module.io.cpu.resp.bits.replay
-    c.bits.next_pc := outer.frontend.module.io.cpu.resp.bits.pc
-  }
-  outer.frontend.module.io.cpu.resp.ready := core.io.imem.resp(0).ready
-  outer.frontend.module.io.cpu.gpa := DontCare
-  outer.frontend.module.io.cpu.btb_update := core.io.imem.btb_update
-  outer.frontend.module.io.cpu.bht_update := core.io.imem.bht_update
-  outer.frontend.module.io.cpu.ras_update := core.io.imem.ras_update
-  outer.frontend.module.io.cpu.flush_icache := core.io.imem.flush_icache
-  core.io.imem.perf := outer.frontend.module.io.cpu.perf
-  outer.frontend.module.io.cpu.progress := core.io.imem.progress
-  // ---- temp end ----
-  
+  outer.frontend.module.io.cpu <> core.io.imem
   dcachePorts += core.io.dmem // TODO outer.dcachePorts += () => module.core.io.dmem ??
   fpuOpt foreach { fpu =>
     core.io.fpu :<>= fpu.io.waiveAs[FPUCoreIO](_.cp_req, _.cp_resp)
@@ -200,10 +172,6 @@ class RocketTileModuleImp(outer: RocketTile) extends BaseTileModuleImp(outer)
     core.io.fpu := DontCare
   }
   core.io.ptw <> ptw.io.dpath
-
-  // Connect VPU
-  core.io.vcomplete := DontCare
-  core.io.villegal := DontCare
 
   // Connect the coprocessor interfaces
   if (outer.roccs.size > 0) {
