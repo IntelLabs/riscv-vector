@@ -95,7 +95,6 @@ class SmartVector extends Module {
   split.io.in.regFileIn <> regFile.io.out
   if (hasMatrix) {
     split.io.in.rfData.get <> regFile.io.rfData
-    iex.io.acc_clr.get <> merge.io.out.commitInfo.valid
     iex.io.matrix_in.get <> split.io.out.mma_in.get
     merge.io.in.matrix_out.get <> iex.io.matrix_out.get
   }
