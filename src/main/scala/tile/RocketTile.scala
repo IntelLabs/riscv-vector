@@ -201,6 +201,10 @@ class RocketTileModuleImp(outer: RocketTile) extends BaseTileModuleImp(outer)
   }
   core.io.ptw <> ptw.io.dpath
 
+  // Connect VPU
+  core.io.vcomplete := DontCare
+  core.io.villegal := DontCare
+
   // Connect the coprocessor interfaces
   if (outer.roccs.size > 0) {
     cmdRouter.get.io.in <> core.io.rocc.cmd

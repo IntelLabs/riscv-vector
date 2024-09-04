@@ -11,6 +11,7 @@ import scala.collection.mutable.ArrayBuffer
 import freechips.rocketchip.rocket._
 import utility._
 import VectorParam._
+import java.awt.BufferCapabilities.FlipContents
 
 // case class GpcCoreParams(
 //   bootFreqHz: BigInt = 0,
@@ -134,8 +135,9 @@ trait HasGpcCoreIO extends HasGpcCoreParameters {
     val wfi = Output(Bool())
     val traceStall = Input(Bool())
     val vissue = Output(new VIssue)
-    val villegal = Input(new VIllegal)
-    val vcomplete = Input(new VComplete)
+    val villegal = Flipped(new VIllegal)
+    val vcomplete = Flipped(new VComplete)
+    val vwb_ready = Flipped(new VWritebackReady)
   })
 }
 
@@ -236,6 +238,7 @@ class Gpc(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
   val take_pc_m2_p1 = Wire(Bool())
   val take_pc_m2 = take_pc_m2_p0 || take_pc_m2_p1
   val take_pc_all = take_pc_ex_p1 || take_pc_m2
+  val vxcpt_flush = Wire(Bool())
 
   /** ID stage:
    *    Decode, RF read, Dual-issue scheduling
@@ -810,7 +813,6 @@ class Gpc(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
   }
   m2_reg_flush_pipe := !ctrl_killm1(0) && m1_reg_flush_pipe
 
-  val vxcpt_flush = Wire(Bool())
   val vxcpt_cause = Reg(new VLdstXcpt)
   val vxcpt_cause_case = Mux1H(Seq(
     vxcpt_cause.ma.ld -> Causes.misaligned_load.U,
@@ -853,9 +855,9 @@ class Gpc(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
   val ll_wen_mem_p0 = dmem_resp_replay && dmem_resp_xpu
   val ll_waddr_mem_p0 = dmem_resp_waddr
   val m2_wxd_p0 = m2_reg_valids(0) && m2_reg_uops(0).ctrl.wxd
-  io.vcomplete.wb_int_ready := !m2_wxd_p0
-  when (ll_wen_mem_p0) { io.vcomplete.wb_int_ready := false.B }
-  val ll_wen_fire_v_int = io.vcomplete.wb_int_ready && io.vcomplete.wen_int
+  io.vwb_ready.wb_int_ready := !m2_wxd_p0
+  when (ll_wen_mem_p0) { io.vwb_ready.wb_int_ready := false.B }
+  val ll_wen_fire_v_int = io.vwb_ready.wb_int_ready && io.vcomplete.wen_int
   val ll_wen_p0 = ll_wen_mem_p0 || ll_wen_fire_v_int
   val ll_waddr_p0 = Mux(ll_wen_mem_p0, dmem_resp_waddr, io.vcomplete.wdata_reg_idx)
 
@@ -899,10 +901,31 @@ class Gpc(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
     val fp_busyTable = new BusyTable
     fp_busyTable.set(Seq((m2_dcache_miss && m2_reg_uops(1).ctrl.wfd || io.fpu.sboard_set || m2_reg_uops(1).vec_arith && m2_reg_uops(1).ctrl.wfd) &&
                           m2_reg_valids(1)), Seq(m2_reg_uops(1).rd))
-    fp_busyTable.clear(Seq(dmem_resp_replay && dmem_resp_fpu, io.fpu.sboard_clr, io.vcomplete.wb_fp_ready && io.vcomplete.wen_fp),
+    fp_busyTable.clear(Seq(dmem_resp_replay && dmem_resp_fpu, io.fpu.sboard_clr, io.vwb_ready.wb_fp_ready && io.vcomplete.wen_fp),
                        Seq(dmem_resp_waddr, io.fpu.sboard_clra, io.vcomplete.wdata_reg_idx))
     checkHazards(fp_hazard_targets, fp_busyTable.read _)
   } else false.B
+
+  // Vector Scoreboard
+  class VScoreboardEntry extends Bundle {
+    val valid = Bool()
+    val wb = Bool() // write-back (i.e. complete)
+    val no_illegal_xcpt = Bool()
+    val no_mem_xcpt = Bool()
+    val inst = UInt(32.W)
+    val pc = UInt(vaddrBitsExtended.W)
+  }
+  val vsb = Reg(Vec(VScoreboardSize, new VScoreboardEntry))
+  for (i <- 0 until VScoreboardSize) {
+    when (reset.asBool) {
+      vsb(i).valid := false.B
+      vsb(i).wb := false.B
+    }
+  }
+  class VsbPtr extends CircularQueuePtr[VsbPtr](VScoreboardSize)
+  val enqPtrVsb = RegInit(0.U.asTypeOf(new VsbPtr))
+  val deqPtrVsb = RegInit(0.U.asTypeOf(new VsbPtr))
+  val vsb_almost_full = hasFreeEntries(enqPtrVsb, deqPtrVsb) <= 3.U
 
   //---- Some M2 utils ----                         hit   p0/p1
   def swap_select(swap: Bool, v0: Bool, v1: Bool): (Bool, Bool) = (v0 || v1, Mux(!swap, !v0, v1))
@@ -963,7 +986,8 @@ class Gpc(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
   // vector csr write by v_config
   csr.io.vector.foreach { csr_vio =>
     csr_vio.set_vs_dirty := true.B //FIXME - 
-    csr_vio.set_vstart := 0.U //FIXME -
+    csr_vio.set_vstart.valid := false.B //FIXME -
+    csr_vio.set_vstart.bits := 0.U //FIXME -
     csr_vio.set_vxsat := false.B //FIXME - 
     csr_vio.set_vconfig.valid := m2_valid_final_p0 && m2_reg_uops(0).vec_config
     val cfig_case = m2_reg_uops(0).vec_config_case
@@ -972,37 +996,17 @@ class Gpc(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
     val vtype_vlmul_mag = Cat(vtype(vtype.getWidth - 1, 2), vlmul_mag(vtype(2, 0)))
     val avl = Mux(cfig_case(1), m2_reg_uops(0).inst(19, 15), m2_reg_uops(0).rs1)
     csr_vio.set_vconfig.bits.vtype := VType.fromUInt(vtype_vlmul_mag, true)
-    csr_vio.set_vconfig.bits.vl := csr_vio.set_vconfig.bits.vtype.vl(avl, 0.U, false.B, true.B, false.B)
+    // csr_vio.set_vconfig.bits.vl := csr_vio.set_vconfig.bits.vtype.vl(avl, 0.U, false.B, true.B, false.B)
+    csr_vio.set_vconfig.bits.vl := 1.U //FIXME -
   }
-
-  // Vector Scoreboard
-  class VScoreboardEntry extends Bundle {
-    val valid = Bool()
-    val wb = Bool() // write-back (i.e. complete)
-    val no_illegal_xcpt = Bool()
-    val no_mem_xcpt = Bool()
-    val inst = UInt(32.W)
-    val pc = UInt(vaddrBitsExtended.W)
-  }
-  val vsb = Reg(Vec(VScoreboardSize, new VScoreboardEntry))
-  for (i <- 0 until VScoreboardSize) {
-    when (reset.asBool) {
-      vsb(i).valid := false.B
-      vsb(i).wb := false.B
-    }
-  }
-  class VsbPtr extends CircularQueuePtr[VsbPtr](VScoreboardSize)
-  val enqPtrVsb = RegInit(0.U.asTypeOf(new VsbPtr))
-  val deqPtrVsb = RegInit(0.U.asTypeOf(new VsbPtr))
-  val vsb_almost_full = hasFreeEntries(enqPtrVsb, deqPtrVsb) <= 3.U
 
   // vector csr read by vector instrn
   val m2_vissue = Wire(new VIssue)
   m2_vissue.valid := m2_valid_final_p0 && m2_reg_uops(0).vec
   m2_vissue.vsb_id := enqPtrVsb.asUInt
   m2_vissue.inst := m2_reg_uops(0).inst
-  m2_vissue.rs1 := m2_reg_rsdata(0)
-  m2_vissue.rs2 := m2_reg_rsdata(1)
+  m2_vissue.rs1 := m2_reg_rsdata(0)(0)
+  m2_vissue.rs2 := m2_reg_rsdata(0)(1)
   csr.io.vector.foreach { csr_vio =>
     m2_vissue.vcsr.vstart := csr_vio.vstart
     m2_vissue.vcsr.vxrm := csr_vio.vxrm
@@ -1208,7 +1212,7 @@ class Gpc(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
   io.fpu.dmem_resp_type := io.dmem.resp.bits.size
   io.fpu.dmem_resp_tag := dmem_resp_waddr
   io.fpu.keep_clock_enabled := io.ptw.customCSRs.disableCoreClockGate
-  io.vcomplete.wb_fp_ready := io.fpu.vfp_wb.ready
+  io.vwb_ready.wb_fp_ready := io.fpu.vfp_wb.ready
   io.fpu.vfp_wb.valid := io.vcomplete.wen_fp
   io.fpu.vfp_wb.bits.wdata := io.vcomplete.wdata
   io.fpu.vfp_wb.bits.waddr := io.vcomplete.wdata_reg_idx

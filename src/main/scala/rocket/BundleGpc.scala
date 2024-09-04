@@ -139,25 +139,29 @@ class VLdstXcpt extends Bundle {
 }
 
 class VIllegal extends Bundle {
-  val valid = Bool()
-  val vsb_id = UInt(bVScoreboardId.W)
-  val not_illegal = Bool()
+  val valid = Output(Bool())
+  val vsb_id = Output(UInt(bVScoreboardId.W))
+  val not_illegal = Output(Bool())
 }
+
+// From perspective of VPU
 class VComplete(implicit p: Parameters) extends CoreBundle {
-  val valid = Bool()
-  val vsb_id = UInt(bVScoreboardId.W)
-  val wen_int = Bool()
-  val wen_fp = Bool()
-  val wb_int_ready = Flipped(Bool())
-  val wb_fp_ready = Flipped(Bool())
-  val wdata = UInt(xLen.W)
-  val wdata_reg_idx = UInt(5.W)
-  val illegal_inst = Bool()
-  val update_vl = Bool()
-  val update_vl_data = UInt(bVL.W)
-  val mem_xcpt_valid = Bool()
-  val mem_xcpt_cause = new VLdstXcpt
-  val xcpt_addr = UInt(VecMemAddrWidth.W)
-  val vxsat = Bool()
-  val fflags = UInt(5.W)
+  val valid = Output(Bool())
+  val vsb_id = Output(UInt(bVScoreboardId.W))
+  val wen_int = Output(Bool())
+  val wen_fp = Output(Bool())
+  val wdata = Output(UInt(xLen.W))
+  val wdata_reg_idx = Output(UInt(5.W))
+  val illegal_inst = Output(Bool())
+  val update_vl = Output(Bool())
+  val update_vl_data = Output(UInt(bVL.W))
+  val mem_xcpt_valid = Output(Bool())
+  val mem_xcpt_cause = Output(new VLdstXcpt)
+  val xcpt_addr = Output(UInt(VecMemAddrWidth.W))
+  val vxsat = Output(Bool())
+  val fflags = Output(UInt(5.W))
+}
+class VWritebackReady extends Bundle {
+  val wb_int_ready = Input(Bool())
+  val wb_fp_ready = Input(Bool())
 }
