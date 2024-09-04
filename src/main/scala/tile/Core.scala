@@ -63,7 +63,7 @@ trait CoreParams {
   def dcacheReqTagBits: Int = 6
 
   def minFLen: Int = 32
-  def vLen: Int = 0
+  def vLen: Int = 128
   def sLen: Int = 0
   def eLen(xLen: Int, fLen: Int): Int = xLen max fLen
   def vMemDataBits: Int = 0

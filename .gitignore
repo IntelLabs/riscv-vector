@@ -17,3 +17,5 @@ rocketchip.jar
 .#*
 .metals/
 .vscode/
+compile.log
+metals
