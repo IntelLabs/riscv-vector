@@ -32,6 +32,7 @@ class VIexWrapper(implicit p: Parameters) extends Module {
     val in = Input(ValidIO(new Muop))
     val out = ValidIO(new IexOutput)
     val matrix_in = if (hasMatrix) Some(Input(Valid(new mma_in()))) else None
+    val acc_clr = if (hasMatrix) Some(Input(Bool())) else None
     val matrix_out = if (hasMatrix) Some(Output(Valid(UInt((mxuPERows * mxuPECols * 32).W)))) else None
 
     val permOut = new(VPermOutput)
@@ -87,7 +88,7 @@ class VIexWrapper(implicit p: Parameters) extends Module {
       mma.io.macReqSrcD(c) := 0.U
     }
 
-    mma.io.clrReq.valid := false.B
+    mma.io.clrReq.valid := io.acc_clr.get
     mma.io.clrReq.bits.ridx := 0.U
 
     for (c <- 0 until numReadPorts) {
