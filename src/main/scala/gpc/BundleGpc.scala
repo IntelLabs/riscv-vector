@@ -61,41 +61,41 @@ class SUOp(implicit p: Parameters) extends CoreBundle {
 }
 
 //---- Frontend - Mainpipe IO ----
-class FrontendIO(implicit p: Parameters) extends CoreBundle()(p) {
+class FrontendIOGpc(implicit p: Parameters) extends CoreBundle()(p) {
     val might_request = Output(Bool())
-    val req = Valid(new FrontendReq)
+    val req = Valid(new FrontendReqGpc)
     val sfence = Valid(new SFenceReq)
-    val resp = Flipped(Vec(2, Decoupled(new FrontendResp)))
+    val resp = Flipped(Vec(2, Decoupled(new FrontendRespGpc)))
     val btb_update = Valid(new BTBUpdate)
     val bht_update = Valid(new BHTUpdate)
     val ras_update = Valid(new RASUpdate)
     val flush_icache = Output(Bool())
-    val perf = Input(new FrontendPerfEvents())
+    val perf = Input(new FrontendPerfEventsGpc())
     val progress = Output(Bool())
 }
 
-class FrontendPerfEvents extends Bundle {
+class FrontendPerfEventsGpc extends Bundle {
     val acquire = Bool()
     val tlbMiss = Bool()
 }
 
-class FrontendResp(implicit p: Parameters) extends CoreBundle()(p) {
+class FrontendRespGpc(implicit p: Parameters) extends CoreBundle()(p) {
     val btb = new BTBResp
     val pc = UInt(vaddrBitsExtended.W)  
     val inst = UInt(32.W)
     val raw_inst = UInt(32.W)
     val rvc = Bool()
-    val xcpt = new FrontendExceptions
+    val xcpt = new FrontendExceptionsGpc
     val replay = Bool()
     val next_pc = UInt(vaddrBitsExtended.W)
 }
 
-class FrontendReq(implicit p: Parameters) extends CoreBundle()(p) {
+class FrontendReqGpc(implicit p: Parameters) extends CoreBundle()(p) {
     val pc = UInt(vaddrBitsExtended.W)
     val speculative = Bool()
 }
 
-class FrontendExceptions extends Bundle {
+class FrontendExceptionsGpc extends Bundle {
     val pf = new Bundle {
     val inst = Bool()
     }

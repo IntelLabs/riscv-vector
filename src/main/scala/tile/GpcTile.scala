@@ -2,7 +2,6 @@
 // See LICENSE.Berkeley for license details.
 
 package gpc.tile
-import freechips.rocketchip.rocket.frontend._
 
 import chisel3._
 import org.chipsalliance.cde.config._
@@ -124,8 +123,8 @@ class GpcTile private(
 }
 
 class GpcTileModuleImp(outer: GpcTile) extends BaseTileModuleImp(outer)
-    with HasFpuOpt
-    with HasLazyRoCCModule
+    with HasFpuOptGpc
+    with HasLazyRoCCModuleGpc
     with HasICacheFrontendModule {
   Annotated.params(this, outer.gpcParams)
 
@@ -207,6 +206,8 @@ class GpcTileModuleImp(outer: GpcTile) extends BaseTileModuleImp(outer)
   core.io.villegal := DontCare
 
   // Connect the coprocessor interfaces
+  val rocc_size = outer.roccs.size
+  require(false, s"-------****---- rocc size: $rocc_size ")
   if (outer.roccs.size > 0) {
     cmdRouter.get.io.in <> core.io.rocc.cmd
     outer.roccs.foreach{ lm =>
@@ -245,6 +246,6 @@ class GpcTileModuleImp(outer: GpcTile) extends BaseTileModuleImp(outer)
   ptw.io.requestor <> ptwPorts.toSeq
 }
 
-trait HasFpuOpt { this: GpcTileModuleImp =>
+trait HasFpuOptGpc { this: GpcTileModuleImp =>
   val fpuOpt = outer.tileParams.core.fpu.map(params => Module(new FPU(params)(outer.p)))
 }

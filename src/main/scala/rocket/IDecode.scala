@@ -1,7 +1,7 @@
 // See LICENSE.SiFive for license details.
 // See LICENSE.Berkeley for license details.
 
-package freechips.rocketchip.rocket.decode
+package  freechips.rocketchip.rocket.decode
 import freechips.rocketchip.rocket._
 
 import chisel3._

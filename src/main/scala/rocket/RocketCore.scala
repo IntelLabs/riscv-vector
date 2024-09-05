@@ -2,8 +2,6 @@
 // See LICENSE.SiFive for license details.
 
 package freechips.rocketchip.rocket
-import freechips.rocketchip.rocket.decode._
-import freechips.rocketchip.rocket.frontend._
 
 import chisel3._
 import chisel3.util._
@@ -13,6 +11,8 @@ import freechips.rocketchip.tile._
 import freechips.rocketchip.util._
 import freechips.rocketchip.util.property
 import scala.collection.mutable.ArrayBuffer
+
+import freechips.rocketchip.rocket.decode._
 
 case class RocketCoreParams(
   bootFreqHz: BigInt = 0,

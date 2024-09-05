@@ -1,7 +1,6 @@
 // See LICENSE.SiFive for license details.
 
 package freechips.rocketchip.rocket
-import freechips.rocketchip.rocket.frontend._
 
 import chisel3._
 import chisel3.util.{Decoupled,log2Ceil,Cat,UIntToOH,Fill}
