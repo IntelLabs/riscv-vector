@@ -65,7 +65,7 @@ case class GpcCoreParams(
   val traceHasWdata: Boolean = false // ooo wb, so no wdata in trace
   override val customIsaExt = Option.when(haveCease)("xrocket") // CEASE instruction
   override def minFLen: Int = fpu.map(_.minFLen).getOrElse(32)
-  override def customCSRs(implicit p: Parameters) = new RocketCustomCSRs
+  override def customCSRs(implicit p: Parameters) = new GpcCustomCSRs
 }
 
 trait HasGpcCoreParameters extends HasCoreParameters {
@@ -124,7 +124,7 @@ trait HasGpcCoreIO extends HasGpcCoreParameters {
     val hartid = Input(UInt(hartIdLen.W))
     val reset_vector = Input(UInt(resetVectorLen.W))
     val interrupts = Input(new CoreInterrupts(tileParams.asInstanceOf[RocketTileParams].beuAddr.isDefined))
-    val imem  = new FrontendIO
+    val imem  = new FrontendIOGpc
     val dmem = new HellaCacheIO
     val ptw = Flipped(new DatapathPTWIO())
     val fpu = Flipped(new FPUCoreIO())
