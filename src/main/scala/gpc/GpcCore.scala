@@ -1,4 +1,4 @@
-package gpc.mainpipe
+package gpc.core
 
 import chisel3._
 import chisel3.util._
@@ -11,65 +11,65 @@ import scala.collection.mutable.ArrayBuffer
 import freechips.rocketchip.rocket._
 import utility._
 import VectorParam._
-import java.awt.BufferCapabilities.FlipContents
+import gpc.tile._
 
-// case class GpcCoreParams(
-//   bootFreqHz: BigInt = 0,
-//   useVM: Boolean = true,
-//   useUser: Boolean = false,
-//   useSupervisor: Boolean = false,
-//   useHypervisor: Boolean = false,
-//   useDebug: Boolean = true,
-//   useAtomics: Boolean = true,
-//   useAtomicsOnlyForIO: Boolean = false,
-//   useCompressed: Boolean = true,
-//   useRVE: Boolean = false,
-//   useConditionalZero: Boolean = false,
-//   nLocalInterrupts: Int = 0,
-//   useNMI: Boolean = false,
-//   nBreakpoints: Int = 1,
-//   useBPWatch: Boolean = false,
-//   mcontextWidth: Int = 0,
-//   scontextWidth: Int = 0,
-//   nPMPs: Int = 8,
-//   nPerfCounters: Int = 0,
-//   haveBasicCounters: Boolean = true,
-//   haveCFlush: Boolean = false,
-//   misaWritable: Boolean = true,
-//   nL2TLBEntries: Int = 0,
-//   nL2TLBWays: Int = 1,
-//   nPTECacheEntries: Int = 8,
-//   mtvecInit: Option[BigInt] = Some(BigInt(0)),
-//   mtvecWritable: Boolean = true,
-//   fastLoadWord: Boolean = true,
-//   fastLoadByte: Boolean = false,
-//   branchPredictionModeCSR: Boolean = false,
-//   clockGate: Boolean = false,
-//   mvendorid: Int = 0, // 0 means non-commercial implementation
-//   mimpid: Int = 0x20181004, // release date in BCD
-//   mulDiv: Option[MulDivParams] = Some(MulDivParams()),
-//   fpu: Option[FPUParams] = Some(FPUParams()),
-//   debugROB: Boolean = false, // if enabled, uses a C++ debug ROB to generate trace-with-wdata
-//   haveCease: Boolean = false, // non-standard CEASE instruction
-//   haveSimTimeout: Boolean = true // add plusarg for simulation timeout
-// ) extends CoreParams {
-//   val lgPauseCycles = 5
-//   val haveFSDirty = false
-//   val pmpGranularity: Int = if (useHypervisor) 4096 else 4
-//   val fetchWidth: Int = if (useCompressed) 2 else 1
-//   //  fetchWidth doubled, but coreInstBytes halved, for RVC:
-//   val decodeWidth: Int = 2
-//   val retireWidth: Int = 2
-//   val instBits: Int = if (useCompressed) 16 else 32
-//   val lrscCycles: Int = 80 // worst case is 14 mispredicted branches + slop
-//   val traceHasWdata: Boolean = false // ooo wb, so no wdata in trace
-//   override val customIsaExt = Option.when(haveCease)("xrocket") // CEASE instruction
-//   override def minFLen: Int = fpu.map(_.minFLen).getOrElse(32)
-//   override def customCSRs(implicit p: Parameters) = new RocketCustomCSRs
-// }
+case class GpcCoreParams(
+  bootFreqHz: BigInt = 0,
+  useVM: Boolean = true,
+  useUser: Boolean = false,
+  useSupervisor: Boolean = false,
+  useHypervisor: Boolean = false,
+  useDebug: Boolean = true,
+  useAtomics: Boolean = true,
+  useAtomicsOnlyForIO: Boolean = false,
+  useCompressed: Boolean = true,
+  useRVE: Boolean = false,
+  useConditionalZero: Boolean = false,
+  nLocalInterrupts: Int = 0,
+  useNMI: Boolean = false,
+  nBreakpoints: Int = 1,
+  useBPWatch: Boolean = false,
+  mcontextWidth: Int = 0,
+  scontextWidth: Int = 0,
+  nPMPs: Int = 8,
+  nPerfCounters: Int = 0,
+  haveBasicCounters: Boolean = true,
+  haveCFlush: Boolean = false,
+  misaWritable: Boolean = true,
+  nL2TLBEntries: Int = 0,
+  nL2TLBWays: Int = 1,
+  nPTECacheEntries: Int = 8,
+  mtvecInit: Option[BigInt] = Some(BigInt(0)),
+  mtvecWritable: Boolean = true,
+  fastLoadWord: Boolean = true,
+  fastLoadByte: Boolean = false,
+  branchPredictionModeCSR: Boolean = false,
+  clockGate: Boolean = false,
+  mvendorid: Int = 0, // 0 means non-commercial implementation
+  mimpid: Int = 0x20181004, // release date in BCD
+  mulDiv: Option[MulDivParams] = Some(MulDivParams()),
+  fpu: Option[FPUParams] = Some(FPUParams()),
+  debugROB: Boolean = false, // if enabled, uses a C++ debug ROB to generate trace-with-wdata
+  haveCease: Boolean = false, // non-standard CEASE instruction
+  haveSimTimeout: Boolean = true // add plusarg for simulation timeout
+) extends CoreParams {
+  val lgPauseCycles = 5
+  val haveFSDirty = false
+  val pmpGranularity: Int = if (useHypervisor) 4096 else 4
+  val fetchWidth: Int = if (useCompressed) 2 else 1
+  //  fetchWidth doubled, but coreInstBytes halved, for RVC:
+  val decodeWidth: Int = 2
+  val retireWidth: Int = 2
+  val instBits: Int = if (useCompressed) 16 else 32
+  val lrscCycles: Int = 80 // worst case is 14 mispredicted branches + slop
+  val traceHasWdata: Boolean = false // ooo wb, so no wdata in trace
+  override val customIsaExt = Option.when(haveCease)("xrocket") // CEASE instruction
+  override def minFLen: Int = fpu.map(_.minFLen).getOrElse(32)
+  override def customCSRs(implicit p: Parameters) = new RocketCustomCSRs
+}
 
 trait HasGpcCoreParameters extends HasCoreParameters {
-  lazy val gpcParams: RocketCoreParams = tileParams.core.asInstanceOf[RocketCoreParams].copy(useDebug = true)
+  lazy val gpcParams: GpcCoreParams = tileParams.core.asInstanceOf[GpcCoreParams].copy(useDebug = true)
 
   val fastLoadWord = gpcParams.fastLoadWord
   val fastLoadByte = gpcParams.fastLoadByte
@@ -142,7 +142,7 @@ trait HasGpcCoreIO extends HasGpcCoreParameters {
 }
 
 
-class Gpc(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
+class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     with HasGpcCoreParameters
     with HasGpcCoreIO 
     with HasCircularQueuePtrHelper {
@@ -1282,7 +1282,7 @@ class Gpc(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
   coreMonitorBundle.priv_mode := csr.io.trace(0).priv
 
   } // leaving gated-clock domain
-  val rocketImpl = withClock (gated_clock) { new GpcImpl }
+  val gpcImpl = withClock (gated_clock) { new GpcImpl }
 
   def checkExceptions(x: Seq[(Bool, UInt)]) =
     (x.map(_._1).reduce(_||_), PriorityMux(x))

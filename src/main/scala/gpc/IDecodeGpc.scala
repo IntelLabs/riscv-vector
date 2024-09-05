@@ -1,7 +1,7 @@
 // See LICENSE.SiFive for license details.
 // See LICENSE.Berkeley for license details.
 
-package gpc.mainpipe
+package gpc.core
 
 import chisel3._
 import chisel3.util._

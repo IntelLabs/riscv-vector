@@ -315,6 +315,8 @@ object emulator extends Cross[Emulator](
   //
   ("freechips.rocketchip.system.TestHarness", "freechips.rocketchip.system.DefaultRV32Config"),
   ("freechips.rocketchip.system.TestHarness", "freechips.rocketchip.system.DefaultFP16Config"),
+  // Gpc
+  ("gpc.system.TestHarness", "gpc.system.DefaultConfig"),
 )
 
 object `runnable-riscv-test` extends mill.Cross[RiscvTest](
