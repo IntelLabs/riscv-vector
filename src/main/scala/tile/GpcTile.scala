@@ -15,7 +15,8 @@ import freechips.rocketchip.subsystem.HierarchicalElementCrossingParamsLike
 import freechips.rocketchip.util._
 import freechips.rocketchip.prci.{ClockSinkParameters}
 
-import gpc.mainpipe._
+import gpc.core._
+import freechips.rocketchip.tile._
 
 case class GpcTileBoundaryBufferParams(force: Boolean = false)
 

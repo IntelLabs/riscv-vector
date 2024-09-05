@@ -1,6 +1,6 @@
 // See LICENSE.SiFive for license details.
 
-package freechips.rocketchip.system
+package gpc.system
 
 import chisel3._
 import org.chipsalliance.cde.config.Parameters
@@ -8,12 +8,14 @@ import freechips.rocketchip.devices.debug.Debug
 import freechips.rocketchip.diplomacy.LazyModule
 import freechips.rocketchip.util.AsyncResetReg
 
+import freechips.rocketchip.system._
+
 class TestHarness()(implicit p: Parameters) extends Module {
   val io = IO(new Bundle {
     val success = Output(Bool())
   })
 
-  val ldut = LazyModule(new ExampleRocketSystem)
+  val ldut = LazyModule(new ExampleGpcSystem)
   val dut = Module(ldut.module)
 
   ldut.io_clocks.get.elements.values.foreach(_.clock := clock)
