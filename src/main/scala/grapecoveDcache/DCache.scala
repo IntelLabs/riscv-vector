@@ -172,10 +172,10 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // * load/store
   val s1_hasPerm         = s1_coh.onAccess(s1_req.cmd)._1
   val s1_newHitCoh       = s1_coh.onAccess(s1_req.cmd)._3
-  val s1_hit             = s1_isTagMatch && s1_hasPerm
-  val s1_upgradePermHit  = s1_hit && s1_newHitCoh =/= s1_coh // e.g. T->Dirty hit
-  val s1_noDataMiss      = !s1_isTagMatch                    // e.g. N->B or N->T miss
-  val s1_upgradePermMiss = s1_isTagMatch && !s1_hasPerm      // e.g. B->T miss
+  val s1_hit             = s1_isTagMatch && (s1_hasPerm || isPrefetch(s1_req.cmd))
+  val s1_upgradePermHit  = s1_hit && s1_newHitCoh =/= s1_coh                       // e.g. T->Dirty hit
+  val s1_noDataMiss      = !s1_isTagMatch                                          // e.g. N->B or N->T miss
+  val s1_upgradePermMiss = s1_isTagMatch && !s1_hasPerm && !isPrefetch(s1_req.cmd) // e.g. B->T miss
 
   val storeGen        = new StoreGen(s1_req.size, s1_req.paddr, s1_req.wdata, dataBytes)
   val s1_newStoreData = storeGen.data
