@@ -15,7 +15,7 @@ class ProbeQueue(
 ) extends Module {
   val io = IO(new Bundle {
     val memProbe    = Flipped(Decoupled(new TLBundleB(edge.bundle)))
-    val mainPipeReq = Decoupled(new MainPipeReq)               // send probe req to main pipeline
+    val mainPipeReq = Decoupled(new MainPipeReq(edge.bundle))  // send probe req to main pipeline
     val wbReq       = Decoupled(new WritebackReq(edge.bundle)) // send probe req directly to writeback queue
     val lrscAddr    = Input(Valid(UInt(lineAddrWidth.W)))      // lrsc block
     val probeCheck  = Flipped(new ProbeMSHRFile())             // check probe addr in mshr
@@ -76,7 +76,7 @@ class ProbeQueue(
   io.probeCheck.probePermission := probeReq.param
 
   // orgranize probe req sent to pipeline
-  io.mainPipeReq.bits := MainPipeReqConverter(probeReq)
+  io.mainPipeReq.bits := MainPipeReqConverter(probeReq, edge.bundle)
   io.mainPipeReq.valid :=
     (state === s_pipe_req) &&
       (!io.lrscAddr.valid || io.lrscAddr.bits =/= getLineAddr(probeReq.address))

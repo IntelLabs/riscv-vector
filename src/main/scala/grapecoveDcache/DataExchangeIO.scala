@@ -5,6 +5,7 @@ import chisel3.util._
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.tilelink._
 import MemoryOpConstants._
+import scala.math._
 
 class DataExchangeReq extends Bundle {
   val source = UInt(MasterSource.width.W)
@@ -40,8 +41,8 @@ class DataExchangeIO extends Bundle {
   val s1_kill     = Input(Bool())
 }
 
-class MainPipeReq extends Bundle {
-  val source  = UInt(MasterSource.width.W)
+class MainPipeReq(params: TLBundleParameters) extends Bundle {
+  val source  = UInt(max(MasterSource.width, params.sourceBits).W)
   val paddr   = UInt(paddrWidth.W)
   val cmd     = UInt(M_SZ.W)
   val size    = UInt(log2Up(log2Up(dataBytes)).W)
@@ -61,9 +62,9 @@ class MainPipeReq extends Bundle {
 }
 
 object MainPipeReqConverter {
-  // DataExchangeIO => MainPipeReq
-  def apply(req: DataExchangeReq): MainPipeReq = {
-    val mainPipeReq = WireInit(0.U.asTypeOf(new MainPipeReq))
+// DataExchangeIO => MainPipeReq
+  def apply(req: DataExchangeReq, params: TLBundleParameters): MainPipeReq = {
+    val mainPipeReq = WireInit(0.U.asTypeOf(new MainPipeReq(params)))
 
     mainPipeReq.source  := req.source
     mainPipeReq.paddr   := req.paddr
@@ -84,11 +85,11 @@ object MainPipeReqConverter {
     mainPipeReq
   }
 
-  // ProbeReq => MainPipeReq
-  def apply(req: TLBundleB): MainPipeReq = {
-    val mainPipeReq = WireInit(0.U.asTypeOf(new MainPipeReq))
+// ProbeReq => MainPipeReq
+  def apply(req: TLBundleB, params: TLBundleParameters): MainPipeReq = {
+    val mainPipeReq = WireInit(0.U.asTypeOf(new MainPipeReq(params)))
     mainPipeReq.size      := log2Up(dataBytes).U
-    mainPipeReq.source    := req.source
+    mainPipeReq.source    := req.source // probe source
     mainPipeReq.paddr     := req.address
     mainPipeReq.cmd       := req.opcode
     mainPipeReq.isProbe   := true.B
@@ -96,9 +97,9 @@ object MainPipeReqConverter {
     mainPipeReq
   }
 
-  // RefillReq => MainPipeReq
-  def apply(req: MSHRReplace, victimWay: UInt): MainPipeReq = {
-    val mainPipeReq = WireInit(0.U.asTypeOf(new MainPipeReq))
+// RefillReq => MainPipeReq
+  def apply(req: MSHRReplace, victimWay: UInt, params: TLBundleParameters): MainPipeReq = {
+    val mainPipeReq = WireInit(0.U.asTypeOf(new MainPipeReq(params)))
 
     mainPipeReq.size      := log2Up(dataBytes).U
     mainPipeReq.paddr     := req.lineAddr << blockOffBits
@@ -108,5 +109,4 @@ object MainPipeReqConverter {
     mainPipeReq.refillWay := victimWay
     mainPipeReq
   }
-
 }

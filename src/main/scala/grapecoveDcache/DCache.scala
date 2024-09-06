@@ -62,18 +62,18 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // * pipeline stage 0 Begin
   // req arbiter
-  val mainReqArb = Module(new Arbiter(new MainPipeReq, 3))
+  val mainReqArb = Module(new Arbiter(new MainPipeReq(edge.bundle), 3))
 
   // TODO: priority
   // source 0: probe
   mainReqArb.io.in(0) <> probeQueue.io.mainPipeReq
   // source 1: replace
   mainReqArb.io.in(1).valid := mshrs.io.toReplace.valid
-  mainReqArb.io.in(1).bits  := MainPipeReqConverter(mshrs.io.toReplace.bits, victimWay)
+  mainReqArb.io.in(1).bits  := MainPipeReqConverter(mshrs.io.toReplace.bits, victimWay, edge.bundle)
   mshrs.io.toReplace.ready  := mainReqArb.io.in(1).ready
   // source 2: req
   mainReqArb.io.in(2).valid := io.req.valid
-  mainReqArb.io.in(2).bits  := MainPipeReqConverter(io.req.bits)
+  mainReqArb.io.in(2).bits  := MainPipeReqConverter(io.req.bits, edge.bundle)
   io.req.ready              := mainReqArb.io.in(2).ready
 
   // FIXME: store ready ?
@@ -91,7 +91,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     log2Up(blockBytes).U,
   )
 
-  assert(!(s0_req.isFromCore && s0_req.size > 6.U), "Requst size should <= 6")
+  assert(!(s0_req.isFromCore && s0_req.size > 6.U), "Request size should <= 6")
 
   // read tag array
   metaArray.io.read.valid       := s0_valid
@@ -302,7 +302,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s2_updateData = RegNext(s1_updateData)
   val s2_tag        = RegEnable(s1_tag, s1_needUpdate)
   val s2_data       = RegEnable(s1_data, s1_needUpdate)
-  val s2_req        = RegInit(0.U.asTypeOf(new MainPipeReq))
+  val s2_req        = RegInit(0.U.asTypeOf(new MainPipeReq(edge.bundle)))
   // need to calculate hit store data & miss store data
   when(s1_needUpdate | (s1_mshrAlloc && isWrite(s1_req.cmd))) {
     s2_req       := s1_req
@@ -483,7 +483,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   wbPipeReq.bits.voluntary := !s1_req.isProbe
   wbPipeReq.bits.data      := s1_data
   wbPipeReq.bits.lineAddr  := Mux(s1_replaceWb, s1_repLineAddr, getLineAddr(s1_req.paddr))
-  wbPipeReq.bits.source    := DontCare
+  wbPipeReq.bits.source    := s1_req.source
   wbPipeReq.bits.perm := Mux(
     s1_probeWb,
     s1_probeReportParam,

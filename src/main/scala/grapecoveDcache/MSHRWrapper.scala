@@ -10,7 +10,7 @@ class MSHRWrapper(
     implicit edge: TLEdgeOut
 ) extends Module {
   val io = IO(new Bundle {
-    val req       = Flipped(DecoupledIO(new MainPipeReq))
+    val req       = Flipped(DecoupledIO(new MainPipeReq(edge.bundle)))
     val cacheable = Input(Bool())
     val isUpgrade = Input(Bool())
 
