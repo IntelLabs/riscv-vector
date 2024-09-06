@@ -15,7 +15,7 @@ class WritebackReq(params: TLBundleParameters) extends Bundle {
   val perm      = UInt(TLPermissions.cWidth.W)
   val hasData   = Bool()
   val data      = UInt(dataWidth.W)
-  // val source    = UInt(params.sourceBits.W) // tilelink source
+  val source    = UInt(params.sourceBits.W) // tilelink source
 }
 
 class MissCheck extends Bundle {
@@ -99,7 +99,7 @@ class WritebackEntry(id: Int)(
 
   // probe ack response
   val probeAck = edge.ProbeAck(
-    fromSource = id.U,
+    fromSource = reqReg.source,
     toAddress = releaseAddr,
     lgSize = log2Ceil(blockBytes).U,
     reportPermissions = reqReg.perm,
@@ -107,7 +107,7 @@ class WritebackEntry(id: Int)(
 
   // probe ack with data
   val probeAckData = edge.ProbeAck(
-    fromSource = id.U,
+    fromSource = reqReg.source,
     toAddress = releaseAddr,
     lgSize = log2Ceil(blockBytes).U,
     reportPermissions = reqReg.perm,

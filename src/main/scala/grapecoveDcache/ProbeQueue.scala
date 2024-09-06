@@ -86,6 +86,7 @@ class ProbeQueue(
   io.wbReq.bits.voluntary := false.B
   io.wbReq.bits.lineAddr  := getLineAddr(probeReq.address)
   io.wbReq.bits.perm      := probeReq.param
+  io.wbReq.bits.source    := probeReq.source
   io.wbReq.bits.data      := DontCare // FIXME
   io.wbReq.bits.hasData   := false.B  // FIXME
 

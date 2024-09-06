@@ -483,6 +483,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   wbPipeReq.bits.voluntary := !s1_req.isProbe
   wbPipeReq.bits.data      := s1_data
   wbPipeReq.bits.lineAddr  := Mux(s1_replaceWb, s1_repLineAddr, getLineAddr(s1_req.paddr))
+  wbPipeReq.bits.source    := DontCare
   wbPipeReq.bits.perm := Mux(
     s1_probeWb,
     s1_probeReportParam,
