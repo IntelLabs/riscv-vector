@@ -32,6 +32,7 @@ class MSHR(id: Int) extends Module() {
   val privErr = (state >= mode_resp_wait) && (sentPermission === TLPermissions.NtoB) && isWriteIntent(io.reqCmd)
   // it is not allowed for write -> read -> write
   val readAfterWriteFlag = RegInit(false.B)
+  val trueWriteFlag      = RegInit(false.B)
   val wrwErr             = readAfterWriteFlag && isWrite(io.reqCmd)
 
   val probeState = Mux(
@@ -55,21 +56,22 @@ class MSHR(id: Int) extends Module() {
   readAfterWriteFlag := MuxCase(
     readAfterWriteFlag,
     Seq(
-      (state === mode_clear)                                                             -> false.B,
-      (allocLineAddrMatch && sentPermission =/= TLPermissions.NtoB && isRead(io.reqCmd)) -> true.B,
+      (state === mode_clear)                                                               -> false.B,
+      (allocLineAddrMatch && trueWriteFlag && isRead(io.reqCmd) && !isPrefetch(io.reqCmd)) -> true.B,
     ),
   )
 
   // don't have enough space to store current inst
   val isFull = (metaCounter + 1.U) >= nMSHRMetas.asUInt
 
-  val stallReq = allocLineAddrMatch && (!(state <= mode_resp_wait) || isFull || privErr || wrwErr)
+  val stallReq =
+    allocLineAddrMatch && (!(state <= mode_resp_wait) || isFull || privErr || wrwErr) && !isPrefetch(io.reqCmd)
   io.stallReq := stallReq
   io.isEmpty  := state === mode_idle
 
   /////////////// refill state flag & io
   io.writeCounter := Mux(
-    sentPermission =/= TLPermissions.NtoB && allocateReq && isWrite(io.reqCmd),
+    trueWriteFlag && allocateReq && isWrite(io.reqCmd),
     metaCounter - 1.U,
     metaCounter,
   )
@@ -78,13 +80,16 @@ class MSHR(id: Int) extends Module() {
 
   // if already has write req, metaCounter won't change
   when(state === mode_clear) {
-    metaCounter := 0.U
+    metaCounter   := 0.U
+    trueWriteFlag := false.B
   }.elsewhen(allocateReq && !stallReq) {
     when(state === mode_idle) {
-      metaCounter := 1.U
-    }.elsewhen(allocLineAddrMatch) {
-      when(sentPermission === TLPermissions.NtoB && isWrite(io.reqCmd)) {
-        metaCounter := metaCounter + 1.U
+      metaCounter   := 1.U
+      trueWriteFlag := io.isUpgrade || isWrite(io.reqCmd)
+    }.elsewhen(allocLineAddrMatch && !isPrefetch(io.reqCmd)) {
+      when(!trueWriteFlag && isWrite(io.reqCmd)) {
+        trueWriteFlag := true.B
+        metaCounter   := metaCounter + 1.U
       }.elsewhen(isRead(io.reqCmd)) {
         metaCounter := metaCounter + 1.U
       }
@@ -101,7 +106,7 @@ class MSHR(id: Int) extends Module() {
         TLPermissions.BtoT,
         Mux(isWriteIntent(io.reqCmd), TLPermissions.NtoT, TLPermissions.NtoB),
       )
-    }.elsewhen(allocLineAddrMatch) {
+    }.elsewhen(allocLineAddrMatch && !isPrefetch(io.reqCmd)) {
       sentPermission := Mux(
         sentPermission === TLPermissions.NtoB && isWriteIntent(io.reqCmd),
         TLPermissions.NtoT,
@@ -423,7 +428,7 @@ class MSHRFile extends Module() {
   val dataArrayWriteEna = RegInit(false.B)
   val dataArrayWriteIdx = RegInit(0.U(nMSHRs.W))
 
-  when(io.pipelineReq.fire) {
+  when(io.pipelineReq.fire && Mux(lineAddrMatch, !isPrefetch(io.pipelineReq.bits.meta.cmd), true.B)) {
     // read/write => update meta info
     metaArray(wrIdx)(metaWriteIdx) := io.pipelineReq.bits.meta.asUInt
 
