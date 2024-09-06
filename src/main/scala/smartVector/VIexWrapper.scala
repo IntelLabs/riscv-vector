@@ -31,6 +31,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
     val permOut = new(VPermOutput)
     val permRegIn = Input(new(VPermRegIn))
     val iexNeedStall = Output(Bool())
+    val excpInfo = Output(new ExcpInfo)
   })
 
   // IEX modules
@@ -48,7 +49,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
 
   // IEX input source
   val mUop = io.in.bits
-  val mUopValid = io.in.valid && ~io.in.bits.uop.ctrl.isLdst
+  val mUopValid = io.in.valid && ~io.in.bits.uop.ctrl.isLdst && ~mUop.excpInfo.exception_vld
 
   // val divNotReady  = ~SVDiv.io.in.ready
   // val fpuNotReady  = ~SVFpu.io.in.ready
@@ -74,12 +75,13 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   val oneCycleLatIn = mUopValid & (mUop.uop.ctrl.alu || mUop.uop.ctrl.mask)
   val twoCycleLatIn = mUopValid & (mUop.uop.ctrl.mul || mUop.uop.ctrl.redu)
   val noFixLatIn    = mUopValid & (mUop.uop.ctrl.div || mUop.uop.ctrl.perm || mUop.uop.ctrl.fp)
-  val twoCycleReg = RegEnable(twoCycleLatIn, mUopValid)
-  val fixLatVld   = SVDiv.io.out.valid || permDone || SVFpu.io.out.valid
+  val twoCycleReg   = RegEnable(twoCycleLatIn, mUopValid)
+  val fixLatVld     = SVDiv.io.out.valid || permDone || SVFpu.io.out.valid
 
   switch(currentState){
     is(empty){
-      when(mUopValid && ~mUop.uop.ctrl.alu && ~mUop.uop.ctrl.isLdst && ~mUop.uop.ctrl.mask && ~(mUop.uop.ctrl.narrow_to_1 && ~mUop.uop.uopEnd)){
+      when(mUopValid && ~mUop.uop.ctrl.alu && ~mUop.uop.ctrl.isLdst && ~mUop.uop.ctrl.mask && 
+          ~(mUop.uop.ctrl.narrow_to_1 && ~mUop.uop.uopEnd && ~mUop.excpInfo.exception_vld)){
         currentStateNext := ongoing
       }.otherwise{
         currentStateNext := empty
@@ -97,38 +99,9 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   } 
 
   currentState := currentStateNext
-  //io.iexNeedStall := (currentStateNext === ongoing) || ~ready
-  //val ready = currentState === empty || (mUop.uop.ctrl.floatRed && SVFpu.io.in.ready && ~(mUop.uop.uopIdx === 0.U))
+  
   io.iexNeedStall := (currentState === ongoing)
 
-  //if is floatRed, when is ready, the next uop valid will be high in same cycle.
-  //and the first's ready match the second's valid, it will cause second's ready invalid
-  //io.iexNeedStall := Mux(bitsReg.uop.ctrl.floatRed && !iexNeedStallTmp , RegNext(iexNeedStallTmp) , iexNeedStallTmp)
-  //assert(!(currentState === ongoing && validFinal), "when current state is ongoing, should not has new inst in")
-  //assert(!(!SVDiv.io.in.ready && validFinal), "when div is not ready, should not has new inst in")
-  //assert(!(SVPerm.io.out.perm_busy && validFinal), "when perm is busy, should not has new inst in")
-  
-  // val fpFire = RegInit(false.B) 
-  // val divFire = RegInit(false.B)
-  // val perFire = RegInit(false.B)
-
-  // when(mUopValid && mUop.uop.ctrl.fp && SVFpu.io.in.ready){
-  //   fpFire := true.B
-  // }
-
-  // when(mUopValid && mUop.uop.ctrl.div && SVDiv.io.in.ready){
-  //   divFire := true.B
-  // }
-
-  // when(mUopValid && mUop.uop.ctrl.perm && ~SVPerm.io.out.perm_busy){
-  //   perFire := true.B
-  // }
-
-  // when(currentStateNext === empty){
-  //   fpFire := false.B
-  //   divFire := false.B
-  //   perFire := false.B
-  // }
  
   SValu.io.in.valid   := mUopValid && mUop.uop.ctrl.alu
   SVMac.io.in.valid   := mUopValid && mUop.uop.ctrl.mul
@@ -196,6 +169,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
     io.out.bits.vxsat  := false.B
   }
   io.out.valid := outValid
+  io.excpInfo := mUop.excpInfo
 }
 
 

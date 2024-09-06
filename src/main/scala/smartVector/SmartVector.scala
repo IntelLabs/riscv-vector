@@ -95,7 +95,7 @@ class SmartVector extends Module {
     merge.io.in.aluIn <> iex.io.out
     merge.io.in.permIn <> iex.io.permOut
     commit.io.in.commitInfo <> merge.io.out.commitInfo
-    commit.io.in.excpInfo <> split.io.excpInfo
+    commit.io.in.excpInfo <> iex.io.excpInfo
     io.out.rvuCommit <> commit.io.out.commitInfo
 
     svlsuWrapper.io.mUop <> split.io.out.mUop

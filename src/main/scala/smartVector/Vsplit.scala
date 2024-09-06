@@ -97,6 +97,7 @@ class Muop(implicit p : Parameters) extends Bundle {
     val scalar_opnd_1 = UInt(64.W)
     val scalar_opnd_2 = UInt(64.W)
     val uopRegInfo    = new UopRegInfo
+    val excpInfo      = new ExcpInfo
 }
 
 class ExcpInfo extends Bundle {
@@ -126,7 +127,6 @@ class Vsplit(implicit p : Parameters) extends Module {
         val lsuStallSplit = Input(Bool()) 
         val iexNeedStall  = Input(Bool())
         val vLSUXcpt = Input (new VLSUXcpt)
-        val excpInfo = Output(new ExcpInfo)
     })
 
     val expdWidth     = 8 // 1~128
@@ -499,6 +499,14 @@ class Vsplit(implicit p : Parameters) extends Module {
     mUopIn.bits.uopRegInfo.old_vd    := old_vd
     mUopIn.bits.uopRegInfo.mask      := mask
 
+    mUopIn.bits.excpInfo.exception_vld := io.vLSUXcpt.exception_vld || RegNext((ctrl.illegal & instDecodeIn))
+    mUopIn.bits.excpInfo.illegalInst   := RegNext(ctrl.illegal)
+    mUopIn.bits.excpInfo.update_float  := ctrl.rdVal && isfloat
+    mUopIn.bits.excpInfo.reg_idx       := ctrl.ldest
+    mUopIn.bits.excpInfo.update_vl     := io.vLSUXcpt.update_vl
+    mUopIn.bits.excpInfo.update_data   := io.vLSUXcpt.update_data
+    mUopIn.bits.excpInfo.xcpt_addr     := io.vLSUXcpt.xcpt_addr
+    mUopIn.bits.excpInfo.xcpt_cause    := io.vLSUXcpt.xcpt_cause
 
     when((instDecodeIn || currentState === ongoing) & ~regConf & ~hasExcp){
         mUopIn.valid := true.B   
@@ -569,7 +577,6 @@ class Vsplit(implicit p : Parameters) extends Module {
     // * Split FSM
     // * END
     
-
     // * BEGIN
     // * Pipeline Register
     val validReg        = RegInit(false.B)
@@ -582,7 +589,7 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     // when exu accepts the current muop or when there is no uop accept new muop
     when (pipeRegReady) {
-        validReg := mUopIn.valid
+        validReg := mUopIn.valid || hasExcp
         bitsReg := mUopIn.bits
         mergeAttrReg := mUopMergeAttrIn.bits
     }
@@ -608,14 +615,7 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     // * BEGIN
     // * Output ExcpInfo
-    io.excpInfo.exception_vld := io.vLSUXcpt.exception_vld || RegNext((ctrl.illegal & instDecodeIn))
-    io.excpInfo.illegalInst   := RegNext(ctrl.illegal)
-    io.excpInfo.update_float  := ctrl.rdVal && isfloat
-    io.excpInfo.reg_idx       := ctrl.ldest
-    io.excpInfo.update_vl     := io.vLSUXcpt.update_vl
-    io.excpInfo.update_data   := io.vLSUXcpt.update_data
-    io.excpInfo.xcpt_addr     := io.vLSUXcpt.xcpt_addr
-    io.excpInfo.xcpt_cause    := io.vLSUXcpt.xcpt_cause
+
     // * Output ExcpInfo
     // * END
 
