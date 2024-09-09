@@ -161,7 +161,7 @@ class VIllegalInstrn extends Module {
                         (!overlap_isLegal(vs1, vs1End, veewVs1, vemulVs1, vd, vdEnd, veewVd) || vrgather || viota)
   val ill_regOverlap_2 = overlap(vs2, vs2End, ctrl.lsrcVal(1), vd, vdEnd, ctrl.ldestVal) &&
                         (!overlap_isLegal(vs2, vs2End, veewVs2, vemulVs2, vd, vdEnd, veewVd) || vrgather || viota)
-  val ill_regOverlap_m = vd === 0.U && !ctrl.vm && ~mask_onlyOneReg && ~alu_mask && ~ctrl.narrow_to_1
+  val ill_regOverlap_m = vd === 0.U && !ctrl.vm && ~mask_onlyOneReg && ~alu_mask && ~ctrl.narrow_to_1 &&  ctrl.ldestVal 
   val ill_regOverlap = (ill_regOverlap_1 || ill_regOverlap_2 || ill_regOverlap_m) && ~ctrl.redu
 
   // Segment: for indexed segment, vd reg-group cannot overlap vs2 reg-group
@@ -179,16 +179,16 @@ class VIllegalInstrn extends Module {
    *  the source mask register (v0), unless the destination vector register is being written
    *  with a mask value (e.g., compares) or the scalar result of a reduction.
    */
-  val ill_vd_v0 = ctrl.ldest === 0.U && ctrl.ldestVal && !ctrl.vm && !(ctrl.redu ||
-                  ctrl.mask && ctrl.rdVal ||
-                  ctrl.funct6(5, 3) === "b011".U ||  //compare
-                  ctrl.funct6(5, 2) === "b0100".U && ctrl.funct6(0) && ctrl.opi) //vmadc/vmsbc
+  //val ill_vd_v0 = ctrl.ldest === 0.U && ctrl.ldestVal && !ctrl.vm && !(ctrl.redu ||
+  //                ctrl.mask && ctrl.rdVal ||
+  //                ctrl.funct6(5, 3) === "b011".U ||  //compare
+  //                ctrl.funct6(5, 2) === "b0100".U && ctrl.funct6(0) && ctrl.opi) //vmadc/vmsbc
 
   val illFinal = ill_vsew || ill_vlmul || ill_widenNarrow || ill_vstart || ill_gatherE16 ||
                ill_ldstEmul || ill_seg || ill_seg_past31 || ill_nfield ||
                ill_ext || ill_nreg || ill_frm || ill_sewFP ||
                ill_reg || ill_regGrpEnd || ill_regOverlap || ill_segOverlap ||
-               ill_vd_vs2 || ill_vd_v0
+               ill_vd_vs2 //|| ill_vd_v0
   io.ill.valid := RegNext(illFinal || io.ctrl.illegal || io.csr.vill) && RegNext(io.validIn)
   io.ill.bits := RegNext(io.robPtrIn)
 }

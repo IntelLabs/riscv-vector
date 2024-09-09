@@ -37,15 +37,15 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   val bufferValidReg = RegInit(false.B)
   val validReg = RegInit(false.B)
 
-  //has exception, clear buffer
-  when(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl || io.out.bits.vCtrl.illegal){
-    bufferValidReg := false.B
-  }
-
   //set buffer
   when(!bufferValidReg && !(!validReg || io.out.ready) && io.in.valid){
     bufferReg := io.in.bits
     bufferValidReg := io.in.valid
+  }
+
+  //has exception, clear buffer
+  when(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl || io.out.bits.vCtrl.illegal){
+    bufferValidReg := false.B
   }
 
   //fire to pipeline reg, clear buffer
@@ -139,7 +139,6 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   when(fire) {
       bitsReg := bitsIn
   }
-
  
   io.out.valid := validReg
   io.out.bits  := bitsReg
