@@ -69,6 +69,8 @@ class FrontendModule(outer: Frontend) extends LazyModuleImp(outer)
   val f0_pc = WireInit(0.U(vaddrBitsExtended.W))
   val f0_valid = WireInit(false.B)
   val f0_fb_has_space = Wire(Bool())
+  val f0_speculative = Wire(Bool())
+
   f0_valid := io.cpu.req.valid || f0_fb_has_space 
   
   btb.io.req.valid := f0_valid && !io.cpu.sfence.valid
@@ -91,10 +93,12 @@ class FrontendModule(outer: Frontend) extends LazyModuleImp(outer)
   val f1_speculative = Reg(Bool())
   val f1_next_fetch = nextFetch(f1_pc)
   val f1_predicted_taken = WireInit(false.B)
-  val f1_target = Mux(btb.io.resp.valid && btb.io.resp.bits.bht.taken,btb.io.resp.bits.target.sextTo(vaddrBitsExtended),f1_next_fetch)
+  val f1_target = Mux(f1_predicted_taken,btb.io.resp.bits.target.sextTo(vaddrBitsExtended),f1_next_fetch)
   val f1f2_clear = WireInit(false.B)
+  val f1_specualtive = Reg(Bool())
   
   f1_valid := f0_valid
+  f1_predicted_taken := btb.io.resp.valid && btb.io.resp.bits.bht.taken
   
   btb.io.btb_update := io.cpu.btb_update
   btb.io.bht_update := io.cpu.bht_update
@@ -104,7 +108,7 @@ class FrontendModule(outer: Frontend) extends LazyModuleImp(outer)
   btb.io.ras_update.bits := DontCare
   btb.io.bht_advance.valid := false.B
   btb.io.bht_advance.bits := DontCare
-
+  
   tlb.io.req.valid := f1_valid && !f1f2_clear 
   tlb.io.req.bits.cmd := M_XRD // Frontend only reads
   tlb.io.req.bits.vaddr := f1_pc
@@ -147,6 +151,10 @@ class FrontendModule(outer: Frontend) extends LazyModuleImp(outer)
   f0_fb_has_space := !fb.io.mask(fb.io.mask.getWidth-3) || 
                       !fb.io.mask(fb.io.mask.getWidth-2) && (!f1_valid || !f2_valid) || 
                       !fb.io.mask(fb.io.mask.getWidth-1) && (!f1_valid && !f2_valid)
+  f0_speculative = f2_valid && !f2_speculative || f1_predicted_taken
+
+  f1_speculative := Mux(io.cpu.req.valid, io.cpu.req.bits.speculative,Mux(f2_replay, f2_speculative, f0_speculative))
+
   //A replay is triggered if the handshake is not successfully completed
   f2_replay := (f2_valid && !fb.io.enq.fire) || RegNext(f2_replay && !f0_valid, true.B)
   //TODO: wether 'f2_valid && !icache.io.resp.valid' or not
