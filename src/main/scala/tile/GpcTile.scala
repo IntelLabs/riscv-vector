@@ -21,7 +21,7 @@ case class GpcTileBoundaryBufferParams(force: Boolean = false)
 
 case class GpcTileParams(
     core: GpcCoreParams = GpcCoreParams(),
-    icache: Option[ICacheParams] = Some(ICacheParams()),
+    icache: Option[ICacheParams] = Some(ICacheParams().copy(nSets = 128)),
     dcache: Option[DCacheParams] = Some(DCacheParams()),
     btb: Option[BTBParams] = Some(BTBParams()),
     dataScratchpadBytes: Int = 0,
@@ -50,7 +50,7 @@ class GpcTile private(
     with SourcesExternalNotifications
     with HasLazyRoCC  // implies CanHaveSharedFPU with CanHavePTW with HasHellaCache
     with HasHellaCache
-    with HasICacheFrontend
+    with HasICacheFrontendGpc
 {
   // Private constructor ensures altered LazyModule.p is used implicitly
   def this(params: GpcTileParams, crossing: HierarchicalElementCrossingParamsLike, lookup: LookupByHartIdImpl)(implicit p: Parameters) =
@@ -89,7 +89,7 @@ class GpcTile private(
   val dtimProperty = dtim_adapter.map(d => Map(
     "sifive,dtim" -> d.device.asProperty)).getOrElse(Nil)
 
-  val itimProperty = frontend.icache.itimProperty.toSeq.flatMap(p => Map("sifive,itim" -> p))
+  // val itimProperty = frontend.icache.itimProperty.toSeq.flatMap(p => Map("sifive,itim" -> p))
 
   val beuProperty = bus_error_unit.map(d => Map(
           "sifive,buserror" -> d.device.asProperty)).getOrElse(Nil)
@@ -99,7 +99,8 @@ class GpcTile private(
     override def describe(resources: ResourceBindings): Description = {
       val Description(name, mapping) = super.describe(resources)
       Description(name, mapping ++ cpuProperties ++ nextLevelCacheProperty
-                  ++ tileProperties ++ dtimProperty ++ itimProperty ++ beuProperty)
+                  // ++ tileProperties ++ dtimProperty ++ itimProperty ++ beuProperty)
+                  ++ tileProperties ++ dtimProperty ++ beuProperty)
     }
   }
 
@@ -125,7 +126,7 @@ class GpcTile private(
 class GpcTileModuleImp(outer: GpcTile) extends BaseTileModuleImp(outer)
     with HasFpuOptGpc
     with HasLazyRoCCModuleGpc
-    with HasICacheFrontendModule {
+    with HasICacheFrontendGpcModule {
   Annotated.params(this, outer.gpcParams)
 
   val core = Module(new Gpc(outer)(outer.p))

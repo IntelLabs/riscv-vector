@@ -1,4 +1,4 @@
-package freechips.rocketchip.rocket
+package gpc.core
 
 import chisel3._
 import chisel3.util._
@@ -8,8 +8,7 @@ import freechips.rocketchip.subsystem.CacheBlockBytes
 import freechips.rocketchip.tile.HasCoreParameters
 import freechips.rocketchip.util._
 
-
-case class BHTParams(
+case class BHTParamsGpc(
   nEntries: Int = 512,  //number of PHT entry
   counterLength: Int = 2,  
   historyLength: Int = 20, //TODO: maybe need to change
@@ -18,16 +17,16 @@ case class BHTParams(
   nCountersPerEntry: Int = 8,
   entryLength: Int = 8)
 
-case class BTBParams(
+case class BTBParamsGpc(
   nEntries: Int = 28,   //TODO:need to change
   nMatchBits: Int = 14,
   nPages: Int = 6,
   nRAS: Int = 6,  //TODO: need to change
-  bhtParams: Option[BHTParams] = Some(BHTParams()),
+  bhtParams: Option[BHTParamsGpc] = Some(BHTParamsGpc()),
   updatesOutOfOrder: Boolean = false,
   ijtpParams: Option[IJTPParams] = Some(IJTPParams()))
 
-  //TODO:IJTP parameters
+//TODO:IJTP parameters
 case class IJTPParams(
   nEntries: Int = 8,
   nMatchBits: Int = 14,
@@ -37,7 +36,8 @@ case class IJTPParams(
 )
 
 trait HasBtbParameters extends HasCoreParameters { this: InstanceId =>
-  val btbParams = tileParams.btb.getOrElse(BTBParams(nEntries = 0))
+  // val btbParams = tileParams.btb.getOrElse(BTBParams(nEntries = 0))
+  val btbParams = BTBParamsGpc()
   val matchBits = btbParams.nMatchBits max log2Ceil(p(CacheBlockBytes) * tileParams.icache.get.nSets)
   val entries = btbParams.nEntries
   val updatesOutOfOrder = btbParams.updatesOutOfOrder
@@ -140,7 +140,7 @@ class BHTResp(implicit p: Parameters) extends BtbBundle()(p) {
                 tagBits       log(entryLength)
 */
 
-class BHT(params: BHTParams)(implicit val p: Parameters) extends HasCoreParameters {
+class BHT(params: BHTParamsGpc)(implicit val p: Parameters) extends HasCoreParameters {
 //direction PHT
 val taken_array = DescribedSRAM(
     name = "taken_array",

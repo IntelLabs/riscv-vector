@@ -1,4 +1,4 @@
-package freechips.rocketchip.rocket
+package gpc.core
 
 import chisel3._
 import chisel3.util._
@@ -10,8 +10,9 @@ import freechips.rocketchip.tilelink.{TLWidthWidget}
 import freechips.rocketchip.util._
 import freechips.rocketchip.util.property
 
+import freechips.rocketchip.rocket.{ExpandedInstruction, SFenceReq, TLBPTWIO}
 
-class FrontendBundle(val outer: Frontend) extends CoreBundle()(outer.p) {
+class FrontendBundle(val outer: FrontendGpc) extends CoreBundle()(outer.p) {
     val cpu = Flipped(new FrontendIO())
     val ptw = new TLBPTWIO()
     val errors = new ICacheErrors
