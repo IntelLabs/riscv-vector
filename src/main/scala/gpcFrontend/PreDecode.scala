@@ -1,4 +1,4 @@
-package freechips.rocketchip.rocket
+package gpc.core
 
 import chisel3._
 import chisel3.util._
@@ -9,6 +9,9 @@ import freechips.rocketchip.tile._
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.util._
 import freechips.rocketchip.util.property
+
+import freechips.rocketchip.rocket.{ExpandedInstruction, Instructions}
+import freechips.rocketchip.rocket.{RVCExpander, IMM_UJ}
 
 class PreDecoder(implicit p: Parameters) extends CoreModule{
 

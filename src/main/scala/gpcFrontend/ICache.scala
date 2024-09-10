@@ -1,7 +1,7 @@
 // See LICENSE.Berkeley for license details.
 // See LICENSE.SiFive for license details.
 
-package freechips.rocketchip.rocket
+package gpc.core
 
 import chisel3._
 import chisel3.util.{Cat, Decoupled, Mux1H, OHToUInt, RegEnable, Valid, isPow2, log2Ceil, log2Up, PopCount}
@@ -15,6 +15,8 @@ import freechips.rocketchip.util.property
 import chisel3.internal.sourceinfo.SourceInfo
 import chisel3.dontTouch
 import chisel3.util.random.LFSR
+
+import freechips.rocketchip.rocket.ICacheParams
 
 /** Parameter of [[ICache]].
   *
@@ -35,26 +37,26 @@ import chisel3.util.random.LFSR
   * @param latency latency of a instruction fetch, 1 or 2 are available
   * @param fetchBytes byte size fetched by CPU for each cycle.
   */
-case class ICacheParams(
-    nSets: Int = 128, 
-    nWays: Int = 4,
-    rowBits: Int = 128,
-    nTLBSets: Int = 1,
-    nTLBWays: Int = 32,
-    nTLBBasePageSectors: Int = 4,
-    nTLBSuperpages: Int = 4,
-    cacheIdBits: Int = 0,
-    tagECC: Option[String] = None,
-    dataECC: Option[String] = None,
-    itimAddr: Option[BigInt] = None,
-    prefetch: Boolean = false,
-    blockBytes: Int = 64,
-    latency: Int = 2,
-    fetchBytes: Int = 4) extends L1CacheParams {
-  def tagCode: Code = Code.fromString(tagECC)
-  def dataCode: Code = Code.fromString(dataECC)
-  def replacement = new RandomReplacement(nWays)
-}
+// case class ICacheParams(
+//     nSets: Int = 128, 
+//     nWays: Int = 4,
+//     rowBits: Int = 128,
+//     nTLBSets: Int = 1,
+//     nTLBWays: Int = 32,
+//     nTLBBasePageSectors: Int = 4,
+//     nTLBSuperpages: Int = 4,
+//     cacheIdBits: Int = 0,
+//     tagECC: Option[String] = None,
+//     dataECC: Option[String] = None,
+//     itimAddr: Option[BigInt] = None,
+//     prefetch: Boolean = false,
+//     blockBytes: Int = 64,
+//     latency: Int = 2,
+//     fetchBytes: Int = 4) extends L1CacheParams {
+//   def tagCode: Code = Code.fromString(tagECC)
+//   def dataCode: Code = Code.fromString(dataECC)
+//   def replacement = new RandomReplacement(nWays)
+// }
 
 trait HasL1ICacheParameters extends HasL1CacheParameters with HasCoreParameters {
   val cacheParams = tileParams.icache.get
@@ -195,7 +197,7 @@ class ICacheModule(outer: ICache) extends LazyModuleImp(outer)
   require(isPow2(nSets) && isPow2(nWays))
 
   /** valid signal for CPU accessing cache in stage 0. */
-  val s0_valid = io.req.fire()
+  val s0_valid = io.req.fire
   /** virtual address from CPU in stage 0. */
   val s0_vaddr = io.req.bits.addr
   /** valid signal for stage 1, drived by s0_valid.*/
@@ -217,7 +219,7 @@ class ICacheModule(outer: ICache) extends LazyModuleImp(outer)
    * */
   val send_hint = RegInit(false.B)
   /** indicate [[tl_out]] is performing a refill. */
-  val refill_fire = tl_out.a.fire() && !send_hint
+  val refill_fire = tl_out.a.fire && !send_hint
   /** register to indicate there is a outstanding hint. */
   val hint_outstanding = RegInit(false.B)
   /** [[io]] access L1 I$ miss. */
@@ -234,14 +236,14 @@ class ICacheModule(outer: ICache) extends LazyModuleImp(outer)
   val refill_tag = refill_paddr >> pgUntagBits
   val refill_idx = index(refill_vaddr, refill_paddr)
   /** AccessAckData, is refilling I$, it will block request from CPU. */
-  val refill_one_beat = tl_out.d.fire() && edge_out.hasData(tl_out.d.bits)
+  val refill_one_beat = tl_out.d.fire && edge_out.hasData(tl_out.d.bits)
 
   /** block request from CPU when refill or scratch pad access. */
   io.req.ready := !(refill_one_beat)
   s1_valid := s0_valid
 
   val (_, _, d_done, refill_cnt) = edge_out.count(tl_out.d)
-  /** at last beat of `tl_out.d.fire()`, finish refill. */
+  /** at last beat of `tl_out.d.fire`, finish refill. */
   val refill_done = refill_one_beat && d_done
   tl_out.d.ready := true.B
   require (edge_out.manager.minLatency > 0)
@@ -276,7 +278,7 @@ class ICacheModule(outer: ICache) extends LazyModuleImp(outer)
     ccover(refillError, "D_CORRUPT", "I$ D-channel corrupt")
   }
   // notify CPU, I$ has corrupt.
-  io.errors.bus.valid := tl_out.d.fire() && (tl_out.d.bits.denied || tl_out.d.bits.corrupt)
+  io.errors.bus.valid := tl_out.d.fire && (tl_out.d.bits.denied || tl_out.d.bits.corrupt)
   io.errors.bus.bits  := (refill_paddr >> blockOffBits) << blockOffBits
 
   /** true indicate this cacheline is valid,
@@ -436,7 +438,7 @@ class ICacheModule(outer: ICache) extends LazyModuleImp(outer)
       */
     val (crosses_page, next_block) = Split(refill_paddr(pgIdxBits-1, blockOffBits) +& 1.U, pgIdxBits-blockOffBits)
 
-    when (tl_out.a.fire()) {
+    when (tl_out.a.fire) {
       send_hint := !hint_outstanding && io.s2_prefetch && !crosses_page
       when (send_hint) {
         send_hint := false.B
@@ -450,7 +452,7 @@ class ICacheModule(outer: ICache) extends LazyModuleImp(outer)
     }
 
     // D channel reply with HintAck.
-    when (tl_out.d.fire() && !refill_one_beat) {
+    when (tl_out.d.fire && !refill_one_beat) {
       hint_outstanding := false.B
     }
 
@@ -464,9 +466,9 @@ class ICacheModule(outer: ICache) extends LazyModuleImp(outer)
     }
 
     ccover(send_hint && !tl_out.a.ready, "PREFETCH_A_STALL", "I$ prefetch blocked by A-channel")
-    ccover(refill_valid && (tl_out.d.fire() && !refill_one_beat), "PREFETCH_D_BEFORE_MISS_D", "I$ prefetch resolves before miss")
-    ccover(!refill_valid && (tl_out.d.fire() && !refill_one_beat), "PREFETCH_D_AFTER_MISS_D", "I$ prefetch resolves after miss")
-    ccover(tl_out.a.fire() && hint_outstanding, "PREFETCH_D_AFTER_MISS_A", "I$ prefetch resolves after second miss")
+    ccover(refill_valid && (tl_out.d.fire && !refill_one_beat), "PREFETCH_D_BEFORE_MISS_D", "I$ prefetch resolves before miss")
+    ccover(!refill_valid && (tl_out.d.fire && !refill_one_beat), "PREFETCH_D_AFTER_MISS_D", "I$ prefetch resolves after miss")
+    ccover(tl_out.a.fire && hint_outstanding, "PREFETCH_D_AFTER_MISS_A", "I$ prefetch resolves after second miss")
   }
   // Drive APROT information
   tl_out.a.bits.user.lift(AMBAProt).foreach { x =>

@@ -1,10 +1,11 @@
-package freechips.rocketchip.rocket
+package gpc.core
 
 import chisel3._
 import chisel3.util._
 import freechips.rocketchip.tile._
 import org.chipsalliance.cde.config.{Parameters}
 
+import freechips.rocketchip.rocket.ExpandedInstruction
 
 class EnqueueBuddle(implicit p: Parameters) extends CoreBundle()(p) {
   val btb_resp = Output(new BTBResp)

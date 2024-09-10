@@ -1,4 +1,4 @@
-package freechips.rocketchip.rocket
+package gpc.core
 
 import chisel3._
 import chisel3.util._
@@ -10,7 +10,9 @@ import freechips.rocketchip.tilelink.{TLWidthWidget}
 import freechips.rocketchip.util._
 import freechips.rocketchip.util.property
 
-
+import freechips.rocketchip.rocket.{CanHavePTW, CanHavePTWModule}
+import freechips.rocketchip.rocket.{TLB, TLBConfig, ICacheParams}
+import freechips.rocketchip.rocket.{M_XRD}
 
 /*
   For dual-issue fetch group 64 bits
@@ -23,16 +25,16 @@ import freechips.rocketchip.util.property
   retireWidth = 2 (change from 1 to 2)
 */ 
 
-class Frontend(val icacheParams: ICacheParams, staticIdForMetadataUseOnly: Int)(implicit p: Parameters) extends LazyModule {
-  lazy val module = new FrontendModule(this)
+class FrontendGpc(val icacheParams: ICacheParams, staticIdForMetadataUseOnly: Int)(implicit p: Parameters) extends LazyModule {
+  lazy val module = new FrontendModuleGpc(this)
   val icache = LazyModule(new ICache(icacheParams, staticIdForMetadataUseOnly))
   val masterNode = icache.masterNode
   //val slaveNode = icache.slaveNode
   val resetVectorSinkNode = BundleBridgeSink[UInt](Some(() => UInt(masterNode.edges.out.head.bundle.addressBits.W)))
 }
 
-class FrontendModule(outer: Frontend) extends LazyModuleImp(outer) 
-      with HasRocketCoreParameters
+class FrontendModuleGpc(outer: FrontendGpc) extends LazyModuleImp(outer) 
+      with HasGpcCoreParameters
       with HasL1ICacheParameters {
   val io = IO(new FrontendBundle(outer))
   val io_reset_vector = outer.resetVectorSinkNode.bundle
@@ -56,7 +58,7 @@ class FrontendModule(outer: Frontend) extends LazyModuleImp(outer)
 
   assert(!(io.cpu.req.valid || io.cpu.sfence.valid || io.cpu.flush_icache || io.cpu.bht_update.valid || io.cpu.btb_update.valid) || io.cpu.might_request)
   val gated_clock =
-    if (!rocketParams.clockGate) clock
+    if (!gpcParams.clockGate) clock
     else ClockGate(clock, clock_en, "icache_clock_gate")
 
   icache.clock := gated_clock
@@ -151,7 +153,7 @@ class FrontendModule(outer: Frontend) extends LazyModuleImp(outer)
   f0_fb_has_space := !fb.io.mask(fb.io.mask.getWidth-3) || 
                       !fb.io.mask(fb.io.mask.getWidth-2) && (!f1_valid || !f2_valid) || 
                       !fb.io.mask(fb.io.mask.getWidth-1) && (!f1_valid && !f2_valid)
-  f0_speculative = f2_valid && !f2_speculative || f1_predicted_taken
+  f0_speculative := f2_valid && !f2_speculative || f1_predicted_taken
 
   f1_speculative := Mux(io.cpu.req.valid, io.cpu.req.bits.speculative,Mux(f2_replay, f2_speculative, f0_speculative))
 
@@ -253,7 +255,7 @@ class FrontendModule(outer: Frontend) extends LazyModuleImp(outer)
   io.errors := icache.io.errors
 
   // gate the clock
-  clock_en_reg := !rocketParams.clockGate.B ||
+  clock_en_reg := !gpcParams.clockGate.B ||
     io.cpu.might_request || // chicken bit
     icache.io.keep_clock_enabled || // I$ miss or ITIM access
     f1_valid || f2_valid || // some fetch in flight
@@ -268,9 +270,9 @@ class FrontendModule(outer: Frontend) extends LazyModuleImp(outer)
 }
 
 /** Mix-ins for constructing tiles that have an ICache-based pipeline frontend */
-trait HasICacheFrontend extends CanHavePTW { this: BaseTile =>
-  val module: HasICacheFrontendModule
-  val frontend = LazyModule(new Frontend(tileParams.icache.get, staticIdForMetadataUseOnly))
+trait HasICacheFrontendGpc extends CanHavePTW { this: BaseTile =>
+  val module: HasICacheFrontendGpcModule
+  val frontend = LazyModule(new FrontendGpc(tileParams.icache.get, tileId))
   tlMasterXbar.node := TLWidthWidget(tileParams.icache.get.rowBits/8) := frontend.masterNode
   frontend.resetVectorSinkNode := resetVectorNexusNode
   nPTWPorts += 1
@@ -280,7 +282,7 @@ trait HasICacheFrontend extends CanHavePTW { this: BaseTile =>
   private val deviceOpt = None
 }
 
-trait HasICacheFrontendModule extends CanHavePTWModule {
-  val outer: HasICacheFrontend
+trait HasICacheFrontendGpcModule extends CanHavePTWModule {
+  val outer: HasICacheFrontendGpc
   ptwPorts += outer.frontend.module.io.ptw
 }
