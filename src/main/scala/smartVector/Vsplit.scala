@@ -13,6 +13,7 @@ import SmartParam._
 import darecreek.lsu.LdstDecoder
 import darecreek.Vlmul_to_lmul
 import darecreek.VInfoAll
+import java.awt.HeadlessException
 
 class MuopMergeAttr extends Bundle {
     val scalarRegWriteEn = Bool()
@@ -462,8 +463,8 @@ class Vsplit(implicit p : Parameters) extends Module {
     mUopIn.bits.uop.ctrl.widen2      := ctrl.widen2
     mUopIn.bits.uop.ctrl.narrow      := ctrl.narrow
     mUopIn.bits.uop.ctrl.narrow_to_1 := ctrl.narrow_to_1
-    mUopIn.bits.uop.ctrl.load        := ctrl.load
-    mUopIn.bits.uop.ctrl.store       := ctrl.store
+    mUopIn.bits.uop.ctrl.load        := ctrl.load && ~ctrl.illegal
+    mUopIn.bits.uop.ctrl.store       := ctrl.store && ~ctrl.illegal
     mUopIn.bits.uop.ctrl.alu         := ctrl.alu  
     mUopIn.bits.uop.ctrl.mul         := ctrl.mul 
     mUopIn.bits.uop.ctrl.fp          := ctrl.fp  
@@ -499,14 +500,14 @@ class Vsplit(implicit p : Parameters) extends Module {
     mUopIn.bits.uopRegInfo.old_vd    := old_vd
     mUopIn.bits.uopRegInfo.mask      := mask
 
-    mUopIn.bits.excpInfo.exception_vld := io.vLSUXcpt.exception_vld || RegNext((ctrl.illegal & instDecodeIn))
-    mUopIn.bits.excpInfo.illegalInst   := RegNext(ctrl.illegal)
+    mUopIn.bits.excpInfo.exception_vld := ctrl.illegal & instDecodeIn
+    mUopIn.bits.excpInfo.illegalInst   := ctrl.illegal
     mUopIn.bits.excpInfo.update_float  := ctrl.rdVal && isfloat
     mUopIn.bits.excpInfo.reg_idx       := ctrl.ldest
-    mUopIn.bits.excpInfo.update_vl     := io.vLSUXcpt.update_vl
-    mUopIn.bits.excpInfo.update_data   := io.vLSUXcpt.update_data
-    mUopIn.bits.excpInfo.xcpt_addr     := io.vLSUXcpt.xcpt_addr
-    mUopIn.bits.excpInfo.xcpt_cause    := io.vLSUXcpt.xcpt_cause
+    mUopIn.bits.excpInfo.update_vl     := false.B
+    mUopIn.bits.excpInfo.update_data   := 0.U
+    mUopIn.bits.excpInfo.xcpt_addr     := 0.U
+    mUopIn.bits.excpInfo.xcpt_cause    := 0.U.asTypeOf(new HellaCacheExceptions)
 
     when((instDecodeIn || currentState === ongoing) & ~regConf & ~hasExcp){
         mUopIn.valid := true.B   
@@ -589,7 +590,7 @@ class Vsplit(implicit p : Parameters) extends Module {
 
     // when exu accepts the current muop or when there is no uop accept new muop
     when (pipeRegReady) {
-        validReg := mUopIn.valid || hasExcp
+        validReg := mUopIn.valid || ctrl.illegal
         bitsReg := mUopIn.bits
         mergeAttrReg := mUopMergeAttrIn.bits
     }

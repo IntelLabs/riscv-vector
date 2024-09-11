@@ -31,11 +31,13 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
     val in  = Flipped(Decoupled(new RVUissue))
     val out = Decoupled(new VDecodeOutput)
     val vLSUXcpt = Input (new VLSUXcpt)
+    val exceptionOut = Input(Bool())
   })
 
   val bufferReg = RegInit(0.U.asTypeOf(new RVUissue))
   val bufferValidReg = RegInit(false.B)
   val validReg = RegInit(false.B)
+  val illegalReg = RegInit(false.B)
 
   //set buffer
   when(!bufferValidReg && !(!validReg || io.out.ready) && io.in.valid){
@@ -44,7 +46,7 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   }
 
   //has exception, clear buffer
-  when(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl || io.out.bits.vCtrl.illegal){
+  when(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl || io.out.bits.vCtrl.illegal || illegalReg){
     bufferValidReg := false.B
   }
 
@@ -131,7 +133,7 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
       validReg := decodeInValid
   }
 
-  when(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl || io.out.bits.vCtrl.illegal){
+  when(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl || io.out.bits.vCtrl.illegal || illegalReg){
     validReg := false.B
   }
  
@@ -144,6 +146,14 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   io.out.bits  := bitsReg
 
   io.out.bits.vCtrl.illegal := vIllegalInstrn.io.ill.valid && io.out.valid
+
+  when(io.out.bits.vCtrl.illegal){
+    illegalReg := true.B
+  }
+
+  when(io.exceptionOut){
+    illegalReg := false.B
+  }
 
   io.in.ready := !bufferValidReg
 }

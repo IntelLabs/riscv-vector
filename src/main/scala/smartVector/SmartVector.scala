@@ -97,10 +97,12 @@ class SmartVector extends Module {
     commit.io.in.commitInfo <> merge.io.out.commitInfo
     commit.io.in.excpInfo <> iex.io.excpInfo
     io.out.rvuCommit <> commit.io.out.commitInfo
+    decoder.io.exceptionOut := commit.io.out.commitInfo.exception_vld
 
     svlsuWrapper.io.mUop <> split.io.out.mUop
     svlsuWrapper.io.mUopMergeAttr <> split.io.out.mUopMergeAttr
     split.io.vLSUXcpt := Mux(svlsuWrapper.io.lsuOut.valid, svlsuWrapper.io.lsuOut.bits.xcpt, 0.U.asTypeOf(new VLSUXcpt))
+    commit.io.in.vLSUXcpt := Mux(svlsuWrapper.io.lsuOut.valid, svlsuWrapper.io.lsuOut.bits.xcpt, 0.U.asTypeOf(new VLSUXcpt))
     decoder.io.vLSUXcpt := Mux(svlsuWrapper.io.lsuOut.valid, svlsuWrapper.io.lsuOut.bits.xcpt, 0.U.asTypeOf(new VLSUXcpt))
     //ChenLu change
     split.io.lsuStallSplit := ~svlsuWrapper.io.lsuReady

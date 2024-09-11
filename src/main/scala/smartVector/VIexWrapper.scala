@@ -49,7 +49,8 @@ class VIexWrapper(implicit p : Parameters) extends Module {
 
   // IEX input source
   val mUop = io.in.bits
-  val mUopValid = io.in.valid && ~io.in.bits.uop.ctrl.isLdst && ~mUop.excpInfo.exception_vld
+  //val mUopValid = io.in.valid && ~(io.in.bits.uop.ctrl.isLdst && io.excpInfo.illegalInst) && ~mUop.excpInfo.exception_vld
+  val mUopValid = io.in.valid && ~mUop.excpInfo.exception_vld
 
   // val divNotReady  = ~SVDiv.io.in.ready
   // val fpuNotReady  = ~SVFpu.io.in.ready
@@ -72,7 +73,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
       permDone := false.B
   }
 
-  val oneCycleLatIn = mUopValid & (mUop.uop.ctrl.alu || mUop.uop.ctrl.mask)
+  val oneCycleLatIn = mUopValid & (mUop.uop.ctrl.alu || mUop.uop.ctrl.mask || mUop.excpInfo.illegalInst)
   val twoCycleLatIn = mUopValid & (mUop.uop.ctrl.mul || mUop.uop.ctrl.redu)
   val noFixLatIn    = mUopValid & (mUop.uop.ctrl.div || mUop.uop.ctrl.perm || mUop.uop.ctrl.fp)
   val twoCycleReg   = RegEnable(twoCycleLatIn, mUopValid)
@@ -81,15 +82,13 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   switch(currentState){
     is(empty){
       when(mUopValid && ~mUop.uop.ctrl.alu && ~mUop.uop.ctrl.isLdst && ~mUop.uop.ctrl.mask && 
-          ~(mUop.uop.ctrl.narrow_to_1 && ~mUop.uop.uopEnd && ~mUop.excpInfo.exception_vld)){
+          ~(mUop.uop.ctrl.narrow_to_1 && ~mUop.uop.uopEnd && ~mUop.excpInfo.illegalInst)){
         currentStateNext := ongoing
       }.otherwise{
         currentStateNext := empty
       }
     }
     is(ongoing){
-      //when(twoCycleReg || fixLatVld){
-      //when(twoCycleReg || fixLatVld || mUop.uop.ctrl.floatRed && SVFpu.io.in.ready && ~mUop.uop.uopEnd){
       when(twoCycleReg || fixLatVld  || (mUop.uop.ctrl.floatRed && SVFpu.io.in.ready && ~(mUop.uop.uopIdx === 0.U))){
           currentStateNext := empty
       }.otherwise{
