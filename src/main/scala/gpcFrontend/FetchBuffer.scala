@@ -11,7 +11,7 @@ class EnqueueBuddle(implicit p: Parameters) extends CoreBundle()(p) {
   val btb_resp = Output(new BTBResp)
   //val inst_mask = Output(UInt(fetchWidth.W)) 
   val pcs = Output(Vec(fetchWidth, UInt(vaddrBitsExtended.W))) // a group pcs
-  val inst_exp = Output(Vec(fetchWidth,new ExpandedInstruction))
+  val inst_exp = Output(Vec(fetchWidth, UInt(32.W)))
   val inst_mask = Output(Vec(fetchWidth, Bool()))
   val raw_insts = Output(Vec(fetchWidth, UInt(32.W)))
   val rvc = Output(Vec(fetchWidth, Bool()))

@@ -3,7 +3,7 @@ package gpc.core
 import chisel3._
 import chisel3.util._
 import org.chipsalliance.cde.config.Parameters
-import freechips.rocketchip.rocket.{SFenceReq, BTBUpdate, BHTUpdate, RASUpdate, BTBResp}
+import freechips.rocketchip.rocket.{SFenceReq}//, BTBUpdate, BHTUpdate, RASUpdate, BTBResp}
 import freechips.rocketchip.tile._
 import freechips.rocketchip.util._
 
@@ -60,49 +60,49 @@ class SUOp(implicit p: Parameters) extends CoreBundle {
   val vec = Bool() // vec_arith || vec_load || vec_store
 }
 
-//---- Frontend - Mainpipe IO ----
-class FrontendIOGpc(implicit p: Parameters) extends CoreBundle()(p) {
-    val might_request = Output(Bool())
-    val req = Valid(new FrontendReqGpc)
-    val sfence = Valid(new SFenceReq)
-    val resp = Flipped(Vec(2, Decoupled(new FrontendRespGpc)))
-    val btb_update = Valid(new BTBUpdate)
-    val bht_update = Valid(new BHTUpdate)
-    val ras_update = Valid(new RASUpdate)
-    val flush_icache = Output(Bool())
-    val perf = Input(new FrontendPerfEventsGpc())
-    val progress = Output(Bool())
-}
+// //---- Frontend - Mainpipe IO ----
+// class FrontendIOGpc(implicit p: Parameters) extends CoreBundle()(p) {
+//     val might_request = Output(Bool())
+//     val req = Valid(new FrontendReqGpc)
+//     val sfence = Valid(new SFenceReq)
+//     val resp = Flipped(Vec(2, Decoupled(new FrontendRespGpc)))
+//     val btb_update = Valid(new BTBUpdate)
+//     val bht_update = Valid(new BHTUpdate)
+//     val ras_update = Valid(new RASUpdate)
+//     val flush_icache = Output(Bool())
+//     val perf = Input(new FrontendPerfEventsGpc())
+//     val progress = Output(Bool())
+// }
 
-class FrontendPerfEventsGpc extends Bundle {
-    val acquire = Bool()
-    val tlbMiss = Bool()
-}
+// class FrontendPerfEventsGpc extends Bundle {
+//     val acquire = Bool()
+//     val tlbMiss = Bool()
+// }
 
-class FrontendRespGpc(implicit p: Parameters) extends CoreBundle()(p) {
-    val btb = new BTBResp
-    val pc = UInt(vaddrBitsExtended.W)  
-    val inst = UInt(32.W)
-    val raw_inst = UInt(32.W)
-    val rvc = Bool()
-    val xcpt = new FrontendExceptionsGpc
-    val replay = Bool()
-    val next_pc = UInt(vaddrBitsExtended.W)
-}
+// class FrontendRespGpc(implicit p: Parameters) extends CoreBundle()(p) {
+//     val btb = new BTBResp
+//     val pc = UInt(vaddrBitsExtended.W)  
+//     val inst = UInt(32.W)
+//     val raw_inst = UInt(32.W)
+//     val rvc = Bool()
+//     val xcpt = new FrontendExceptionsGpc
+//     val replay = Bool()
+//     val next_pc = UInt(vaddrBitsExtended.W)
+// }
 
-class FrontendReqGpc(implicit p: Parameters) extends CoreBundle()(p) {
-    val pc = UInt(vaddrBitsExtended.W)
-    val speculative = Bool()
-}
+// class FrontendReqGpc(implicit p: Parameters) extends CoreBundle()(p) {
+//     val pc = UInt(vaddrBitsExtended.W)
+//     val speculative = Bool()
+// }
 
-class FrontendExceptionsGpc extends Bundle {
-    val pf = new Bundle {
-    val inst = Bool()
-    }
-    val ae = new Bundle {
-    val inst = Bool()
-    }
-}
+// class FrontendExceptionsGpc extends Bundle {
+//     val pf = new Bundle {
+//     val inst = Bool()
+//     }
+//     val ae = new Bundle {
+//     val inst = Bool()
+//     }
+// }
 
 // Vector
 class VCsr extends Bundle {

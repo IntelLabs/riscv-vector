@@ -22,7 +22,7 @@ class PreDecoder(implicit p: Parameters) extends CoreModule{
         val btb_resp = Input(Valid(new BTBResp()))
         val prev_is_half = Input(Bool())
         val prev_half_inst = Input(UInt(16.W))
-        val inst_exp = Output(Vec(fetchWidth,new ExpandedInstruction))
+        val inst_exp = Output(Vec(fetchWidth, UInt(32.W)))
         val inst = Output(UInt())
         val inst_mask = Output(Vec(fetchWidth, Bool()))
         val raw_insts = Output(Vec(fetchWidth, UInt(32.W)))
@@ -42,7 +42,7 @@ class PreDecoder(implicit p: Parameters) extends CoreModule{
         val redirect_bridx = Output(UInt(log2Ceil(fetchWidth).W))
         val npc_plus4_mask = Output(Vec(fetchWidth, Bool())) 
     })
-    
+
     io.redirect_bridx := 0.U
     io.flush := false.B
     io.predict_npc := DontCare
@@ -60,24 +60,21 @@ class PreDecoder(implicit p: Parameters) extends CoreModule{
         val idx = addr.extract(log2Ceil(fetchWidth)+log2Ceil(coreInstBytes)-1, log2Ceil(coreInstBytes))
         ((BigInt(1) << fetchWidth)-1).U << idx
     }
-    def instDecoder(x: UInt) = {
-    val res = Wire(new ExpandedInstruction)
-    res.bits := x
-    res.rd := x(11,7)
-    res.rs1 := x(19,15)
-    res.rs2 := x(24,20)
-    res.rs3 := x(31,27)
-    res
-    }
+    // def instDecoder(x: UInt) = {
+    // val res = Wire(new ExpandedInstruction)
+    // res.bits := x
+    // res.rd := x(11,7)
+    // res.rs1 := x(19,15)
+    // res.rs2 := x(24,20)
+    // res.rs3 := x(31,27)
+    // res
+    // }
     def ExpandRVC(inst: UInt)(implicit p: Parameters): UInt = {
     val rvc_exp = Module(new RVCExpander)
         rvc_exp.io.in := inst
     Mux(rvc_exp.io.rvc, rvc_exp.io.out.bits, inst)
     }
     
-   // val inst_exp = Wire(Vec(fetchWidth,new ExpandedInstruction)) 
-    //val pc = Wire(Vec(fetchWidth, UInt(vaddrBitsExtended.W)))
-    //val raw = Wire(Vec(fetchWidth, UInt(32.W)))
     val call_mask  = Wire(Vec(fetchWidth, Bool()))
     val ret_mask   = Wire(Vec(fetchWidth, Bool()))
     val br_mask   = Wire(Vec(fetchWidth, Bool()))
@@ -109,7 +106,7 @@ class PreDecoder(implicit p: Parameters) extends CoreModule{
     io.inst_mask(i) := io.stage_valid && fetch_mask(i) && valid && !redir_found  
     io.inst_pcs(i) := aligned_pc + (i << 1).U - ((io.edge_inst && (i == 0).B) << 1)
     io.rvc(i) := instisRVC(io.raw_insts(i)) && io.inst_mask(i)
-    io.inst := io.inst_exp(i).bits
+    io.inst := io.inst_exp(i)
     // wrong path
     when (!valid && io.btb_resp.valid && io.btb_resp.bits.bridx === i.U) {
         io.flush := true.B 
@@ -128,35 +125,35 @@ class PreDecoder(implicit p: Parameters) extends CoreModule{
     --> redirect 
     */
     
-    when (io.inst_mask(i) && (isJump(io.inst_exp(i).bits))) {
-        jump_target := (io.inst_pcs(i).asSInt + ImmGen(IMM_UJ,io.inst_exp(i).bits)).asUInt
+    when (io.inst_mask(i) && (isJump(io.inst_exp(i)))) {
+        jump_target := (io.inst_pcs(i).asSInt + ImmGen(IMM_UJ,io.inst_exp(i))).asUInt
     }
 
-    when (!io.btb_resp.valid && io.inst_mask(i) && (isJump(io.inst_exp(i).bits) || isBr(io.inst_exp(i).bits) && io.btb_resp.bits.bht.taken) ||
-            !io.btb_resp.bits.bht.taken && io.btb_resp.valid && io.inst_mask(i) && (isJump(io.inst_exp(i).bits)) ||
-            io.btb_resp.valid && io.btb_resp.bits.bht.taken && io.inst_mask(i) && (isJump(io.inst_exp(i).bits)) && (io.btb_resp.bits.target =/= jump_target)){
-                io.predict_npc := (io.inst_pcs(i).asSInt + ImmGen(IMM_UJ,io.inst_exp(i).bits)).asUInt
+    when (!io.btb_resp.valid && io.inst_mask(i) && (isJump(io.inst_exp(i)) || isBr(io.inst_exp(i)) && io.btb_resp.bits.bht.taken) ||
+            !io.btb_resp.bits.bht.taken && io.btb_resp.valid && io.inst_mask(i) && (isJump(io.inst_exp(i))) ||
+            io.btb_resp.valid && io.btb_resp.bits.bht.taken && io.inst_mask(i) && (isJump(io.inst_exp(i))) && (io.btb_resp.bits.target =/= jump_target)){
+                io.predict_npc := (io.inst_pcs(i).asSInt + ImmGen(IMM_UJ,io.inst_exp(i))).asUInt
                 redirect := true.B
                 io.btb_update := true.B
         }
 
-    when((!io.btb_resp.valid || !io.btb_resp.bits.bht.taken) && io.inst_mask(i) && isRet(io.inst_exp(i).bits)){
+    when((!io.btb_resp.valid || !io.btb_resp.bits.bht.taken) && io.inst_mask(i) && isRet(io.inst_exp(i))){
         redirect := true.B
         io.redirect_return := true.B
         io.btb_update := true.B
         io.redirect_bridx := i.U
     }
     
-    call_mask(i) := isCall(io.inst_exp(i).bits)
-    ret_mask(i) := isRet(io.inst_exp(i).bits)
-    br_mask(i) := isBr(io.inst_exp(i).bits)
-    jump_mask(i) := isJump(io.inst_exp(i).bits)
+    call_mask(i) := isCall(io.inst_exp(i))
+    ret_mask(i) := isRet(io.inst_exp(i))
+    br_mask(i) := isBr(io.inst_exp(i))
+    jump_mask(i) := isJump(io.inst_exp(i))
     io.npc_plus4_mask(i) := !instisRVC(io.raw_insts(i))
     if (i == 0)
     io.npc_plus4_mask(i) := !instisRVC(io.raw_insts(i)) && !io.edge_inst
-    val redir_br = (isBr(io.inst_exp(i).bits) &&
+    val redir_br = (isBr(io.inst_exp(i)) &&
         ((io.btb_resp.valid && io.btb_resp.bits.bridx === i.U && io.btb_resp.bits.taken && io.btb_resp.bits.bht.taken)))
-    val redir = io.inst_mask(i) && (isJALR(io.inst_exp(i).bits) || isJump(io.inst_exp(i).bits) || redir_br)
+    val redir = io.inst_mask(i) && (isJALR(io.inst_exp(i)) || isJump(io.inst_exp(i)) || redir_br)
     // Within the fetch group, if there are jump instructions or predicted branch jump instructions, 
     // subsequent instructions will be invalidated.
     redir_found = redir_found || redir  //TODO: need to change: add redirect condition
@@ -166,31 +163,31 @@ class PreDecoder(implicit p: Parameters) extends CoreModule{
         when (io.prev_is_half) {
         val expanded = ExpandRVC(Cat(io.data(15,0), io.prev_half_inst))
         io.raw_insts(i) := Cat(io.data(15,0), io.prev_half_inst)
-        io.inst_exp(i) := instDecoder(expanded)
+        io.inst_exp(i) := expanded
         io.edge_inst := true.B
         }.otherwise {
         val expanded = ExpandRVC(io.data(31,0))
         io.raw_insts(i) := io.data(31,0)
-        io.inst_exp(i) := instDecoder(expanded)
+        io.inst_exp(i) := expanded
         io.edge_inst    := false.B
         }} else if (i == 1) {
       // Need special case since 0th instruction may carry over the wrap around
         val inst = io.data(47,16)
         val expanded = ExpandRVC(inst)
         io.raw_insts(i) := inst
-        io.inst_exp(i) := instDecoder(expanded)
+        io.inst_exp(i) := expanded
         valid := io.prev_is_half || !(io.inst_mask(i-1) && !instisRVC(io.raw_insts(i-1)))
     } else if (i == fetchWidth - 1) {
         val inst = Cat(0.U(16.W), io.data(fetchWidth*16-1,(fetchWidth-1)*16))
         val expanded = ExpandRVC(inst)
         io.raw_insts(i) := inst
-        io.inst_exp(i) := instDecoder(expanded)
+        io.inst_exp(i) := expanded
         valid := !((io.inst_mask(i-1) && !instisRVC(io.raw_insts(i-1))) || !instisRVC(inst))
     } else {
         val inst = io.data(i*16+32-1,i*16)
         val expanded = ExpandRVC(inst)
         io.raw_insts(i) := inst
-        io.inst_exp(i) := instDecoder(expanded)
+        io.inst_exp(i) := expanded
         valid := !(io.inst_mask(i-1) && !instisRVC(io.raw_insts(i-1)))
     }
     }
@@ -201,18 +198,18 @@ class PreDecoder(implicit p: Parameters) extends CoreModule{
         when (io.prev_is_half) {
         val expanded = ExpandRVC(Cat(io.data(15,0), io.prev_half_inst))
         io.raw_insts(i) := Cat(io.data(15,0), io.prev_half_inst)
-        io.inst_exp(i) := instDecoder(expanded)
+        io.inst_exp(i) := expanded
         io.edge_inst := true.B
         }.otherwise {
         val expanded = ExpandRVC(io.data(31,0))
         io.raw_insts(i) := io.data(31,0)
-        io.inst_exp(i) := instDecoder(expanded)
+        io.inst_exp(i) := expanded
         io.edge_inst    := false.B
         }} else if (i == fetchWidth - 1) {
         val inst = Cat(0.U(16.W), io.data(fetchWidth*16-1,(fetchWidth-1)*16))
         val expanded = ExpandRVC(inst)
         io.raw_insts(i) := inst
-        io.inst_exp(i) := instDecoder(expanded)
+        io.inst_exp(i) := expanded
         valid := instisRVC(io.raw_insts(i-1)) && io.inst_mask(i-1)|| io.prev_is_half
         } 
     }

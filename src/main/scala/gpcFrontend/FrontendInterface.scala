@@ -10,16 +10,16 @@ import freechips.rocketchip.tilelink.{TLWidthWidget}
 import freechips.rocketchip.util._
 import freechips.rocketchip.util.property
 
-import freechips.rocketchip.rocket.{ExpandedInstruction, SFenceReq, TLBPTWIO}
+import freechips.rocketchip.rocket.{SFenceReq, TLBPTWIO}
 
 class FrontendBundle(val outer: FrontendGpc) extends CoreBundle()(outer.p) {
-    val cpu = Flipped(new FrontendIO())
+    val cpu = Flipped(new FrontendIOGpc())
     val ptw = new TLBPTWIO()
     val errors = new ICacheErrors
 }
 
 
-class FrontendIO(implicit p: Parameters) extends CoreBundle()(p) {
+class FrontendIOGpc(implicit p: Parameters) extends CoreBundle()(p) {
     val might_request = Output(Bool())
     val req = Valid(new FrontendReq)
     val sfence = Valid(new SFenceReq)
@@ -41,7 +41,7 @@ class FrontendResp(implicit p: Parameters) extends CoreBundle()(p) {
     val btb = new BTBResp
     val pc = UInt(vaddrBitsExtended.W)
     val next_pc = UInt(vaddrBitsExtended.W)
-    val inst = new ExpandedInstruction
+    val inst = UInt(32.W)
     val raw_inst = UInt(32.W)
     val rvc = Bool()
     val xcpt = new FrontendExceptions

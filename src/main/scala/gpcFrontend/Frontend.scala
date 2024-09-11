@@ -272,8 +272,8 @@ class FrontendModuleGpc(outer: FrontendGpc) extends LazyModuleImp(outer)
 /** Mix-ins for constructing tiles that have an ICache-based pipeline frontend */
 trait HasICacheFrontendGpc extends CanHavePTW { this: BaseTile =>
   val module: HasICacheFrontendGpcModule
-  val frontend = LazyModule(new FrontendGpc(tileParams.icache.get, tileId))
-  tlMasterXbar.node := TLWidthWidget(tileParams.icache.get.rowBits/8) := frontend.masterNode
+  val frontend = LazyModule(new FrontendGpc(ICacheParamsGpc.ICacheParams_gpc, tileId))
+  tlMasterXbar.node := TLWidthWidget(ICacheParamsGpc.ICacheParams_gpc.rowBits/8) := frontend.masterNode
   frontend.resetVectorSinkNode := resetVectorNexusNode
   nPTWPorts += 1
 

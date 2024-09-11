@@ -52,14 +52,22 @@ import freechips.rocketchip.rocket.ICacheParams
 //     prefetch: Boolean = false,
 //     blockBytes: Int = 64,
 //     latency: Int = 2,
-//     fetchBytes: Int = 4) extends L1CacheParams {
+//     fetchBytes: Int = 8) extends L1CacheParams {
 //   def tagCode: Code = Code.fromString(tagECC)
 //   def dataCode: Code = Code.fromString(dataECC)
 //   def replacement = new RandomReplacement(nWays)
 // }
 
+object ICacheParamsGpc {
+  val ICacheParams_gpc = ICacheParams().copy(
+    nSets = 128,
+    fetchBytes = 8
+  )
+}
+
 trait HasL1ICacheParameters extends HasL1CacheParameters with HasCoreParameters {
-  val cacheParams = tileParams.icache.get
+  // val cacheParams = tileParams.icache.get
+  val cacheParams = ICacheParamsGpc.ICacheParams_gpc
 }
 
 class ICacheReq(implicit p: Parameters) extends CoreBundle()(p) with HasL1ICacheParameters {

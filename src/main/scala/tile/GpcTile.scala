@@ -21,7 +21,7 @@ case class GpcTileBoundaryBufferParams(force: Boolean = false)
 
 case class GpcTileParams(
     core: GpcCoreParams = GpcCoreParams(),
-    icache: Option[ICacheParams] = Some(ICacheParams().copy(nSets = 128)),
+    icache: Option[ICacheParams] = Some(ICacheParams()),
     dcache: Option[DCacheParams] = Some(DCacheParams()),
     btb: Option[BTBParams] = Some(BTBParams()),
     dataScratchpadBytes: Int = 0,
@@ -140,7 +140,7 @@ class GpcTileModuleImp(outer: GpcTile) extends BaseTileModuleImp(outer)
   // Report when the tile has ceased to retire instructions; for now the only cause is clock gating
   outer.reportCease(outer.gpcParams.core.clockGate.option(
     !outer.dcache.module.io.cpu.clock_enabled &&
-    !outer.frontend.module.io.cpu.clock_enabled &&
+    // !outer.frontend.module.io.cpu.clock_enabled &&
     !ptw.io.dpath.clock_enabled &&
     core.io.cease))
 
@@ -170,19 +170,7 @@ class GpcTileModuleImp(outer: GpcTile) extends BaseTileModuleImp(outer)
   outer.frontend.module.io.cpu.might_request := core.io.imem.might_request
   outer.frontend.module.io.cpu.req := core.io.imem.req
   outer.frontend.module.io.cpu.sfence := core.io.imem.sfence
-  core.io.imem.resp foreach { c =>
-    c.valid := outer.frontend.module.io.cpu.resp.valid
-    c.bits.btb := outer.frontend.module.io.cpu.resp.bits.btb
-    c.bits.pc := outer.frontend.module.io.cpu.resp.bits.pc
-    c.bits.inst := outer.frontend.module.io.cpu.resp.bits.data
-    c.bits.raw_inst := outer.frontend.module.io.cpu.resp.bits.data
-    c.bits.rvc := false.B
-    c.bits.xcpt := outer.frontend.module.io.cpu.resp.bits.xcpt
-    c.bits.replay := outer.frontend.module.io.cpu.resp.bits.replay
-    c.bits.next_pc := outer.frontend.module.io.cpu.resp.bits.pc
-  }
-  outer.frontend.module.io.cpu.resp.ready := core.io.imem.resp(0).ready
-  outer.frontend.module.io.cpu.gpa := DontCare
+  core.io.imem.resp <> outer.frontend.module.io.cpu.resp
   outer.frontend.module.io.cpu.btb_update := core.io.imem.btb_update
   outer.frontend.module.io.cpu.bht_update := core.io.imem.bht_update
   outer.frontend.module.io.cpu.ras_update := core.io.imem.ras_update
@@ -207,8 +195,7 @@ class GpcTileModuleImp(outer: GpcTile) extends BaseTileModuleImp(outer)
   core.io.villegal := DontCare
 
   // Connect the coprocessor interfaces
-  val rocc_size = outer.roccs.size
-  require(false, s"-------****---- rocc size: $rocc_size ")
+  // outer.roccs.size is 0
   if (outer.roccs.size > 0) {
     cmdRouter.get.io.in <> core.io.rocc.cmd
     outer.roccs.foreach{ lm =>

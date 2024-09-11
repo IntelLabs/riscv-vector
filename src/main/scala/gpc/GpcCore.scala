@@ -56,7 +56,7 @@ case class GpcCoreParams(
   val lgPauseCycles = 5
   val haveFSDirty = false
   val pmpGranularity: Int = if (useHypervisor) 4096 else 4
-  val fetchWidth: Int = if (useCompressed) 2 else 1
+  val fetchWidth: Int = if (useCompressed) 4 else 2
   //  fetchWidth doubled, but coreInstBytes halved, for RVC:
   val decodeWidth: Int = 2
   val retireWidth: Int = 2
@@ -123,7 +123,7 @@ trait HasGpcCoreIO extends HasGpcCoreParameters {
   val io = IO(new CoreBundle()(p) {
     val hartid = Input(UInt(hartIdLen.W))
     val reset_vector = Input(UInt(resetVectorLen.W))
-    val interrupts = Input(new CoreInterrupts(tileParams.asInstanceOf[RocketTileParams].beuAddr.isDefined))
+    val interrupts = Input(new CoreInterrupts(tileParams.asInstanceOf[GpcTileParams].beuAddr.isDefined))
     val imem  = new FrontendIOGpc
     val dmem = new HellaCacheIO
     val ptw = Flipped(new DatapathPTWIO())
@@ -1186,7 +1186,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     Mux(final_cfi_uop.ctrl.jalr && final_cfi_uop.inst(19,15) === BitPat("b00?01"), CFIType.ret,
     Mux(final_cfi_uop.ctrl.jal || final_cfi_uop.ctrl.jalr, CFIType.jump,
     CFIType.branch)))
-  io.imem.btb_update.bits.target := io.imem.req.bits.pc
+  // io.imem.btb_update.bits.target := io.imem.req.bits.pc
   io.imem.btb_update.bits.br_pc := (if (usingCompressed) final_cfi_uop.pc + Mux(final_cfi_uop.rvc, 0.U, 2.U) else final_cfi_uop.pc)
   io.imem.btb_update.bits.pc := ~(~io.imem.btb_update.bits.br_pc | (coreInstBytes*fetchWidth-1).U)
   io.imem.btb_update.bits.prediction := final_cfi_uop.btb_resp
