@@ -557,7 +557,25 @@ class PE(
     io.rowReadDout(i) := rowRdata
   }
 
-  io.accout.valid := RegNext(io.macReqIn.valid)
+  val cnt = RegInit(0.U(1.W))
+  val acc_valid = RegInit(false.B)
+  when(io.macReqIn.valid) {
+    when(cnt === 1.U) {
+      cnt := 0.U
+    }.otherwise {
+      cnt := cnt + 1.U
+    }
+  }.otherwise {
+    cnt := 0.U
+  }
+
+  when(io.macReqIn.valid && (cnt === 1.U)) {
+    acc_valid := true.B
+  }.otherwise {
+    acc_valid := false.B
+  }
+
+  io.accout.valid := acc_valid
   io.accout.bits := c0(0)
   // -----------------------------------------------------------------------------------
   // write row slices
