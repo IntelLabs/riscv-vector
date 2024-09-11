@@ -96,7 +96,12 @@ class SmartVector extends Module {
   if (hasMatrix) {
     split.io.in.rfData.get <> regFile.io.rfData
     iex.io.matrix_in.get <> split.io.out.mma_in.get
-    merge.io.in.matrix_out.get <> iex.io.matrix_out.get
+    regFile.io.acc_out.get <> iex.io.acc_out.get
+    merge.io.in.acc_out.get <> iex.io.acc_out.get
+    iex.io.rowWriteReq.get <> regFile.io.rowWriteReq.get
+    iex.io.rowWriteMask.get <> regFile.io.rowWriteMask.get
+    iex.io.rowWriteByteMask.get <> regFile.io.rowWriteByteMask.get
+    iex.io.rowWriteData.get <> regFile.io.rowWriteData.get
   }
   iex.io.in <> split.io.out.mUop
   merge.io.in.aluIn <> iex.io.out

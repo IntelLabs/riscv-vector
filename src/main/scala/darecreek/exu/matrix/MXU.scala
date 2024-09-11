@@ -450,10 +450,12 @@ class PE(
     val rowReadDout = Output(Vec(numReadPorts, UInt(64.W)))
     // write row slices, control signals propagated vertically
     val rowWriteReq = Input(Vec(numVLdPorts, Valid(new SliceCtrls())))
-    val rowWriteDin = Input(Vec(numVLdPorts, UInt(64.W)))
+    val rowWriteDin = Input(Vec(numVLdPorts, UInt(32.W)))
+    val rowWriteByteMask = Input(Vec(numVLdPorts, UInt(4.W)))
     val rowWriteMask = Input(Vec(numVLdPorts, UInt(2.W)))
     val rowWriteResp = Output(Vec(numVLdPorts, Valid(new SliceCtrls())))
-    val rowWriteDout = Output(Vec(numVLdPorts, UInt(64.W)))
+    val rowWriteDout = Output(Vec(numVLdPorts, UInt(32.W)))
+    val rowWriteByteMout = Output(Vec(numVLdPorts, UInt(4.W)))
     val rowWriteMout = Output(Vec(numVLdPorts, UInt(2.W)))
     // read col slices, control signals propagated horizontally
     val colReadReq = Input(Vec(numReadPorts, Valid(new SliceCtrls())))
@@ -567,15 +569,31 @@ class PE(
     val rowWriteHitC0 = rowWriteHit && io.rowWriteMask(w)(0).asBool
     val rowWriteHitC1 = rowWriteHit && io.rowWriteMask(w)(1).asBool
 
+    val c0_data = Wire(Vec(4, UInt(8.W)))
+    c0_data := VecInit(Seq.tabulate(4) { i => c0(0)((i + 1) * 8 - 1, i * 8) })
+    // c0_data := VecInit.tabulate(4)(i => c0((i + 1) * 8 - 1, i * 8))
     when(rowWriteHitC0) {
-      c0(rowWrtieCtrls.ridx) := io.rowWriteDin(w)(31, 0)
+      for (i <- 0 until 32 / 8) {
+        when(io.rowWriteByteMask(w)(i)) {
+          c0_data(i) := io.rowWriteDin(w)((i + 1) * 8 - 1, i * 8)
+        }
+      }
     }
+
+    when(rowWriteHitC0) {
+      c0(rowWrtieCtrls.ridx) := c0_data.asUInt
+    }
+
+    //    when(rowWriteHitC0) {
+    //      c0(rowWrtieCtrls.ridx) := io.rowWriteDin(w)(31, 0)
+    //    }
     when(rowWriteHitC1) {
-      c1(rowWrtieCtrls.ridx) := io.rowWriteDin(w)(63, 32)
+      c1(rowWrtieCtrls.ridx) := io.rowWriteDin(w)(31, 0)
     }
 
     io.rowWriteResp(w) := io.rowWriteReq(w)
     io.rowWriteDout(w) := io.rowWriteDin(w)
+    io.rowWriteByteMout(w) := io.rowWriteByteMask(w)
     io.rowWriteMout(w) := io.rowWriteMask(w)
   }
   // -----------------------------------------------------------------------------------
@@ -647,10 +665,12 @@ class Tile(
     val rowReadDout = Output(Vec(numReadPorts, UInt((mxuTileCols * 64).W)))
     // write row slices, control signals propagated vertically
     val rowWriteReq = Input(Vec(numVLdPorts, Valid(new SliceCtrls())))
-    val rowWriteDin = Input(Vec(numVLdPorts, UInt((mxuTileCols * 64).W)))
+    val rowWriteDin = Input(Vec(numVLdPorts, UInt((mxuTileCols * 32).W)))
+    val rowWriteByteMask = Input(Vec(numVLdPorts, UInt((mxuTileCols * 4).W)))
     val rowWriteMask = Input(Vec(numVLdPorts, UInt((mxuTileCols * 2).W)))
     val rowWriteResp = Output(Vec(numVLdPorts, Valid(new SliceCtrls())))
-    val rowWriteDout = Output(Vec(numVLdPorts, UInt((mxuTileCols * 64).W)))
+    val rowWriteDout = Output(Vec(numVLdPorts, UInt((mxuTileCols * 32).W)))
+    val rowWriteByteMout = Output(Vec(numVLdPorts, UInt((mxuTileCols * 4).W)))
     val rowWriteMout = Output(Vec(numVLdPorts, UInt((mxuTileCols * 2).W)))
     // read col slice, control signals propagated horizontally
     val colReadReq = Input(Vec(numReadPorts, Valid(new SliceCtrls())))
@@ -768,7 +788,7 @@ class Tile(
           pe.io.rowWriteResp(w)
         }
       }
-      val peRowWdata = io.rowWriteDin(w)(64 * c + 63, 64 * c)
+      val peRowWdata = io.rowWriteDin(w)(32 * c + 31, 32 * c)
       tileT(c).foldLeft(peRowWdata) {
         case (rowWriteData, pe) => {
           pe.io.rowWriteDin(w) := rowWriteData
@@ -780,6 +800,13 @@ class Tile(
         case (rowWriteMask, pe) => {
           pe.io.rowWriteMask(w) := rowWriteMask
           pe.io.rowWriteMout(w)
+        }
+      }
+      val peRowByteWmask = io.rowWriteByteMask(w)(4 * c + 1, 4 * c)
+      tileT(c).foldLeft(peRowByteWmask) {
+        case (rowWriteByteMask, pe) => {
+          pe.io.rowWriteByteMask(w) := rowWriteByteMask
+          pe.io.rowWriteByteMout(w)
         }
       }
     }
@@ -833,10 +860,12 @@ class Tile(
   // val rowWriteDataMux = WireInit(VecInit(Seq.fill(mxuTileCols)(0.U(64.W))))
   val rowWriteDataMux = Wire(Vec(numVLdPorts, Vec(mxuTileCols, UInt(64.W))))
   val rowWriteMaskMux = Wire(Vec(numVLdPorts, Vec(mxuTileCols, UInt(2.W))))
+  val rowWriteByteMaskMux = Wire(Vec(numVLdPorts, Vec(mxuTileCols, UInt(4.W))))
   for (i <- 0 until numVLdPorts) {
     for (j <- 0 until mxuTileCols) {
       rowWriteDataMux(i)(j) := 0.U
       rowWriteMaskMux(i)(j) := 0.U
+      rowWriteByteMaskMux(i)(j) := 0.U
     }
   }
   for (c <- 0 until mxuTileCols) {
@@ -845,6 +874,7 @@ class Tile(
     for (w <- 0 until numVLdPorts) {
       rowWriteDataMux(w)(c) := tile(mxuTileRows - 1)(c).io.rowWriteDout(w)
       rowWriteMaskMux(w)(c) := tile(mxuTileRows - 1)(c).io.rowWriteMout(w)
+      rowWriteByteMaskMux(w)(c) := tile(mxuTileRows - 1)(c).io.rowWriteByteMout(w)
     }
   }
   io.macOutSrcA := macOutSrcAMux.asUInt
@@ -856,6 +886,7 @@ class Tile(
     io.colWriteMout(w) := colWriteMaskMux(w).asUInt
     io.rowWriteDout(w) := rowWriteDataMux(w).asUInt
     io.rowWriteMout(w) := rowWriteMaskMux(w).asUInt
+    io.rowWriteByteMout(w) := rowWriteByteMaskMux(w).asUInt
   }
 
   for (i <- 0 until numReadPorts) {
@@ -909,6 +940,7 @@ class Mesh(
     // write row slices, control signals propagated vertically
     val rowWriteReq = Input(Vec(numVLdPorts, Valid(new SliceCtrls())))
     val rowWriteData = Input(Vec(numVLdPorts, UInt((mxuPECols * 32).W)))
+    val rowWriteByteMask = Input(Vec(numVLdPorts, UInt((mxuPECols * 4).W)))
     val rowWriteMask = Input(Vec(numVLdPorts, UInt((mxuPECols).W)))
     val rowWriteResp = Output(Vec(numVLdPorts, Valid(new SliceCtrls())))
     // read col slice, control signals propagated horizontally
@@ -1029,6 +1061,13 @@ class Mesh(
         case (rowWriteMask, tile) => {
           tile.io.rowWriteMask(w) := RegNext(rowWriteMask)
           tile.io.rowWriteMout(w)
+        }
+      }
+
+      meshT(c).foldLeft(io.rowWriteByteMask(w)(4 * mxuTileCols * (c + 1) - 1, 4 * mxuTileCols * c)) {
+        case (rowWriteByteMask, tile) => {
+          tile.io.rowWriteByteMask(w) := RegNext(rowWriteByteMask)
+          tile.io.rowWriteByteMout(w)
         }
       }
     }

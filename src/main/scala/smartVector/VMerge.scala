@@ -18,7 +18,7 @@ class VMerge(implicit p: Parameters) extends Module {
     val in = new Bundle {
       val mergeInfo = Input(ValidIO(new MuopMergeAttr))
       val aluIn = Input(ValidIO(new IexOutput))
-      val matrix_out = if (hasMatrix) Some(Input(Valid(UInt((mxuPERows * mxuPECols * 32).W)))) else None
+      val acc_out = if (hasMatrix) Some(Input(Valid(UInt((mxuPERows * mxuPECols * 32).W)))) else None
       val lsuIn = Input(ValidIO(new LsuOutput))
       val permIn = Input(new VPermOutput)
     }
@@ -47,21 +47,6 @@ class VMerge(implicit p: Parameters) extends Module {
   val muopEnd = RegEnable(io.in.mergeInfo.bits.muopEnd, io.in.mergeInfo.valid)
   val permExpdLen = RegEnable(io.in.mergeInfo.bits.permExpdLen, io.in.mergeInfo.valid)
   val regDstIdx = RegEnable(io.in.mergeInfo.bits.regDstIdx, io.in.mergeInfo.valid)
-
-  val cnt_en = RegInit(false.B)
-  val cnt = RegInit(0.U(5.W))
-
-  when(cnt_en && (cnt === 15.U)) {
-    cnt_en := false.B
-  }.elsewhen(io.in.matrix_out.get.valid) {
-    cnt_en := true.B
-  }
-
-  when(cnt_en) {
-    cnt := cnt + 1.U
-  }.otherwise {
-    cnt := 0.U
-  }
 
   when(io.in.aluIn.valid && rfWriteEn) {
     when(regBackWidth === "b111".U) {
@@ -96,11 +81,6 @@ class VMerge(implicit p: Parameters) extends Module {
     io.out.toRegFileWrite.rfWriteMask := io.in.lsuIn.bits.rfWriteMask
     io.out.toRegFileWrite.rfWriteIdx := io.in.lsuIn.bits.rfWriteIdx
     io.out.toRegFileWrite.rfWriteData := io.in.lsuIn.bits.data
-  }.elsewhen(cnt_en) {
-    io.out.toRegFileWrite.rfWriteEn := true.B
-    io.out.toRegFileWrite.rfWriteMask := Fill(VLEN / 8, 0.U)
-    io.out.toRegFileWrite.rfWriteIdx := cnt + 16.U
-    io.out.toRegFileWrite.rfWriteData := io.in.matrix_out.get.bits.asTypeOf(Vec(16, UInt(VLEN.W)))(cnt)
   }.otherwise {
     io.out.toRegFileWrite := 0.U.asTypeOf(new regWriteIn)
   }
@@ -133,7 +113,7 @@ class VMerge(implicit p: Parameters) extends Module {
     io.out.commitInfo.bits.data := io.in.lsuIn.bits.data
     io.out.commitInfo.bits.vxsat := false.B
     io.out.commitInfo.bits.fflags := 0.U
-  }.elsewhen(cnt_en && (cnt === 15.U)) {
+  }.elsewhen(io.in.acc_out.get.valid) {
     io.out.commitInfo.valid := true.B
     io.out.commitInfo.bits.scalarRegWriteEn := false.B
     io.out.commitInfo.bits.floatRegWriteEn := false.B
@@ -172,9 +152,9 @@ class VMerge(implicit p: Parameters) extends Module {
   val sboardClearAll = io.in.lsuIn.valid && ldstXcpt
 
   io.scoreBoardCleanIO.clearEn := io.out.toRegFileWrite.rfWriteEn && !(io.in.lsuIn.valid && io.in.lsuIn.bits.isSegLoad)
-  io.scoreBoardCleanIO.clearAddr := Mux(io.in.matrix_out.get.valid, 16.U, Mux(sboardClearMulti, io.in.lsuIn.bits.regStartIdx,
+  io.scoreBoardCleanIO.clearAddr := Mux(io.in.acc_out.get.valid, 16.U, Mux(sboardClearMulti, io.in.lsuIn.bits.regStartIdx,
     io.out.toRegFileWrite.rfWriteIdx))
-  io.scoreBoardCleanIO.clearMultiEn := sboardClearMulti || io.in.matrix_out.get.valid
-  io.scoreBoardCleanIO.clearNum := Mux(io.in.matrix_out.get.valid, 16.U, io.in.lsuIn.bits.regCount)
+  io.scoreBoardCleanIO.clearMultiEn := sboardClearMulti || io.in.acc_out.get.valid
+  io.scoreBoardCleanIO.clearNum := Mux(io.in.acc_out.get.valid, 16.U, io.in.lsuIn.bits.regCount)
   io.scoreBoardCleanIO.clearAll := sboardClearAll
 }

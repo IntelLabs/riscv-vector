@@ -31,8 +31,13 @@ class VIexWrapper(implicit p: Parameters) extends Module {
   val io = IO(new Bundle {
     val in = Input(ValidIO(new Muop))
     val out = ValidIO(new IexOutput)
+
+    val rowWriteReq = if (hasMatrix) Some(Input(Vec(numVLdPorts, Valid(new SliceCtrls())))) else None
+    val rowWriteData = if (hasMatrix) Some(Input(Vec(numVLdPorts, UInt((mxuPECols * 32).W)))) else None
+    val rowWriteMask = if (hasMatrix) Some(Input(Vec(numVLdPorts, UInt((mxuPECols).W)))) else None
+    val rowWriteByteMask = if (hasMatrix) Some(Input(Vec(numVLdPorts, UInt((mxuPECols).W)))) else None
     val matrix_in = if (hasMatrix) Some(Input(Valid(new mma_in()))) else None
-    val matrix_out = if (hasMatrix) Some(Output(Valid(UInt((mxuPERows * mxuPECols * 32).W)))) else None
+    val acc_out = if (hasMatrix) Some(Output(Valid(UInt((mxuPERows * mxuPECols * 32).W)))) else None
 
     val permOut = new(VPermOutput)
     val permRegIn = Input(new(VPermRegIn))
@@ -62,7 +67,7 @@ class VIexWrapper(implicit p: Parameters) extends Module {
   // val ready    = ~(divNotReady || fpuNotReady || permNotReady)
   if (hasMatrix) {
     val mma = Module(new Mesh()(p))
-    io.matrix_out.get := mma.io.accout(0)
+    io.acc_out.get := mma.io.accout(0)
     for (c <- 0 until mxuMeshCols) {
       mma.io.macReq(c).valid := io.matrix_in.get.valid
       mma.io.macReq(c).bits.src1Ridx := 0.U
@@ -102,16 +107,14 @@ class VIexWrapper(implicit p: Parameters) extends Module {
     }
 
     for (c <- 0 until numVLdPorts) {
-      mma.io.rowWriteReq(c).valid := false.B
+      mma.io.rowWriteReq(c) := io.rowWriteReq.get(c)
+      mma.io.rowWriteMask(c) := io.rowWriteMask.get(c)
+      mma.io.rowWriteByteMask(c) := io.rowWriteByteMask.get(c)
+      mma.io.rowWriteData(c) := io.rowWriteData.get(c)
       mma.io.colWriteReq(c).valid := false.B
-      mma.io.rowWriteReq(c).bits.ridx := 0.U
-      mma.io.rowWriteReq(c).bits.sidx := 0.U
-      mma.io.rowWriteReq(c).bits.sew := 0.U
       mma.io.colWriteReq(c).bits.ridx := 0.U
       mma.io.colWriteReq(c).bits.sidx := 0.U
       mma.io.colWriteReq(c).bits.sew := 0.U
-      mma.io.rowWriteData(c) := 0.U
-      mma.io.rowWriteMask(c) := 0.U
       mma.io.colWriteData(c) := 0.U
       mma.io.colWriteMask(c) := 0.U
     }
