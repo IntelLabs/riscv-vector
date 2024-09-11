@@ -18,7 +18,7 @@ class SVRegFileWrapper(implicit p: Parameters) extends Module {
     val rowWriteReq = if (hasMatrix) Some(Output(Vec(numVLdPorts, Valid(new SliceCtrls())))) else None
     val rowWriteData = if (hasMatrix) Some(Output(Vec(numVLdPorts, UInt((mxuPECols * 32).W)))) else None
     val rowWriteMask = if (hasMatrix) Some(Output(Vec(numVLdPorts, UInt((mxuPECols).W)))) else None
-    val rowWriteByteMask = if (hasMatrix) Some(Output(Vec(numVLdPorts, UInt((mxuPECols).W)))) else None
+    val rowWriteByteMask = if (hasMatrix) Some(Output(Vec(numVLdPorts, UInt((mxuPECols * 4).W)))) else None
 
     val in = new Bundle {
       val readIn = Input(new regReadIn)

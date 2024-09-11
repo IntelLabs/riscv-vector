@@ -35,7 +35,7 @@ class VIexWrapper(implicit p: Parameters) extends Module {
     val rowWriteReq = if (hasMatrix) Some(Input(Vec(numVLdPorts, Valid(new SliceCtrls())))) else None
     val rowWriteData = if (hasMatrix) Some(Input(Vec(numVLdPorts, UInt((mxuPECols * 32).W)))) else None
     val rowWriteMask = if (hasMatrix) Some(Input(Vec(numVLdPorts, UInt((mxuPECols).W)))) else None
-    val rowWriteByteMask = if (hasMatrix) Some(Input(Vec(numVLdPorts, UInt((mxuPECols).W)))) else None
+    val rowWriteByteMask = if (hasMatrix) Some(Input(Vec(numVLdPorts, UInt((mxuPECols * 4).W)))) else None
     val matrix_in = if (hasMatrix) Some(Input(Valid(new mma_in()))) else None
     val acc_out = if (hasMatrix) Some(Output(Valid(UInt((mxuPERows * mxuPECols * 32).W)))) else None
 
