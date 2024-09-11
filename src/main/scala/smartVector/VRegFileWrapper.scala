@@ -17,7 +17,7 @@ class SVRegFileWrapper(implicit p: Parameters) extends Module {
     val acc_out = if (hasMatrix) Some(Input(Valid(UInt((mxuPERows * mxuPECols * 32).W)))) else None
     val rowWriteReq = if (hasMatrix) Some(Output(Vec(numVLdPorts, Valid(new SliceCtrls())))) else None
     val rowWriteData = if (hasMatrix) Some(Output(Vec(numVLdPorts, UInt((mxuPECols * 32).W)))) else None
-    val rowWriteMask = if (hasMatrix) Some(Output(Vec(numVLdPorts, UInt((mxuPECols).W)))) else None
+    val rowWriteMask = if (hasMatrix) Some(Output(Vec(numVLdPorts, UInt((mxuPECols * 2).W)))) else None
     val rowWriteByteMask = if (hasMatrix) Some(Output(Vec(numVLdPorts, UInt((mxuPECols * 4).W)))) else None
 
     val in = new Bundle {
@@ -52,7 +52,7 @@ class SVRegFileWrapper(implicit p: Parameters) extends Module {
   io.rowWriteReq.get(0).bits.sew := 0.U
 
   io.rowWriteData.get(0) := Cat(io.in.writeIn.rfWriteData, io.in.writeIn.rfWriteData)
-  io.rowWriteMask.get(0) := 0xff.U
+  io.rowWriteMask.get(0) := 0xffff.U
   io.rowWriteByteMask.get(0) := Cat(~io.in.writeIn.rfWriteMask, ~io.in.writeIn.rfWriteMask)
 
   regFile.io.acc_out.get := io.acc_out.get
