@@ -168,7 +168,9 @@ class VIexWrapper(implicit p : Parameters) extends Module {
     io.out.bits.vxsat  := false.B
   }
   io.out.valid := outValid
-  io.excpInfo := mUop.excpInfo
+  io.excpInfo := io.in.bits.excpInfo
+  io.excpInfo.exception_vld := mUop.excpInfo.exception_vld && io.in.valid
+  io.excpInfo.illegalInst := mUop.excpInfo.illegalInst && io.in.valid
 }
 
 
