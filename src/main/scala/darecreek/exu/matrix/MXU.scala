@@ -432,11 +432,15 @@ class PE(
     val macReqIn = Input(Valid(new MacCtrls())) // control signals
     val macReqSrcA = Input(UInt(32.W))
     val macReqSrcB = Input(UInt(32.W))
+    val SrcAMask = Input(Bool())
+    val SrcBMask = Input(Bool())
     val macReqSrcC = Input(UInt(16.W))
     val macReqSrcD = Input(UInt(16.W))
     val macReqOut = Output(Valid(new MacCtrls()))
     val macOutSrcA = Output(UInt(32.W)) // for systolic horizontally
     val macOutSrcB = Output(UInt(32.W)) // for systolic vertically
+    val SrcAMout = Output(Bool())
+    val SrcBMout = Output(Bool())
     val macOutSrcC = Output(UInt(16.W)) // for systolic vertically
     val macOutSrcD = Output(UInt(16.W)) // for systolic horizontally
     val accout = Output(Valid(UInt(32.W)))
@@ -481,7 +485,7 @@ class PE(
   // -----------------------------------------------------------------------------------
   // matrix multiply-accumulate
   // -----------------------------------------------------------------------------------
-  val macReqValid = io.macReqIn.valid
+  val macReqValid = io.macReqIn.valid && io.SrcAMask && io.SrcBMask
   val macReqCtrls = io.macReqIn.bits
   val fpMacValid = io.macReqIn.valid && macReqCtrls.srcType(2)
   // fp16*fp16+fp32
@@ -528,6 +532,8 @@ class PE(
   io.macReqOut := io.macReqIn
   io.macOutSrcA := io.macReqSrcA
   io.macOutSrcB := io.macReqSrcB
+  io.SrcAMout := io.SrcAMask
+  io.SrcBMout := io.SrcBMask
   io.macOutSrcC := io.macReqSrcC
   io.macOutSrcD := io.macReqSrcD
 
@@ -665,11 +671,15 @@ class Tile(
     val macReqIn = Input(Valid(new MacCtrls()))
     val macReqSrcA = Input(UInt((mxuTileRows * 32).W))
     val macReqSrcB = Input(UInt((mxuTileCols * 32).W))
+    val SrcAMask = Input(UInt((mxuTileRows).W))
+    val SrcBMask = Input(UInt((mxuTileCols).W))
     val macReqSrcC = Input(UInt((mxuTileCols * 16).W))
     val macReqSrcD = Input(UInt((mxuTileRows * 16).W))
     val macReqOut = Output(Valid(new MacCtrls()))
     val macOutSrcA = Output(UInt((mxuTileRows * 32).W))
     val macOutSrcB = Output(UInt((mxuTileCols * 32).W))
+    val SrcAMOut = Output(UInt((mxuTileRows).W))
+    val SrcBMOut = Output(UInt((mxuTileCols).W))
     val macOutSrcC = Output(UInt((mxuTileCols * 16).W))
     val macOutSrcD = Output(UInt((mxuTileRows * 16).W))
     // clear tile slices, control signals propagated vertically
@@ -724,6 +734,14 @@ class Tile(
         pe.io.macOutSrcA
       }
     }
+    val peSrcAMask = io.SrcAMask(r)
+    tile(r).foldLeft(peSrcAMask) {
+      (AMask, pe) => {
+        pe.io.SrcAMask := AMask
+        pe.io.SrcAMout
+      }
+    }
+
     val peSrcD = io.macReqSrcD(16 * r + 15, 16 * r)
     tile(r).foldLeft(peSrcD) {
       case (macReqSrcD, pe) => {
@@ -784,6 +802,13 @@ class Tile(
       case (macReqSrcB, pe) => {
         pe.io.macReqSrcB := macReqSrcB
         pe.io.macOutSrcB
+      }
+    }
+    val peSrcBMask = io.SrcBMask(c)
+    tileT(c).foldLeft(peSrcBMask) {
+      (BMask, pe) => {
+        pe.io.SrcBMask := BMask
+        pe.io.SrcBMout
       }
     }
     val peSrcC = io.macReqSrcC(16 * c + 15, 16 * c)
@@ -852,7 +877,8 @@ class Tile(
     io.rowWriteResp(w) := io.rowWriteReq(w)
     io.colWriteResp(w) := io.colWriteReq(w)
   }
-  val macOutSrcAMux = WireInit(VecInit(Seq.fill(mxuTileRows)(0.U(16.W))))
+  val macOutSrcAMux = WireInit(VecInit(Seq.fill(mxuTileRows)(0.U(32.W))))
+  val macOutSrcAMaskMux = WireInit(VecInit(Seq.fill(mxuTileRows)(0.U(1.W))))
   val macOutSrcDMux = WireInit(VecInit(Seq.fill(mxuTileRows)(0.U(16.W))))
   // val colWriteDataMux = WireInit(Vec(numVLdPorts,VecInit(Seq.fill(mxuTileRows)(0.U(32.W)))))
   // val colWriteMaskMux = WireInit(Vec(numVLdPorts,VecInit(Seq.fill(mxuTileRows)(0.U(1.W)))))
@@ -866,6 +892,7 @@ class Tile(
   }
   for (r <- 0 until mxuTileRows) {
     macOutSrcAMux(r) := tile(r)(mxuTileCols - 1).io.macOutSrcA
+    macOutSrcAMaskMux(r) := tile(r)(mxuTileCols - 1).io.SrcAMout
     macOutSrcDMux(r) := tile(r)(mxuTileCols - 1).io.macOutSrcD
     for (w <- 0 until numVLdPorts) {
       colWriteDataMux(w)(r) := tile(r)(mxuTileCols - 1).io.colWriteDout(w)
@@ -873,7 +900,8 @@ class Tile(
     }
   }
 
-  val macOutSrcBMux = WireInit(VecInit(Seq.fill(mxuTileCols)(0.U(16.W))))
+  val macOutSrcBMux = WireInit(VecInit(Seq.fill(mxuTileCols)(0.U(32.W))))
+  val macOutSrcBMaskMux = WireInit(VecInit(Seq.fill(mxuTileCols)(0.U(1.W))))
   val macOutSrcCMux = WireInit(VecInit(Seq.fill(mxuTileCols)(0.U(16.W))))
   // val rowWriteDataMux = WireInit(VecInit(Seq.fill(mxuTileCols)(0.U(64.W))))
   val rowWriteDataMux = Wire(Vec(numVLdPorts, Vec(mxuTileCols, UInt(32.W))))
@@ -888,6 +916,7 @@ class Tile(
   }
   for (c <- 0 until mxuTileCols) {
     macOutSrcBMux(c) := tile(mxuTileRows - 1)(c).io.macOutSrcB
+    macOutSrcBMaskMux(c) := tile(mxuTileRows - 1)(c).io.SrcBMout
     macOutSrcCMux(c) := tile(mxuTileRows - 1)(c).io.macOutSrcC
     for (w <- 0 until numVLdPorts) {
       rowWriteDataMux(w)(c) := tile(mxuTileRows - 1)(c).io.rowWriteDout(w)
@@ -896,8 +925,10 @@ class Tile(
     }
   }
   io.macOutSrcA := macOutSrcAMux.asUInt
+  io.SrcAMOut := macOutSrcAMaskMux.asUInt
   io.macOutSrcD := macOutSrcDMux.asUInt
   io.macOutSrcB := macOutSrcBMux.asUInt
+  io.SrcBMOut := macOutSrcBMaskMux.asUInt
   io.macOutSrcC := macOutSrcCMux.asUInt
   for (w <- 0 until numVLdPorts) {
     io.colWriteDout(w) := colWriteDataMux(w).asUInt
@@ -943,6 +974,8 @@ class Mesh(
     val macReq = Input(Vec(mxuMeshCols, Valid(new MacCtrls())))
     val macReqSrcA = Input(Vec(mxuMeshRows, UInt((mxuTileRows * 32).W)))
     val macReqSrcB = Input(Vec(mxuMeshCols, UInt((mxuTileCols * 32).W)))
+    val SrcAMask = Input(Vec(mxuMeshRows, UInt((mxuTileRows).W)))
+    val SrcBMask = Input(Vec(mxuMeshCols, UInt((mxuTileCols).W)))
     val macReqSrcC = Input(Vec(mxuMeshCols, UInt((mxuTileCols * 16).W)))
     val macReqSrcD = Input(Vec(mxuMeshRows, UInt((mxuTileRows * 16).W)))
     val macResp = Output(Valid(new MacCtrls()))
@@ -989,6 +1022,12 @@ class Mesh(
       case (macReqSrcA, tile) => {
         tile.io.macReqSrcA := RegNext(macReqSrcA)
         tile.io.macOutSrcA
+      }
+    }
+    mesh(r).foldLeft(io.SrcAMask(r)) {
+      (SrcAMask, tile) => {
+        tile.io.SrcAMask := RegNext(SrcAMask)
+        tile.io.SrcAMOut
       }
     }
     mesh(r).foldLeft(io.macReqSrcD(r)) {
@@ -1046,6 +1085,12 @@ class Mesh(
       case (macReqSrcB, tile) => {
         tile.io.macReqSrcB := RegNext(macReqSrcB)
         tile.io.macOutSrcB
+      }
+    }
+    meshT(c).foldLeft(io.SrcBMask(c)) {
+      (SrcBMask, tile) => {
+        tile.io.SrcBMask := RegNext(SrcBMask)
+        tile.io.SrcBMOut
       }
     }
     meshT(c).foldLeft(io.macReqSrcC(c)) {

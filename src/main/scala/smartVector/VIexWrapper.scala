@@ -84,11 +84,13 @@ class VIexWrapper(implicit p: Parameters) extends Module {
       mma.io.macReq(c).bits.dirCal := 0.U
       mma.io.macReq(c).bits.rm := 0.U
       mma.io.macReqSrcB(c) := io.matrix_in.get.bits.srcB
+      mma.io.SrcBMask(c) := io.matrix_in.get.bits.srcBMask
       mma.io.macReqSrcC(c) := 0.U
     }
 
     for (c <- 0 until mxuMeshRows) {
       mma.io.macReqSrcA(c) := io.matrix_in.get.bits.srcA
+      mma.io.SrcAMask(c) := io.matrix_in.get.bits.srcAMask
       mma.io.macReqSrcD(c) := 0.U
     }
 
