@@ -500,9 +500,9 @@ class Vsplit(implicit p : Parameters) extends Module {
     mUopIn.bits.uopRegInfo.old_vd    := old_vd
     mUopIn.bits.uopRegInfo.mask      := mask
 
-    mUopIn.bits.excpInfo.exception_vld := ctrl.illegal & instDecodeIn
-    mUopIn.bits.excpInfo.illegalInst   := ctrl.illegal
-    mUopIn.bits.excpInfo.update_float  := ctrl.rdVal && isfloat
+    mUopIn.bits.excpInfo.exception_vld := ctrl.illegal && instDecodeIn
+    mUopIn.bits.excpInfo.illegalInst   := ctrl.illegal && instDecodeIn 
+    mUopIn.bits.excpInfo.update_float  := ctrl.rdVal && isfloat && instDecodeIn
     mUopIn.bits.excpInfo.reg_idx       := ctrl.ldest
     mUopIn.bits.excpInfo.update_vl     := false.B
     mUopIn.bits.excpInfo.update_data   := 0.U
