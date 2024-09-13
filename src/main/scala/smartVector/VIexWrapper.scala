@@ -73,23 +73,23 @@ class VIexWrapper(implicit p : Parameters) extends Module {
       permDone := false.B
   }
 
-  val oneCycleLatIn = mUopValid & (mUop.uop.ctrl.alu || mUop.uop.ctrl.mask || mUop.excpInfo.illegalInst)
-  val twoCycleLatIn = mUopValid & (mUop.uop.ctrl.mul || mUop.uop.ctrl.redu)
-  val noFixLatIn    = mUopValid & (mUop.uop.ctrl.div || mUop.uop.ctrl.perm || mUop.uop.ctrl.fp)
-  val twoCycleReg   = RegEnable(twoCycleLatIn, mUopValid)
-  val fixLatVld     = SVDiv.io.out.valid || permDone || SVFpu.io.out.valid
+  //val oneCycleLatIn = mUopValid & (mUop.uop.ctrl.alu || mUop.uop.ctrl.mask || mUop.excpInfo.illegalInst)
+  //val twoCycleLatIn = mUopValid & (mUop.uop.ctrl.mul || mUop.uop.ctrl.redu)
+  //val noFixLatIn    = mUopValid & (mUop.uop.ctrl.div || mUop.uop.ctrl.perm || mUop.uop.ctrl.fp)
+  //val twoCycleReg   = RegEnable(twoCycleLatIn, mUopValid)
+  //val fixLatVld     = SVDiv.io.out.valid || permDone || SVFpu.io.out.valid
 
   switch(currentState){
     is(empty){
-      when(mUopValid && ~mUop.uop.ctrl.alu && ~mUop.uop.ctrl.isLdst && ~mUop.uop.ctrl.mask && 
-          ~(mUop.uop.ctrl.narrow_to_1 && ~mUop.uop.uopEnd && ~mUop.excpInfo.illegalInst)){
+      when(mUopValid && ~mUop.uop.ctrl.isLdst && 
+          ~(mUop.uop.ctrl.narrow_to_1 && ~mUop.uop.uopEnd) && ~mUop.excpInfo.illegalInst){
         currentStateNext := ongoing
       }.otherwise{
         currentStateNext := empty
       }
     }
     is(ongoing){
-      when(twoCycleReg || fixLatVld  || (mUop.uop.ctrl.floatRed && SVFpu.io.in.ready && ~(mUop.uop.uopIdx === 0.U))){
+      when(outValid || (mUop.uop.ctrl.floatRed && SVFpu.io.in.ready && ~(mUop.uop.uopIdx === 0.U))){
           currentStateNext := empty
       }.otherwise{
           currentStateNext := ongoing
@@ -101,7 +101,6 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   
   io.iexNeedStall := (currentState === ongoing)
 
- 
   SValu.io.in.valid   := mUopValid && mUop.uop.ctrl.alu
   SVMac.io.in.valid   := mUopValid && mUop.uop.ctrl.mul
   SVMask.io.in.valid  := mUopValid && mUop.uop.ctrl.mask
