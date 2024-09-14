@@ -17,7 +17,7 @@ class VCommit extends Module {
     }
     )
 
-    io.out.commitInfo.commit_vld             := io.in.commitInfo.valid || io.in.excpInfo.exception_vld || io.in.vLSUXcpt.exception_vld || io.in.excpInfo.update_vl
+    io.out.commitInfo.commit_vld             := io.in.commitInfo.valid || io.in.excpInfo.exception_vld || io.in.vLSUXcpt.exception_vld || io.in.vLSUXcpt.update_vl
     io.out.commitInfo.exception_vld          := io.in.excpInfo.exception_vld || io.in.vLSUXcpt.exception_vld
     io.out.commitInfo.illegal_inst           := io.in.excpInfo.illegalInst
     io.out.commitInfo.update_vl              := io.in.vLSUXcpt.update_vl
