@@ -4,6 +4,7 @@ package matrix
 import Chisel.Pipe
 import chisel3._
 import chisel3.util._
+import darecreek.exu.vfucore.fp.fudian._
 import freechips.rocketchip.tile.FType
 import freechips.rocketchip.config.Parameters
 import hardfloat._
@@ -482,6 +483,9 @@ class PE(
   val fpMultiCycles = true
   val fpAcc2Wider = false
 
+  val H = new FType(5, 11)
+  val S = new FType(8, 24)
+
   // -----------------------------------------------------------------------------------
   // matrix multiply-accumulate
   // -----------------------------------------------------------------------------------
@@ -489,27 +493,35 @@ class PE(
   val macReqCtrls = io.macReqIn.bits
   val fpMacValid = io.macReqIn.valid && macReqCtrls.srcType(2)
   // fp16*fp16+fp32
-  val fpMac = Module(new FpMacUnit((if (fpMultiCycles) 3 else 1), fpAcc2Wider))
-  fpMac.io.validin := fpMacValid
-  fpMac.io.src1 := Mux(macReqCtrls.aluType === MACC && macReqCtrls.dirCal === 0.U, io.macReqSrcA, c0(macReqCtrls.src1Ridx))
+  // val fpMac = Module(new FpMacUnit((if (fpMultiCycles) 3 else 1), fpAcc2Wider))
+  val fpMac = Module(new FCMA(S.exp, S.sig))
 
-  fpMac.io.src2 := Mux(macReqCtrls.dirCal === 1.U, io.macReqSrcC,
-    Mux(macReqCtrls.dirCal === 2.U, io.macReqSrcA, io.macReqSrcB(15, 0)))
-  fpMac.io.src3 := Mux(macReqCtrls.aluType === MULT, 0.U,
-    Mux(macReqCtrls.dirCal === 1.U, io.macReqSrcB,
-      Mux(macReqCtrls.dirCal === 2.U, io.macReqSrcD, c0(macReqCtrls.src2Ridx))))
-  fpMac.io.srcType := macReqCtrls.outType // Attention here, fpMac support fp16 multiply only
-  fpMac.io.outType := macReqCtrls.outType
-  fpMac.io.aluType := macReqCtrls.aluType
-  fpMac.io.src1idx := macReqCtrls.src1Ridx
-  fpMac.io.src2idx := macReqCtrls.src2Ridx
-  fpMac.io.dstRidx := macReqCtrls.dstRidx
-  fpMac.io.macInit := macReqCtrls.macInit
-  fpMac.io.macLast := macReqCtrls.macLast
-  fpMac.io.autoClr := macReqCtrls.autoClr
-  fpMac.io.autoCvt := macReqCtrls.autoCvt
-  fpMac.io.roundingMode := macReqCtrls.rm
-  fpMac.io.detectTininess := hardfloat.consts.tininess_afterRounding
+  fpMac.io.a := io.macReqSrcA
+  fpMac.io.b := io.macReqSrcB
+  fpMac.io.c := c0(macReqCtrls.src2Ridx)
+  fpMac.io.rm := macReqCtrls.rm
+
+
+  //   fpMac.io.validin := fpMacValid
+  //   fpMac.io.src1 := Mux(macReqCtrls.aluType === MACC && macReqCtrls.dirCal === 0.U, io.macReqSrcA, c0(macReqCtrls.src1Ridx))
+  //
+  //   fpMac.io.src2 := Mux(macReqCtrls.dirCal === 1.U, io.macReqSrcC,
+  //     Mux(macReqCtrls.dirCal === 2.U, io.macReqSrcA, io.macReqSrcB(15, 0)))
+  //   fpMac.io.src3 := Mux(macReqCtrls.aluType === MULT, 0.U,
+  //     Mux(macReqCtrls.dirCal === 1.U, io.macReqSrcB,
+  //       Mux(macReqCtrls.dirCal === 2.U, io.macReqSrcD, c0(macReqCtrls.src2Ridx))))
+  //   fpMac.io.srcType := macReqCtrls.outType // Attention here, fpMac support fp16 multiply only
+  //   fpMac.io.outType := macReqCtrls.outType
+  //   fpMac.io.aluType := macReqCtrls.aluType
+  //   fpMac.io.src1idx := macReqCtrls.src1Ridx
+  //   fpMac.io.src2idx := macReqCtrls.src2Ridx
+  //   fpMac.io.dstRidx := macReqCtrls.dstRidx
+  //   fpMac.io.macInit := macReqCtrls.macInit
+  //   fpMac.io.macLast := macReqCtrls.macLast
+  //   fpMac.io.autoClr := macReqCtrls.autoClr
+  //   fpMac.io.autoCvt := macReqCtrls.autoCvt
+  //   fpMac.io.roundingMode := macReqCtrls.rm
+  //   fpMac.io.detectTininess := hardfloat.consts.tininess_afterRounding
 
   // int8 MAC function units
   val intMac = Module(new IntMacUnit())
@@ -521,8 +533,12 @@ class PE(
   intMac.io.aluType := macReqCtrls.aluType
 
   // TODO: Optimization, latency = 1 for int8 mac; 3 for fp16 mac
-  when(fpMac.io.validout) {
-    c0(fpMac.io.idx) := fpMac.io.out
+  // when(fpMac.io.validout) {
+  //   c0(fpMac.io.idx) := fpMac.io.out
+  // }
+
+  when(macReqValid && (macReqCtrls.srcType(2))) {
+    c0(macReqCtrls.dstRidx) := fpMac.io.result
   }
 
   when(macReqValid && (!macReqCtrls.srcType(2))) {
