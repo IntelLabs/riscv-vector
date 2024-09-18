@@ -133,7 +133,7 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
       validReg := decodeInValid
   }
 
-  when(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl || illegalReg || io.out.bits.vCtrl.illegal){
+  when(io.vLSUXcpt.exception_vld || io.vLSUXcpt.update_vl){
     validReg := false.B
   }
  
@@ -145,9 +145,9 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
   io.out.valid := validReg
   io.out.bits  := bitsReg
 
-  io.out.bits.vCtrl.illegal := vIllegalInstrn.io.ill.valid && io.out.valid
+  io.out.bits.vCtrl.illegal := Mux(RegNext(fire), vIllegalInstrn.io.ill.valid, illegalReg)
 
-  when(io.out.bits.vCtrl.illegal && fire){
+  when(io.out.bits.vCtrl.illegal){
     illegalReg := true.B
   }
 
@@ -155,5 +155,5 @@ class SVDecodeUnit(implicit p: Parameters) extends Module {
     illegalReg := false.B
   }
 
-  io.in.ready := !bufferValidReg
+  io.in.ready := !bufferValidReg && ~io.out.bits.vCtrl.illegal && ~illegalReg
 }
