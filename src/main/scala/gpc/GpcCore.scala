@@ -438,7 +438,6 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
   when (!id_mem_busy) { id_reg_fence := false.B }
   val id_do_fence = WireDefault(id_mem_busy && (id_ctrls(0).amo && id_amo_rl || id_ctrls(0).fence_i || id_reg_fence && id_ctrls(0).mem))
 
-  //TODO - recheck ready_swapped and ctrl_killed logics, make them concise if possible
   val ctrl_killd = Wire(Vec(decodeWidthGpc, Bool()))
   ctrl_killd(0) := !id_valids(0) || !readys_swapped(0) || id_uops(0).replay || take_pc_all || id_stall(0) || csr.io.interrupt || vxcpt_flush
   ctrl_killd(1) := !id_valids(1) || !readys_swapped(1) || id_uops(1).replay || take_pc_all || id_stall(1) || csr.io.interrupt || vxcpt_flush
@@ -637,7 +636,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
   val ex_xcpt = ex_check_xcpt.map(_._1)
   val ex_cause = ex_check_xcpt.map(_._2)
 
-  // Todo: sfence handling
+  //TODO - sfence handling
 
   /** M1 stage
    */
