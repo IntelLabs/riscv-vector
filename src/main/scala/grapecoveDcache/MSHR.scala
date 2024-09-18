@@ -62,7 +62,8 @@ class MSHR(id: Int) extends Module() {
   )
 
   // don't have enough space to store current inst
-  val isFull = (metaCounter + 1.U) >= nMSHRMetas.asUInt
+  val isFull = metaCounter === (nMSHRMetas - 1).asUInt
+//  dontTouch(isFull)
 
   val stallReq =
     allocLineAddrMatch && (!(state <= mode_resp_wait) || isFull || privErr || wrwErr) && !isPrefetch(io.reqCmd)
