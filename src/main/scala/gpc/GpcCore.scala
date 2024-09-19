@@ -14,6 +14,9 @@ import VectorParam._
 import gpc.tile._
 
 case class GpcCoreParams(
+  // Enable verificaton
+  enUVM: Boolean = false,
+
   bootFreqHz: BigInt = 0,
   useVM: Boolean = true,
   useUser: Boolean = false,
@@ -66,6 +69,8 @@ case class GpcCoreParams(
   override val customIsaExt = Option.when(haveCease)("xrocket") // CEASE instruction
   override def minFLen: Int = fpu.map(_.minFLen).getOrElse(32)
   override def customCSRs(implicit p: Parameters) = new GpcCustomCSRs
+  // Enable verification
+  override val useVerif: Boolean = enUVM
 }
 
 trait HasGpcCoreParameters extends HasCoreParameters {
@@ -138,6 +143,7 @@ trait HasGpcCoreIO extends HasGpcCoreParameters {
     val villegal = Flipped(new VIllegal)
     val vcomplete = Flipped(new VComplete)
     val vwb_ready = Flipped(new VWritebackReady)
+    val verif = coreParams.useVerif.option(new VerOutIO)
   })
 }
 
@@ -1279,6 +1285,29 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
   coreMonitorBundle.inst := csr.io.trace(0).insn
   coreMonitorBundle.excpt := csr.io.trace(0).exception
   coreMonitorBundle.priv_mode := csr.io.trace(0).priv
+
+  /**
+    * Verification logic //TODO - so far, only integer instrn logic
+    */
+  val ver_module = Module(new UvmVerification)
+  if(gpcParams.useVerif) {
+    ver_module.io.uvm_in := DontCare
+    for (i <- 0 until 2) {
+      ver_module.io.uvm_in.rob_enq(i).valid := wb_reg_valids(i)
+      ver_module.io.uvm_in.rob_enq(i).bits.int := wb_reg_uops(i).ctrl.wxd
+      ver_module.io.uvm_in.rob_enq(i).bits.fp := wb_reg_uops(i).wfd
+      ver_module.io.uvm_in.rob_enq(i).bits.waddr := wb_reg_waddr(i)
+      ver_module.io.uvm_in.rob_enq(i).bits.wdata := wb_reg_wdata(i)
+      ver_module.io.uvm_in.rob_wb(i).valid := ll_wen_wb(i)
+      ver_module.io.uvm_in.rob_wb(i).bits.int := ll_wen_wb(i)
+      ver_module.io.uvm_in.rob_wb(i).bits.waddr := wb_reg_waddr(i)
+      ver_module.io.uvm_in.rob_wb(i).bits.wdata := wb_reg_wdata(i)
+    }
+
+    dontTouch(io.verif.get)
+    io.verif.get <> ver_module.io.uvm_out
+  }
+
 
   } // leaving gated-clock domain
   val gpcImpl = withClock (gated_clock) { new GpcImpl }

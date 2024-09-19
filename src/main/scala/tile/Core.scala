@@ -67,6 +67,9 @@ trait CoreParams {
   def sLen: Int = 0
   def eLen(xLen: Int, fLen: Int): Int = xLen max fLen
   def vMemDataBits: Int = 0
+  /** @Description: add for verification
+   */
+  val useVerif: Boolean = true
 }
 
 trait HasCoreParameters extends HasTileParameters {
@@ -86,6 +89,7 @@ trait HasCoreParameters extends HasTileParameters {
   val usingConditionalZero = coreParams.useConditionalZero
 
   val retireWidth = coreParams.retireWidth
+  val NRET = retireWidth
   val fetchWidth = coreParams.fetchWidth
   val decodeWidth = coreParams.decodeWidth
 
