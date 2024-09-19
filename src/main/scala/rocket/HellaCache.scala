@@ -202,12 +202,12 @@ abstract class HellaCache(tileId: Int)(implicit p: Parameters) extends LazyModul
 
   protected def cacheClientParameters = cfg.scratch.map(x => Seq()).getOrElse(Seq(TLMasterParameters.v1(
     name          = s"Core ${tileId} DCache",
-    sourceId      = IdRange(0, 1 max cfg.nMSHRs),
+    sourceId      = IdRange(0, 1 max 16), // FIXME
     supportsProbe = TransferSizes(cfg.blockBytes, cfg.blockBytes))))
 
   protected def mmioClientParameters = Seq(TLMasterParameters.v1(
     name          = s"Core ${tileId} DCache MMIO",
-    sourceId      = IdRange(firstMMIO, firstMMIO + cfg.nMMIOs),
+    sourceId      = IdRange(firstMMIO, firstMMIO + 8),
     requestFifo   = true))
 
   def firstMMIO = (cacheClientParameters.map(_.sourceId.end) :+ 0).max
@@ -265,7 +265,7 @@ object HellaCacheFactory {
     if (tile.tileParams.dcache.get.nMSHRs == 0)
       new DCache(tile.tileId, tile.crossing)(p)
     else
-      new NonBlockingDCache(tile.tileId)(p)
+      new GPCDCacheWrapper(tile.tileId)(p)
   }
 }
 

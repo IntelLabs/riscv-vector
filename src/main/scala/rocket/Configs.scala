@@ -34,7 +34,7 @@ class WithNHugeCores(
         nSets = 64,
         nWays = 8,
         rowBits = site(SystemBusKey).beatBits,
-        nMSHRs = 0,
+        nMSHRs = 8,
         blockBytes = site(CacheBlockBytes))),
       icache = Some(ICacheParams(
         nSets = 64,
@@ -73,7 +73,7 @@ class WithNBigCores(
         divEarlyOut = true))),
       dcache = Some(DCacheParams(
         rowBits = site(SystemBusKey).beatBits,
-        nMSHRs = 0,
+        nMSHRs = 8,
         blockBytes = site(CacheBlockBytes))),
       icache = Some(ICacheParams(
         rowBits = site(SystemBusKey).beatBits,
@@ -111,7 +111,7 @@ class WithNMedCores(
         nWays = 1,
         nTLBSets = 1,
         nTLBWays = 4,
-        nMSHRs = 0,
+        nMSHRs = 8,
         blockBytes = site(CacheBlockBytes))),
       icache = Some(ICacheParams(
         rowBits = site(SystemBusKey).beatBits,
@@ -144,7 +144,7 @@ class WithNSmallCores(
         nWays = 1,
         nTLBSets = 1,
         nTLBWays = 4,
-        nMSHRs = 0,
+        nMSHRs = 8,
         blockBytes = site(CacheBlockBytes))),
       icache = Some(ICacheParams(
         rowBits = site(SystemBusKey).beatBits,
@@ -177,7 +177,7 @@ class With1TinyCore extends Config((site, here, up) => {
         nWays = 1,
         nTLBSets = 1,
         nTLBWays = 4,
-        nMSHRs = 0,
+        nMSHRs = 8,
         blockBytes = site(CacheBlockBytes),
         scratch = Some(0x80000000L))),
       icache = Some(ICacheParams(
