@@ -437,15 +437,20 @@ class MSHRFile extends Module() {
     when(isWrite(io.pipelineReq.bits.meta.cmd)) {
       dataArrayWriteEna := true.B
       dataArrayWriteIdx := wrIdx
+    }.otherwise {
+      dataArrayWriteEna := false.B
     }
   }.elsewhen(io.replaceStatus === ReplaceStatus.replace_finish) {
     maskArray(replayReg.io.replayIdx) := 0.U
     dataArray(replayReg.io.replayIdx) := 0.U
+    dataArrayWriteEna                 := false.B
+  }.otherwise {
+    dataArrayWriteEna := false.B
   }
 
   // receive miss addr data at s2
   when(dataArrayWriteEna) {
-    dataArrayWriteEna := false.B
+//    dataArrayWriteEna := false.B
     dataArray(dataArrayWriteIdx) := Mux(
       RegNext(io.pipelineReq.bits.isUpgrade),
       io.pipelineReq.bits.data,
