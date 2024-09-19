@@ -57,10 +57,10 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   // val permNotReady = SVPerm.io.out.perm_busy
   // val ready    = ~(divNotReady || fpuNotReady || permNotReady)
 
-  val outValid = SValu.io.out.valid || SVMac.io.out.valid || SVMask.io.out.valid || 
-                 SVReduc.io.out.valid || SVDiv.io.out.valid || SVFpu.io.out.valid
-
   val permDone = Wire(Bool())
+  val outValid = SValu.io.out.valid || SVMac.io.out.valid || SVMask.io.out.valid || 
+                 SVReduc.io.out.valid || SVDiv.io.out.valid || SVFpu.io.out.valid || permDone
+
   val permWriteNum = RegInit(0.U(4.W))
   when(SVPerm.io.out.wb_vld){
       permWriteNum := permWriteNum + 1.U
@@ -78,11 +78,12 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   //val noFixLatIn    = mUopValid & (mUop.uop.ctrl.div || mUop.uop.ctrl.perm || mUop.uop.ctrl.fp)
   //val twoCycleReg   = RegEnable(twoCycleLatIn, mUopValid)
   //val fixLatVld     = SVDiv.io.out.valid || permDone || SVFpu.io.out.valid
+  val vcpop_m = (mUop.uop.ctrl.funct6 === "b010000".U) && (mUop.uop.ctrl.funct3 === "b010".U) && (mUop.uop.ctrl.vs1_imm === "b10000".U)
 
   switch(currentState){
     is(empty){
       when(mUopValid && ~mUop.uop.ctrl.isLdst && 
-          ~(mUop.uop.ctrl.narrow_to_1 && ~mUop.uop.uopEnd) && ~mUop.excpInfo.illegalInst){
+          ~((mUop.uop.ctrl.narrow_to_1 || mUop.uop.ctrl.redu || vcpop_m) && ~mUop.uop.uopEnd) && ~mUop.excpInfo.illegalInst){
         currentStateNext := ongoing
       }.otherwise{
         currentStateNext := empty
