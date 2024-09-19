@@ -104,7 +104,7 @@ class IOMSHRFile(
   io.addrMatch := addrMatchList.asUInt.orR
 
   // set sender enq/deq info
-  senderQueue.io.enq.valid := senderQueue.io.enq.ready && io.req.valid
+  senderQueue.io.enq.valid := senderQueue.io.enq.ready && io.req.fire
   senderQueue.io.enq.bits  := OHToUInt(allocList.asUInt)
 
   val counter     = RegInit(0.U(log2Up(refillCycles).W))
