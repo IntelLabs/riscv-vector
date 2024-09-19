@@ -411,7 +411,9 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val touchWay          = OHToUInt(s1_wayEn)
   val touchSet          = getSetIdx(s1_req.paddr)
 
-  when(s1_updateReplacer)(replacer.access(touchSet, touchWay))
+  when(s1_updateReplacer) {
+    replacer.access(touchSet, touchWay)
+  }
 
   // get victim way
   val replSet = getSetIdx(mshrs.io.toReplace.bits.lineAddr << blockOffBits)
