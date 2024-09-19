@@ -25,10 +25,12 @@ class WithNBigCoresGpc(
     val prev = up(TilesLocated(`location`), site)
     val idOffset = up(NumTiles)
     val big = GpcTileParams(
-      core   = GpcCoreParams(mulDiv = Some(MulDivParams(
-        mulUnroll = 8,
-        mulEarlyOut = true,
-        divEarlyOut = true))),
+      core   = GpcCoreParams(
+        enUVM = true,
+        mulDiv = Some(MulDivParams(
+          mulUnroll = 8,
+          mulEarlyOut = true,
+          divEarlyOut = true))),
       dcache = Some(DCacheParams(
         rowBits = site(SystemBusKey).beatBits,
         nMSHRs = 0,
