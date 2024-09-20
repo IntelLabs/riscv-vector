@@ -298,8 +298,10 @@ class Vsplit(implicit p: Parameters) extends Module {
       cnt := 0.U
     }
     io.out.mma_in.get.valid := cnt_en.asBool
-    io.out.mma_in.get.bits.srcType := 0.U
-    io.out.mma_in.get.bits.dstType := 2.U
+   //  io.out.mma_in.get.bits.srcType := 0.U
+   //  io.out.mma_in.get.bits.dstType := 2.U
+    io.out.mma_in.get.bits.srcType := 6.U
+    io.out.mma_in.get.bits.dstType := 6.U
 
     val v0 = io.in.rfData.get(0)
     io.out.mma_in.get.bits.srcAMask := 0xff.U //Cat(v0(3), v0(3), v0(2), v0(2), v0(1), v0(1), v0(0), v0(0))
