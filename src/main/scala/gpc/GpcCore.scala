@@ -1292,8 +1292,11 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
   val ver_module = Module(new UvmVerification)
   if(gpcParams.useVerif) {
     ver_module.io.uvm_in := DontCare
+    ver_module.io.uvm_in.swap := wb_reg_swap
     for (i <- 0 until 2) {
       ver_module.io.uvm_in.rob_enq(i).valid := wb_reg_valids(i)
+      ver_module.io.uvm_in.rob_enq(i).bits.pc := wb_reg_uops(i).pc
+      ver_module.io.uvm_in.rob_enq(i).bits.insn := wb_reg_uops(i).inst
       ver_module.io.uvm_in.rob_enq(i).bits.int := wb_reg_uops(i).ctrl.wxd
       ver_module.io.uvm_in.rob_enq(i).bits.fp := wb_reg_uops(i).wfd
       ver_module.io.uvm_in.rob_enq(i).bits.waddr := wb_reg_waddr(i)
