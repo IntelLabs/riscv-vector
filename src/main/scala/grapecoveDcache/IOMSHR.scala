@@ -58,10 +58,10 @@ class IOMSHRFile(
     implicit edge: TLEdgeOut
 ) extends Module {
   val io = IO(new Bundle {
-    val req        = Flipped(DecoupledIO(new MainPipeReq(edge.bundle)))
-    val addrMatch  = Output(Bool())
-    val flushReady = Output(Bool())
-    val resp       = DecoupledIO(new DataExchangeResp())
+    val req       = Flipped(DecoupledIO(new MainPipeReq(edge.bundle)))
+    val addrMatch = Output(Bool())
+    val fenceRdy  = Output(Bool())
+    val resp      = DecoupledIO(new DataExchangeResp())
 
     val l2Req      = DecoupledIO(new TLBundleA(edge.bundle))
     val fromRefill = Flipped(DecoupledIO(new RefillMSHRFile))
@@ -84,7 +84,7 @@ class IOMSHRFile(
   val sendNReadyList = Wire(Vec(nMMIOs, Bool()))
 
   val iomshrEmptyList = Wire(Vec(nMMIOs, Bool()))
-  io.flushReady := !iomshrEmptyList.asUInt.orR
+  io.fenceRdy := iomshrEmptyList.asUInt.andR
 
   val iomshrs = (0 until nMMIOs) map {
     i =>

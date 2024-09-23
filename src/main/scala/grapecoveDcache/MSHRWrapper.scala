@@ -25,7 +25,7 @@ class MSHRWrapper(
     val toReplace     = DecoupledIO(new MSHRReplace())
     val replaceStatus = Input(ReplaceStatus())
 
-    val flushReady = Output(Bool())
+    val fenceRdy = Output(Bool())
   })
 
   val mshrs   = Module(new MSHRFile())
@@ -111,5 +111,5 @@ class MSHRWrapper(
   io.probeCheck <> mshrs.io.probeCheck
   mshrs.io.replaceStatus := io.replaceStatus
 
-  io.flushReady := mshrs.io.flushReady && iomshrs.io.flushReady
+  io.fenceRdy := mshrs.io.fenceRdy && iomshrs.io.fenceRdy
 }

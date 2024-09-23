@@ -582,6 +582,8 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     "MSHR & Cache Resp cannot exist simultaneously",
   )
 
+  io.fenceRdy := mshrs.io.fenceRdy && !s1_valid && !s2_valid && !s3_valid
+
   // * Resp End
 
   // tilelink d

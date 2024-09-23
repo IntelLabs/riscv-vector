@@ -262,7 +262,7 @@ class MSHRFile extends Module() {
     new Bundle {
       val pipelineReq = Flipped(DecoupledIO(new CachepipeMSHRFile))
       val addrMatch   = Output(Bool())
-      val flushReady  = Output(Bool())
+      val fenceRdy    = Output(Bool())
       val toL2Req     = DecoupledIO(new MSHRFileL2)              // TL A
       val fromRefill  = Flipped(DecoupledIO(new RefillMSHRFile)) // TL D/E
 
@@ -371,7 +371,7 @@ class MSHRFile extends Module() {
   val senderPermissionList = Wire(Vec(nMSHRs, UInt(TLPermissions.aWidth.W)))
 
   val mshrEmptyList = Wire(Vec(nMSHRs, Bool()))
-  io.flushReady := !mshrEmptyList.asUInt.orR
+  io.fenceRdy := mshrEmptyList.asUInt.andR
 
   // connect mshr
   val mshrs = (0 until nMSHRs) map {
