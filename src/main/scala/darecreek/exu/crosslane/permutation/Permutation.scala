@@ -42,7 +42,7 @@ class Permutation(implicit p: Parameters) extends VFuModule {
 
   val q = Module(new Queue(new VExpdUOp, 8))
   q.io.enq.bits := uop
-  q.io.enq.valid := fire
+  q.io.enq.valid := (fire && !vrgather16_sew8) || (fire && vrgather16_sew8 && uopIdx(0))
 
   val uop_out = q.io.deq.bits
   q.io.deq.ready := perm.io.out.wb_vld
@@ -50,7 +50,7 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   when(fire) {
     vs2_preg_idx(uopIdx) := psrc(1)
     when(vrgather16_sew8) {
-      vs2_preg_idx(uopIdx(2,1)) := psrc(1)
+      vs2_preg_idx(uopIdx(2, 1)) := psrc(1)
     }
   }
 
@@ -82,7 +82,7 @@ class Permutation(implicit p: Parameters) extends VFuModule {
   io.perm.rd_preg_idx := perm.io.out.rd_preg_idx
   io.out.bits.uop := uop_out
   io.out.valid := perm.io.out.wb_vld
-  io.out.bits.vd := VecInit(Seq.tabulate(NLanes)(i => (perm.io.out.wb_data) ((i + 1) * LaneWidth - 1, i * LaneWidth)))
+  io.out.bits.vd := VecInit(Seq.tabulate(NLanes)(i => (perm.io.out.wb_data)((i + 1) * LaneWidth - 1, i * LaneWidth)))
   io.out.bits.fflags := 0.U
 
   io.in.ready := !(uop_valid | perm_busy)

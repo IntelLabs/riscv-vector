@@ -103,14 +103,3 @@ class LaneFP(implicit p: Parameters) extends VFuModule {
   fpu.io.out.ready := io.out.ready
 
 }
-
-import xiangshan._
-
-object VerilogLaneFP extends App {
-  println("Generating hardware")
-  val p = Parameters.empty
-  emitVerilog(new LaneFP()(p.alterPartial({ case VFuParamsKey =>
-    VFuParameters(VLEN = 256)
-  })), Array("--target-dir", "generated",
-    "--emission-options=disableMemRandomization,disableRegisterRandomization"))
-}

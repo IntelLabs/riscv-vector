@@ -22,13 +22,13 @@ import chisel3.util._
  *  32b (u)int  -> 64b float  widen
  */
 class VFCVT(implicit val p: Parameters) extends VFPUSubModule {
-  val module = Module(new VFCVTDataModule)
+  val cvt = Module(new VFCVTDataModule)
 
-  module.io.in <> io.in
-  module.io.redirect := io.redirect
-  io.out <> module.io.out
+  cvt.io.in <> io.in
+  cvt.io.redirect := io.redirect
+  io.out <> cvt.io.out
   // block if is not cvt,
-  module.io.in.valid := io.in.valid && io.in.bits.uop.vfpCtrl.isCvt
+  cvt.io.in.valid := io.in.valid && io.in.bits.uop.vfpCtrl.isCvt
 }
 
 class VFCVTDataModule(implicit val p: Parameters) extends VFPUPipelineModule {
