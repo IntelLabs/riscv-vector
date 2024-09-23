@@ -1266,6 +1266,23 @@ class Rocket(tile: RocketTile)(implicit p: Parameters) extends CoreModule()(p)
   xrfWriteBundle.excpt := false.B
   xrfWriteBundle.priv_mode := csr.io.trace(0).priv
 
+
+  // * chenlu modify
+  // * debug signals
+  dontTouch(ctrl_stalld)
+  dontTouch(id_ex_hazard)
+  dontTouch(id_mem_hazard)
+  dontTouch(id_wb_hazard)
+  dontTouch(id_sboard_hazard)
+  dontTouch(id_vconfig_hazard)
+  dontTouch(id_stall_fpu)
+  dontTouch(id_do_fence)
+
+  dontTouch(id_raddr1)
+  dontTouch(id_raddr2)
+  dontTouch(id_waddr)
+  dontTouch(id_ctrl)
+
   if (rocketParams.haveSimTimeout) PlusArg.timeout(
     name = "max_core_cycles",
     docstring = "Kill the emulation after INT rdtime cycles. Off if 0."
