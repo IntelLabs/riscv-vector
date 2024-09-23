@@ -26,8 +26,6 @@ class GPCDCacheWrapperModule(outer: GPCDCacheWrapper) extends HellaCacheModule(o
 
   dontTouch(io)
 
-  val s1_replayReq = WireInit(false.B)
-
   // * s0 begin
   io.tlb_port.req.ready := true.B
 
@@ -67,21 +65,20 @@ class GPCDCacheWrapperModule(outer: GPCDCacheWrapper) extends HellaCacheModule(o
   // * s0 end
 
   // * s1 begin
-  // tlb resp
   val s1_req = RegEnable(s0_req, s0_valid)
   val s1_valid = RegNext(s0_valid) && !io.cpu.s1_kill && 
-  !(s1_req.cmd === M_SFENCE || s1_req.cmd === M_HFENCEV || s1_req.cmd === M_HFENCEG)
+    !(s1_req.cmd === M_SFENCE || s1_req.cmd === M_HFENCEV || s1_req.cmd === M_HFENCEG)
+  
+    // tlb resp
   val s1_tlbResp = RegEnable(dtlb.io.resp, s0_valid)
   val s1_tlbMiss = s1_tlbResp.miss
   val s1_tlbXcpt = WireInit(0.U.asTypeOf(new HellaCacheExceptions))
   val s1_tlbHasXcpt = s1_tlbXcpt.asUInt.orR
-  
   s1_tlbXcpt := s1_tlbResp
-
 
   // construct dcache request
   val cacheReqValid = s1_valid && !s1_tlbHasXcpt && !s1_tlbMiss // FIXME
-  s1_replayReq := cacheReqValid && !dcache.io.req.ready
+  val s1_replayReq = cacheReqValid && !dcache.io.req.ready
 
   val cacheReq = WireInit(0.U.asTypeOf(new DataExchangeReq))
   cacheReq.paddr := s1_tlbResp.paddr
@@ -116,7 +113,7 @@ class GPCDCacheWrapperModule(outer: GPCDCacheWrapper) extends HellaCacheModule(o
     s2_replayReq
   io.cpu.s2_nack_cause_raw := false.B
   io.cpu.s2_uncached := false.B
-  io.cpu.ordered := dcache.io.fenceRdy // FIXME
+  io.cpu.ordered := dcache.io.fenceRdy
 
   // cache resp 
   dontTouch(s2_cacheResp)
@@ -130,11 +127,7 @@ class GPCDCacheWrapperModule(outer: GPCDCacheWrapper) extends HellaCacheModule(o
   io.cpu.resp.bits.tag := Cat(s2_cacheResp.dest, s2_cacheResp.source)
   io.cpu.s2_paddr := DontCare // FIXME
   io.cpu.store_pending := false.B // FIXME
-
-  // io.cpu.resp.bits.idx := DontCare // FIXME
-
   io.cpu.replay_next := dcache.io.nextCycleWb
-
   io.cpu.perf := 0.U.asTypeOf(new HellaCachePerfEvents)
   io.cpu.clock_enabled := true.B
 
@@ -152,4 +145,6 @@ class GPCDCacheWrapperModule(outer: GPCDCacheWrapper) extends HellaCacheModule(o
   when(!dtlb.io.req.ready && !s0_req.phys || s1_replayReq) {
     io.cpu.req.ready := false.B
   }
+
+  // * s2 end
 }
