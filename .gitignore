@@ -17,6 +17,4 @@ rocketchip.jar
 .#*
 .metals/
 .vscode/
-src/main/scala/gpc_cache/
-src/main/scala/utility/
 *.bak
