@@ -19,7 +19,7 @@ trait DCacheParams {
   val nRefillQDataEntries = 8 // refill queue data entries
   val nRefillQPermEntries = 8 // refill queue permission entries
   val replacementPolicy   = "setlru"
-  val beatBytes           = 64
+  val beatBytes           = 8
 
   // calculate
   val firstMSHR = 0

@@ -49,7 +49,7 @@ class RefillQueueWrapper(
   }
 
   when(io.memGrant.fire && edge.hasData(io.memGrant.bits)) {
-    counter          := Mux(counter + 1.U >= refillCycles.asUInt, 0.U, counter + 1.U)
+    counter          := Mux(edge.last(io.memGrant), 0.U, counter + 1.U)
     dataReg(counter) := io.memGrant.bits.data
   }
 

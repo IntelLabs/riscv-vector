@@ -38,6 +38,7 @@ class DataExchangeIO extends Bundle {
   val req         = Flipped(Decoupled(new DataExchangeReq))
   val resp        = Valid(new DataExchangeResp)
   val nextCycleWb = Bool() // next cycle occupy wb stage
+  val fenceRdy    = Bool()
   val s1_kill     = Input(Bool())
 }
 

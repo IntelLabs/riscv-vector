@@ -60,6 +60,7 @@ class IOMSHRFile(
   val io = IO(new Bundle {
     val req       = Flipped(DecoupledIO(new MainPipeReq(edge.bundle)))
     val addrMatch = Output(Bool())
+    val fenceRdy  = Output(Bool())
     val resp      = DecoupledIO(new DataExchangeResp())
 
     val l2Req      = DecoupledIO(new TLBundleA(edge.bundle))
@@ -82,11 +83,15 @@ class IOMSHRFile(
 
   val sendNReadyList = Wire(Vec(nMMIOs, Bool()))
 
+  val iomshrEmptyList = Wire(Vec(nMMIOs, Bool()))
+  io.fenceRdy := iomshrEmptyList.asUInt.andR
+
   val iomshrs = (0 until nMMIOs) map {
     i =>
       val iomshr = Module(new IOMSHR(i)(edge))
 
       allocArb.io.in(i).valid := iomshr.io.isEmpty
+      iomshrEmptyList(i)      := iomshr.io.isEmpty
 
       allocList(i)       := allocArb.io.in(i).fire
       iomshr.io.reqValid := allocArb.io.in(i).fire
@@ -104,7 +109,7 @@ class IOMSHRFile(
   io.addrMatch := addrMatchList.asUInt.orR
 
   // set sender enq/deq info
-  senderQueue.io.enq.valid := senderQueue.io.enq.ready && io.req.valid
+  senderQueue.io.enq.valid := senderQueue.io.enq.ready && io.req.fire
   senderQueue.io.enq.bits  := OHToUInt(allocList.asUInt)
 
   val counter     = RegInit(0.U(log2Up(refillCycles).W))

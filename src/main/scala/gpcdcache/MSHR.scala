@@ -62,7 +62,8 @@ class MSHR(id: Int) extends Module() {
   )
 
   // don't have enough space to store current inst
-  val isFull = (metaCounter + 1.U) >= nMSHRMetas.asUInt
+  val isFull = metaCounter === (nMSHRMetas - 1).asUInt
+//  dontTouch(isFull)
 
   val stallReq =
     allocLineAddrMatch && (!(state <= mode_resp_wait) || isFull || privErr || wrwErr) && !isPrefetch(io.reqCmd)
@@ -261,6 +262,7 @@ class MSHRFile extends Module() {
     new Bundle {
       val pipelineReq = Flipped(DecoupledIO(new CachepipeMSHRFile))
       val addrMatch   = Output(Bool())
+      val fenceRdy    = Output(Bool())
       val toL2Req     = DecoupledIO(new MSHRFileL2)              // TL A
       val fromRefill  = Flipped(DecoupledIO(new RefillMSHRFile)) // TL D/E
 
@@ -368,6 +370,9 @@ class MSHRFile extends Module() {
   val lineAddrList         = Wire(Vec(nMSHRs, UInt(lineAddrWidth.W)))
   val senderPermissionList = Wire(Vec(nMSHRs, UInt(TLPermissions.aWidth.W)))
 
+  val mshrEmptyList = Wire(Vec(nMSHRs, Bool()))
+  io.fenceRdy := mshrEmptyList.asUInt.andR
+
   // connect mshr
   val mshrs = (0 until nMSHRs) map {
     i =>
@@ -402,6 +407,7 @@ class MSHRFile extends Module() {
 
       // allocate signal
       allocateArb.io.in(i).valid := mshr.io.isEmpty
+      mshrEmptyList(i)           := mshr.io.isEmpty
       allocateList(i)            := allocateArb.io.in(i).fire
 
       stallReqList(i) := mshr.io.stallReq
@@ -436,15 +442,20 @@ class MSHRFile extends Module() {
     when(isWrite(io.pipelineReq.bits.meta.cmd)) {
       dataArrayWriteEna := true.B
       dataArrayWriteIdx := wrIdx
+    }.otherwise {
+      dataArrayWriteEna := false.B
     }
   }.elsewhen(io.replaceStatus === ReplaceStatus.replace_finish) {
     maskArray(replayReg.io.replayIdx) := 0.U
     dataArray(replayReg.io.replayIdx) := 0.U
+    dataArrayWriteEna                 := false.B
+  }.otherwise {
+    dataArrayWriteEna := false.B
   }
 
   // receive miss addr data at s2
   when(dataArrayWriteEna) {
-    dataArrayWriteEna := false.B
+//    dataArrayWriteEna := false.B
     dataArray(dataArrayWriteIdx) := Mux(
       RegNext(io.pipelineReq.bits.isUpgrade),
       io.pipelineReq.bits.data,
