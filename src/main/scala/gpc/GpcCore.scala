@@ -1239,6 +1239,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
   io.dmem.req.bits.data := DontCare
   io.dmem.req.bits.mask := DontCare
 
+  io.dmem.asid := DontCare // !!! FIXME
   io.dmem.s1_data.data := (if (fLen == 0) m1_reg_rsdata(0)(1) else Mux(m1_reg_uops(0).ctrl.fp, Fill((xLen max fLen) / fLen, io.fpu.store_data), m1_reg_rsdata(0)(1)))
   io.dmem.s1_data.mask := DontCare
 
