@@ -31,6 +31,7 @@ class HellaCacheArbiter(n: Int)(implicit p: Parameters) extends Module
       val req = io.requestor(i).req
       def connect_s0() = {
         io.mem.req.bits := req.bits
+        io.mem.asid := io.requestor(i).asid
         io.mem.req.bits.tag := Cat(req.bits.tag, i.U(log2Up(n).W))
         s1_id := i.U
       }
