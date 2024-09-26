@@ -142,6 +142,7 @@ class SearchableQueue[T <: Data](val gen: T, val entries: Int) extends Module {
   })
 
   val queue      = RegInit(VecInit(Seq.fill(entries)(0.U.asTypeOf(gen))))
+  val valids     = RegInit(VecInit(Seq.fill(entries)(false.B)))
   val enq_ptr    = Counter(entries)
   val deq_ptr    = Counter(entries)
   val maybe_full = RegInit(false.B)
@@ -152,10 +153,12 @@ class SearchableQueue[T <: Data](val gen: T, val entries: Int) extends Module {
   val do_deq     = WireDefault(io.deq.fire)
 
   when(do_enq) {
-    queue(enq_ptr.value) := io.enq.bits
+    valids(enq_ptr.value) := true.B
+    queue(enq_ptr.value)  := io.enq.bits
     enq_ptr.inc()
   }
   when(do_deq) {
+    valids(deq_ptr.value) := false.B
     deq_ptr.inc()
   }
   when(do_enq =/= do_deq) {
@@ -167,8 +170,13 @@ class SearchableQueue[T <: Data](val gen: T, val entries: Int) extends Module {
 
   io.deq.bits := queue(deq_ptr.value)
 
-  def search(gen: T): Bool =
-    queue.foldLeft(false.B)((m, n) => m | n === gen)
+  def search(gen: T): Bool = {
+    val hits = Wire(Vec(entries, Bool()))
+    for (i <- 0 until entries) {
+      hits(i) := queue(i) === gen && valids(i)
+    }
+    hits.asUInt.orR
+  }
   io.idxMatch := search(io.searchIdx)
 }
 
