@@ -19,3 +19,4 @@ rocketchip.jar
 .vscode/
 compile.log
 metals
+.bsp/

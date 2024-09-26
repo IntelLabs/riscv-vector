@@ -467,10 +467,12 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     (ex_reg_uops(1).rs2, ex_reg_uops(1).rxs2)
   )
   val bypass_swaps_all = Seq(m1_reg_swap, m2_reg_swap, wb_reg_swap)
+  // Select the youngest hit bit from two bits, output is one-hot 2-bit UInt
   def hit_sel_2[T <: Data](hits: Seq[Bool], swap: Seq[Bool]): UInt = {
     require(hits.size == 2 && swap.size == 1)
     Mux(!swap(0), Mux(hits(1) && hits(0), 1.U(2.W), hits.asUInt), Mux(hits(1) && hits(0), 2.U(2.W), hits.asUInt))
   }
+  // Select the youngest hit bit from six bits, output is one-hot 6-bit UInt
   def hit_sel_6[T <: Data](hits: Seq[Bool], swap: Seq[Bool]): UInt = {
     require(hits.size == 6 && swap.size == 3)
     val hit_oneHot = Wire(Vec(3, UInt(2.W)))
@@ -491,6 +493,9 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val hit_final = Mux(rs_is_zero, true.B, wdata_ready_sel)
     val wdata_sel_final = Mux(rs_is_zero, 0.U, wdata_sel)
     (need_bypass, hit_final, wdata_sel_final)
+    // need_bypass: this operand need bypass
+    // hit_final: whether the bypass path is hit
+    // wdata_sel_final: the bypass data
   }
   val ex_p0_rs_byps = (0 to 1) map { i =>
     bypass_check(bypass_sinks_ex(i), bypass_sources_all, bypass_swaps_all, hit_sel_6) }
@@ -623,7 +628,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
                             ex_reg_uops(1).replay)
   // replay inst in ex stage?
   val replay_ex_structural = Seq(ex_reg_uops(0).ctrl.mem && !io.dmem.req.ready,
-                                 ex_reg_uops(0).ctrl.div && !div.io.req.ready)
+                                 ex_reg_uops(1).ctrl.div && !div.io.req.ready)
   for (i <- 0 until 2) {
     ex_reg_uops(i).replay := ex_reg_uops(i).replay || ex_reg_valids(i) && replay_ex_structural(i)
   }
