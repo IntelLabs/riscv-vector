@@ -210,6 +210,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
   val ex_reg_cause = Reg(Vec(2, UInt(64.W)))
   val ex_reg_next_pc = Reg(UInt(vaddrBitsExtended.W))
   val ex_reg_wphit = Reg(Vec(nBreakpoints, Bool()))
+  val ex_reg_sfence = Reg(Bool())
 
   val m1_reg_uops = Reg(Vec(decodeWidthGpc, new SUOp))
   val m1_reg_valids = Reg(Vec(decodeWidthGpc, Bool()))
@@ -217,11 +218,13 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
   val m1_reg_rsdata = Reg(Vec(2, Vec(2, UInt(xLen.W))))
   val m1_reg_wdata = Reg(Vec(2, UInt(xLen.W)))
   val m1_reg_flush_pipe = Reg(Bool())
+  val m1_reg_mem_size = Reg(UInt())
   val m1_reg_cause = Reg(Vec(2, UInt(64.W)))
   val m1_reg_next_pc = Reg(UInt(vaddrBitsExtended.W))
   val m1_reg_wphit = Reg(Vec(nBreakpoints, Bool()))
   val m1_reg_load = Reg(Bool())
   val m1_reg_store = Reg(Bool())
+  val m1_reg_sfence = Reg(Bool())
 
   val m2_reg_uops = Reg(Vec(decodeWidthGpc, new SUOp))
   val m2_reg_valids = Reg(Vec(decodeWidthGpc, Bool()))
@@ -230,8 +233,10 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
   val m2_reg_wdata = Reg(Vec(2, UInt(xLen.W)))
   val m2_reg_flush_pipe = Reg(Bool())
   val m2_reg_xcpt = Reg(Vec(2, Bool()))
+  val m2_reg_mem_size = Reg(UInt())
   val m2_reg_cause = Reg(Vec(2, UInt(64.W)))
   val m2_reg_wphit = Reg(Vec(nBreakpoints, Bool()))
+  val m2_reg_sfence = Reg(Bool())
 
   val wb_reg_uops = Reg(Vec(decodeWidthGpc, new SUOp))
   val wb_reg_valids = Reg(Vec(decodeWidthGpc, Bool()))
@@ -552,15 +557,15 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     Mux(ex_br_ctrl.branch, ImmGen(IMM_SB, ex_reg_uops(1).inst),
     Mux(ex_reg_uops(1).rvc, 2.S, 4.S))
   val ex_nl_pc = (ex_reg_uops(1).pc.asSInt + Mux(ex_reg_uops(1).rvc, 2.S, 4.S)).asUInt
-  val ex_npc = (Mux(ex_jalx, encodeVirtualAddress(alu_p1.io.out, alu_p1.io.out).asSInt, 
+  val ex_npc = (Mux(ex_jalx || ex_reg_sfence, encodeVirtualAddress(alu_p1.io.out, alu_p1.io.out).asSInt, 
                     ex_br_target) & (-2).S).asUInt
   val ex_wrong_npc = ex_wdata_ready(1) && ex_cfi &&
     Mux(ex_br_ctrl.branch, ex_br_taken =/= ex_reg_uops(1).btb_resp.bht.taken, ex_npc =/= ex_npc_predict)
-  val ex_npc_misaligned = !csr.io.status.isa('c'-'a') && ex_npc(1)
+  val ex_npc_misaligned = !csr.io.status.isa('c'-'a') && ex_npc(1) && !ex_sfence
   val ex_cfi_taken = (ex_br_ctrl.branch && ex_br_taken) || ex_br_ctrl.jalr || ex_br_ctrl.jal
   val ex_direction_misprediction = ex_br_ctrl.branch && ex_br_taken =/= ex_reg_uops(1).btb_resp.bht.taken
   val ex_misprediction = ex_wrong_npc
-  take_pc_ex_p1 := ex_reg_valids(1) && !ex_reg_uops(1).xcpt_noIntrp && ex_misprediction
+  take_pc_ex_p1 := ex_reg_valids(1) && !ex_reg_uops(1).xcpt_noIntrp && (ex_misprediction || ex_sfence)
  
   // multiplier and divider
   val div = Module(new MulDiv(if (pipelinedMul) mulDivParams.copy(mulUnroll = 0) else mulDivParams, width = xLen, aluFn = aluFn))
@@ -616,7 +621,15 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       ex_reg_uops(i).inst := id_uops(i).inst
       ex_reg_uops(i).pc := id_uops(i).pc
       ex_reg_uops(i).btb_resp := id_uops(i).btb_resp
-      if (i == 0) {ex_reg_wphit := bpu.io.bpwatch.map { bpw => bpw.ivalid(0) }}
+      if (i == 0) {
+        ex_reg_sfence := singVM.B && id_uops(0).ctrl.mem && id_uops(0).ctrl.mem_cmd === M_SFENCE
+        ex_reg_wphit := bpu.io.bpwatch.map { bpw => bpw.ivalid(0) }
+      }
+    }
+    // on pipeline flushes, cause mem_npc to hold the sequential npc, which
+    // will drive the m2-stage npc mux
+    when (ex_reg_valid && ex_reg_flush_pipe) {
+      ex_reg_sfence := false.B
     }
     ex_reg_valids(i) := !ctrl_killd(i)
     ex_reg_uops(i).replay := !take_pc_all && id_valids(i) && id_uops(i).replay
@@ -638,7 +651,6 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
   ctrl_killx(0) := Mux(!ex_reg_swap, ctrl_killx_p0, ctrl_killx_p0 || ctrl_killx_p1 || take_pc_ex_p1) || vxcpt_flush
   ctrl_killx(1) := Mux(ex_reg_swap, ctrl_killx_p1, ctrl_killx_p0 || ctrl_killx_p1) || vxcpt_flush
   
-  val ex_sfence = usingVM.B && ex_reg_uops(0).ctrl.mem && ex_reg_uops(0).ctrl.mem_cmd === M_SFENCE
   val ex_check_xcpt = (0 until 2) map { i =>
     checkExceptions(List(
       ({if (i==0) ex_reg_uops(i).interrupt else false.B} || ex_reg_uops(i).xcpt_noIntrp, ex_reg_cause(i)),
@@ -681,6 +693,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       m1_reg_cause(i) := ex_cause(i)
       if (i == 0) {
         m1_reg_flush_pipe := ex_reg_flush_pipe
+        m1_reg_sfence := ex_reg_sfence
+        m1_reg_mem_size := ex_reg_mem_size
         m1_reg_wphit := ex_reg_wphit
         m1_reg_load := ex_reg_uops(0).ctrl.mem && isRead(ex_reg_uops(0).ctrl.mem_cmd) 
         m1_reg_store := ex_reg_uops(0).ctrl.mem && isWrite(ex_reg_uops(0).ctrl.mem_cmd) 
@@ -808,6 +822,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       m2_reg_uops(i).wdata_ready := m1_reg_uops(i).wdata_ready
       m2_reg_cause(i) := m1_reg_cause(i)
       if (i == 0) {
+        m2_reg_sfence := m1_reg_sfence
+        m2_reg_mem_size := m1_reg_mem_size
         m2_reg_wphit := m1_reg_wphit | bpu.io.bpwatch.map { bpw => (bpw.rvalid(0) && m1_reg_load) || (bpw.wvalid(0) && m1_reg_store) }
       }
     }
@@ -1167,16 +1183,13 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
   }
   io.imem.progress := RegNext(m2_reg_valids(0) && !replay_m2(0) ||
                               m2_reg_valids(1) && !replay_m2(1))  //REVIEW - why !replay_wb_common (in Rocket)
-  //FIXME - 
-  io.imem.sfence := DontCare
-  io.ptw := DontCare
-  
+
   //TODO - sfence of imem                              
-  io.imem.sfence.valid := false.B
-  io.imem.sfence.bits.rs1 := DontCare
-  io.imem.sfence.bits.rs2 := DontCare
-  io.imem.sfence.bits.addr := DontCare
-  io.imem.sfence.bits.asid := DontCare
+  io.imem.sfence.valid := m2_reg_valids(0) && m2_reg_sfence
+  io.imem.sfence.bits.rs1 := m2_reg_mem_size(0)
+  io.imem.sfence.bits.rs2 := m2_reg_mem_size(1)
+  io.imem.sfence.bits.addr := m2_reg_wdata(0)
+  io.imem.sfence.bits.asid := m2_reg_rsdata(1)
   io.ptw.sfence := io.imem.sfence
 
   val m2_take_pc_select = swap_select(m2_reg_swap, take_pc_m2_p0, take_pc_m2_p1)
