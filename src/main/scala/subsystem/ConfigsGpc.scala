@@ -31,7 +31,7 @@ class WithNBigCoresGpc(
         divEarlyOut = true))),
       dcache = Some(DCacheParams(
         rowBits = site(SystemBusKey).beatBits,
-        nMSHRs = 0,
+        nMSHRs = 8,
         blockBytes = site(CacheBlockBytes))),
       icache = Some(ICacheParams(
         rowBits = site(SystemBusKey).beatBits,
