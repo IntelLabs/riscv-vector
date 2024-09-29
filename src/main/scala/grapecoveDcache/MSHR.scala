@@ -344,15 +344,19 @@ class MSHRFile extends Module() {
 
   val probeStateList = Wire(Vec(nMSHRs, UInt(ProbeMSHRState.width.W)))
   val probeState     = probeStateList.reduce(_ | _)
-  io.probeCheck.replaceFinish := io.replaceStatus === ReplaceStatus.replace_finish &&
-    io.probeCheck.lineAddr === replayReg.io.toReplace.bits.lineAddr
+  io.probeCheck.replaceFinish :=
+    io.replaceStatus === ReplaceStatus.replace_finish &&
+      io.probeCheck.lineAddr === replayReg.io.toReplace.bits.lineAddr
 
   io.probeRefill.valid        := io.probeCheck.valid
   io.probeRefill.bits.entryId := probeLineAddrMatchIdx
 
-  io.probeCheck.pass := probeReq && (probeState === ProbeMSHRState.hitGo | (probeState === ProbeMSHRState.hitBlockN && !io.fromRefill.bits.probeMatch))
-  io.probeCheck.hit                       := probeReq && probeLineAddrMatch
-  io.probeCheck.probeHitPassTLAcquirePerm := senderPermissionList(probeLineAddrMatchIdx)
+  io.probeCheck.pass := probeReq &&
+    (probeState === ProbeMSHRState.hitGo |
+      (probeState === ProbeMSHRState.hitBlockN &&
+        !io.fromRefill.bits.probeMatch))
+  io.probeCheck.hit      := probeReq && probeLineAddrMatch
+  io.probeCheck.probeCoh := senderPermissionList(probeLineAddrMatchIdx)
 
   // interface for replay
   val writeCounterList  = Wire(Vec(nMSHRs, UInt(log2Up(nMSHRMetas).W)))

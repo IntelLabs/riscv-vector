@@ -69,6 +69,10 @@ class ProbeQueue(
   // * FSM End
 
   val probeReq = RegEnable(io.memProbe.bits, io.memProbe.fire)
+  val probeCohMSHR = RegEnable(
+    ClientMetadata(io.probeCheck.probeCoh),
+    io.probeCheck.hit && io.probeCheck.pass,
+  )
 
   // check mshr addr
   io.probeCheck.valid           := (state === s_check_mshr)
@@ -85,10 +89,10 @@ class ProbeQueue(
   io.wbReq.valid          := (state === s_wb_req)
   io.wbReq.bits.voluntary := false.B
   io.wbReq.bits.lineAddr  := getLineAddr(probeReq.address)
-  io.wbReq.bits.perm      := probeReq.param
+  io.wbReq.bits.perm      := probeCohMSHR.onProbe(probeReq.param)._2
   io.wbReq.bits.source    := probeReq.source
   io.wbReq.bits.data      := DontCare // FIXME
-  io.wbReq.bits.hasData   := false.B  // FIXME
+  io.wbReq.bits.hasData   := probeCohMSHR.onProbe(probeReq.param)._1
 
   io.memProbe.ready := (state === s_invalid)
 
