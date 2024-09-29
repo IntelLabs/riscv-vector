@@ -118,8 +118,9 @@ class ProbeMSHRFile extends Bundle() {
   val probePermission = Input(UInt(TLPermissions.bdWidth.W))
   val lineAddr        = Input(UInt(lineAddrWidth.W))
 
-  val pass = Output(Bool())
-  val hit  = Output(Bool())
+  val pass                      = Output(Bool())
+  val hit                       = Output(Bool())
+  val probeHitPassTLAcquirePerm = Output(UInt(TLPermissions.aWidth.W))
 
   val replaceFinish = Output(Bool())
 }

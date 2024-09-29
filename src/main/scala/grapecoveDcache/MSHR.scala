@@ -4,6 +4,7 @@ import chisel3._
 import chisel3.util._
 import freechips.rocketchip.tilelink._
 import _root_.circt.stage.ChiselStage
+import freechips.rocketchip.tilelink
 
 class MSHR(id: Int) extends Module() {
   val io = IO(new MSHREntryIO)
@@ -335,6 +336,7 @@ class MSHRFile extends Module() {
   allocateArb.io.out.ready := allocReq && !lineAddrMatch
 
   // interface for probe
+  val senderPermissionList   = Wire(Vec(nMSHRs, UInt(TLPermissions.aWidth.W)))
   val probeReq               = io.probeCheck.valid
   val probeLineAddrMatchList = Wire(Vec(nMSHRs, Bool()))
   val probeLineAddrMatch     = probeLineAddrMatchList.asUInt.orR
@@ -349,7 +351,8 @@ class MSHRFile extends Module() {
   io.probeRefill.bits.entryId := probeLineAddrMatchIdx
 
   io.probeCheck.pass := probeReq && (probeState === ProbeMSHRState.hitGo | (probeState === ProbeMSHRState.hitBlockN && !io.fromRefill.bits.probeMatch))
-  io.probeCheck.hit := probeReq && probeLineAddrMatch
+  io.probeCheck.hit                       := probeReq && probeLineAddrMatch
+  io.probeCheck.probeHitPassTLAcquirePerm := senderPermissionList(probeLineAddrMatchIdx)
 
   // interface for replay
   val writeCounterList  = Wire(Vec(nMSHRs, UInt(log2Up(nMSHRMetas).W)))
@@ -367,8 +370,7 @@ class MSHRFile extends Module() {
   val senderRespList = Wire(Vec(nMSHRs, Bool()))
   // val senderIdx      = OHToUInt(senderReqList)
 
-  val lineAddrList         = Wire(Vec(nMSHRs, UInt(lineAddrWidth.W)))
-  val senderPermissionList = Wire(Vec(nMSHRs, UInt(TLPermissions.aWidth.W)))
+  val lineAddrList = Wire(Vec(nMSHRs, UInt(lineAddrWidth.W)))
 
   val mshrEmptyList = Wire(Vec(nMSHRs, Bool()))
   io.fenceRdy := mshrEmptyList.asUInt.andR
