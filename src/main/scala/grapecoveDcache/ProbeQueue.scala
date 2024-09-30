@@ -92,7 +92,7 @@ class ProbeQueue(
   io.wbReq.bits.perm      := probeCohMSHR.onProbe(probeReq.param)._2
   io.wbReq.bits.source    := probeReq.source
   io.wbReq.bits.data      := DontCare // FIXME
-  io.wbReq.bits.hasData   := probeCohMSHR.onProbe(probeReq.param)._1
+  io.wbReq.bits.hasData   := false.B
 
   io.memProbe.ready := (state === s_invalid)
 
