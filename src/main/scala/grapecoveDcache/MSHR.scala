@@ -51,8 +51,10 @@ class MSHR(id: Int) extends Module() {
     ),
   )
 
-  io.probeState         := Mux(probeReq, probeState, ProbeMSHRState.miss)
-  io.probeLineAddrMatch := lineAddrReg === io.probeLineAddr && probeReq
+  io.probeState := Mux(probeReq, probeState, ProbeMSHRState.miss)
+  io.probeLineAddrMatch := (lineAddrReg === io.probeLineAddr) &&
+    probeReq &&
+    (state =/= mode_idle)
 
   readAfterWriteFlag := MuxCase(
     readAfterWriteFlag,
