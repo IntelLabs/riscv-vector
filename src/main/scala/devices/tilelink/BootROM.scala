@@ -13,10 +13,13 @@ import java.nio.ByteBuffer
 import java.nio.file.{Files, Paths}
 
 /** Size, location and contents of the boot rom. */
+object BootROMConfig {
+  var BOOT_FROM_BIN = true  // Boot from DDR binary for simulation, 0x10000: DDR BIN, 0x10040: JTAG boot
+}
 case class BootROMParams(
   address: BigInt = 0x10000,
   size: Int = 0x10000,
-  hang: BigInt = 0x10040, // The hang parameter is used as the power-on reset vector
+  hang: BigInt = if(BootROMConfig.BOOT_FROM_BIN)0x10000 else 0x10040, // The hang parameter is used as the power-on reset vector
   contentFileName: String)
 
 class TLROM(val base: BigInt, val size: Int, contentsDelayed: => Seq[Byte], executable: Boolean = true, beatBytes: Int = 4,

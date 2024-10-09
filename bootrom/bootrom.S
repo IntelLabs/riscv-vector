@@ -4,6 +4,9 @@
 .globl _start
 _start:
   csrwi 0x7c1, 0 // disable chicken bits
+  csrr a0, mhartid
+  la a1, _dtb
+  csrwi mie, 0
   li s0, DRAM_BASE
   csrr a0, mhartid
   la a1, _dtb
