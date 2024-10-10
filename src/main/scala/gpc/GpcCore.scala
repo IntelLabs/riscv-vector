@@ -1011,7 +1011,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
   def mag_to_vlmul(sign: Bool, mag: UInt) = Mux(sign && mag(0), Cat(sign, !mag(1), true.B), Cat(sign, mag))
   // vector csr write by v_config
   csr.io.vector.foreach { csr_vio =>
-    csr_vio.set_vs_dirty := true.B //FIXME - 
+    csr_vio.set_vs_dirty := false.B //FIXME -
     csr_vio.set_vstart.valid := false.B //FIXME -
     csr_vio.set_vstart.bits := 0.U //FIXME -
     csr_vio.set_vxsat := false.B //FIXME - 
