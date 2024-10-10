@@ -39,19 +39,19 @@ class MSHR(id: Int) extends Module() {
   val probeState = Mux(
     state > mode_resp_wait,
     ProbeMSHRState.hitBlockB,
-    MuxLookup(io.probePermission, ProbeMSHRState.hitBlockB)(
+    MuxLookup(io.probePermission, ProbeMSHRState.hitGo)(
       Seq(
         TLPermissions.toN -> ProbeMSHRState.hitBlockN,
         TLPermissions.toB -> Mux(
           sentPermission === TLPermissions.NtoB,
           ProbeMSHRState.hitGo,
-          ProbeMSHRState.hitBlockB,
+          ProbeMSHRState.hitBlockN,
         ),
       )
     ),
   )
 
-  io.probeState := Mux(probeReq, probeState, ProbeMSHRState.miss)
+  io.probeState := Mux(probeReq && io.probeLineAddrMatch, probeState, ProbeMSHRState.miss)
   io.probeLineAddrMatch := (lineAddrReg === io.probeLineAddr) &&
     probeReq &&
     (state =/= mode_idle)
@@ -117,14 +117,13 @@ class MSHR(id: Int) extends Module() {
         sentPermission,
       )
     }
+  }.elsewhen(probeReq && io.probeLineAddrMatch) {
+    sentPermission := Mux(
+      io.probePermission === TLPermissions.toN && sentPermission === TLPermissions.BtoT,
+      TLPermissions.NtoT,
+      sentPermission,
+    )
   }
-//    .elsewhen(probeReq) {
-//    sentPermission := Mux(
-//      io.probePermission === TLPermissions.toN && sentPermission === TLPermissions.BtoT,
-//      TLPermissions.NtoT,
-//      sentPermission,
-//    )
-//  }
 
   // enqueue the sender
   io.senderPermission := sentPermission
