@@ -356,8 +356,12 @@ class MSHRFile extends Module() {
     (probeState === ProbeMSHRState.hitGo |
       (probeState === ProbeMSHRState.hitBlockN &&
         !io.fromRefill.bits.probeMatch))
-  io.probeCheck.hit      := probeReq && probeLineAddrMatch
-  io.probeCheck.probeCoh := senderPermissionList(probeLineAddrMatchIdx)
+  io.probeCheck.hit := probeReq && probeLineAddrMatch
+  io.probeCheck.probeCoh := Mux(
+    senderPermissionList(probeLineAddrMatchIdx) === TLPermissions.BtoT,
+    ClientStates.Branch,
+    ClientStates.Nothing,
+  )
 
   // interface for replay
   val writeCounterList  = Wire(Vec(nMSHRs, UInt(log2Up(nMSHRMetas).W)))
