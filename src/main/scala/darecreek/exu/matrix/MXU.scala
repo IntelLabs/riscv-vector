@@ -171,10 +171,18 @@ class IntMacUnit extends Module {
   val lhs3 = io.src1(31, 24).asSInt
   val rhs3 = io.src2(31, 24).asSInt
 
+  val lhs_int16_0 = io.src1(15, 0).asSInt
+  val rhs_int16_0 = io.src2(15, 0).asSInt
+  val lhs_int16_1 = io.src1(31, 16).asSInt
+  val rhs_int16_1 = io.src2(31, 16).asSInt
+
   val acc = WireInit(0.U(32.W))
   acc := Mux(io.outType === INT8TYPE, Fill(24, io.src3(7)) ## io.src3(7, 0),
     Mux(io.outType === INT16TYPE, Fill(16, io.src3(15)) ## io.src3(15, 0), io.src3))
-  val macc = lhs0 * rhs0 +& lhs1 * rhs1 +& lhs2 * rhs2 +& lhs3 * rhs3 +& acc.asSInt
+  val macc = Mux(io.srcType === INT8TYPE, lhs0 * rhs0 +& lhs1 * rhs1 +& lhs2 * rhs2 +& lhs3 * rhs3 +& acc.asSInt,
+    Mux(io.srcType === INT16TYPE, lhs_int16_0 * rhs_int16_0 +& lhs_int16_1 * rhs_int16_1 +& acc.asSInt,
+      io.src1.asSInt * io.src2.asSInt +& acc.asSInt)
+  )
 
   // add, sub
   val in1 = Mux(io.srcType === INT8TYPE, Fill(24, io.src1(7)) ## io.src1(7, 0),
