@@ -62,22 +62,18 @@ object DCacheInit extends BundleGenHelper {
     val cacheRefillSeq = Seq(
       cacheRefillDefault.copy(
         paddr = "h80004000",
-        refillWay = 0,
         refillCoh = ClientStates.Dirty,
       ),
       cacheRefillDefault.copy(
         paddr = "h80006000",
-        refillWay = 1,
         refillCoh = ClientStates.Dirty,
       ),
       cacheRefillDefault.copy(
         paddr = "h80008000",
-        refillWay = 2,
         refillCoh = ClientStates.Trunk,
       ),
       cacheRefillDefault.copy(
         paddr = "h8000a000",
-        refillWay = 3,
         refillCoh = ClientStates.Branch,
       ),
     )

@@ -258,7 +258,7 @@ trait DCacheTestTrait {
         DCacheInit.initDut(dut)
 
         val cacheReadReq = CacheReqBundle(
-          paddr = "h80006000",
+          paddr = "h80004000",
           cmd = M_XRD,
         )
 

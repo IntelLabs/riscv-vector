@@ -176,18 +176,18 @@ trait DCacheForwardTestTrait {
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
         val cacheReq = CacheReqBundle(
-          paddr = "h8000a000",
+          paddr = "h80004000",
           cmd = MemoryOpConstants.M_XRD,
         )
 
         DCacheInit.initDut(dut)
 
+        // replace 80004000
         dut.io.req.valid.poke(true.B)
         dut.io.req.bits.poke(genReq(cacheReq.copy(
           paddr = "h8000e000",
           size = 6,
           isRefill = true,
-          refillWay = 3,
           refillCoh = ClientStates.Dirty,
           wdata = "h12345678",
         )))
