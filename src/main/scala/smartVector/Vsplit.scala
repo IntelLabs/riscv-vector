@@ -227,7 +227,6 @@ class Vsplit(implicit p : Parameters) extends Module {
     val vid      = ctrl.mask && ctrl.funct6 === "b010100".U && ctrl.lsrc(0) === "b10001".U
     val vmaskExcp = vcpop || viota || vid
 
-
     val segIndex = idx % nfield
     val uopIdx   = Mux(ldst && ldstCtrl.segment, (idx - segIndex)/nfield, idx)
     // for segment ldst insts
@@ -375,7 +374,9 @@ class Vsplit(implicit p : Parameters) extends Module {
     }
 
     val vs3ReadEn  = (ctrl.store || ctrl.ldestVal) & ~sameLdest
-    val maskReadEn = ~ctrl.vm
+    //sequence issue, so only the first element need to check vm. 
+    //reduction's ldest can be 0, so there is no conflict
+    val maskReadEn = ~ctrl.vm && idx === 0.U && ~(ctrl.redu && io.out.mUopMergeAttr.bits.ldest === 0.U)
     val vs1Idx     = ctrl.lsrc(0) + lsrc0_inc
     val vs2Idx     = ctrl.lsrc(1) + lsrc1_inc
     val vs3Idx     = ctrl.ldest   + ldest_inc
