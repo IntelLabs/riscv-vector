@@ -113,8 +113,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_validFromCore = s1_valid && s1_req.isFromCore
   val s1_validProbe    = s1_valid && s1_req.isProbe
   val s1_validRefill   = s1_valid && s1_req.isRefill
-
-  s1_req.refillWay := victimWay
+  val s1_refillWay     = victimWay
 
   assert(!s1_validProbe || (s1_validProbe && s1_cacheable))
   assert(!s1_validRefill || (s1_validRefill && s1_cacheable))
@@ -146,7 +145,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   val s1_metaPreBypass = Mux(
     s1_req.isRefill,
-    s1_metaArrayResp(s1_req.refillWay),
+    s1_metaArrayResp(s1_refillWay),
     Mux1H(s1_tagMatchWayPreBypassVec, s1_metaArrayResp),
   )
 
@@ -165,8 +164,8 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_dataHitWay = Mux1H(s1_tagMatchWayPreBypassVec, s1_dataArrayResp)
   val s1_dataPreBypass = Mux(
     s1_req.isRefill,
-    s1_dataArrayResp(s1_req.refillWay), // get replace data
-    s1_dataHitWay,                      // select hit way data
+    s1_dataArrayResp(s1_refillWay), // get replace data
+    s1_dataHitWay,                  // select hit way data
   ).asUInt
 
   val s1_data = Mux(s1_bypassStore.valid, s1_bypassStore.bits.data, s1_dataPreBypass)
@@ -288,7 +287,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     s1_tagMatchWayVec,
     Seq(
       s1_validProbe    -> s1_tagMatchWayVec,
-      s1_validRefill   -> VecInit(UIntToOH(s1_req.refillWay).asBools),
+      s1_validRefill   -> VecInit(UIntToOH(s1_refillWay).asBools),
       s1_validFromCore -> s1_tagMatchWayVec,
     ),
   ).asUInt

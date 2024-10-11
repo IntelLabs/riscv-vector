@@ -267,7 +267,6 @@ trait DCacheTestTrait {
         dut.io.req.bits.poke(genReq(cacheReadReq.copy(
           paddr = "h8000c000",
           isRefill = true,
-          refillWay = 1,
           refillCoh = ClientStates.Dirty,
           size = 6,
           wdata = "h12345678",

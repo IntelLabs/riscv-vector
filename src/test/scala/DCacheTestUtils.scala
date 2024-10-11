@@ -22,7 +22,6 @@ case class CacheReqBundle(
     noAlloc:   Boolean = false,
     dest:      Int = 0,
     isRefill:  Boolean = false,
-    refillWay: Int = 0,
     cmd:       UInt = 0.U,
     refillCoh: UInt = 0.U,
 )
@@ -39,7 +38,6 @@ trait BundleGenHelper {
       _.noAlloc   -> r.noAlloc.B,
       _.dest      -> r.dest.U,
       _.isRefill  -> r.isRefill.B,
-      _.refillWay -> r.refillWay.U,
       _.cmd       -> r.cmd,
       _.refillCoh -> r.refillCoh,
     )

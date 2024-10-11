@@ -21,7 +21,6 @@ class DataExchangeReq extends Bundle {
   // for test fill
   // operate a specific cache way
   val isRefill  = Bool()
-  val refillWay = UInt(log2Up(nWays).W)
   val refillCoh = UInt(cohBits.W)
 
 }
@@ -58,7 +57,6 @@ class MainPipeReq(params: TLBundleParameters) extends Bundle {
   val isProbe    = Bool()
   val isRefill   = Bool()
   val probePerm  = UInt(TLPermissions.bdWidth.W) // probe permission
-  val refillWay  = UInt(log2Up(nWays).W)
   val refillCoh  = UInt(cohBits.W)
 }
 
@@ -79,7 +77,6 @@ object MainPipeReqConverter {
     // for test
     mainPipeReq.isFromCore := Mux(req.isRefill, false.B, true.B)
     mainPipeReq.isRefill   := req.isRefill
-    mainPipeReq.refillWay  := 0.U
     mainPipeReq.refillCoh  := req.refillCoh
 
     assert(!req.isRefill || (req.isRefill && (req.size === log2Up(dataBytes).U)))
@@ -107,7 +104,6 @@ object MainPipeReqConverter {
     mainPipeReq.isRefill  := true.B
     mainPipeReq.refillCoh := req.state
     mainPipeReq.wdata     := req.data
-    mainPipeReq.refillWay := 0.U
     mainPipeReq
   }
 }
