@@ -992,6 +992,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
   csr.io.gva := false.B
   csr.io.htval := false.B
 
+  io.ptw := DontCare
   //TODO - Recheck ptw ports
   io.ptw.ptbr := csr.io.ptbr
   io.ptw.hgatp := csr.io.hgatp
@@ -1185,8 +1186,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
                               m2_reg_valids(1) && !replay_m2(1))  //REVIEW - why !replay_wb_common (in Rocket)
   
   io.imem.sfence.bits := DontCare
-  io.ptw := DontCare
-                          
+
   io.imem.sfence.valid := m2_reg_valids(0) && m2_reg_sfence
   io.imem.sfence.bits.rs1 := m2_reg_mem_size(0)
   io.imem.sfence.bits.rs2 := m2_reg_mem_size(1)
