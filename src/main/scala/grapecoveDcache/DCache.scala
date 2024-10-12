@@ -390,8 +390,11 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     (s4_valid, s4_req, s4_bypassStoreCandidate, s4_tag),
   ).map(r =>
     (
-      r._1 && getLineAddr(s1_req.paddr) === getLineAddr(r._2.paddr),
-      r._1 && r._2.isRefill && (getLineAddr(s1_req.paddr) === Cat(r._4, getSetIdx(r._2.paddr))),
+      r._1 &&
+        ((getLineAddr(s1_req.paddr) === getLineAddr(r._2.paddr)) || // s1 access addr = s2/s3/s4 access addr
+          s1_req.isRefill && (s1_refillWay === r._3.wayEn)),        // s1 replace way = s2/s3/s4 access/replace way
+      r._1 && r._2.isRefill &&
+        (getLineAddr(s1_req.paddr) === Cat(r._4, getSetIdx(r._2.paddr))), // s1 access addr = s2/s3/s4 replace addr
       r._3,
     )
   )
