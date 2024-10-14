@@ -122,7 +122,6 @@ class FrontendModuleGpc(outer: FrontendGpc) extends LazyModuleImp(outer)
   io.ptw <> tlb.io.ptw                                                               
   
   icache.io.s1_paddr := tlb.io.resp.paddr
-  icache.io.s1_kill := tlb.io.resp.miss || f1f2_clear
 
   //---------------------------------------------------------------
   //                         F2 stage
@@ -159,10 +158,11 @@ class FrontendModuleGpc(outer: FrontendGpc) extends LazyModuleImp(outer)
 
   //A replay is triggered if the handshake is not successfully completed
   f2_replay := (f2_valid && !fb.io.enq.fire) || RegNext(f2_replay && !f0_valid, true.B)
+  dontTouch(fb.io.enq)
   //TODO: wether 'f2_valid && !icache.io.resp.valid' or not
   f1f2_clear := io.cpu.req.valid || f2_replay || f2_redirect
   f2_correct_redirect := decode_insts.io.correct_redirect
-  f2_redirect := f2_replay || f1_valid && (f1_pc =/= f2_target)
+  f2_redirect := f2_replay || f2_correct_redirect //|| f1_valid && (f1_pc =/= f2_target)
   f2_valid := !f2_redirect
 
   tlb.io.kill := !f2_valid || f2_kill_speculative_tlb_refill
@@ -170,6 +170,7 @@ class FrontendModuleGpc(outer: FrontendGpc) extends LazyModuleImp(outer)
   icache.io.s2_vaddr := f2_pc
   icache.io.s2_cacheable := f2_tlb_resp.cacheable
   icache.io.s2_prefetch := f2_tlb_resp.prefetchable
+  icache.io.s1_kill := tlb.io.resp.miss || f2_redirect //|| f1f2_clear
   icache.io.s2_kill := f2_speculative && !f2_can_speculatively_refill || f2_xcpt 
   
   when (!f1f2_clear) {
