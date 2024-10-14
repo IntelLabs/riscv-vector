@@ -44,6 +44,7 @@ class FetchBuffer(implicit p: Parameters) extends CoreModule{
     })
   
     val fb = Reg(Vec(numEntries, Valid(new FrontendResp)))
+    fb.foreach(_.valid := false.B)
     val cnt = RegInit(0.U(log2Up(numEntries).W))
     io.mask := Mux(cnt === 0.U, 0.U, (1.U << cnt) - 1.U)
 
