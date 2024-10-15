@@ -299,6 +299,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s2_valid      = RegNext(s1_needUpdate)
   val s2_wayEn      = RegEnable(s1_wayEn, s1_needUpdate)
   val s2_newCoh     = RegEnable(s1_newCoh, s1_needUpdate)
+  val s2_repCoh     = RegEnable(s1_repCoh, s1_needUpdate)
   val s2_updateMeta = RegNext(s1_updateMeta)
   val s2_updateData = RegNext(s1_updateData)
   val s2_tag        = RegEnable(s1_tag, s1_needUpdate)
@@ -340,6 +341,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s3_valid      = RegNext(s2_valid)
   val s3_req        = RegEnable(s2_req, s2_valid)
   val s3_newCoh     = RegEnable(s2_newCoh, s2_valid)
+  val s3_repCoh     = RegEnable(s2_repCoh, s2_valid)
   val s3_wayEn      = RegEnable(s2_wayEn, s2_valid)
   val s3_tag        = RegEnable(s2_tag, s2_valid)
   val s3_updateMeta = RegNext(s2_updateMeta)
@@ -373,6 +375,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s4_valid  = RegNext(s3_valid)
   val s4_req    = RegEnable(s3_req, s3_valid)
   val s4_newCoh = RegEnable(s3_newCoh, s3_valid)
+  val s4_repCoh = RegEnable(s3_repCoh, s3_valid)
   val s4_wayEn  = RegEnable(s3_wayEn, s3_valid)
   val s4_tag    = RegEnable(s3_tag, s3_valid)
   // * pipeline stage 4 End
@@ -385,15 +388,18 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s4_bypassStoreCandidate = createBypassStore(s4_req.wdata, getTag(s4_req.paddr), s4_newCoh, s4_wayEn)
 
   val bypassList = List(
-    (s2_valid, s2_req, s2_bypassStoreCandidate, s2_tag),
-    (s3_valid, s3_req, s3_bypassStoreCandidate, s3_tag),
-    (s4_valid, s4_req, s4_bypassStoreCandidate, s4_tag),
+    (s2_valid, s2_req, s2_bypassStoreCandidate, s2_tag, s2_repCoh),
+    (s3_valid, s3_req, s3_bypassStoreCandidate, s3_tag, s3_repCoh),
+    (s4_valid, s4_req, s4_bypassStoreCandidate, s4_tag, s4_repCoh),
   ).map(r =>
     (
       r._1 &&
-        ((getLineAddr(s1_req.paddr) === getLineAddr(r._2.paddr)) || // s1 access addr = s2/s3/s4 access addr
-          s1_req.isRefill && (s1_refillWay === r._3.wayEn)),        // s1 replace way = s2/s3/s4 access/replace way
-      r._1 && r._2.isRefill &&
+        // s1 access/refill addr = s2/s3/s4 access/refill addr
+        ((getLineAddr(s1_req.paddr) === getLineAddr(r._2.paddr)) ||
+          // s1 replace way = s2/s3/s4 access/refill way; same set same way
+          (getSetIdx(r._2.paddr) === getSetIdx(s1_req.paddr) &&
+            (s1_refillWay === OHToUInt(r._3.wayEn) && s1_req.isRefill))),
+      r._1 && r._2.isRefill && r._5.state > ClientStates.Nothing &&
         (getLineAddr(s1_req.paddr) === Cat(r._4, getSetIdx(r._2.paddr))), // s1 access addr = s2/s3/s4 replace addr
       r._3,
     )
