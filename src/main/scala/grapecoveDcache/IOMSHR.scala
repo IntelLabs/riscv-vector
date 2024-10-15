@@ -58,10 +58,11 @@ class IOMSHRFile(
     implicit edge: TLEdgeOut
 ) extends Module {
   val io = IO(new Bundle {
-    val req       = Flipped(DecoupledIO(new MainPipeReq(edge.bundle)))
-    val addrMatch = Output(Bool())
-    val fenceRdy  = Output(Bool())
-    val resp      = DecoupledIO(new DataExchangeResp())
+    val req         = Flipped(DecoupledIO(new MainPipeReq(edge.bundle)))
+    val addrMatch   = Output(Bool())
+    val fenceRdy    = Output(Bool())
+    val nextCycleWb = Output(Bool())
+    val resp        = DecoupledIO(new DataExchangeResp())
 
     val l2Req      = DecoupledIO(new TLBundleA(edge.bundle))
     val fromRefill = Flipped(DecoupledIO(new RefillMSHRFile))
@@ -168,7 +169,8 @@ class IOMSHRFile(
     blockBytes,
   )
 
-  io.resp.valid        := state === mode_replay
+  io.nextCycleWb       := Mux(state === mode_replay, !io.resp.ready, io.fromRefill.fire)
+  io.resp.valid        := RegNext(io.nextCycleWb)
   io.resp.bits.hasData := true.B
   io.resp.bits.source  := reqList(respIOMSHRIdx).source
   io.resp.bits.dest    := reqList(respIOMSHRIdx).dest

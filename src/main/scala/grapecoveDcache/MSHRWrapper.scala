@@ -97,13 +97,10 @@ class MSHRWrapper(
   mshrsResp.data    := mshrs.io.toPipeline.bits.regData
   mshrsResp.hasData := mshrs.io.toPipeline.valid
 
-  val iomshrWbSucc = RegInit(false.B)
-  iomshrWbSucc := Mux(iomshrWbSucc || mshrs.io.toPipeline.bits.nextCycleWb, false.B, iomshrs.io.resp.valid)
-
-  io.nextCycleWb        := mshrs.io.toPipeline.bits.nextCycleWb || (iomshrs.io.resp.valid && !iomshrWbSucc)
-  io.resp.valid         := mshrs.io.toPipeline.valid || iomshrWbSucc
-  io.resp.bits          := Mux(iomshrWbSucc, iomshrs.io.resp.bits, mshrsResp)
-  iomshrs.io.resp.ready := iomshrWbSucc
+  io.nextCycleWb        := mshrs.io.toPipeline.bits.nextCycleWb || iomshrs.io.nextCycleWb
+  io.resp.valid         := mshrs.io.toPipeline.valid || iomshrs.io.resp.valid
+  io.resp.bits          := Mux(mshrs.io.toPipeline.valid, mshrsResp, iomshrs.io.resp.bits)
+  iomshrs.io.resp.ready := !mshrs.io.toPipeline.valid
 
   // others for MSHR
   io.toReplace <> mshrs.io.toReplace
