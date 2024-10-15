@@ -202,7 +202,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
   val id_swap = Wire(Bool())
 
   val ex_reg_uops = Reg(Vec(decodeWidthGpc, new SUOp))
-  val ex_reg_valids = RegInit(Vec(decodeWidthGpc, false.B))
+  val ex_reg_valids = RegInit(VecInit(Seq.fill(decodeWidthGpc)(false.B)))
   val ex_reg_swap = RegNext(id_swap)
   val ex_reg_rsdata = Reg(Vec(2, Vec(2, UInt(xLen.W))))
   val ex_reg_flush_pipe = Reg(Bool())
