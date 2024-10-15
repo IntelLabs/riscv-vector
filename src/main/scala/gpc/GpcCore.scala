@@ -156,7 +156,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
 
   val clock_en_reg = RegInit(true.B)
   val long_latency_stall = Reg(Bool())
-  val id_reg_pause = RegInit(fasle.B)
+  val id_reg_pause = RegInit(false.B)
   val imem_might_request_reg = Reg(Bool())
   val clock_en = WireDefault(true.B)
   val gated_clock =
