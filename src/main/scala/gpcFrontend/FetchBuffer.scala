@@ -147,13 +147,6 @@ dontTouch(io.enq.fire)
     deq_mask = Mux(io.deq(i).fire, deq_mask | ptr_de.ptr, deq_mask)
     ptr_de = rotateLeft(ptr_de)
   }
-  for (i <- 0 until retireWidth) {
-  //  io.peek(i) := Mux1H(ptr_de, fb)
-    val deq_data = Mux1H(ptr_de.ptr, fb)
-    io.deq(i).valid := deq_data.valid
-    io.deq(i).bits := deq_data.bits
-    ptr_de = rotateLeft(ptr_de)
-  }
 
   for (i <- 0 until numEntries) {
     when (deq_mask(i)) {
