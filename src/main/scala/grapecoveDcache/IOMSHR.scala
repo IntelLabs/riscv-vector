@@ -169,7 +169,7 @@ class IOMSHRFile(
     blockBytes,
   )
 
-  io.nextCycleWb       := Mux(state === mode_replay, !io.resp.ready, io.fromRefill.fire)
+  io.nextCycleWb       := Mux(state === mode_replay, !io.resp.ready, io.fromRefill.fire && io.fromRefill.bits.hasData)
   io.resp.valid        := RegNext(io.nextCycleWb)
   io.resp.bits.hasData := true.B
   io.resp.bits.source  := reqList(respIOMSHRIdx).source
