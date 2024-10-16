@@ -23,7 +23,7 @@ class EnqueueBuddle(implicit p: Parameters) extends CoreBundle()(p) {
 class Ptr(numEntries: Int) extends Bundle {
   val ptr = UInt(numEntries.W)
   val flag = Bool()
-
+  
   def isEmpty(other: Ptr): Bool = {
     (this.ptr === other.ptr) && (this.flag === other.flag)
   }
@@ -42,14 +42,14 @@ class FetchBuffer(implicit p: Parameters) extends CoreModule{
     val flush = Input(Bool())
     val mask = Output(UInt(numEntries.W))
     })
-  
-    val fb = Reg(Vec(numEntries, Valid(new FrontendResp)))
-    fb.foreach(_.valid := false.B)
+    dontTouch(io.enq)
+    dontTouch(io.deq)
+    val fb = RegInit(VecInit.fill(numEntries)(0.U.asTypeOf(Valid(new FrontendResp))))
     val cnt = RegInit(0.U(log2Up(numEntries).W))
     io.mask := Mux(cnt === 0.U, 0.U, (1.U << cnt) - 1.U)
 
    // def isFull: Bool = cnt === numEntries.U 
-
+    
     val enq_ptr = RegInit({
       val ptr_bundle = Wire(new Ptr(numEntries))
       ptr_bundle.flag := false.B
@@ -64,7 +64,6 @@ class FetchBuffer(implicit p: Parameters) extends CoreModule{
       })
       require(numEntries >= fetchWidth)
     io.enq.ready := PopCount(fb.map(_.valid)) +& PopCount(io.enq.bits.inst_mask) <= numEntries.U
-
     def rotateLeft(in: Ptr): Ptr = {
     val w = in.ptr.getWidth
     val rotatedPtr = ((in.ptr << 1) | in.ptr(w-1))(w-1,0)
@@ -99,7 +98,7 @@ class FetchBuffer(implicit p: Parameters) extends CoreModule{
     result
   }
   
-  def isEmpty: Bool = enq_ptr.isEmpty(deq_ptr)
+  //def isEmpty: Bool = enq_ptr.isEmpty(deq_ptr)
   
 
   val enq_data = Wire(Vec(fetchWidth, Valid(new FrontendResp)))
@@ -115,7 +114,7 @@ class FetchBuffer(implicit p: Parameters) extends CoreModule{
     enq_data(i).bits.replay := io.enq.bits.replay
     enq_data(i).bits.btb := io.enq.bits.btb_resp
   }
-
+  dontTouch(enq_data)
 /* Enqueue */
   var ptr_en = enq_ptr
   val write_mask = Wire(Vec(numEntries, Vec(fetchWidth, Bool())))
@@ -132,10 +131,12 @@ when (io.enq.fire) {
     for (i <- 0 until numEntries) {
       when (!fb(i).valid) {
         fb(i) := Mux1H(write_mask(i), enq_data)
+      }.otherwise{
+        fb(i) := fb(i)
       }
     }
   }
-
+dontTouch(io.enq.fire)
 /* -------------------- dequeue -------------------- */
   var ptr_de = deq_ptr
   var deq_mask = 0.U(numEntries.W)
