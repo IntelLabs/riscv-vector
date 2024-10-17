@@ -71,7 +71,7 @@ class FrontendModuleGpc(outer: FrontendGpc) extends LazyModuleImp(outer)
   val f0_pc = WireInit(0.U(vaddrBitsExtended.W))
   val f0_valid = WireInit(false.B)
   val f0_fb_has_space = Wire(Bool())
-  val f0_speculative = Wire(Bool())
+  val f0_speculative = WireInit(false.B)
 
   f0_valid := io.cpu.req.valid || f0_fb_has_space 
   
@@ -238,9 +238,6 @@ class FrontendModuleGpc(outer: FrontendGpc) extends LazyModuleImp(outer)
   fb.io.enq.bits.btb_resp := f2_btb_resp_bits
   fb.io.enq.bits.pcs := decode_insts.io.inst_pcs
   fb.io.enq.bits.inst_exp := decode_insts.io.inst_exp
-  // need next_pc.valid?
-  fb.io.enq.bits.next_pc.valid := f2_correct_redirect
-  fb.io.enq.bits.next_pc.bits := f2_target
   fb.io.enq.bits.raw_insts := decode_insts.io.raw_insts
   fb.io.enq.bits.rvc := decode_insts.io.rvc
   fb.io.enq.bits.xcpt := f2_tlb_resp

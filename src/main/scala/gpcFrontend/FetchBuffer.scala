@@ -9,13 +9,11 @@ import freechips.rocketchip.rocket.ExpandedInstruction
 
 class EnqueueBuddle(implicit p: Parameters) extends CoreBundle()(p) {
   val btb_resp = Output(new BTBResp)
-  //val inst_mask = Output(UInt(fetchWidth.W)) 
   val pcs = Output(Vec(fetchWidth, UInt(vaddrBitsExtended.W))) // a group pcs
   val inst_exp = Output(Vec(fetchWidth, UInt(32.W)))
   val inst_mask = Output(Vec(fetchWidth, Bool()))
   val raw_insts = Output(Vec(fetchWidth, UInt(32.W)))
   val rvc = Output(Vec(fetchWidth, Bool()))
-  val next_pc = Output(Valid(UInt(vaddrBitsExtended.W)))
   val xcpt = Output(new FrontendExceptions)
   val replay = Output(Bool())
 }
@@ -105,8 +103,7 @@ class FetchBuffer(implicit p: Parameters) extends CoreModule{
   for (i <- 0 until fetchWidth) {
     enq_data(i).valid := io.enq.valid && io.enq.bits.inst_mask(i)
     enq_data(i).bits.pc := io.enq.bits.pcs(i)
-    //enq_data(i).bits.next_pc.valid := io.enq.bits.next_pc.valid && 
-    enq_data(i).bits.next_pc := io.enq.bits.next_pc.bits
+    enq_data(i).bits.next_pc := DontCare
     enq_data(i).bits.inst := io.enq.bits.inst_exp(i)
     enq_data(i).bits.raw_inst := io.enq.bits.raw_insts(i)
     enq_data(i).bits.rvc := io.enq.bits.rvc(i)
@@ -142,8 +139,10 @@ dontTouch(io.enq.fire)
   var deq_mask = 0.U(numEntries.W)
   for (i <- 0 until retireWidth) {
     val deq_data = Mux1H(ptr_de.ptr, fb)
+    val next_pc =  Mux1H(rotateLeft(ptr_de).ptr, fb.map(_.bits.pc))
     io.deq(i).valid := deq_data.valid
     io.deq(i).bits := deq_data.bits
+    io.deq(i).bits.next_pc := next_pc
     deq_mask = Mux(io.deq(i).fire, deq_mask | ptr_de.ptr, deq_mask)
     ptr_de = rotateLeft(ptr_de)
   }
