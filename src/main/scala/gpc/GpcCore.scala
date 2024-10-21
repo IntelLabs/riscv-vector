@@ -262,7 +262,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
      */
     require(decodeWidthGpc == 2)
     assert(!(!io.imem.resp(0).valid && io.imem.resp(1).valid), "Assertion error: main pipe input valid(0)=false, valid(1)=true")
-    val csr = Module(new CSRFile(perfEvents))
+    // val csr = Module(new CSRFile(perfEvents, coreParams.customCSRs.decls, tile.roccCSRs.flatten))
+    val csr = Module(new CSRFile(perfEvents, coreParams.customCSRs.decls))
 
     val id_uops_origin = WireDefault(VecInit.fill(decodeWidthGpc)(0.U.asTypeOf(new SUOp)))
     val id_valids_origin = Seq(io.imem.resp(0).valid, io.imem.resp(1).valid)
