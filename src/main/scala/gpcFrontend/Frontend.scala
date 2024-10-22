@@ -163,7 +163,7 @@ class FrontendModuleGpc(outer: FrontendGpc) extends LazyModuleImp(outer)
   f1f2_clear := io.cpu.req.valid || f2_replay || f2_redirect
   f2_correct_redirect := decode_insts.io.correct_redirect
   f2_redirect := f2_replay || f2_correct_redirect //|| f1_valid && (f1_pc =/= f2_target)
-  f2_valid := !f2_redirect
+  f2_valid :=  !f1f2_clear
 
   tlb.io.kill := !f2_valid || f2_kill_speculative_tlb_refill
   
@@ -174,18 +174,15 @@ class FrontendModuleGpc(outer: FrontendGpc) extends LazyModuleImp(outer)
   icache.io.s2_kill := f2_speculative && !f2_can_speculatively_refill || f2_xcpt 
   
   when (!f1f2_clear) {
-  //f2_valid := !f2_redirect
     f2_pc := f1_pc
     f2_speculative := f1_speculative
     f2_tlb_resp := tlb.io.resp
     f2_btb_resp_valid := btb.io.resp.valid
     f2_btb_resp_bits := btb.io.resp.bits
   }
-  //redirect
-  when (io.cpu.req.valid){
-    f2_prev_is_half := false.B
-  }
+  
   when (icache.io.resp.valid && icache.io.resp.bits.ae) { fb.io.enq.bits.xcpt.ae.inst := true.B }
+  dontTouch(icache.io.resp.bits.ae)
   //TODO: need to complete Predecode
   decode_insts.io.stage_valid := f2_valid
   decode_insts.io.pc := f2_pc
@@ -246,6 +243,12 @@ class FrontendModuleGpc(outer: FrontendGpc) extends LazyModuleImp(outer)
                                       (f2_kill_speculative_tlb_refill && f2_tlb_resp.miss)
   fb.io.flush := false.B
   io.cpu.resp <> fb.io.deq
+
+  //redirect
+  when (io.cpu.req.valid){
+    fb.io.flush := true.B
+    f2_prev_is_half := false.B
+  }
 
   // performance events
   io.cpu.perf.acquire := icache.io.perf.acquire
