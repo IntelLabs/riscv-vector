@@ -191,27 +191,5 @@ class PreDecoder(implicit p: Parameters) extends CoreModule{
         valid := !(io.inst_mask(i-1) && !instisRVC(io.raw_insts(i-1)))
     }
     }
-    
-    if (decodeWidth == 1){
-    if (i == 0) {
-        valid := true.B
-        when (io.prev_is_half) {
-        val expanded = ExpandRVC(Cat(io.data(15,0), io.prev_half_inst))
-        io.raw_insts(i) := Cat(io.data(15,0), io.prev_half_inst)
-        io.inst_exp(i) := expanded
-        io.edge_inst := true.B
-        }.otherwise {
-        val expanded = ExpandRVC(io.data(31,0))
-        io.raw_insts(i) := io.data(31,0)
-        io.inst_exp(i) := expanded
-        io.edge_inst    := false.B
-        }} else if (i == fetchWidth - 1) {
-        val inst = Cat(0.U(16.W), io.data(fetchWidth*16-1,(fetchWidth-1)*16))
-        val expanded = ExpandRVC(inst)
-        io.raw_insts(i) := inst
-        io.inst_exp(i) := expanded
-        valid := instisRVC(io.raw_insts(i-1)) && io.inst_mask(i-1)|| io.prev_is_half
-        } 
-    }
 }
 }

@@ -178,5 +178,5 @@ dontTouch(io.enq.fire)
       }
     }
   }
-
+  dontTouch(io.flush)
 }
