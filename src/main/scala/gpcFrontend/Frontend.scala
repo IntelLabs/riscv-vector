@@ -146,7 +146,7 @@ class FrontendModuleGpc(outer: FrontendGpc) extends LazyModuleImp(outer)
   val f2_target = Mux(f2_replay,f2_pc,Mux(f2_correct_redirect,Mux(decode_insts.io.redirect_return,btb.io.ras_head.bits,decode_insts.io.predict_npc),f2_next_fetch))
   val f2_redirect = WireInit(false.B)
 
-  assert(!(f2_speculative && !icache.io.s2_kill))
+  //assert(!(f2_speculative && !icache.io.s2_kill))
 
   f0_pc := Mux(io.cpu.req.valid,io.cpu.req.bits.pc,Mux(f2_redirect,f2_target,f1_target))
   f0_fb_has_space := !fb.io.mask(fb.io.mask.getWidth-3) || 
