@@ -855,6 +855,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val m2_nl_pc = (m2_reg_uops(1).pc.asSInt + Mux(m2_reg_uops(1).rvc, 2.S, 4.S)).asUInt
     val m2_npc = (Mux(m2_jalx, encodeVirtualAddress(aluM2_p1.io.out, aluM2_p1.io.out).asSInt,
       m2_br_target) & (-2).S).asUInt
+    // NPC for pipe0 flush
+    val m2_npc_flush = (m2_reg_uops(0).pc.asSInt + Mux(m2_reg_uops(0).rvc, 2.S, 4.S) & (-2).S).asUInt
     val m2_wrong_npc = m2_cfi &&
       Mux(m2_br_ctrl.branch, m2_br_taken =/= m2_reg_uops(1).btb_resp.bht.taken, m2_npc =/= m2_npc_predict)
     val m2_npc_misaligned = !csr.io.status.isa('c' - 'a') && m2_npc(1)
@@ -1250,7 +1252,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     io.imem.req.bits.pc :=
       Mux(csr.io.exception || csr.io.eret, csr.io.evec, // exception or [m|s]ret
         Mux(m2_replay_select._1, m2_pc_replay_select, // replay
-          Mux(take_pc_ex_p1, ex_npc, m2_npc))) //FIXME - m2_npc   // flush or branch misprediction
+          Mux(take_pc_ex_p1, ex_npc,
+            Mux(m2_reg_flush_pipe, m2_npc_flush, m2_npc)))) //FIXME - m2_npc   // flush or branch misprediction
     io.imem.flush_icache := m2_reg_valids(0) && m2_reg_uops(0).ctrl.fence_i && !io.dmem.s2_nack
     io.imem.might_request := {
       imem_might_request_reg := ex_reg_valids.orR || m1_reg_valids.orR || io.ptw.customCSRs.disableICacheClockGate
